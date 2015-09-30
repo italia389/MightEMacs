@@ -1,0 +1,57 @@
+Instructions for compiling and installing MightEMacs.
+
+ 1. Edit include/os.h and select a platform (OS).
+
+ 2. Create .platform file, which contains the platform name in lower case; for
+    example, SOLARIS:
+
+	$ echo 'solaris' >.platform
+
+ 3. Create directories for platform if needed:
+
+	$ make platform
+
+ 4. If platform is OSX or REDHAT, go to next step; otherwise, go to step 8.
+
+ 5. The MightEMacs binary (mm) for the OSX and REDHAT platforms is included in
+    this distribution.  If you want to use it (and skip compilation), go to next
+    step; otherwise, go to step 9.
+
+ 6. Link binary:
+
+	$ make link
+
+ 7. Go to step 13.
+
+ 8. Create makefiles for geeklib and memacs, using "Makefile" from OSX or REDHAT
+    platform as template.  Generally, you should just need to change CFLAGS and
+    LDFLAGS, if anything.  Makefile locations are (for example, SOLARIS):
+    geeklib-1.0.0/solaris/Makefile and memacs-8.0.0/solaris/Makefile.
+
+ 9. Compile geeklib sources.  This will create file "libgeek.a" in the geeklib
+    directory:
+
+	$ make geeklib
+
+10. Review and/or edit beginning portion of memacs-8.0.0/src/edef.h to customize
+    MightEMacs compilation (optional).
+
+11. Review and/or edit memacs-8.0.0/src/ebind.h if you want to change the
+    default key bindings (not recommended).
+
+12. Compile MightEMacs sources.  This will create file "mm" in the memacs
+    directory.  Note that you may see several "... may be used uninitialized ..."
+    warnings with some older compilers.  These may be ignored:
+
+	$ make memacs
+
+13. If you want to strip the binary before it is installed (recommended):
+
+	$ make strip
+
+14. Install MightEMacs (in /usr/local):
+
+	$ sudo make install
+
+15. Review and/or edit /usr/local/etc/memacs.d/site.mm to customize site-wide
+    defaults for the editor.
