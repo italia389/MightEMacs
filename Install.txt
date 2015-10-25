@@ -1,57 +1,69 @@
 Instructions for compiling and installing MightEMacs.
 
- 1. Edit include/os.h and select a platform (OS).
+This distribution includes 64-bit binaries and make files for the OS X and Red
+Hat platforms.  If you are installing on a different platform, the installation
+scripts will automatically select and use the appropriate make files from the
+included platforms for compilation.  However, compilation on other platforms has
+not been tested, so it is possible that there may be errors.  If this occurs,
+please contact the author with the details so that the problem can be resolved.
+(See the ReadMe.txt file for contact information.)  For reference, make file
+locations are (for example, Solaris): geeklib-1.0.0/solaris/Makefile and
+memacs-8.1.0/solaris/Makefile.  The make files use "cc" to run the compiler.
 
- 2. Create .platform file, which contains the platform name in lower case; for
-    example, SOLARIS:
+To install MightEMacs, perform the following steps:
 
-	$ echo 'solaris' >.platform
+ 1. If you want to use one of the MightEMacs 64-bit binaries that is included
+    for the OS X (10.6 and later) and Red Hat (RHEL 6 and later) platforms and
+    skip compilation, go to step 6; otherwise, go to the next step.
 
- 3. Create directories for platform if needed:
+ 2. Remove package binaries.
 
-	$ make platform
+	$ make clean
 
- 4. If platform is OSX or REDHAT, go to next step; otherwise, go to step 8.
-
- 5. The MightEMacs binary (mm) for the OSX and REDHAT platforms is included in
-    this distribution.  If you want to use it (and skip compilation), go to next
-    step; otherwise, go to step 9.
-
- 6. Link binary:
-
-	$ make link
-
- 7. Go to step 13.
-
- 8. Create makefiles for geeklib and memacs, using "Makefile" from OSX or REDHAT
-    platform as template.  Generally, you should just need to change CFLAGS and
-    LDFLAGS, if anything.  Makefile locations are (for example, SOLARIS):
-    geeklib-1.0.0/solaris/Makefile and memacs-8.0.0/solaris/Makefile.
-
- 9. Compile geeklib sources.  This will create file "libgeek.a" in the geeklib
-    directory:
-
-	$ make geeklib
-
-10. Review and/or edit beginning portion of memacs-8.0.0/src/edef.h to customize
+ 3. Review and/or edit beginning portion of memacs-8.1.0/src/edef.h to customize
     MightEMacs compilation (optional).
 
-11. Review and/or edit memacs-8.0.0/src/ebind.h if you want to change the
+ 4. Review and/or edit memacs-8.1.0/src/ebind.h if you want to change the
     default key bindings (not recommended).
 
-12. Compile MightEMacs sources.  This will create file "mm" in the memacs
-    directory.  Note that you may see several "... may be used uninitialized ..."
-    warnings with some older compilers.  These may be ignored:
+ 5. To see a list of available platforms (optional):
 
-	$ make memacs
+	$ make
 
-13. If you want to strip the binary before it is installed (recommended):
+ 6. Build and/or link MightEMacs.  This will create files "libgeek.a" in the
+    geeklib directory and "mm" in the memacs directory.  Note that if you are
+    compiling the sources, you may see several "... may be used uninitialized
+    ..." warnings with some older compilers.  These may be ignored.
 
-	$ make strip
+    To proceed, supply the desired platform name in lower case as the value of
+    the PLATFORM variable; for example, Solaris:
 
-14. Install MightEMacs (in /usr/local):
+	$ make PLATFORM=solaris
+
+ 7. Install MightEMacs.  If you have superuser privileges and want to do a
+    site-wide install (in /usr/local), go to the next step; otherwise, go to
+    step 10.
+
+ 8. Perform a site-wide install:
 
 	$ sudo make install
 
-15. Review and/or edit /usr/local/etc/memacs.d/site.mm to customize site-wide
-    defaults for the editor.
+ 9. Go to step 12.
+
+10. Perform a local (user) install.  Supply the pathname of the local
+    installation directory as the value of the INSTALL variable; for example,
+    "$HOME/MightEMacs":
+
+	$ make install INSTALL=$HOME/MightEMacs
+
+11. Modify your shell startup file in your HOME directory so that the shell can
+    find the MightEMacs binary and MightEMacs can find its startup files.  For
+    example, if you are using the Bourne shell, add the following two lines to
+    file $HOME/.profile:
+
+	export PATH="$PATH:$HOME/MightEMacs/bin"
+	export MMPATH=":$HOME/MightEMacs/etc:$HOME/MightEMacs/etc/memacs.d"
+
+12. Review and/or edit file "site.mm" in the .../etc/memacs.d installation
+    directory to customize site-wide defaults for the editor.  Note that
+    MightEMacs can be run with the command "memacs" or "mm".

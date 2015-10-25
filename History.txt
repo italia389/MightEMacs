@@ -1,0 +1,18 @@
+8.1.0	25 Oct 2015
+ 1. Created "undelete" command, which restores the most recently deleted text
+    from a deleteXXX or truncBuf command, and bound it to M-U.
+ 2. Renamed $loopMax variable to $maxLoop and created $maxRecursion variable,
+    which sets the maximum recursion depth for any macro to prevent endless
+    recursion and an "out of memory" crash.
+ 3. Changed the bang (!) to a carat (^) in the -G and -D switches to avoid
+    conflicts with the shell's use of the bang character.
+ 4. Changed default architecture to 64 bit.
+ 5. Changed joinLines command to join lines with no space between them (instead
+    of a single space) when invoked in a script with a nil argument, and created
+    a corresponding macro (joinLines0) bound to X-^ so it can be used
+    interactively.
+ 6. Fixed some minor bugs.
+ 7. Simplified the installation procedure.
+
+8.0.0	29 Sep 2015
+ 1. First public release.

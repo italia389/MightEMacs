@@ -1,0 +1,479 @@
+.\" Standard preamble:
+.\" ========================================================================
+.de Sh \" Subsection heading
+.br
+.if t .Sp
+.ne 5
+.PP
+\fB\\$1\fR
+.PP
+..
+.de Sp \" Vertical space (when we can't use .PP)
+.if t .sp .5v
+.if n .sp
+..
+.de Bb \" Begin bullet item
+.if t .sp .5v
+.if n .sp
+\fB*\fR
+.in +.32i
+.sp -1
+..
+.de Lb \" Begin list item
+.if t .sp .5v
+.if n .sp
+\\$1
+.in +.32i
+.sp -1
+..
+.de Le \" End (bullet or) list item
+.in
+..
+.de Vb \" Begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" End verbatim text
+.ft R
+.fi
+..
+.\" Set up some character translations and predefined strings.  \*(-- will
+.\" give an unbreakable dash, \*(PI will give pi, \*(L" will give a left
+.\" double quote, and \*(R" will give a right double quote.  \*(C+ will
+.\" give a nicer C++.  Capital omega is used to do unbreakable dashes and
+.\" therefore won't be available.  \*(C` and \*(C' expand to `' in nroff,
+.\" nothing in troff, for use with C<>.
+.tr \(*W-
+.ds C+ C\v'-.1v'\h'-1p'\s-2+\h'-1p'+\s0\v'.1v'\h'-1p'
+.ie n \{\
+.    ds -- \(*W-
+.    ds PI pi
+.    if (\n(.H=4u)&(1m=24u) .ds -- \(*W\h'-12u'\(*W\h'-12u'-\" diablo 10 pitch
+.    if (\n(.H=4u)&(1m=20u) .ds -- \(*W\h'-12u'\(*W\h'-8u'-\"  diablo 12 pitch
+.    ds L" ""
+.    ds R" ""
+.    ds C` ""
+.    ds C' ""
+'br\}
+.el\{\
+.    ds -- \|\(em\|
+.    ds PI \(*p
+.    ds L" ``
+.    ds R" ''
+'br\}
+.\"
+.\" Escape single quotes in literal strings from groff's Unicode transform.
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\"
+.\" Accent mark definitions (@(#)ms.acc 1.5 88/02/08 SMI; from UCB 4.2).
+.\" Fear.  Run.  Save yourself.  No user-serviceable parts.
+.    \" fudge factors for nroff and troff
+.if n \{\
+.    ds #H 0
+.    ds #V .8m
+.    ds #F .3m
+.    ds #[ \f1
+.    ds #] \fP
+.\}
+.if t \{\
+.    ds #H ((1u-(\\\\n(.fu%2u))*.13m)
+.    ds #V .6m
+.    ds #F 0
+.    ds #[ \&
+.    ds #] \&
+.\}
+.    \" simple accents for nroff and troff
+.if n \{\
+.    ds ' \&
+.    ds ` \&
+.    ds ^ \&
+.    ds , \&
+.    ds ~ ~
+.    ds /
+.\}
+.if t \{\
+.    ds ' \\k:\h'-(\\n(.wu*8/10-\*(#H)'\'\h"|\\n:u"
+.    ds ` \\k:\h'-(\\n(.wu*8/10-\*(#H)'\`\h'|\\n:u'
+.    ds ^ \\k:\h'-(\\n(.wu*10/11-\*(#H)'^\h'|\\n:u'
+.    ds , \\k:\h'-(\\n(.wu*8/10)',\h'|\\n:u'
+.    ds ~ \\k:\h'-(\\n(.wu-\*(#H-.1m)'~\h'|\\n:u'
+.    ds / \\k:\h'-(\\n(.wu*8/10-\*(#H)'\z\(sl\h'|\\n:u'
+.\}
+.    \" troff and (daisy-wheel) nroff accents
+.ds : \\k:\h'-(\\n(.wu*8/10-\*(#H+.1m+\*(#F)'\v'-\*(#V'\z.\h'.2m+\*(#F'.\h'|\\n:u'\v'\*(#V'
+.ds 8 \h'\*(#H'\(*b\h'-\*(#H'
+.ds o \\k:\h'-(\\n(.wu+\w'\(de'u-\*(#H)/2u'\v'-.3n'\*(#[\z\(de\v'.3n'\h'|\\n:u'\*(#]
+.ds d- \h'\*(#H'\(pd\h'-\w'~'u'\v'-.25m'\f2\(hy\fP\v'.25m'\h'-\*(#H'
+.ds D- D\\k:\h'-\w'D'u'\v'-.11m'\z\(hy\v'.11m'\h'|\\n:u'
+.ds th \*(#[\v'.3m'\s+1I\s-1\v'-.3m'\h'-(\w'I'u*2/3)'\s-1o\s+1\*(#]
+.ds Th \*(#[\s+2I\s-2\h'-\w'I'u*3/5'\v'-.3m'o\v'.3m'\*(#]
+.ds ae a\h'-(\w'a'u*4/10)'e
+.ds Ae A\h'-(\w'A'u*4/10)'E
+.    \" corrections for vroff
+.if v .ds ~ \\k:\h'-(\\n(.wu*9/10-\*(#H)'\s-2\u~\d\s+2\h'|\\n:u'
+.if v .ds ^ \\k:\h'-(\\n(.wu*10/11-\*(#H)'\v'-.4m'^\v'.4m'\h'|\\n:u'
+.    \" for low resolution devices (crt and lpr)
+.if \n(.H>23 .if \n(.V>19 \
+\{\
+.    ds : e
+.    ds 8 ss
+.    ds o a
+.    ds d- d\h'-1'\(ga
+.    ds D- D\h'-1'\(hy
+.    ds th \o'bp'
+.    ds Th \o'LP'
+.    ds ae ae
+.    ds Ae AE
+.\}
+.rm #[ #] #H #V #F C
+.\" ========================================================================
+.\"
+.TH MEMACS-MACROS 1 "2015-08-15" "memacs 8.1.0" "MightEMacs Documentation"
+.\" For nroff, turn off justification.  Always turn off hyphenation; it makes
+.\" way too many mistakes in technical documents.
+.if n .ad l
+.nh
+.SH "NAME"
+memacs\-macros \- Standard MightEMacs Macros
+.SH "ABSTRACT"
+This document describes the macros included with the standard distribution of MightEMacs.  These macros
+are defined in the "memacs.mm" site startup file
+installed in /usr/local/etc, and other files installed
+in /usr/local/etc/memacs.d that are loaded via hooks during an editing session or (optionally) from file "site.mm".
+.SH "MACRO REFERENCE"
+Following is a complete list of the macros available for interactive use, which may optionally be invoked with a numeric
+argument (referred to as "n" in the descriptions).
+The language-specific macros are loaded (if needed), activated, and deactivated automatically when buffers or modes are
+changed.  The word processing and keyboard macro packages can be loaded by uncommenting the appropriate line(s) in "site.mm"
+or by adding \fIrequire\fR statements to the user startup file ".memacs".
+.Sh "General Use"
+.in 2.6i
+.sp -2v
+(defined in "memacs.mm")
+.Sp
+.in 1.1i
+\fIapropos\fR
+.in +2.0i
+.sp -1v
+\fIESC A\fR
+.in +0.8i
+.sp -1v
+Prompt for a pattern, pass it to the \fIshowBindings\fR, \fIshowFunctions\fR, and \fIshowVariables\fR commands, and
+display the results in a pop-up buffer.
+.in 1.1i
+\fIgrepFiles\fR
+.in +2.0i
+.sp -1v
+\fIESC S\fR
+.in +0.8i
+.sp -1v
+Open all files matching a shell template and optionally, also matching a search pattern.  The user is prompted for both
+strings.  If a search pattern is entered, it is assumed to be a regular expression and passed to egrep
+if the macro was invoked with a numeric
+argument; otherwise, the pattern is passed to fgrep.  The files that match are opened in the background and
+their buffer names are saved in a global variable so that they can be subsequently searched by the \fIqueryReplaceAll\fR
+or \fIcNukePPLines\fR macros.
+.in 1.1i
+\fIpopBuf\fR
+.in +2.0i
+.sp -1v
+\fI^H P\fR
+.in +0.8i
+.sp -1v
+Prompt for a buffer name and display it in a pop-up window.
+.in 1.1i
+\fIpopFile\fR
+.in +2.0i
+.sp -1v
+\fI^H ^P\fR
+.in +0.8i
+.sp -1v
+Prompt for a pathname and display the file in a pop-up window.
+.in 1.1i
+\fIpwd\fR
+.in +2.0i
+.sp -1v
+\fI^H .\fR
+.in +0.8i
+.sp -1v
+Display the current working directory on the message line.
+.in 1.1i
+\fIqueryReplaceAll\fR
+.in +2.0i
+.sp -1v
+\fIESC ^Q\fR
+.in +0.8i
+.sp -1v
+Invoke the \fIqueryReplace\fR command on all visible buffers, or just those that matched the most recent
+\fIgrepFiles\fR invocation if n <= 0.
+.Sh "Word Processing"
+.in 2.6i
+.sp -2v
+(defined in "site.mm")
+.Sp
+.in 1.1i
+\fIjoinText\fR
+.in +2.0i
+.sp -1v
+\fI^C ^\fR
+.in +0.8i
+.sp -1v
+Run the \fIjoinLines\fR command with the $EndSentence global variable as an argument to obtain extra spacing between
+joined lines.  (Macro is not defined unless $EndSentence is defined and not \fInil\fR or null.)
+.in 1.1i
+\fIwrapText\fR
+.in +2.0i
+.sp -1v
+\fI^C ^M\fR
+.in +0.8i
+.sp -1v
+Run the \fIwrapLine\fR command with the $EndSentence global variable as an argument to obtain extra spacing between
+lines when the line block is rewrapped.  (Macro is not defined unless $EndSentence is defined and not \fInil\fR or null.)
+.Sh "Word Processing"
+.in 2.6i
+.sp -2v
+(defined in "blockFormat.mm")
+.Sp
+.in 1.1i
+\fIbfFormatItem\fR
+.in +2.0i
+.sp -1v
+\fI^H 1\fR
+.in +0.8i
+.sp -1v
+Format a block of comment lines or one numbered list item if cursor is within the line group.  If the first non-whitespace
+character(s) on the current line match any of the text strings in the $CommentList global variable, the current line is
+assumed to be part of a comment block; otherwise, if the current line is not blank and a backward search for the regular
+expression '^\ *[0-9]+\\. +.' succeeds without passing over a blank line, the line matching the RE is assumed to be the first
+line of a numbered list item.  All lines in a comment block are rewrapped (using the $EndSentence global variable to control
+spacing between joined lines) so that they all have the same
+indentation as the first line of the block but do not extend past the current wrap column ($wrapCol).  All lines in a
+numbered list item are similarly rewrapped so that the first line begins with "nn. " (where "nn" is a one or two digit
+number) and all subsequent lines are indented by four spaces.  Additionally, any text within either type of line block
+matching the regular expression '\ *\\([0-9]+\\),'
+is assumed to be a numbered "phrase", and all such numbers are resequenced beginning at 1.  Line blocks
+are bounded by beginning of buffer, end of buffer, a blank line, or the first line of a numbered list item.
+.in 1.1i
+\fIbfFormatList\fR
+.in +2.0i
+.sp -1v
+\fI^H ,\fR
+.in +0.8i
+.sp -1v
+Format a sequence of numbered list items (as described for the \fIbfFormatItem\fR macro) and resequence all such items
+beginning at 1.
+.Sh "Keyboard Macros"
+.in 2.6i
+.sp -2v
+(defined in "keyMacro.mm")
+.Sp
+.in 1.1i
+\fIkmDeleteKeyMacro\fR
+.in +2.0i
+.sp -1v
+\fI^C ^D\fR
+.in +0.8i
+.sp -1v
+Delete a saved keyboard macro by name or number (n argument).
+.in 1.1i
+\fIkmSaveKeyMacro\fR
+.in +2.0i
+.sp -1v
+\fI^C ^S\fR
+.in +0.8i
+.sp -1v
+Prompt for a name and save current keyboard macro to disk (in file ~/.memacs-key).
+.in 1.1i
+\fIkmSelectKeyMacro\fR
+.in +2.0i
+.sp -1v
+\fI^C K\fR
+.in +0.8i
+.sp -1v
+Select a saved keyboard macro by name or number (n argument) and load it.
+.in 1.1i
+\fIkmShowKeyMacros\fR
+.in +2.0i
+.sp -1v
+\fI^H Y\fR
+.in +0.8i
+.sp -1v
+Show saved keyboard macros in a pop-up window.
+.in 1.1i
+\fIkmXeqKeyMacro\fR
+.in +2.0i
+.sp -1v
+\fI^C E\fR
+.in +0.8i
+.sp -1v
+Load and execute a saved keyboard macro by name or number (n argument).
+.Sh "C Language"
+.in 2.6i
+.sp -2v
+(defined in "cTools.mm")
+.Sp
+.in 1.1i
+\fIcFindFunc\fR
+.in +2.0i
+.sp -1v
+\fIESC ^]\fR
+.in +0.8i
+.sp -1v
+Find first file matching "*.c" template that contains a function declaration and render it according to n argument if found.
+The user is prompted for the directory to search and the name of the function.
+.in 1.1i
+\fIcGotoIfEndif\fR
+.in +2.0i
+.sp -1v
+\fI^C ^G\fR
+.in +0.8i
+.sp -1v
+Go to matching \fI#if...\fR or \fI#endif\fR if current line begins with one of the two keywords.
+Save current position in mark 0 and set
+mark 1 to the \fI#if...\fR line, mark 2 to the \fI#else\fR (if it exists), and mark 3 to the \fI#endif\fR.
+.in 1.1i
+\fIcNukePPLines\fR
+.in +2.0i
+.sp -1v
+\fI^C #\fR
+.in +0.8i
+.sp -1v
+Remove conditional preprocessor lines from all visible buffers, or just those that matched the most recent
+\fIgrepFiles\fR invocation if n <= 0.  "#if" lines must be in form \fI#if\fR MACRO or \fI#if !\fRMACRO.  The user is
+prompted for the preprocessor macro name and given the option to continue or quit after each buffer is scanned.
+.in 1.1i
+\fIcWrapIf0\fR
+.in +2.0i
+.sp -1v
+\fIESC 0\fR
+.in +0.8i
+.sp -1v
+Wrap \fI#if 0\fR and \fI#endif\fR around a block of lines according to the n argument.
+.in 1.1i
+\fIcWrapIf1\fR
+.in +2.0i
+.sp -1v
+\fIESC 1\fR
+.in +0.8i
+.sp -1v
+Wrap \fI#if 1\fR and \fI#endif\fR around a block of lines according to the n argument.
+.in 1.1i
+\fIcWrapIfElse\fR
+.in +2.0i
+.sp -1v
+\fIESC 2\fR
+.in +0.8i
+.sp -1v
+Wrap \fI#if 0\fR and \fI#else\fR around a block of lines according to the n argument, duplicate them, and add \fI#endif\fR.
+.in 1.1i
+\fIcWrapIfName0\fR
+.in +2.0i
+.sp -1v
+\fI^C 0\fR
+.in +0.8i
+.sp -1v
+Prompt for a preprocessor name and wrap \fI#if !\fRNAME and \fI#endif\fR around a block of lines according to the n argument.
+.in 1.1i
+\fIcWrapIfName1\fR
+.in +2.0i
+.sp -1v
+\fI^C 1\fR
+.in +0.8i
+.sp -1v
+Prompt for a preprocessor name and wrap \fI#if\fR NAME and \fI#endif\fR around a block of lines according to the n argument.
+.in 1.1i
+\fIcWrapIfElseName\fR
+.in +2.0i
+.sp -1v
+\fI^C 2\fR
+.in +0.8i
+.sp -1v
+Prompt for a preprocessor name, wrap \fI#if\fR NAME and \fI#else\fR around a block of lines according to the n argument,
+duplicate them, and add \fI#endif\fR.
+.Sh "MightEMacs Script"
+.in 2.6i
+.sp -2v
+(defined in "memacsTools.mm")
+.Sp
+.in 1.1i
+\fImemacsFindMacro\fR
+.in +2.0i
+.sp -1v
+\fIESC ^]\fR
+.in +0.8i
+.sp -1v
+Find first file matching "*.mm" template that contains a macro definition and render it according to n argument if found.
+The user is prompted for the directory to search and the name of the macro.
+.in 1.1i
+\fImemacsGotoBlockEnd\fR
+.in +2.0i
+.sp -1v
+\fI^C ^G\fR
+.in +0.8i
+.sp -1v
+Go to matching block end point if current line begins with a block directive (\fI!loop\fR, \fI!until\fR, \fI!while\fR,
+\fI!if\fR, \fI!macro\fR, or \fI!end...\fR).  Save current position in mark 0 and set mark 1 to the top
+line of the block, mark 2 to the \fI!else\fR line (if it exists), and mark 3 to the bottom line.
+If n == 0, be silent about errors.
+.in 1.1i
+\fImemacsWrapIf0\fR
+.in +2.0i
+.sp -1v
+\fIESC 0\fR
+.in +0.8i
+.sp -1v
+Wrap \fI!if 0\fR and \fI!endif\fR around a block of lines according to the n argument.
+.in 1.1i
+\fImemacsWrapIf1\fR
+.in +2.0i
+.sp -1v
+\fIESC 1\fR
+.in +0.8i
+.sp -1v
+Wrap \fI!if 1\fR and \fI!endif\fR around a block of lines according to the n argument.
+.in 1.1i
+\fImemacsWrapIfElse\fR
+.in +2.0i
+.sp -1v
+\fIESC 2\fR
+.in +0.8i
+.sp -1v
+Wrap \fI!if 0\fR and \fI!else\fR around a block of lines according to the n argument, duplicate them, and add \fI!endif\fR.
+.Sh "Ruby Script"
+.in 2.6i
+.sp -2v
+(defined in "rubyTools.mm")
+.Sp
+.in 1.1i
+\fIrubyFindMethod\fR
+.in +2.0i
+.sp -1v
+\fIESC ^]\fR
+.in +0.8i
+.sp -1v
+Find first file matching "*.rb" template that contains a method definition and render it according to n argument if found.
+The user is prompted for the directory to search and the name of the method.
+.in 1.1i
+\fIrubyGotoBlockEnd\fR
+.in +2.0i
+.sp -1v
+\fI^C ^G\fR
+.in +0.8i
+.sp -1v
+Go to matching block end point if current line begins with a block directive
+(\fIbegin\fR, \fImodule\fR, \fIclass\fR, \fIdef\fR, \fIcase\fR, \fIif\fR, \fIunless\fR, \fIuntil\fR, \fIwhile\fR, or \fIend\fR).
+Save current position in mark 0 and set mark 1 to the top
+line of the block, mark 2 to the \fIelse\fR line (if it exists), and mark 3 to the bottom line.
+If n == 0, be silent about errors.
+.in 1.1i
+\fIrubyWrapBeginEnd\fR
+.in +2.0i
+.sp -1v
+\fIESC 0\fR
+.in +0.8i
+.sp -1v
+Wrap \fI=begin\fR and \fI=end\fR around a block of lines according to the n argument.
+.SH "SEE ALSO"
+memacs(1), memacs-guide(1)

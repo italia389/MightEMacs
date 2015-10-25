@@ -1,0 +1,344 @@
+.\" Standard preamble:
+.\" ========================================================================
+.de Sh \" Subsection heading
+.br
+.if t .Sp
+.ne 5
+.PP
+\fB\\$1\fR
+.PP
+..
+.de Sp \" Vertical space (when we can't use .PP)
+.if t .sp .5v
+.if n .sp
+..
+.de Bb \" Begin bullet item
+.if t .sp .5v
+.if n .sp
+\fB*\fR
+.in +.32i
+.sp -1
+..
+.de Lb \" Begin list item
+.if t .sp .5v
+.if n .sp
+\\$1
+.in +.32i
+.sp -1
+..
+.de Le \" End (bullet or) list item
+.in
+..
+.de Vb \" Begin verbatim text
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve \" End verbatim text
+.ft R
+.fi
+..
+.\" Set up some character translations and predefined strings.  \*(-- will
+.\" give an unbreakable dash, \*(PI will give pi, \*(L" will give a left
+.\" double quote, and \*(R" will give a right double quote.  \*(C+ will
+.\" give a nicer C++.  Capital omega is used to do unbreakable dashes and
+.\" therefore won't be available.  \*(C` and \*(C' expand to `' in nroff,
+.\" nothing in troff, for use with C<>.
+.tr \(*W-
+.ds C+ C\v'-.1v'\h'-1p'\s-2+\h'-1p'+\s0\v'.1v'\h'-1p'
+.ie n \{\
+.    ds -- \(*W-
+.    ds PI pi
+.    if (\n(.H=4u)&(1m=24u) .ds -- \(*W\h'-12u'\(*W\h'-12u'-\" diablo 10 pitch
+.    if (\n(.H=4u)&(1m=20u) .ds -- \(*W\h'-12u'\(*W\h'-8u'-\"  diablo 12 pitch
+.    ds L" ""
+.    ds R" ""
+.    ds C` ""
+.    ds C' ""
+'br\}
+.el\{\
+.    ds -- \|\(em\|
+.    ds PI \(*p
+.    ds L" ``
+.    ds R" ''
+'br\}
+.\"
+.\" Escape single quotes in literal strings from groff's Unicode transform.
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\"
+.\" Accent mark definitions (@(#)ms.acc 1.5 88/02/08 SMI; from UCB 4.2).
+.\" Fear.  Run.  Save yourself.  No user-serviceable parts.
+.    \" fudge factors for nroff and troff
+.if n \{\
+.    ds #H 0
+.    ds #V .8m
+.    ds #F .3m
+.    ds #[ \f1
+.    ds #] \fP
+.\}
+.if t \{\
+.    ds #H ((1u-(\\\\n(.fu%2u))*.13m)
+.    ds #V .6m
+.    ds #F 0
+.    ds #[ \&
+.    ds #] \&
+.\}
+.    \" simple accents for nroff and troff
+.if n \{\
+.    ds ' \&
+.    ds ` \&
+.    ds ^ \&
+.    ds , \&
+.    ds ~ ~
+.    ds /
+.\}
+.if t \{\
+.    ds ' \\k:\h'-(\\n(.wu*8/10-\*(#H)'\'\h"|\\n:u"
+.    ds ` \\k:\h'-(\\n(.wu*8/10-\*(#H)'\`\h'|\\n:u'
+.    ds ^ \\k:\h'-(\\n(.wu*10/11-\*(#H)'^\h'|\\n:u'
+.    ds , \\k:\h'-(\\n(.wu*8/10)',\h'|\\n:u'
+.    ds ~ \\k:\h'-(\\n(.wu-\*(#H-.1m)'~\h'|\\n:u'
+.    ds / \\k:\h'-(\\n(.wu*8/10-\*(#H)'\z\(sl\h'|\\n:u'
+.\}
+.    \" troff and (daisy-wheel) nroff accents
+.ds : \\k:\h'-(\\n(.wu*8/10-\*(#H+.1m+\*(#F)'\v'-\*(#V'\z.\h'.2m+\*(#F'.\h'|\\n:u'\v'\*(#V'
+.ds 8 \h'\*(#H'\(*b\h'-\*(#H'
+.ds o \\k:\h'-(\\n(.wu+\w'\(de'u-\*(#H)/2u'\v'-.3n'\*(#[\z\(de\v'.3n'\h'|\\n:u'\*(#]
+.ds d- \h'\*(#H'\(pd\h'-\w'~'u'\v'-.25m'\f2\(hy\fP\v'.25m'\h'-\*(#H'
+.ds D- D\\k:\h'-\w'D'u'\v'-.11m'\z\(hy\v'.11m'\h'|\\n:u'
+.ds th \*(#[\v'.3m'\s+1I\s-1\v'-.3m'\h'-(\w'I'u*2/3)'\s-1o\s+1\*(#]
+.ds Th \*(#[\s+2I\s-2\h'-\w'I'u*3/5'\v'-.3m'o\v'.3m'\*(#]
+.ds ae a\h'-(\w'a'u*4/10)'e
+.ds Ae A\h'-(\w'A'u*4/10)'E
+.    \" corrections for vroff
+.if v .ds ~ \\k:\h'-(\\n(.wu*9/10-\*(#H)'\s-2\u~\d\s+2\h'|\\n:u'
+.if v .ds ^ \\k:\h'-(\\n(.wu*10/11-\*(#H)'\v'-.4m'^\v'.4m'\h'|\\n:u'
+.    \" for low resolution devices (crt and lpr)
+.if \n(.H>23 .if \n(.V>19 \
+\{\
+.    ds : e
+.    ds 8 ss
+.    ds o a
+.    ds d- d\h'-1'\(ga
+.    ds D- D\h'-1'\(hy
+.    ds th \o'bp'
+.    ds Th \o'LP'
+.    ds ae ae
+.    ds Ae AE
+.\}
+.rm #[ #] #H #V #F C
+.\" ========================================================================
+.\"
+.TH MEMACS 1 "2015-08-15" "memacs 8.1.0" "MightEMacs Documentation"
+.\" For nroff, turn off justification.  Always turn off hyphenation; it makes
+.\" way too many mistakes in technical documents.
+.if n .ad l
+.nh
+.SH "NAME"
+memacs \- Light and fast Emacs text editor
+.SH "SYNOPSIS"
+\&\fBmemacs\fR [\fB\-?\fR | \fB\-h\fR | \fB\-V\fR] [\fB\-D\fR[^]\fImode\fR[,...]] [\fB\-d\fIdir\fR] [\fB\-e\fR\fIstmt\fR]
+[\fB\-G\fR[^]\fImode\fR[,...]] [{\fB\-g\fR | \fB+\fR}\fIline\fR[\fI:pos\fR]] [\fB\-i\fR\fIinput\-delim\fR]
+[\fB\-n\fR] [\fB\-R\fR] [\fB\-r\fR] [\fB\-s\fR\fIstring\fR] [\fB\-X\fR\fIexec\-path\fR] [\fB@\fR\fIscript-file\fR]
+[\fIfile\-spec\fR ...]
+.SH "DESCRIPTION"
+\&\fBmemacs\fR (or \fBmm\fR) is MightEMacs, a full-featured Emacs text editor that uses a Text User Interface.
+It is very robust, designed for the programmer, and focused on rapid text manipulation with few
+keystrokes.  For speed and ease of learning, it uses a simplified scheme in which only four prefix keys
+(\fI^C\fR, \fI^H\fR, \fI^X\fR, and \fIESC\fR) are used and all commands are either one or two keystrokes.  Features include:
+.in +.4i
+.Bb
+A user interface that provides for quick entry of numeric command prefixes and common commands,
+and rigorous error detection and reporting.
+.Le
+.Bb
+A comprehensive set of commands, including several for buffer, file, and window management and control,
+and a powerful group of text editing commands that allow deleting, killing,
+or copying words, partial or full lines, and fenced or marked regions of text either forward or backward with ease.
+.Le
+.Bb
+Auto-indenting/outdenting (with tabs or space characters)
+and fence matching for C, MightEMacs, Perl, Shell, and Ruby languages.
+.Le
+.Bb
+A simple but powerful scripting language that uses C-like operators and expressions and provides many features, including
+numerous built-in variables and functions, directives for sophisticated looping and flow control,
+macro nesting, recursion, and runaway loop detection.
+User variables are either "global" (permanent) or "local" (exist only during
+macro or buffer execution) and may be Boolean, nil, integer, or string data types.  The language also provides
+the ability to code non-printable characters and imbedded expressions in string literals,
+delay execution (to display a message), call a macro with arguments, assign values to macro arguments, and
+call a macro or command as a function and return a value.
+Built-in functions include \fIjoin\fR, \fIpush\fR, \fIpop\fR, \fIunshift\fR, and \fIshift\fR,
+which allow substrings to be concatenated, appended or prepended to, and subsequently
+removed from a delimited string (a pseudo array); \fIquote\fR, \fIshQuote\fR, and \fIstringLit\fR,
+which preserve or translate strings to visible form; \fIsub\fR, \fIsubString\fR, and \fIsubLine\fR,
+which perform substitution and extraction operations on strings and buffer lines;
+and \fIprompt\fR, which provides extensive user prompting and input
+capabilities, including single-character entry and automatic completion of buffer names and filenames.
+.Le
+.Bb
+The ability to edit a file read from standard input, and the ability to
+read or write files with CR, NL, or CR-LF line terminators, including auto-detection on input.
+.Le
+.Bb
+Simplified screen management and the ability to resize
+MightEmacs's terminal dimensions when the size of the terminal emulator's window changes (for example, when using a
+smart phone).
+.Le
+.Bb
+Pop-up windows that can be scrolled backward or forward, and in half-pages or lines in addition to full pages
+using a subset of commands from the "less" file viewer.
+.Le
+.Bb
+Quick informational displays (\fIshowBindings\fR, \fIshowBuffers\fR, \fIshowFunctions\fR, \fIshowKillRing\fR,
+\fIshowScreens\fR, and \fIshowVariables\fR).
+.Le
+.Bb
+Several "hooks" for customizing various operations (for example, reading and writing files or switching buffers)
+including command hooks that allow for total control of the editing session from a macro.
+.Le
+.Bb
+Several predefined macros for various tasks, including performing a search and replace on multiple files at once,
+language-specific "tools" such as finding a file containing a C function, and naming and saving keyboard macros in a
+file so that they can be used in every editing session.
+.Le
+.PP
+See on-line help (\fIESC\fR \fI?\fR) for an introductory overview of the editor,
+the \fIshowBindings\fR command (\fI^H\fR \fIN\fR) for a list of all interactive commands and their key bindings, and the
+\fIshowFunctions\fR (\fI^H\fR \fIF\fR) and \fIshowVariables\fR (\fI^H\fR \fIV\fR) commands for a list of all functions
+(in addition to commands) and variables that are available for use in a script.
+.SH "OPTIONS AND ARGUMENTS"
+.IP "\fB\-?\fR" 4
+Display usage and exit.
+.IP "\fB\-D\fR[^]\fImode\fR[,...]" 4
+Specify one or more default buffer modes to clear (^) or set (no ^), separated by commas.  Switch may be repeated.
+.IP "\fB\-d\fR\fIdir\fR" 4
+Specify a (working) directory to change to.  Switch may be repeated.
+.IP "\fB\-e\fR\fIstmt\fR" 4
+Specify an expression statement to be executed.  Switch may be repeated.
+.IP "\fB\-G\fR[^]\fImode\fR[,...]" 4
+Specify one or more global modes to clear (^) or set (no ^), separated by commas.  Switch may be repeated.
+.IP "{\fB\-g\fR | \fB+\fR}\fIline\fR[\fI:pos\fR]" 4
+Go to specified line number and optional character position on line in buffer of first file after reading it.
+Line numbers begin at 0 (end of buffer) and character positions begin at 1
+.IP "\fB\-h\fR" 4
+Display detailed help and exit.
+.IP "\fB\-i\fR\fIinput\-delim\fR" 4
+Specify zero, one, or two characters to use as file input record delimiter(s).  If none specified (the default),
+then the first NL, CR-LF, or CR found when a file is read will be used.  Non-printable characters are specified in \fI\\x\fR
+form, or as \fI\\0n\fR (octal) or \fI\\xn\fR (hexadecimal) values; for example, \'\fI\\r\fR\' for CR or
+\'\fI\\015\\012\fR\' for CR-LF.
+.IP "\fB\-n\fR" 4
+Do not load the site or user startup file.
+.IP "\fB\-R\fR" 4
+Not Read-only: open files that follow with Read mode \fIoff\fR.  Switch may be repeated.
+.IP "\fB\-r\fR" 4
+Read-only: open files that follow with Read mode \fIon\fR.  Switch may be repeated.
+.IP "\fB\-s\fR\fIstring\fR" 4
+Search for specified string in buffer of first file after reading it.
+.IP "\fB\-V\fR" 4
+Display program version and exit.
+.IP "\fB\-X\fR\fIexec\-path\fR" 4
+Specify colon-separated list of script search directories to prepend to existing path.
+.IP "\fB@\fR\fIscript-file\fR" 4
+Execute specified script file (in path) before processing argument(s) that follow it.  May appear anywhere on
+command line and may be repeated.
+.IP "\fIfile\-spec\fR" 4
+Zero or more files to open for viewing or editing.
+If "\-" is specified in place of the filename, data is read from standard input into buffer "untitled".
+.SH "ENVIRONMENT"
+.\" .IP "\fB\s-1MMPATH\s0\fR" 4
+.IP "\fBMMPATH\fR" 4
+The script execution path is initially set to the value of this environmental variable if it is defined
+(even if it is null).
+.SH "NOTES"
+All arguments are processed in the order given before any files are opened.
+.Sp
+Switches \fB\-g\fR and \fB+\fR are mutually exclusive with \fB\-s\fR.
+.Sp
+MightEMacs takes the following steps at startup to initialize its environment and prepare to enter interactive mode:
+.Sp
+.in +.4i
+.Lb 1.
+Buffer "untitled" is created and set as the current buffer.
+.Le
+.Lb 2.
+The script execution path is initialized to ":/usr/local/etc/memacs.d:/usr/local/etc" or to the value of the MMPATH
+environmental variable if it is defined.
+.Le
+.Lb 3.
+If the -n switch was not specified,
+the site startup file \fImemacs.mm\fR is searched for on the execution path and executed if found.
+.Le
+.Lb 4.
+If the -n switch was not specified and the HOME environmental variable is defined,
+the user startup file ".memacs" is searched for in the HOME directory (only), and executed if found.
+.Le
+.Lb 5.
+Arguments on the command line (if any) are processed in order.  If any \fB@\fR\fIscript-file\fR argument is found,
+the indicated file is searched for verbatim if the name contains a \fI/\fR; otherwise, it is searched for in
+the directories in the current execution path (which may have been changed by a prior \fB-X\fR or \fB-e\fR switch).
+In either case, the file with \fI.mm\fR appended is also searched for unless that extension is already present in
+\fIscript-file\fR.
+If the file is found, it is executed; otherwise, execution halts with a non-zero return code and error message.
+Execution will also halt if a fatal error occurs or the editor is instructed to exit during execution
+of a \fB-e\fR switch or a script.
+.Le
+.Lb 6.
+If no exit was warranted from the previous step, the 'rd1st' global mode is enabled (the default), and
+one or more files were specified to edit, the first one is read into a new buffer and buffer "untitled" is deleted.
+.Le
+.Lb 7.
+Lastly, if the \fB-g\fR, \fB+\fR, or \fB-s\fR switch was specified, it is executed in the current buffer.
+MightEMacs will then display the contents of the current window and prompt for a command.
+.Le
+.in -.4i
+.Sp
+In order for informational displays and prompts to be viewed without truncation, it is recommended that the terminal width be
+at least 128 columns.
+.SH "FILES"
+.IP "\fI\s-1/usr/local/bin/memacs\s0\fR" 4
+The MightEMacs executable.
+.IP "\fI\s-1/usr/local/bin/mm\s0\fR" 4
+Alternate MightEMacs executable.
+.IP "\fI\s-1/usr/local/etc/memacs.mm\s0\fR" 4
+.sp -1v
+.IP "\fI\s-1/usr/local/etc/memacs.d/site.mm\s0\fR" 4
+Standard and user-customizable site startup files.
+.IP "\fI\s-1~/.memacs\s0\fR" 4
+User startup file.
+.IP "\fI\s-1/usr/local/etc/memacs.d/cTools.mm\s0\fR" 4
+.sp -1v
+.IP "\fI\s-1/usr/local/etc/memacs.d/memacsTools.mm\s0\fR" 4
+.sp -1v
+.IP "\fI\s-1/usr/local/etc/memacs.d/rubyTools.mm\s0\fR" 4
+.sp -1v
+.IP "\fI\s-1/usr/local/etc/memacs.d/toolbox.mm\s0\fR" 4
+Files containing macros (tools) for editing C, MightEMacs, and Ruby source files and scripts.
+Loaded automatically when a file with a \fI.c\fR or \fI.h\fR, \fI.mm\fR, or \fI.rb\fR extension
+is opened for editing (via the \fIinitLang\fR macro in \fImemacs.mm\fR).
+.IP "\fI\s-1/usr/local/etc/memacs.d/blockFormat.mm\s0\fR" 4
+File containing macros for formatting line "blocks", which may be comments or numbered list items.
+.IP "\fI\s-1/usr/local/etc/memacs.d/keyMacro.mm\s0\fR" 4
+File containing macros for naming, saving, and retrieving keyboard macros across editing sessions.
+.IP "\fI\s-1/usr/local/etc/memacs.d/memacs-help\s0\fR" 4
+File displayed for help command (\fIESC\fR \fI?\fR, via the \fIgetHelp\fR macro in \fImemacs.mm\fR).
+.SH "BUGS"
+Due to the nature of how MightEMacs manages text, all lines are assumed to implicitly end with a line terminator, including
+the last line in a buffer.  Consequently, the last character written from a non-empty buffer to a file will always be a
+line terminator (usually a newline character) even if the file did not contain one when it was read.  This may be fixed in
+a future version.
+.Sp
+To report bugs in the editor, please contact the author.  Bug reports should include a detailed description
+along with information to reproduce.
+.SH "SEE ALSO"
+.Vb 1
+\&memacs-guide(1), memacs-macros(1), less(1)
+.Ve
+.SH "AUTHOR"
+MightEMacs is maintained by Richard W. Marinelli <italian389@yahoo.com>.  It is based on the MicroEMACS 3.12
+text editor written by Daniel M. Lawrence, et al. in 1993 and has the same look and feel,
+but it has been extensively rewritten, runs on Unix platforms exclusively, and little of the original code remains.  See
+the \fIabout\fR command (\fI^H\fR \fIA\fR) for version, copyright, and build information.

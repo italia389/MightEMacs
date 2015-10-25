@@ -24,7 +24,8 @@
 #endif
 
 #if SOLARIS
-#define USG		0
+#undef USG
+#define USG		1
 #endif
 
 #if REDHAT
