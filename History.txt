@@ -1,3 +1,11 @@
+8.1.1	14 Nov 2015
+ 1. Fixed various bugs, including an issue where entering a right brace in the
+    first column of a line when C mode was enabled could cause random text to be
+    deleted before the cursor; and an issue where backspacing did not work
+    correctly if the cursor had previously moved past the right edge of the
+    terminal window.
+ 2. Changed the license for the project to GNU General Public License (GPLv3).
+
 8.1.0	25 Oct 2015
  1. Created "undelete" command, which restores the most recently deleted text
     from a deleteXXX or truncBuf command, and bound it to M-U.
