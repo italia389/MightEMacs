@@ -1,8 +1,7 @@
 // GeekLib (c) Copyright 2015 Richard W. Marinelli
 //
-// This work is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License.
-// To view a copy of this license, see the "License.txt" file included with this distribution or visit
-// http://creativecommons.org/licenses/by-nc/4.0/legalcode.
+// This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
+// "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 //
 // os.h - Standard Unix OS definitions for C code.
 
@@ -12,7 +11,7 @@
 // OS selection.  Set one of the following to "1".
 #define BSD		0		// Unix BSD 4.2 and ULTRIX.
 #define HPUX8		0		// HPUX HP 9000 ver. 8 and earlier.
-#define HPUX9		0		// HPUX HP 9000 ver. 9.
+#define HPUX		0		// HPUX HP 9000 ver. 9. and later.
 #define OSX		0		// Apple OS X for Macintosh.
 #define REDHAT		0		// Red Hat Linux.
 #define SOLARIS		0		// Sun Solaris 2.5 and later.

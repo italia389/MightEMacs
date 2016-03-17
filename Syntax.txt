@@ -4,22 +4,22 @@ script              = compound_statement { compound_statement }
 compound_statement  = macro_definition | if_statement | loop_statement |
                         return_statement | force_statement | expr_statement
 
-macro_definition    = macro_declaration EOL { compound_statement } "!endmacro"
+macro_definition    = macro_declaration EOL { compound_statement } "endmacro"
                         EOL
-macro_declaration   = "!macro" white_space identifier [ "," integer_expr ] EOL
+macro_declaration   = "macro" white_space identifier [ "," integer_expr ] EOL
 
-if_statement        = "!if" white_space comma_expr EOL { compound_statement } ,
-                        { "!elsif" white_space comma_expr EOL
-                        { compound_statement } } , [ "!else" EOL
-                        { compound_statement } ] , "!endif" EOL
+if_statement        = "if" white_space comma_expr EOL { compound_statement } ,
+                        { "elsif" white_space comma_expr EOL
+                        { compound_statement } } , [ "else" EOL
+                        { compound_statement } ] , "endif" EOL
 
-loop_statement      = ( ( "!while" | "!until" ) white_space comma_expr |
-                        "!loop" ) EOL , { compound_statement | "!break"
-                        [ white_space integer_expr ] EOL | "!next" EOL } ,
-                        "!endloop" EOL
+loop_statement      = ( ( "while" | "until" ) white_space comma_expr |
+                        "loop" ) EOL , { compound_statement | "break"
+                        [ white_space integer_expr ] EOL | "next" EOL } ,
+                        "endloop" EOL
 
-return_statement    = "!return" [ white_space comma_expr ] EOL
-force_statement     = "!force" white_space expr_statement
+return_statement    = "return" [ white_space comma_expr ] EOL
+force_statement     = "force" white_space expr_statement
 
 expr_statement      = comma_expr EOL
 
@@ -35,7 +35,8 @@ assignment_expr     = identifier ( "=" | "*=" | "/=" | "%=" | "+=" | "-=" |
 conditional_expr    = { logical_or_expr "?" comma_expr ":" } logical_or_expr
 logical_or_expr     = logical_and_expr { "||" logical_and_expr }
 logical_and_expr    = equality_expr { "&&" equality_expr }
-equality_expr       = relational_expr { ( "==" | "!=" ) relational_expr }
+equality_expr       = relational_expr { ( "==" | "!=" | "=~" | "!~" )
+			relational_expr }
 relational_expr     = concatenation_expr { ( "<" | "<=" | ">" | ">=" )
                         concatenation_expr }
 concatenation_expr  = format_expr { "&" format_expr }
@@ -59,27 +60,27 @@ constant            = integer_constant | string_constant | "true" | "false" |
 
 MightEMacs DIRECTIVES
 
-!macro <name>[,argct]   Begin definition of named macro with optional (exact)
+macro <name>[,argct]   Begin definition of named macro with optional (exact)
                         number of arguments.
-!endmacro               End a macro definition.
+endmacro               End a macro definition.
 
-!if <cond>              Execute following lines if condition is true.
-!elsif <cond>           Execute following lines if prior !if and !elsif
+if <cond>              Execute following lines if condition is true.
+elsif <cond>           Execute following lines if prior "if" and "elsif"
                         conditions were false and this condition is true.
-!else                   Execute following lines if prior !if and !elsif
+else                   Execute following lines if prior "if" and "elsif"
                         conditions were false.
-!endif                  Terminate !if/!elsif/!else.
+endif                  Terminate "if/elsif/else".
 
-!return [value]         Return from current macro unconditionally with optional
+return [value]         Return from current macro unconditionally with optional
                         value.
-!force <cmd-line>       Force macro to continue ... even if <cmd-line> fails.
+force <cmd-line>       Force macro to continue ... even if <cmd-line> fails.
 
-!while <cond>           Execute a loop while the condition is true.
-!until <cond>           Execute a loop while the condition is false.
-!loop                   Execute a loop forever (must contain a !break or
-                        !return).
-!endloop                Terminate a !while, !until, or !loop.
+while <cond>           Execute a loop while the condition is true.
+until <cond>           Execute a loop while the condition is false.
+loop                   Execute a loop forever (must contain a "break" or
+                        "return").
+endloop                Terminate a "while", "until", or "loop".
 
-!break [n]              Break out of n enclosing loops (default 1).
-!next                   Return to top of current loop (and reevaluate condition,
+break [n]              Break out of n enclosing loops (default 1).
+next                   Return to top of current loop (and reevaluate condition,
                         if any).

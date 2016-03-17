@@ -1,8 +1,7 @@
 // GeekLib (c) Copyright 2015 Richard W. Marinelli
 //
-// This work is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License.
-// To view a copy of this license, see the "License.txt" file included with this distribution or visit
-// http://creativecommons.org/licenses/by-nc/4.0/legalcode.
+// This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
+// "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 //
 // geeklib.h - Header file for geek library.
 
@@ -16,11 +15,15 @@
 #define VGet		0		// Include "get" value object routines (experimental).
 
 // Expression value definitions, for creating and managing strings and integers allocated from heap space.
+
+// Substring object: used for holding chunks of memory for string list (StrList) objects.
 typedef struct substr {
 	struct substr *ss_nextp;	// Link to next item in list.
 	char ss_text[1];		// Substring (on heap).
 	} SubStr;
 
+// Value object: general purpose structure for holding a long integer, a string of any length, or substring objects that are
+// used when building a string in pieces.
 typedef struct value {
 	struct value *v_nextp;		// Link to next item in list.
 	ushort v_type;			// Type of value.
@@ -47,6 +50,7 @@ typedef struct value {
 #define VALCHUNK	128		// Maximum size of string list chunks/pieces.
 #endif
 
+// String list object: used to build a string in pieces.
 typedef struct {
 	Value *sl_vp;			// Value pointer.
 	char *sl_strp;			// Next byte in current piece.

@@ -8,7 +8,7 @@ not been tested, so it is possible that there may be errors.  If this occurs,
 please contact the author with the details so that the problem can be resolved.
 (See the ReadMe.md file for contact information.)  For reference, make file
 locations are (for example, Solaris): geeklib-1.0.0/solaris/Makefile and
-memacs-8.1.1/solaris/Makefile.  The make files use "cc" to run the compiler.
+memacs-8.2.0/solaris/Makefile.  The make files use "cc" to run the compiler.
 
 To install MightEMacs, perform the following steps:
 
@@ -20,10 +20,10 @@ To install MightEMacs, perform the following steps:
 
 	$ make clean
 
- 3. Review and/or edit beginning portion of memacs-8.1.1/src/edef.h to customize
+ 3. Review and/or edit beginning portion of memacs-8.2.0/src/edef.h to customize
     MightEMacs compilation (optional).
 
- 4. Review and/or edit memacs-8.1.1/src/ebind.h if you want to change the
+ 4. Review and/or edit memacs-8.2.0/src/ebind.h if you want to change the
     default key bindings (not recommended).
 
  5. To see a list of available platforms (optional):
@@ -64,6 +64,11 @@ To install MightEMacs, perform the following steps:
 	export PATH="$PATH:$HOME/MightEMacs/bin"
 	export MMPATH=":$HOME/MightEMacs/etc:$HOME/MightEMacs/etc/memacs.d"
 
-12. Review and/or edit file "site.mm" in the .../etc/memacs.d installation
+12. If you want to install the sample user startup file (.memacs) into your HOME
+    directory (and rename any existing file to ".memacs.old"):
+
+	$ make uinstall
+ 
+13. Review and/or edit file "site.mm" in the .../etc/memacs.d installation
     directory to customize site-wide defaults for the editor.  Note that
     MightEMacs can be run with the command "memacs" or "mm".

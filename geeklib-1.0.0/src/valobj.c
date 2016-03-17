@@ -1,8 +1,7 @@
-// GeekLib (c) Copyright 2015 Richard W. Marinelli
+// GeekLib (c) Copyright 2016 Richard W. Marinelli
 //
-// This work is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License.
-// To view a copy of this license, see the "License.txt" file included with this distribution or visit
-// http://creativecommons.org/licenses/by-nc/4.0/legalcode.
+// This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
+// "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 //
 // valobj.c - Value object routines.
 
@@ -15,7 +14,7 @@
 #include <errno.h>
 
 // Global variables.
-Value *vgarbp = NULL;			// Head of list of temporary Value records ("garbage collection").
+Value *vgarbp = NULL;			// Head of list of temporary value objects, for "garbage collection".
 
 #if VDebug
 extern FILE *logfile;
@@ -50,7 +49,7 @@ string:
 					nmemb = "v_strp";
 bad:
 					fprintf(logfile,
-					 "*** %s member of Value record passed to vdump() is NULL ***\n",nmemb);
+					 "*** %s member of value object passed to vdump() is NULL ***\n",nmemb);
 					}
 				else {
 					int c;
@@ -261,7 +260,7 @@ int vnew(Value **vpp,bool perm) {
 	for(vp = vgarbp; vp != NULL; vp = vp->v_nextp)
 		vdump(vp,"vnew() DUMP");
 #endif
-	// Get new record ...
+	// Get new object ...
 	if((vp = (Value *) malloc(sizeof(Value))) == NULL)
 		return vmsg(-2,strerror(errno));
 #if VDebug
@@ -313,7 +312,7 @@ static int vslsave(Value *vp,char *strp) {
 	ssp->ss_nextp = NULL;
 
 	// and append it to the list in the value object.  Force it to be the first chunk if the substring is internal.
-	if((strp == vp->v_strp) || vp->u.v_sheadp == NULL)
+	if(strp == vp->v_strp || vp->u.v_sheadp == NULL)
 		vp->u.v_sheadp = ssp;
 	else {
 		SubStr *ssp1 = vp->u.v_sheadp;
@@ -498,7 +497,7 @@ static int vmksolo(Value *vp) {
 	return 0;
 	}
 
-// Set a value object to a string list.  Preserve existing solo string value if keep is true.  Return status code.
+// Convert a value object to a string list.  Preserve existing solo string value if keep is true.  Return status code.
 static int vslinit(Value *vp,bool keep) {
 	int rcode = 0;
 
@@ -636,7 +635,7 @@ int vclose(StrList *slp) {
 	}
 
 #if 0
-// Remove a value record from the garbage collection stack.
+// Remove a value object from the garbage collection stack.
 void vdelist(Value *vp) {
 
 #if VDebug
@@ -681,7 +680,8 @@ int vcpy(Value *destp,Value *srcp) {
 	return 0;
 	}
 
-// Delete given Value record.
+// Delete given value object.  It assumed that either the object was permanent and not in the garbage collection list, or the
+// caller is removing it from the list; for example, when called from vgarbpop().
 #if VDebug
 void vdelete(Value *vp,char *callerp) {
 

@@ -1,4 +1,4 @@
-# Root Unix makefile for MightEMacs.		Ver. 8.1.0.0
+# Root Unix makefile for MightEMacs.		Ver. 8.2.0
 
 # Definitions.
 MAKEFLAGS = --no-print-directory
@@ -12,12 +12,12 @@ LIBNAME = libgeek.a
 BIN1 = mm
 BIN2 = memacs
 SITEMM = memacs.mm
-SITEUSER = site.mm
+USITEMM = site.mm
+UMM = .memacs
 HELP = memacs-help
 INSTALL = /usr/local
 
-strip: $(LIB) $(BIN2)
-	@cd $(MDIR)-[0-9]*[0-9] || exit $$?; exec make $@
+all: $(LIB) $(BIN2)
 
 $(LIB) $(BIN2): platform
 	@cd $@-[0-9]*[0-9] || exit $$?; exec make
@@ -72,27 +72,33 @@ install:
 	umask 022; owngrp=; [ `id -u` -eq 0 ] && owngrp='-o 0 -g 0';\
 	cd $(MDIR)-[0-9]*[0-9] || exit $$?;\
 	[ -f $(BIN1) ] || { echo "Error: File '`pwd`/$(BIN1)' does not exist" 1>&2; exit -1; };\
-	install -v -d $$owngrp -m 755 $(INSTALL)/bin;\
-	install -v $$owngrp -m 755 $(BIN1) $(INSTALL)/bin;\
+	install -v -d $$owngrp -m 755 $(INSTALL)/bin 1>&2;\
+	install -v $$owngrp -m 755 $(BIN1) $(INSTALL)/bin 1>&2;\
 	ln -f $(INSTALL)/bin/$(BIN1) $(INSTALL)/bin/$(BIN2);\
 	[ -n "$$owngrp" ] && chown 0:0 $(INSTALL)/bin/$(BIN2);\
 	chmod 755 $(INSTALL)/bin/$(BIN2);\
-	install -v -d $$owngrp -m 755 $(INSTALL)/etc/memacs.d;\
+	install -v -d $$owngrp -m 755 $(INSTALL)/etc/memacs.d 1>&2;\
 	cd scripts || exit $$?;\
-	install -v -C $$owngrp -m 644 $(SITEMM) $(INSTALL)/etc;\
+	install -v -C $$owngrp -m 644 $(SITEMM) $(INSTALL)/etc 1>&2;\
 	cd memacs.d || exit $$?;\
 	for x in *.mm; do \
 		bak=;\
-		[ $$x == $(SITEUSER) ] && bak=-b;\
-		install -v -C $$bak $$owngrp -m 644 $$x $(INSTALL)/etc/memacs.d;\
+		[ $$x == $(USITEMM) ] && bak=-b;\
+		install -v -C $$bak $$owngrp -m 644 $$x $(INSTALL)/etc/memacs.d 1>&2;\
 	done;\
 	cd ../../doc || exit $$?;\
-	install -v -d $$owngrp -m 755 $(INSTALL)/share/man/man1;\
-	install -v -C $$owngrp -m 644 $(HELP) $(INSTALL)/etc/memacs.d;\
+	install -v -d $$owngrp -m 755 $(INSTALL)/share/man/man1 1>&2;\
+	install -v -C $$owngrp -m 644 $(HELP) $(INSTALL)/etc/memacs.d 1>&2;\
 	for x in *.1; do \
-		install -v -C $$owngrp -m 644 $$x $(INSTALL)/share/man/man1;\
+		install -v -C $$owngrp -m 644 $$x $(INSTALL)/share/man/man1 1>&2;\
 	done;\
 	echo "Done.  MightEMacs files installed in '$(INSTALL)'." 1>&2
+
+uinstall:
+	@echo 'Beginning user startup file installation ...' 1>&2;\
+	cd $(MDIR)-[0-9]*[0-9]/scripts || exit $$?;\
+	install -v -C -b -m 644 $(UMM) ~ 1>&2;\
+	echo "Done.  User startup file '$(UMM)' installed in '`cd; pwd`'." 1>&2
 
 clean:
 	@for x in $(LIB) $(MDIR); do \

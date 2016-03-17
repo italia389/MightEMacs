@@ -6,11 +6,11 @@ included binaries.
 
 History and Project Goals
 -------------------------
-MightEMacs has been in private development for a couple of years and is designed
-to be a light, fast, and full-featured text editor.  Its general purpose is to:
+MightEMacs is designed to be a light, fast, and full-featured text editor.  The
+goals of the project are to create an editor that will:
 
 1. Provide the ability to edit code easily with few keystrokes, using the
-   modeless text editor paradigm.
+   modeless text editing paradigm.
 2. Be as easy as possible to learn.
 3. Be robust and powerful enough to perform sophisticated editing and automation
    tasks, provide a high level of extensibility, and yet not be overly complex.
@@ -26,7 +26,7 @@ Emacs editor, like buffers, windows, modes, a kill ring, keyboard macros,
 sophisticated navigation, searching, and editing commands, language-specific
 auto-formatting, fence matching, extensibility, etc.
 
-It also supports a C-like scripting language that is quite powerful and fairly
+It also supports a C-like scripting language that is very powerful and fairly
 easy to learn (assuming you already have programming experience).  The
 distribution package includes several scripts as well that perform various
 tasks, such as finding a file that contains a particular C function or Ruby
@@ -45,11 +45,11 @@ Contact
 -------
 Direct any questions, comments, bug reports, etc. to Rick Marinelli
 <italian389@yahoo.com> or post a message on Reddit at
-`http://reddit.com/r/emacs`.
+`http://reddit.com/r/memacs`.
 
 Notes
 -----
-This distribution of MightEMacs is version 8.1.1.   64-bit binaries are included
+This distribution of MightEMacs is version 8.2.0.   64-bit binaries are included
 for Red Hat Linux (RHEL 6 and later) and OS X (Intel 10.6 and later).  The
 sources should compile on other platforms as well; however, this has not been
 tested and there may be some (hopefully minor) issues which will need to be
@@ -69,6 +69,8 @@ MightEMacs is currently in private development and collaboration is not planned
 at this time.  However, user feedback is welcomed.  If you have the time and
 interest, please contact the author with your likes, dislikes, or whatever you
 feel is worth mentioning.  Questions and feature requests are welcomed as well.
+You may also post questions or comments on the MightEMacs discussion forum on
+Reddit at `http://reddit.com/r/memacs`.
 
 Future collaboration will depend on whether MightEMacs attains a "critical mass"
 of users who are actively using the editor and are genuinely interested in its
@@ -76,7 +78,7 @@ continued improvement.  Development will continue in any case.
 
 Credits
 -------
-MightEMacs (c) Copyright 2015 Richard W. Marinelli is based on code from
+MightEMacs (c) Copyright 2016 Richard W. Marinelli is based on code from
 MicroEMACS 3.12 (c) Copyright 1988, 1989, 1990, 1991, 1992, 1993 Daniel M.
 Lawrence, which was based on code by Dave G. Conroy, Steve Wilhite, and George
 Jones.
