@@ -1,8 +1,8 @@
 You are looking at the ReadMe file for MightEMacs, an Emacs text editor which
 runs on Unix and Linux platforms.  See file *Install.txt* for build and
 installation instructions.  A C99 C compiler is required if you are not
-installing on an OS X or Red Hat Linux platform, or do not want to use the
-included binaries.
+installing on a CentOS Linux, Debian Linux, OS X, or Red Hat Linux platform, or
+do not want to use the included binaries.
 
 History and Project Goals
 -------------------------
@@ -41,20 +41,24 @@ Distribution
 The current distribution of MightEMacs may be obtained at
 `https://github.com/italia389/MightEMacs.git`.
 
-Contact
--------
-Direct any questions, comments, bug reports, etc. to Rick Marinelli
-<italian389@yahoo.com> or post a message on Reddit at
+Contact and Feedback
+--------------------
+User feedback is welcomed and encouraged.  If you have the time and interest,
+please contact Rick Marinelli <italian389@yahoo.com> with your questions,
+comments, bug reports, likes, dislikes, or whatever you feel is worth
+mentioning.  Questions and feature requests are welcomed as well.  You may also
+post questions or comments on the MightEMacs discussion forum on Reddit at
 `http://reddit.com/r/memacs`.
 
 Notes
 -----
-This distribution of MightEMacs is version 8.2.0.   64-bit binaries are included
-for Red Hat Linux (RHEL 6 and later) and OS X (Intel 10.6 and later).  The
+This distribution of MightEMacs is version 8.2.1.   64-bit binaries are included
+for CentOS Linux (vers. 6 and later), Debian Linux (vers. 8 and later), OS X
+(vers. 10.6 and later on Intel), and Red Hat Linux (RHEL 6 and later).  The
 sources should compile on other platforms as well; however, this has not been
 tested and there may be some (hopefully minor) issues which will need to be
-resolved.  If you are compiling on a platform other than Red Hat Linux or OS X
-and encounter any problems, please contact the author with the details.
+resolved.  If you are compiling on a platform other than one of those listed
+above and encounter any problems, please contact the author with the details.
 
 Note that a library (geeklib) is included which contains a few routines that are
 used by the editor.  The most important ones are in valobj.c.  These functions
@@ -62,19 +66,6 @@ manage "Value" objects, which are strings that can be of any length and built on
 the fly.  Geeklib contains those and other generic functions that can be used in
 any C program.  The library is independent of MightEMacs, but included with it
 for convenience.
-
-Collaboration
--------------
-MightEMacs is currently in private development and collaboration is not planned
-at this time.  However, user feedback is welcomed.  If you have the time and
-interest, please contact the author with your likes, dislikes, or whatever you
-feel is worth mentioning.  Questions and feature requests are welcomed as well.
-You may also post questions or comments on the MightEMacs discussion forum on
-Reddit at `http://reddit.com/r/memacs`.
-
-Future collaboration will depend on whether MightEMacs attains a "critical mass"
-of users who are actively using the editor and are genuinely interested in its
-continued improvement.  Development will continue in any case.
 
 Credits
 -------

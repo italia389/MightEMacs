@@ -1,3 +1,34 @@
+8.2.1	22 Apr 2016
+ 1. Bug fixes:
+	* Fixed bug where all integer global variables were being converted to
+	  strings after the "showVariables" command was executed.
+	* Fixed bug where the "setBufFile" command was returning an error
+	  message when RETURN was entered at the filename prompt instead of
+	  clearing the filename.
+	* Fixed bug where all marks were cleared in a narrowed buffer when the
+	  "clearBuf" command was executed, instead of just the visible ones.
+ 2. Renamed the `fileExists?` function to `stat?` and changed to accept a second
+    argument containing letter(s) which mimic the shell's -x file tests.  The
+    function now returns true if any of the following test codes are true for
+    the given file: [d]ir, [e]xists, [f]ile, sym[L]ink, hard[l]ink, [r]ead,
+    [s]ize > 0, [w]rite, or [x]eq; otherwise, it returns false.
+ 3. Changed the `pathname` function to not resolve a symbolic link and return
+    the abolute pathname of the link itself if n <= 0.
+ 4. Added calls to the exit-buffer and enter-buffer hooks if the buffer changes
+    when switching screens.
+ 5. Added new macros to the memacs.mm startup file:
+	* "renameFile" (bound to 'C-x r'), which renames the file associated
+	  with the current buffer, both in the editor and the OS.
+	* "nextGrepBuf" (bound to 'C-c ]'), and "prevGrepBuf" (bound to
+	  'C-c ['), which switch to the next or previous buffer from the
+	  result of the most recent "grepFiles" invocation.
+ 6. Changed the user startup file .memacs to create a write hook which will
+    check if the file that is about to be written already exists and is a
+    symbolic or hard link.  If so, it will ask the user if the link should be
+    broken before writing, thereby preserving the original file.
+ 7. The Red Hat Linux binary has been replaced with an equivalent one built on
+    CentOS Linux, and a new Debian Linux binary is now included.
+
 8.2.0	11 Mar 2016
  1. Made search and replacement changes:
 	* Search and replacement patterns may now be any length.

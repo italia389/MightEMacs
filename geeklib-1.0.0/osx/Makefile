@@ -1,4 +1,4 @@
-# Unix makefile for Geeklib.		Ver. 1.1.0.0
+# Unix makefile for Geeklib.		Ver. 1.0.0.2
 
 # Definitions.
 LIB = libgeek.a
@@ -9,15 +9,8 @@ OBJS = $(OBJD)/chlit.o $(OBJD)/gexcep.o $(OBJD)/stplcpy.o $(OBJD)/strfit.o $(OBJ
 INCD = ../../include
 HDRS = $(INCD)/geekdef.h $(INCD)/geeklib.h $(INCD)/os.h
 
-# Options and arguments to the C compiler.  Use one of the following two blocks.
+# Options and arguments to the C compiler.
 CC = cc
-
-# Uncomment the following lines to compile in 32-bit mode (deprecated).
-#CFLAGS = -funsigned-char -W -Wall -Wunused\
-# -Wno-comment -Wno-missing-field-initializers -Wno-missing-braces -Wno-pointer-sign -Wno-unused-parameter -O2 -I$(INCD)\
-# -arch i386
-
-# Uncomment the following lines to compile in 64-bit mode (default).
 CFLAGS = -funsigned-char -W -Wall -Wunused\
  -Wno-comment -Wno-missing-field-initializers -Wno-missing-braces -Wno-pointer-sign -Wno-unused-parameter -O2 -I$(INCD)
 

@@ -1,0 +1,31 @@
+# .memacs	Ver. 8.2.1
+#	MightEMacs user startup file.
+
+# Create write hook which deletes output file before write if file is a symbolic or hard link and user okays it so that symbolic
+# links will not be followed and hard links will be broken on update.  This will effectively create a new file and preserve the
+# original file.  Note that links will also be broken if 'safe' mode is enabled, so do nothing in that case.
+
+$linksToKeep = ''			# List of link pathnames to leave in place, per user's request.
+
+# Delete any existing file before buffer is written, if applicable.  Arguments: (1), buffer name; (2), filename.
+macro checkWrite,2
+	if !($globalModes & $ModeSafeSave)
+
+		# Check if output file exists, is a symbolic or hard link, and is not in the $linksToKeep list.
+		if stat?($2,'Ll') && !include?($linksToKeep,"\t",filename = 0 => pathname($2))
+
+			# Outfile is a link and not previously brought to user's attention.  Ask user if the link should be
+			# broken.  If yes, delete the output file; otherwise, remember response by adding absolute pathname to
+			# $linksToKeep.
+			type = stat?(filename,'L') ? 'symbolic' : 'hard'
+			p = "Break #{type} link#{$2 == $bufFile ? '' : ' for file "' & $2 & '"'} on output? (y,n)"
+			if prompt(p,'n','c') == 'y'
+				shellCmd 'rm ',filename
+			else
+				push $linksToKeep,"\t",filename
+			endif
+		endif
+	endif
+endmacro
+
+setHook 'write',checkWrite		# Set write hook.

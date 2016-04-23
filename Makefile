@@ -1,11 +1,11 @@
-# Root Unix makefile for MightEMacs.		Ver. 8.2.0
+# Root Unix makefile for MightEMacs.		Ver. 8.2.1
 
 # Definitions.
 MAKEFLAGS = --no-print-directory
 MDIR = memacs
 PFFILE = .platform
 PFLIST = .platforms
-PFTEMPLATE_DEFAULT = redhat
+PFTEMPLATE_DEFAULT = centos
 PFTEMPLATE_LIBTOOL = osx
 LIB = geeklib
 LIBNAME = libgeek.a
@@ -36,7 +36,7 @@ platform: $(PFFILE)
 			fi;\
 		done;\
 		if [ ! -f $$pdir/Makefile ]; then \
-			if [ $$x == $(LIB) ] && type libtool 1>/dev/null 2>&1; then \
+			if [ $$x = $(LIB) ] && type libtool 1>/dev/null 2>&1; then \
 				tplatform=$(PFTEMPLATE_LIBTOOL);\
 			else \
 				tplatform=$(PFTEMPLATE_DEFAULT);\
@@ -69,28 +69,44 @@ $(PFFILE):
 
 install:
 	@echo 'Beginning installation ...' 1>&2;\
-	umask 022; owngrp=; [ `id -u` -eq 0 ] && owngrp='-o 0 -g 0';\
+	umask 022;\
+	comp='-C';\
+	if [ `id -u` -ne 0 ]; then \
+		own= grp= owngrp=;\
+		dmode=755 fmode=644;\
+	elif [ `uname -s` = Darwin ]; then \
+		own=0 grp=80 owngrp='-o 0 -g 80';\
+		dmode=755 fmode=644;\
+	else \
+		own=`stat -c %u '$(INSTALL)'`;\
+		grp=`stat -c %g '$(INSTALL)'`;\
+		owngrp="-o $$own -g $$grp";\
+		eval `stat -c %a '$(INSTALL)' |\
+		 sed 's/^/000/; s/^.*\(.\)\(.\)\(.\)\(.\)$$/p3=\1 p2=\2 p1=\3 p0=\4/'`;\
+		dmode=$$p3$$p2$$p1$$p0 fmode=$$p3$$(($$p2 & 6))$$(($$p1 & 6))$$(($$p0 & 6));\
+		[ $$p3 -gt 0 ] && comp=;\
+	fi;\
 	cd $(MDIR)-[0-9]*[0-9] || exit $$?;\
 	[ -f $(BIN1) ] || { echo "Error: File '`pwd`/$(BIN1)' does not exist" 1>&2; exit -1; };\
-	install -v -d $$owngrp -m 755 $(INSTALL)/bin 1>&2;\
-	install -v $$owngrp -m 755 $(BIN1) $(INSTALL)/bin 1>&2;\
+	install -v -d $$owngrp -m $$dmode $(INSTALL)/bin 1>&2;\
+	install -v $$owngrp -m $$dmode $(BIN1) $(INSTALL)/bin 1>&2;\
 	ln -f $(INSTALL)/bin/$(BIN1) $(INSTALL)/bin/$(BIN2);\
-	[ -n "$$owngrp" ] && chown 0:0 $(INSTALL)/bin/$(BIN2);\
-	chmod 755 $(INSTALL)/bin/$(BIN2);\
-	install -v -d $$owngrp -m 755 $(INSTALL)/etc/memacs.d 1>&2;\
+	[ -n "$$owngrp" ] && chown $$own:$$grp $(INSTALL)/bin/$(BIN2);\
+	chmod $$dmode $(INSTALL)/bin/$(BIN2);\
+	install -v -d $$owngrp -m $$dmode $(INSTALL)/etc/memacs.d 1>&2;\
 	cd scripts || exit $$?;\
-	install -v -C $$owngrp -m 644 $(SITEMM) $(INSTALL)/etc 1>&2;\
+	install -v $$comp $$owngrp -m $$fmode $(SITEMM) $(INSTALL)/etc 1>&2;\
 	cd memacs.d || exit $$?;\
 	for x in *.mm; do \
 		bak=;\
-		[ $$x == $(USITEMM) ] && bak=-b;\
-		install -v -C $$bak $$owngrp -m 644 $$x $(INSTALL)/etc/memacs.d 1>&2;\
+		[ $$x = $(USITEMM) ] && bak=-b;\
+		install -v $$comp $$bak $$owngrp -m $$fmode $$x $(INSTALL)/etc/memacs.d 1>&2;\
 	done;\
 	cd ../../doc || exit $$?;\
-	install -v -d $$owngrp -m 755 $(INSTALL)/share/man/man1 1>&2;\
-	install -v -C $$owngrp -m 644 $(HELP) $(INSTALL)/etc/memacs.d 1>&2;\
+	install -v -d $$owngrp -m $$dmode $(INSTALL)/share/man/man1 1>&2;\
+	install -v $$comp $$owngrp -m $$fmode $(HELP) $(INSTALL)/etc/memacs.d 1>&2;\
 	for x in *.1; do \
-		install -v -C $$owngrp -m 644 $$x $(INSTALL)/share/man/man1 1>&2;\
+		install -v $$comp $$owngrp -m $$fmode $$x $(INSTALL)/share/man/man1 1>&2;\
 	done;\
 	echo "Done.  MightEMacs files installed in '$(INSTALL)'." 1>&2
 
