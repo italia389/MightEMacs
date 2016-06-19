@@ -1,3 +1,24 @@
+8.3.0	18 Jun 2016
+ 1. For Debian Linux: changed default value of $execPath global variable to
+    ":/etc/memacs.d:/etc" in memacs binary, and changed installation process to
+    install package files in /etc and /usr/bin instead of /usr/local.
+ 2. Made regular expression changes:
+	* Added support for "{m,n}" repetition operators, "\b" (word boundary),
+	  and "\B" (non-word boundary) metacharacters.
+	* Changed RE compilation to return an error if a repetition operator
+	  (such as + or *) is specified in an invalid location, instead of
+	  treating the operator as a literal character, as was done previously.
+ 3. Made mode changes:
+	* Replaced single-letter shortcuts for mode names with name completion.
+	  Partial mode names which are unambiguous (such as "rd" for "RdOnly")
+	  are also allowed.
+	* Created "showModes" command bound to "C-h o", and removed cryptic mode
+	  information from "showBuffers" display.
+ 4. Changed "insertLineI" command to use its numeric prefix to determine a
+    target line and insert a single line with indentation before that line
+    instead of inserting n lines before or after the current line, as was done
+    previously.
+
 8.2.1	22 Apr 2016
  1. Bug fixes:
 	* Fixed bug where all integer global variables were being converted to
