@@ -7,23 +7,24 @@ do not want to use the included binaries.
 History and Project Goals
 -------------------------
 MightEMacs is designed to be a fast and full-featured text editor.  The goals of
-the project are to create a modeless text editor that will:
+the project are to create an Emacs-like text editor that will:
 
-1. Provide the ability to edit code easily with few keystrokes.
-2. Be as easy as possible to learn.
-3. Be robust and powerful enough to perform sophisticated editing and automation
+1. Provide the ability to edit code quickly and easily with few keystrokes.
+2. Use key bindings that are well designed and intuitive.
+3. Be as easy as possible to learn.
+4. Be robust and powerful enough to perform sophisticated editing and automation
    tasks, provide a high level of extensibility, and yet not be overly complex.
 
 MightEMacs is focused on editing files well and being easily extensible, but
 also being an editor that is not daunting -- one that can be learned fairly
 quickly by the average programmer.  The tradeoff is that it lacks some features
-of other editors.  It uses a simple Text User Interface with no special text
-formatting; for example, there is no color display or highlighting of lexical
-elements of a particular programming language.  It is not an IDE and doesn't try
-to be.  It does however, provide most of the things you would expect from an
-Emacs editor, like buffers, windows, modes, a kill ring, keyboard macros,
-sophisticated navigation, searching, and editing commands, language-specific
-auto-formatting, fence matching, extensibility, etc.
+(and complexity) of other editors.  It uses a simple Text User Interface with no
+special text formatting; for example, there is no color display or highlighting
+of lexical elements of a particular programming language.  It is not an IDE and
+doesn't try to be.  It does however, provide most of the things you would expect
+from an Emacs editor, like buffers, windows, modes, a kill ring, keyboard
+macros, sophisticated navigation, searching, and editing commands,
+language-specific auto-formatting, fence matching, extensibility, etc.
 
 It also supports a C-like scripting language that is very powerful and fairly
 easy to learn (assuming you already have programming experience).  The
@@ -51,7 +52,7 @@ post questions or comments on the MightEMacs discussion forum on Reddit at
 
 Notes
 -----
-This distribution of MightEMacs is version 8.3.0.   64-bit binaries are included
+This distribution of MightEMacs is version 8.3.1.   64-bit binaries are included
 for CentOS Linux (vers. 6 and later), Debian Linux (vers. 8 and later), OS X
 (vers. 10.6 and later on Intel), and Red Hat Linux (RHEL 6 and later).  The
 sources should compile on other platforms as well; however, this has not been

@@ -5,8 +5,9 @@
 //
 // strfit.c
 
-#include "gl_string.h"
+#include "os.h"
 #include <string.h>
+#include "gl_string.h"
 
 // Copy and shrink string by inserting an ellipsis in the middle (if necessary), given destination pointer, maximum destination
 // length (excluding the trailing null), source pointer, and source length.  Destination buffer is assumed to be at least

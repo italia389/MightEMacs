@@ -1,3 +1,44 @@
+8.3.1	18 Sep 2016
+ 1. Bug fixes:
+	* Fixed bug where it was not possible to specify an explicit RegExp
+	  pattern that ended with a colon due to a syntax issue related to
+	  consecutive colons.  For example, the pattern "abc:::r" was
+	  interpreted as the plain text pattern 'abc::r' instead of RegExp
+	  pattern /abc:/.  Changed method of interpreting patterns as follows:
+	  "If a pattern ends with a colon followed by one or more valid option
+	  letters, and the colon is not the first character of the pattern, then
+	  everything preceding the colon is the pattern.  In all other cases,
+	  the entire string is the pattern (with no options)."  Now for example,
+	  "abc:ri" would be interpreted as RegExp pattern /abc/i, "abc:r:p"
+	  would be interpreted as plain text pattern 'abc:r', and "abc::r" would
+	  be interpreted as RegExp pattern /abc:/.
+	* Fixed bug in "include?" function where it was returning false when the
+	  element being searched for was in the list but also occurred earlier
+	  in the list as a substring of a different element.
+	* Fixed bug in "sub" function where it would return an incorrect result
+	  in certain circumstances when called with a RegExp pattern and n > 1.
+	* Fixed the "renameFile" (C-x r) macro and "help" (ESC ?) command by
+	  changing all occurrences of the obsolete "fileExists?" function in
+	  memacs.mm to equivalent "stat?" calls.
+	* Fixed issues in the keyboard macro toolbox (keyMacro.mm) where saving
+	  a macro (C-c C-s) produced an error and displaying a list (C-c y) did
+	  nothing.
+ 2. Renamed $search and $replace system variables to $searchPat and $replacePat,
+    which better describe their purpose.
+ 3. Renamed $WorkDir system variable to $workDir and changed its usage so that
+    the current working directory can be changed by assigning a value to it.
+ 4. Replaced "Rd1st" global mode with -N switch.
+ 5. Changed default bindings for grepFiles macro from "M-s" to "C-x C-g",
+    cFindFunc, memacsFindMacro, and rubyFindMethod macros from "M-C-]" to
+    "C-c C-f", and newScreen command from "M-C-s" to "M-s", which puts the first
+    in the "file family" (most of which begin with "C-x") and makes the latter
+    ones easier to enter and/or remember.
+ 6. Added option to "renameFile" (C-x r) macro to rename file on disk only if
+    n <= 0.
+ 7. Changed fenceWord macro to accept any punctuation character as a fence (in
+    addition to (), [], {}, and <> pairs) and use it for both the left and right
+    fence characters.
+
 8.3.0	18 Jun 2016
  1. For Debian Linux: changed default value of $execPath global variable to
     ":/etc/memacs.d:/etc" in memacs binary, and changed installation process to
@@ -28,12 +69,12 @@
 	  clearing the filename.
 	* Fixed bug where all marks were cleared in a narrowed buffer when the
 	  "clearBuf" command was executed, instead of just the visible ones.
- 2. Renamed the `fileExists?` function to `stat?` and changed to accept a second
+ 2. Renamed the "fileExists?" function to "stat?" and changed to accept a second
     argument containing letter(s) which mimic the shell's -x file tests.  The
     function now returns true if any of the following test codes are true for
     the given file: [d]ir, [e]xists, [f]ile, sym[L]ink, hard[l]ink, [r]ead,
     [s]ize > 0, [w]rite, or [x]eq; otherwise, it returns false.
- 3. Changed the `pathname` function to not resolve a symbolic link and return
+ 3. Changed the "pathname" function to not resolve a symbolic link and return
     the abolute pathname of the link itself if n <= 0.
  4. Added calls to the exit-buffer and enter-buffer hooks if the buffer changes
     when switching screens.
