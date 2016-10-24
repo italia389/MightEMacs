@@ -1,4 +1,4 @@
-// GeekLib (c) Copyright 2015 Richard W. Marinelli
+// ProLib (c) Copyright 2016 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.

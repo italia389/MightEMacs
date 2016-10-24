@@ -8,7 +8,7 @@ However, compilation on other platforms has not been tested, so it is possible
 that there may be errors.  If this occurs, please contact the author with the
 details so that the problem can be resolved.  (See the ReadMe.md file for
 contact information.)  For reference, make file locations are (for example,
-Debian): geeklib-1.1.0/debian/Makefile and memacs-8.3.1/debian/Makefile.  The
+Debian): geeklib-1.1.0/debian/Makefile and memacs-8.4.0/debian/Makefile.  The
 make files use "cc" to run the compiler.
 
 To install MightEMacs, perform the following steps:
@@ -22,10 +22,10 @@ To install MightEMacs, perform the following steps:
 
 	$ make clean
 
- 3. Review and/or edit beginning portion of memacs-8.3.1/src/edef.h to customize
+ 3. Review and/or edit beginning portion of memacs-8.4.0/src/edef.h to customize
     MightEMacs compilation (optional).
 
- 4. Review and/or edit memacs-8.3.1/src/ebind.h if you want to change the
+ 4. Review and/or edit memacs-8.4.0/src/ebind.h if you want to change the
     default key bindings (not recommended).
 
  5. To see a list of available platforms (optional):
@@ -42,36 +42,43 @@ To install MightEMacs, perform the following steps:
 
 	$ make PLATFORM=debian
 
- 7. Install MightEMacs.  If you have superuser privileges and want to do a
-    site-wide install, go to the next step; otherwise, go to step 10.
+ 7. Install MightEMacs.  If you have customized file "site.mm" (site-wide
+    defaults) from a previous installation and want to save it, copy the file to
+    another directory now.  For example, to copy the file to your home directory
+    (assuming MightEMacs was previously installed in /usr/local):
 
- 8. Perform a site-wide install:
+	$ cp /usr/local/etc/memacs.d/site.mm ~
+ 
+ 8. If you have superuser privileges and want to do a site-wide install, go to
+    the next step; otherwise, go to step 11.
+
+ 9. Perform a site-wide install:
 
 	$ su root
 	# make install
 	# exit
 
- 9. Go to step 12.
+10. Go to step 13.
 
-10. Perform a local (user) install.  Supply the pathname of the local
+11. Perform a local (user) install.  Supply the pathname of the local
     installation directory as the value of the INSTALL variable; for example,
     "$HOME/MightEMacs":
 
 	$ make install INSTALL=$HOME/MightEMacs
 
-11. Modify your shell startup file in your HOME directory so that the shell can
+12. Modify your shell startup file in your HOME directory so that the shell can
     find the MightEMacs binary and MightEMacs can find its startup files.  For
     example, if you are using the Bourne shell, add the following two lines to
     file $HOME/.profile:
 
 	export PATH="$PATH:$HOME/MightEMacs/bin"
-	export MMPATH=":$HOME/MightEMacs/etc:$HOME/MightEMacs/etc/memacs.d"
+	export MMPATH=":$HOME/MightEMacs/lib/memacs"
 
-12. If you want to install the sample user startup file (.memacs) into your HOME
+13. If you want to install the sample user startup file (.memacs) into your HOME
     directory (and rename any existing file to ".memacs.old"):
 
 	$ make user-install
  
-13. Review and/or edit file "site.mm" in the .../etc/memacs.d installation
+14. Review and/or edit file "site.mm" in the .../lib/memacs installation
     directory to customize site-wide defaults for the editor.  Note that
     MightEMacs can be run with the command "memacs" or "mm".

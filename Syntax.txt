@@ -1,4 +1,4 @@
-MightEMacs SCRIPT SYNTAX
+MightEMacs SCRIPT SYNTAX	Ver. 8.2
 
 script              = compound_statement { compound_statement }
 compound_statement  = macro_definition | if_statement | loop_statement |
@@ -50,10 +50,9 @@ multiplicative_expr = unary_expr { ( "*" | "/" | "%" ) unary_expr }
 unary_expr          = postfix_expr | ( "++" | "--" | "+" | "-" | "!" | "~" )
                         unary_expr
 postfix_expr        = primary_expr | postfix_expr ( "++" | "--" ) |
-                                postfix_expr "(" comma_expr ")" |
-                                postfix_expr white_space comma_expr
+                        postfix_expr "(" comma_expr ")" |
+                        postfix_expr white_space comma_expr
 primary_expr        = identifier | constant | "(" comma_expr ")"
-
 constant            = integer_constant | string_constant | "true" | "false" |
                         "nil" | "defn"
 

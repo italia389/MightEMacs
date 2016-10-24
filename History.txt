@@ -1,3 +1,37 @@
+8.4.0	23 Oct 2016
+ 1. Changed internal line delimiters from CR to NL: (1), changed all terminal input to allow either "return" (C-m) or "newline"
+    (C-j) as a line delimiter if either one is specified as the delimiter, and to convert "return" to "newline" by default
+    otherwise; (2), changed all buffer editing to create a line when a NL character is inserted instead of a CR character; and
+    (3), changed pattern matching to recognize NL as "end of line" instead of CR.
+ 2. Changed expression evaluation so that a null string ('' or "") will evaluate to true instead of false when used in a Boolean
+    context.  Now the only expressions that are false are 0, false, and nil.  All other expressions, including a null string,
+    are true.
+ 3. Changed "replace" and "queryReplace" commands to interpret a "\0" literal in the replacement pattern in Regexp mode as a
+    "group 0" (the entire match) reference instead of a "0" character.
+ 4. Changed "deleteBuf" command to (1), ignore changes when n < 0 instead of n > 0; (2), delete all unchanged buffers if n == 0;
+    (3), delete all buffers, no force, if n == 1; and (4), delete all buffers, ignoring changes, if n > 1.  The user is prompted
+    for confirmation in the last case.
+ 5. Changed "white space" delimiter in list processing from nil to a space character: (1), changed push and unshift functions to
+    convert a nil delimiter to a null string instead of a space when adding the delimiter and value to a variable; (2), changed
+    pop and shift functions to process a nil delimiter the same way as a null ("") delimiter; and (3), changed include?, pop,
+    and shift functions to use a space character for white space instead of nil.
+ 6. Changed default $execPath to ":/usr/lib/memacs" (Debian) and ":/usr/local/lib/memacs" (non-Debian) and changed installation
+    process accordingly.
+ 7. Removed "echo" option from "getKey" function and changed it to get a single key and return it as an integer if n <= 0.
+ 8. Changed the "writeFile" and "appendFile" commands to update the buffer name by default when a new filename is set, but to
+    skip the update if n <= 0.
+ 9. Eliminated if/loop nesting limit in scripts.  Nesting depth is now unlimited.
+10. Changed processing of "about" command and all "showXXX" commands so that if the buffer that is created is not deleted after
+    the command is executed (if n >= 0), the buffer is made visible.
+11. Added case-insensitive search option to "grepFiles" (C-x C-g) macro.
+12. Fixed bug in "showMarks" command where a mark set on an empty line was sometimes displaying random characters or incorrect
+    data for the line's contents.
+13. Previously, when the "$otpDelim" variable was not set and multiple buffers were written, the input record delimiter from the
+    current buffer was being used as the output delimiter for all buffers instead of using each buffer's input delimiter.  This
+    has been fixed.
+14. Fixed bug where assignment to the $bufLineNum variable was returning an error.
+15. Removed the "reverse" function, which had dubious value.
+
 8.3.1	18 Sep 2016
  1. Bug fixes:
 	* Fixed bug where it was not possible to specify an explicit RegExp

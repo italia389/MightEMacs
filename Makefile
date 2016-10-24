@@ -1,4 +1,4 @@
-# Root Unix makefile for MightEMacs.		Ver. 8.3.0
+# Root Unix makefile for MightEMacs.		Ver. 8.4.0
 
 # Definitions.
 MAKEFLAGS = --no-print-directory
@@ -70,33 +70,36 @@ $(PFFILE):
 
 uninstall:
 	@echo 'Uninstalling...' 1>&2;\
-	if [ -x "$(INSTALL1)/bin/$(BIN2)" ]; then \
-		mainDir=$(INSTALL1) confDir="$(INSTALL1)/etc";\
-	elif [ -x "$(INSTALL2)/bin/$(BIN2)" ]; then \
-		mainDir=$(INSTALL2) confDir=/etc;\
-	elif [ -n "$(INSTALL)" ] && [ -x "$(INSTALL)/bin/$(BIN2)" ]; then \
+	if [ -n "$(INSTALL)" ] && [ -x "$(INSTALL)/bin/$(BIN2)" ]; then \
 		mainDir="$(INSTALL)";\
 		if [ "$(INSTALL)" = $(INSTALL2) ]; then \
-			confDir=/etc;\
+			oldConfDir=/etc;\
 		else \
-			confDir="$(INSTALL)/etc";\
+			oldConfDir="$(INSTALL)/etc";\
 		fi;\
+	elif [ -x "$(INSTALL1)/bin/$(BIN2)" ]; then \
+		mainDir=$(INSTALL1); oldConfDir="$(INSTALL1)/etc";\
+	elif [ -x "$(INSTALL2)/bin/$(BIN2)" ]; then \
+		mainDir=$(INSTALL2); oldConfDir=/etc;\
 	else \
-		echo "'$(BIN2)' binary not found." 1>&2;\
-		exit;\
+		mainDir=;\
 	fi;\
-	for f in "$$mainDir/bin/$(BIN1)" "$$mainDir/bin/$(BIN2)" "$$confDir/memacs.mm" "$$confDir/memacs.d"\
-	 "$$mainDir/share/man/man1/memacs"*.1; do \
-		if [ -e "$$f" ]; then \
-			rm -rf "$$f" && echo "Deleted '$$f'" 1>&2;\
-		fi;\
-	done;\
+	if [ -z "$$mainDir" ]; then \
+		echo "'$(BIN2)' binary not found." 1>&2;\
+	else \
+		for f in "$$mainDir/bin/$(BIN1)" "$$mainDir/bin/$(BIN2)" "$$oldConfDir/memacs.mm" "$$oldConfDir/memacs.d"\
+		 "$$mainDir/lib/$(MDIR)" "$$mainDir/share/man/man1/memacs"*.1; do \
+			if [ -e "$$f" ]; then \
+				rm -rf "$$f" && echo "Deleted '$$f'" 1>&2;\
+			fi;\
+		done;\
+	fi;\
 	echo 'Done.' 1>&2
 
 install: uninstall
 	@echo 'Beginning installation...' 1>&2;\
 	umask 022;\
-	comp='-C' etcCheck=false permCheck=false mainDir=$(INSTALL) confDir=;\
+	comp='-C' permCheck=false mainDir=$(INSTALL);\
 	if [ `id -u` -ne 0 ]; then \
 		if [ -z "$$mainDir" ]; then \
 			if uname -v | fgrep -qi debian; then \
@@ -107,20 +110,13 @@ install: uninstall
 		fi;\
 	elif [ -z "$$mainDir" ]; then \
 		if uname -v | fgrep -qi debian; then \
-			mainDir=$(INSTALL2) confDir=/etc;\
+			mainDir=$(INSTALL2);\
 		fi;\
 		permCheck=true;\
 	else \
-		etcCheck=true permCheck=true;\
+		permCheck=true;\
 	fi;\
 	[ -z "$$mainDir" ] && mainDir=$(INSTALL1);\
-	if [ -z "$$confDir" ]; then \
-		if [ $$etcCheck = true ] && [ "$$mainDir" = $(INSTALL2) ]; then \
-			confDir=/etc;\
-		else \
-			confDir="$$mainDir/etc";\
-		fi;\
-	fi;\
 	if [ $$permCheck = false ]; then \
 		own= grp= owngrp=;\
 		dmode=755 fmode=644;\
@@ -144,24 +140,21 @@ install: uninstall
 	ln -f "$$mainDir"/bin/$(BIN1) "$$mainDir"/bin/$(BIN2);\
 	[ -n "$$owngrp" ] && chown $$own:$$grp "$$mainDir"/bin/$(BIN2);\
 	chmod $$dmode "$$mainDir"/bin/$(BIN2);\
-	[ -d "$$confDir"/memacs.d ] || install -v -d $$owngrp -m $$dmode "$$confDir"/memacs.d 1>&2;\
+	[ -d "$$mainDir/lib/$(MDIR)" ] || install -v -d $$owngrp -m $$dmode "$$mainDir/lib/$(MDIR)" 1>&2;\
 	cd scripts || exit $$?;\
-	install -v $$comp $$owngrp -m $$fmode $(SITEMM) "$$confDir" 1>&2;\
-	cd memacs.d || exit $$?;\
+	install -v $$comp $$owngrp -m $$fmode $(SITEMM) "$$mainDir/lib/$(MDIR)" 1>&2;\
 	for x in *.mm; do \
 		bak=;\
 		[ $$x = $(USITEMM) ] && bak=-b;\
-		install -v $$comp $$bak $$owngrp -m $$fmode $$x "$$confDir"/memacs.d 1>&2;\
+		install -v $$comp $$bak $$owngrp -m $$fmode $$x "$$mainDir/lib/$(MDIR)" 1>&2;\
 	done;\
-	cd ../../doc || exit $$?;\
+	cd ../doc || exit $$?;\
 	[ -d "$$mainDir"/share/man/man1 ] || install -v -d $$owngrp -m $$dmode "$$mainDir"/share/man/man1 1>&2;\
-	install -v $$comp $$owngrp -m $$fmode $(HELP) "$$confDir"/memacs.d 1>&2;\
+	install -v $$comp $$owngrp -m $$fmode $(HELP) "$$mainDir/lib/$(MDIR)" 1>&2;\
 	for x in *.1; do \
 		install -v $$comp $$owngrp -m $$fmode $$x "$$mainDir"/share/man/man1 1>&2;\
 	done;\
-	x=;\
-	[ "$$confDir" = /etc ] && x=" and '/etc'";\
-	echo "Done.  MightEMacs files installed in '$$mainDir'$$x." 1>&2
+	echo "Done.  MightEMacs files installed in '$$mainDir'." 1>&2
 
 user-install:
 	@echo 'Beginning user startup file installation...' 1>&2;\
