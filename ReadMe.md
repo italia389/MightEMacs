@@ -1,7 +1,7 @@
 You are looking at the ReadMe file for MightEMacs, an Emacs text editor which
 runs on Unix and Linux platforms.  See file *Install.txt* for build and
 installation instructions.  A C99 C compiler is required if you are not
-installing on a CentOS Linux, Debian Linux, OS X, or Red Hat Linux platform, or
+installing on a CentOS Linux, Debian Linux, macOS, or Red Hat Linux platform, or
 do not want to use the included binaries.
 
 History and Project Goals
@@ -52,24 +52,25 @@ post questions or comments on the MightEMacs discussion forum on Reddit at
 
 Notes
 -----
-This distribution of MightEMacs is version 8.4.0.   64-bit binaries are included
-for CentOS Linux (vers. 6 and later), Debian Linux (vers. 8 and later), OS X
+This distribution of MightEMacs is version 8.5.0.   64-bit binaries are included
+for CentOS Linux (vers. 6 and later), Debian Linux (vers. 8 and later), macOS
 (vers. 10.6 and later on Intel), and Red Hat Linux (RHEL 6 and later).  The
 sources should compile on other platforms as well; however, this has not been
 tested and there may be some (hopefully minor) issues which will need to be
 resolved.  If you are compiling on a platform other than one of those listed
 above and encounter any problems, please contact the author with the details.
 
-Note that a library (geeklib) is included which contains a few routines that are
-used by the editor.  The most important ones are in valobj.c.  These functions
-manage "Value" objects, which are strings that can be of any length and built on
-the fly.  Geeklib contains those and other generic functions that can be used in
-any C program.  The library is independent of MightEMacs, but included with it
-for convenience.
+Note that a portion of a library (ProLib) is included which contains routines
+that are used by the editor.  The most important ones are in datum.c.  These
+functions manage "Datum" objects, which are objects that contain data of various
+types, including strings that can be of any length and built on the fly.  It
+also includes array.c, which contains routines for managing arrays.  Prolib
+contains these and other functions that can be used in any C program.  The
+library is independent of MightEMacs, but included with it for convenience.
 
 Credits
 -------
-MightEMacs (c) Copyright 2016 Richard W. Marinelli is based on code from
+MightEMacs (c) Copyright 2017 Richard W. Marinelli is based on code from
 MicroEMACS 3.12 (c) Copyright 1988, 1989, 1990, 1991, 1992, 1993 Daniel M.
 Lawrence, which was based on code by Dave G. Conroy, Steve Wilhite, and George
 Jones.

@@ -1,66 +1,127 @@
-MightEMacs SCRIPT SYNTAX	Ver. 8.2
+MightEMacs SCRIPT SYNTAX        Ver. 8.5
 
-script              = compound_statement { compound_statement }
-compound_statement  = macro_definition | if_statement | loop_statement |
-                        return_statement | force_statement | expr_statement
+script =
+    compound_statement { compound_statement }
 
-macro_definition    = macro_declaration EOL { compound_statement } "endmacro"
-                        EOL
-macro_declaration   = "macro" white_space identifier [ "," integer_expr ] EOL
+compound_statement =
+    macro_definition | if_statement | loop_statement | return_statement |
+    force_statement | expr_statement
 
-if_statement        = "if" white_space comma_expr EOL { compound_statement } ,
-                        { "elsif" white_space comma_expr EOL
-                        { compound_statement } } , [ "else" EOL
-                        { compound_statement } ] , "endif" EOL
+macro_definition =
+    macro_declaration EOL { compound_statement } "endmacro" EOL
 
-loop_statement      = ( ( "while" | "until" ) white_space comma_expr |
-                        "loop" ) EOL , { compound_statement | "break"
-                        [ white_space integer_expr ] EOL | "next" EOL } ,
-                        "endloop" EOL
+macro_declaration =
+    "macro" white_space identifier { "(" integer_expr ")" } { "{" help_clause
+    { "," help_clause } "}" }
 
-return_statement    = "return" [ white_space comma_expr ] EOL
-force_statement     = "force" white_space expr_statement
+help_clause =
+    ( "usage:" | "desc:" ) string_expr
 
-expr_statement      = comma_expr EOL
+if_statement =
+    "if" white_space and_or_expr EOL { compound_statement } , { "elsif"
+    white_space and_or_expr EOL { compound_statement } } , { "else" EOL
+    { compound_statement } } , "endif" EOL
 
-integer_expr        = and_or_expr
+loop_statement =
+    ( "for" white_space identifier white_space "in" white_space assignment_expr
+    | ( "while" | "until" ) white_space assignment_expr | "loop" ) EOL ,
+    { compound_statement | "break" { white_space integer_expr } EOL | "next"
+    EOL } , "endloop" EOL
 
-comma_expr          = and_or_expr { "," and_or_expr }
-and_or_expr         = not_expr { white_space ( "and" | "or" ) white_space
-                        not_expr }
-not_expr            = assignment_expr | "not" white_space not_expr
-assignment_expr     = identifier ( "=" | "*=" | "/=" | "%=" | "+=" | "-=" |
-                        "<<=" | ">>=" | "&=" | "|=" | "^=" ) assignment_expr |
-                        conditional_expr
-conditional_expr    = { logical_or_expr "?" comma_expr ":" } logical_or_expr
-logical_or_expr     = logical_and_expr { "||" logical_and_expr }
-logical_and_expr    = equality_expr { "&&" equality_expr }
-equality_expr       = relational_expr { ( "==" | "!=" | "=~" | "!~" )
-			relational_expr }
-relational_expr     = concatenation_expr { ( "<" | "<=" | ">" | ">=" )
-                        concatenation_expr }
-concatenation_expr  = format_expr { "&" format_expr }
-format_expr         = bitwise_or_expr { "%" bitwise_or_expr }
-bitwise_or_expr     = bitwise_and_expr { ( "|" | "^" ) bitwise_and_expr }
-bitwise_and_expr    = bitwise_shift_expr { "&" bitwise_shift_expr }
-bitwise_shift_expr  = num_prefix_expr { ( "<<" | ">>" ) num_prefix_expr }
-num_prefix_expr     = additive_expr { "=>" postfix_expr }
-additive_expr       = multiplicative_expr { ( "+" | "-" ) multiplicative_expr }
-multiplicative_expr = unary_expr { ( "*" | "/" | "%" ) unary_expr }
-unary_expr          = postfix_expr | ( "++" | "--" | "+" | "-" | "!" | "~" )
-                        unary_expr
-postfix_expr        = primary_expr | postfix_expr ( "++" | "--" ) |
-                        postfix_expr "(" comma_expr ")" |
-                        postfix_expr white_space comma_expr
-primary_expr        = identifier | constant | "(" comma_expr ")"
-constant            = integer_constant | string_constant | "true" | "false" |
-                        "nil" | "defn"
+return_statement =
+    "return" { white_space and_or_expr } EOL
+
+force_statement =
+    "force" white_space expr_statement
+
+expr_statement =
+    and_or_expr EOL
+
+integer_expr =
+    assignment_expr
+
+string_expr =
+    assignment_expr
+
+and_or_expr =
+    not_expr { white_space ( "and" | "or" ) white_space not_expr }
+
+not_expr =
+    assignment_expr | "not" white_space not_expr
+
+assignment_expr =
+    direct_assignment_expr | indirect_assignment_expr | conditional_expr
+
+direct_assignment_expr =
+    identifier ( "," direct_assignment_expr | "=" ) assignment_expr
+
+indirect_assignment_expr =
+    identifier ( "*=" | "/=" | "%=" | "+=" | "-=" | "<<=" | ">>=" | "&=" |
+    "|=" | "^=" ) assignment_expr
+
+conditional_expr =
+    { logical_or_expr "?" and_or_expr ":" } logical_or_expr
+
+logical_or_expr =
+    logical_and_expr { "||" logical_and_expr }
+
+logical_and_expr =
+    equality_expr { "&&" equality_expr }
+
+equality_expr =
+    relational_expr { ( "==" | "!=" | "=~" | "!~" ) relational_expr }
+
+relational_expr =
+    concatenation_expr { ( "<" | "<=" | ">" | ">=" ) concatenation_expr }
+
+concatenation_expr =
+    format_expr { "&" format_expr }
+
+format_expr =
+    bitwise_or_expr { "%" bitwise_or_expr }
+
+bitwise_or_expr =
+    bitwise_and_expr { ( "|" | "^" ) bitwise_and_expr }
+
+bitwise_and_expr =
+    bitwise_shift_expr { "&" bitwise_shift_expr }
+
+bitwise_shift_expr =
+    num_prefix_expr { ( "<<" | ">>" ) num_prefix_expr }
+
+num_prefix_expr =
+    additive_expr { "=>" postfix_expr }
+
+additive_expr =
+    multiplicative_expr { ( "+" | "-" ) multiplicative_expr }
+
+multiplicative_expr =
+    unary_expr { ( "*" | "/" | "%" ) unary_expr }
+
+unary_expr =
+    postfix_expr | ( "++" | "--" | "+" | "-" | "!" | "~" ) unary_expr
+
+postfix_expr =
+    primary_expr | postfix_expr ( "++" | "--" ) | postfix_expr "(" { arg_list }
+    ")" | postfix_expr white_space arg_list | postfix_expr "[" and_or_expr
+    { "," and_or_expr } "]"
+
+arg_list =
+    and_or_expr { "," arg_list }
+
+primary_expr =
+    identifier | constant | "(" and_or_expr ")" | "[" and_or_expr
+    { "," and_or_expr } "]"
+
+constant =
+    integer_constant | string_constant | "true" | "false" | "nil" | "defn"
 
 
-MightEMacs DIRECTIVES
+MightEMacs STATEMENTS
 
-macro <name>[,argct]   Begin definition of named macro with optional (exact)
-                        number of arguments.
+macro <name>[(argct)] [{usage: <string>,desc: <string>}]
+                       Begin definition of named macro with optional (exact)
+                        number of arguments and usage information.
 endmacro               End a macro definition.
 
 if <cond>              Execute following lines if condition is true.
@@ -72,13 +133,14 @@ endif                  Terminate "if/elsif/else".
 
 return [value]         Return from current macro unconditionally with optional
                         value.
-force <cmd-line>       Force macro to continue ... even if <cmd-line> fails.
+force <cmd-line>       Force macro to continue... even if <cmd-line> fails.
 
+for <var> in <array>   Execute a loop for each element in array.
 while <cond>           Execute a loop while the condition is true.
 until <cond>           Execute a loop while the condition is false.
 loop                   Execute a loop forever (must contain a "break" or
                         "return").
-endloop                Terminate a "while", "until", or "loop".
+endloop                Terminate a "for", "while", "until", or "loop".
 
 break [n]              Break out of n enclosing loops (default 1).
 next                   Return to top of current loop (and reevaluate condition,

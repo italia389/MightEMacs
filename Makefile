@@ -1,4 +1,4 @@
-# Root Unix makefile for MightEMacs.		Ver. 8.4.0
+# Root Unix makefile for MightEMacs.		Ver. 8.5.0
 
 # Definitions.
 MAKEFLAGS = --no-print-directory
@@ -6,9 +6,9 @@ MDIR = memacs
 PFFILE = .platform
 PFLIST = .platforms
 PFTEMPLATE_DEFAULT = centos
-PFTEMPLATE_LIBTOOL = osx
-LIB = geeklib
-LIBNAME = libgeek.a
+PFTEMPLATE_LIBTOOL = macos
+LIB = prolib
+LIBNAME = libpro.a
 BIN1 = mm
 BIN2 = memacs
 SITEMM = memacs.mm

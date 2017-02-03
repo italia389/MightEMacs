@@ -1,0 +1,14 @@
+# .memacs	Ver. 8.5.0
+#	MightEMacs user startup file.
+
+# Pop file whose pathname is the current buffer line.
+macro popBufLine(0) {desc: 'Display file whose pathname is the current buffer line in a pop-up window'}
+	if stat? $lineText,'e'
+		($0 == defn || $0 >= 0) and $0 = -2
+		$0 => readFile $lineText
+	else
+		-1 => notice 'No such file "%s"' % $lineText
+	endif
+endmacro
+
+bindKey 'C-h C-b',popBufLine

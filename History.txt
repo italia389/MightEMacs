@@ -1,35 +1,249 @@
+8.5.0	2 Feb 2017
+ 1. Converted GeekLib library to new ProLib library which contains several
+    improvements, including Datum objects (which replace Value objects and now
+    support several data types) and records and routines for managing arrays.
+    Datum and Array objects are used extensively by MightEMacs.
+ 2. Enhanced supported data types:
+	* Added array data type.
+	* Changed nil and Boolean pseudo (string) types to real types.
+    The scripting language now supports nil, Boolean, integer, string, and array
+    data types.  Arrays may be nested, sliced, and "auto extended" by assigning
+    a value to an element beyond the end of the array.  Array syntax is
+    "[val,val,...]" where "val" is a value of any type, including array; for
+    example, "x = [false,5,['abc',nil]]".  A slice is created by using two
+    indices; for example, "y = x[0,2]" would set "y" to "[false,5]".
+    Additionally, an array may be "auto extended" by assigning a value to an
+    element beyond the end of the array; for example (continuing the previous
+    one), the sequence "y[3] = 'xyz'" would set "y" to "[false,5,nil,'xyz']".
+ 3. Added a "for" statement (loop block) to the scripting language for iterating
+    through elements of an array.  The new syntax is:
+	for <var> in <array-expr>
+		...
+	endloop
+ 4. Changed macro syntax and argument processing:
+	* Changed syntax for a macro definition to:
+		macro <name>(<n>) {usage: <str>, desc: <str>}
+	  which specifies that the (optional) argument count now be in
+	  parentheses instead of preceded by a comma as previously, and adds
+	  optional "usage" and "description" strings.
+	* Changed showBindings display to include any usage text for macros.
+	* Changed showKey command to display usage text on the message line in
+	  addition to the command or macro name.
+	* Replaced $ArgCount, $argIndex variables and "nextArg" function with
+	  new $ArgVector array, which holds the arguments (if any) of a running
+	  macro.
+	* Changed numeric variables ($1, $2, ...) to reference $ArgVector array
+	  elements.
+	* Changed "length" function to accept an array argument and return its
+	  size.
+    Note that the $ArgVector variable may not be assigned to; however, the array
+    it contains may be modified in any way, just like any other array.
+ 5. Implemented parallel assignment:
+	* Added support for assignment expressions such as "a,b[1],c = [1,2,3]",
+	  which will set multiple variables (or array elements) at once to the
+	  elements of an array.
+	* Removed support for comma expressions such as "(x = 3), y = nil" to
+	  avoid syntactical ambiguities.
+ 6. Added array recursion detection:
+	* Renamed $maxRecursion variable to $maxMacroDepth and created
+	  $maxArrayDepth variable.
+	* Changed certain array operations to either (a), return an error if
+	  $maxArrayDepth is exceeded during recursive evaluation; or (b) stop if
+	  endless recursion is detected and return "[...]" for the array.
+	* Changed "quote" function to force the latter behavior if n > 0.
+    These changes will prevent an endless loop if an array that contains itself
+    at any nesting level is evaluated.
+ 7. Added support for line continuation in scripts: changed script processor to
+    combine any line that ends with a backslash (\) with the following line(s)
+    before evaluating it.  This allows any line (or multiple lines) in a script
+    to be extended to the next line by adding a backslash to the end of it,
+    including a line containing a partial single (') or double (") quoted
+    string.
+ 8. Made several function changes:
+	* Removed delimiter argument from include? function and changed to
+	  require an array instead of a list.
+	* Renamed push, pop, shift, unshift functions to strPush, strPop,
+	  strShift, strUnshift and changed to not allow Boolean (or array)
+	  arguments.
+	* Created new push, pop, shift, and unshift functions which operate on
+	  an array.
+	* Changed "length" function to accept an array or string argument and
+	  return its size or length.
+	* Changed the concatenation operators (& and &=) and functions which
+	  concatenate a list of arguments (like `print`), to also accept Boolean
+	  values and arrays and process the latter (recursively) as if each
+	  element was specified as an argument.
+	* Changed "quote" function to accept any data type and convert it to a
+	  string form which can be resolved via the "eval" function back to its
+	  original value.
+	* Changed "join" and "toString" functions to accept arrays and use the n
+	  argument to control the conversion process.
+	* Replaced $KillText variable with "kill N" function, which returns the
+	  Nth kill.
+	* Replaced int? and string? functions with type?, which returns the type
+	  of its argument as a keyword ("nil", "bool", "int", "string", or
+	  "array").
+	* Changed "sprintf" function to accept an array at any position in the
+	  argument list after the format spec and process the array elements as
+	  if they were specified individually.
+	* Created "split" function which converts a string to an array.
+	* Created "array" function which creates an array with size and
+	  initializer options.
+	* Created "clone" function which creates an exact copy of an array.
+	* Replaced void? function with empty?, which returns true if its
+	  argument is nil, a null string, or an empty array.
+	* Changed "sprintf" function and '%' operator to allow a nil argument
+	  for the %s specification in the format string.
+    Note that for compatibility with array elements, which can be assigned to
+    but are not variables, the functionality of the strShift and strPop
+    functions has changed slightly: a null item at the beginning (for strPop) or
+    end (for strShift) of a delimited string in a variable or array element will
+    not be detected, and nil will be returned instead of a null string as
+    before.  The old behavior can be mimicked however, simply by "doubling up"
+    the delimiter at the end of the string.  For example, use "a:bb::" in place
+    of "a:bb:" to get a null string as the third argument for strShift instead
+    of nil.
+ 9. Changed "rand" function:
+	* Added "max N" required argument to function;
+	* Changed to return integers in range 1..N.
+	* replaced internal algorithm with a "xor-shift-64" type which uses
+	  64-bit unsigned integers.
+	* Changed $randNumSeed assignment so that (a), any value other than zero
+	  is used verbatim; and (b), a zero value causes a new seed to be
+	  obtained using the current time.
+10. Made command changes:
+	* Changed default key binding for "inserti" command to "C-c i" and
+	  replaced deleteTab command with deleteBackTab (S-TAB) and
+	  deleteForwTab (M-TAB), which simplifies the task of deleting tabs
+	  forward when using soft tabs.
+	* Changed "beep" command to a function.
+	* Changed nextBuf and prevBuf commands to return buffer name only if n
+	  == 0, and delete exited buffer after switching to new buffer if n < 0.
+	* Changed resizeWind to make all windows on screen the same size if
+	  n == 0.
+	* Changed deleteWind to force space to upper window if n < -1 (instead
+	  of n < 0) and added option to delete its buffer if n == -1 (for
+	  consistency with prevBuf and nextBuf commands).
+	* Created "lastBuf" command (bound to "C-x \"), which (a), switches to,
+	  in the current window, the last buffer that was exited from in any
+	  window; and (b), deletes the former buffer if n < 0.
+    The "lastBuf" command provides a means to easily toggle between two buffers
+    in a window, or view a file in the current window temporarily, then switch
+    back to the previous buffer, deleting the new buffer in the process.
+11. Changed "joinLines" command:
+	* Fixed bug where all lines from dot to the end of the buffer would be
+	  joined if n == 0 and the region contained only one line.
+	* Changed processing to do nothing (instead of returning an error) if
+	  n == 1 or the region line count is 1.
+12. Made system variable changes:
+	* Replaced $BufList and $WindList variables with "bufList" and
+	  "windList" functions (which return arrays instead of delimited
+	  strings) and added list options which can be selected via the n
+	  argument.
+	* Deleted $BufCount (which is synonymous with "length bufList()") and
+	  $BufOtpDelim (which is not needed).
+	* Replaced $BufLen and $BufSize variables with "bufSize" function which
+	  returns the buffer size in lines or bytes, depending on the n
+	  argument.
+	* Replaced $EditorName, $EditorVersion, $Language, and $OS variables
+	  with "sysInfo" function which returns a value selected by the n
+	  argument.
+	* Renamed $travJumpSize to $travJump (to be consistent with $horzJump
+	  and $vertJump) and changed default value from 14 to 12.
+	* Deleted $BufFlagPreprocd.
+	* Eliminated legacy "truncated file" concept and corresponding buffer
+	  flag ($BufFlagTruncated).
+13. Changed concatenation:
+	* A concatenation expression such as "nil & 5" where nil is the first
+	  value is no longer allowed.
+	* Any value may now be concatenated with a string, including Boolean and
+	  array values.
+	* Any value may be concatenated with an array; however, an array value
+	  will be "exploded" first.
+    These changes allow expressions such as "'Result: ' & myMac() & [': ',55]"
+    (string result) and "[1,2] & [3,4,5]" (array result).
+14. Changed auto-save feature:
+	* Changed key entry loop to save all changed buffers instead of just the
+	  current one when auto-save is triggered.
+	* Changed mode control system to not allow "ASave" mode to be activated
+	  if $autoSave is zero.
+15. Changed hook system to no longer allow a command to be bound to a hook
+    (which made no sense):
+	* Changed wrapWord command to a function.
+	* Created "wrapper" macro (in memacs.mm) which calls wrapWord, and set
+	  it to the "wrap" hook.
+16. Changed buffer completion to not display hidden buffers when TAB is entered
+    as the first character, but include them if '?' is entered.
+17. Made improvements to the C, MightEMacs, and Ruby toolbox libraries,
+    including the ability to search for class and module names in Ruby files
+    (via "C-c C-c") in addition to method names.
+18. Changed default key binding for xeqFile command from "M-/" to "C-x /" to be
+    consistent with other file commands and xeqBuf command (C-x x).
+19. Streamlined command and function code so that execution is always done in
+    one place and arguments are validated consistently.  These changes fixed
+    bugs where specifying an unexpected integer argument to certain commands or
+    functions caused a crash, including:
+	* First argument to "joinLines" and "sprintf" functions.
+	* First or second argument to "wrapLine" command.
+	* Any argument to "deleteBuf" command.
+20. Fixed issue where the "writeBuf" function would not always insert text in
+    the correct place if the target buffer was being displayed.
+21. Reorganized source header files: replaced the e*.h files with bind.h, cmd.h,
+    english.h, exec.h, file.h, lang.h, main.h, search.h, std.h, and var.h.
+
 8.4.0	23 Oct 2016
- 1. Changed internal line delimiters from CR to NL: (1), changed all terminal input to allow either "return" (C-m) or "newline"
-    (C-j) as a line delimiter if either one is specified as the delimiter, and to convert "return" to "newline" by default
-    otherwise; (2), changed all buffer editing to create a line when a NL character is inserted instead of a CR character; and
-    (3), changed pattern matching to recognize NL as "end of line" instead of CR.
- 2. Changed expression evaluation so that a null string ('' or "") will evaluate to true instead of false when used in a Boolean
-    context.  Now the only expressions that are false are 0, false, and nil.  All other expressions, including a null string,
-    are true.
- 3. Changed "replace" and "queryReplace" commands to interpret a "\0" literal in the replacement pattern in Regexp mode as a
-    "group 0" (the entire match) reference instead of a "0" character.
- 4. Changed "deleteBuf" command to (1), ignore changes when n < 0 instead of n > 0; (2), delete all unchanged buffers if n == 0;
-    (3), delete all buffers, no force, if n == 1; and (4), delete all buffers, ignoring changes, if n > 1.  The user is prompted
-    for confirmation in the last case.
- 5. Changed "white space" delimiter in list processing from nil to a space character: (1), changed push and unshift functions to
-    convert a nil delimiter to a null string instead of a space when adding the delimiter and value to a variable; (2), changed
-    pop and shift functions to process a nil delimiter the same way as a null ("") delimiter; and (3), changed include?, pop,
-    and shift functions to use a space character for white space instead of nil.
- 6. Changed default $execPath to ":/usr/lib/memacs" (Debian) and ":/usr/local/lib/memacs" (non-Debian) and changed installation
-    process accordingly.
- 7. Removed "echo" option from "getKey" function and changed it to get a single key and return it as an integer if n <= 0.
- 8. Changed the "writeFile" and "appendFile" commands to update the buffer name by default when a new filename is set, but to
-    skip the update if n <= 0.
- 9. Eliminated if/loop nesting limit in scripts.  Nesting depth is now unlimited.
-10. Changed processing of "about" command and all "showXXX" commands so that if the buffer that is created is not deleted after
-    the command is executed (if n >= 0), the buffer is made visible.
+ 1. Changed internal line delimiters from CR to NL:
+	* Changed all terminal input to allow either "return" (C-m) or "newline"
+	  (C-j) as a line delimiter if either one is specified as the delimiter,
+	  and to convert "return" to "newline" by default otherwise.
+	* Changed all buffer editing to create a line when a NL character is
+	  inserted instead of a CR character.
+	* Changed pattern matching to recognize NL as "end of line" instead of
+	  CR.
+ 2. Changed expression evaluation so that a null string ('' or "") will evaluate
+    to true instead of false when used in a Boolean context.  Now the only
+    expressions that are false are 0, false, and nil.  All other expressions,
+    including a null string, are true.
+ 3. Changed "replace" and "queryReplace" commands to interpret a "\0" literal in
+    the replacement pattern in Regexp mode as a "group 0" (the entire match)
+    reference instead of a "0" character.
+ 4. Changed "deleteBuf" command to:
+	* Ignore changes when n < 0 instead of n > 0.
+	* Delete all unchanged buffers if n == 0.
+	* Delete all buffers, no force, if n == 1.
+	* Delete all buffers, ignoring changes, if n > 1.
+    The user is prompted for confirmation in the last case.
+ 5. Changed "white space" delimiter in list processing from nil to a space
+    character:
+	* Changed push and unshift functions to convert a nil delimiter to a
+	  null string instead of a space when adding the delimiter and value to
+	  a variable.
+	* Changed pop and shift functions to process a nil delimiter the same
+	  way as a null ("") delimiter.
+	* Changed include?, pop, and shift functions to use a space character
+	  for white space instead of nil.
+ 6. Changed default $execPath to ":/usr/lib/memacs" (Debian) and
+    ":/usr/local/lib/memacs" (non-Debian) and changed installation process
+    accordingly.
+ 7. Removed "echo" option from "getKey" function and changed it to get a single
+    key and return it as an integer if n <= 0.
+ 8. Changed the "writeFile" and "appendFile" commands to update the buffer name
+    by default when a new filename is set, but to skip the update if n <= 0.
+ 9. Eliminated if/loop nesting limit in scripts.  Nesting depth is now
+    unlimited.
+10. Changed processing of "about" command and all "showXXX" commands so that if
+    the buffer that is created is not deleted after the command is executed (if
+    n >= 0), the buffer is made visible.
 11. Added case-insensitive search option to "grepFiles" (C-x C-g) macro.
-12. Fixed bug in "showMarks" command where a mark set on an empty line was sometimes displaying random characters or incorrect
-    data for the line's contents.
-13. Previously, when the "$otpDelim" variable was not set and multiple buffers were written, the input record delimiter from the
-    current buffer was being used as the output delimiter for all buffers instead of using each buffer's input delimiter.  This
-    has been fixed.
-14. Fixed bug where assignment to the $bufLineNum variable was returning an error.
+12. Fixed bug in "showMarks" command where a mark set on an empty line was
+    sometimes displaying random characters or incorrect data for the line's
+    contents.
+13. Previously, when the "$otpDelim" variable was not set and multiple buffers
+    were written, the input record delimiter from the current buffer was being
+    used as the output delimiter for all buffers instead of using each buffer's
+    input delimiter.  This has been fixed.
+14. Fixed bug where assignment to the $bufLineNum variable was returning an
+    error.
 15. Removed the "reverse" function, which had dubious value.
 
 8.3.1	18 Sep 2016

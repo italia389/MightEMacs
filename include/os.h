@@ -14,13 +14,13 @@
 #define DEBIAN		0		// Debian Linux.
 #define HPUX8		0		// HPUX HP 9000 ver. 8 and earlier.
 #define HPUX		0		// HPUX HP 9000 ver. 9. and later.
-#define OSX		0		// Apple OS X for Macintosh.
+#define MACOS		0		// Apple MacOS for Macintosh.
 #define REDHAT		0		// Red Hat Linux.
 #define SOLARIS		0		// Sun Solaris 2.5 and later.
 #define USG		0		// Generic Unix System V.
 
 // OS-dependent definitions.
-#if !BSD && !CENTOS && !DEBIAN && !HPUX8 && !HPUX && !OSX && !REDHAT && !SOLARIS && !USG
+#if !BSD && !CENTOS && !DEBIAN && !HPUX8 && !HPUX && !MACOS && !REDHAT && !SOLARIS && !USG
 #error	"Unknown OS (a supported Unix platform was not selected in os.h)"
 #endif
 
