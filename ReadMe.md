@@ -70,18 +70,13 @@ library is independent of MightEMacs, but included with it for convenience.
 
 Credits
 -------
-MightEMacs (c) Copyright 2017 Richard W. Marinelli is based on code from
-MicroEMACS 3.12 (c) Copyright 1988, 1989, 1990, 1991, 1992, 1993 Daniel M.
-Lawrence, which was based on code by Dave G. Conroy, Steve Wilhite, and George
-Jones.
+MightEMacs (c) Copyright 2017 Richard W. Marinelli is based on the MicroEMACS
+3.12 text editor (c) Copyright 1993 Daniel M. Lawrence, et al., but it has been
+extensively rewritten and little or none of the original code remains.
 
 MightEMacs is written by Rick Marinelli <italian389@yahoo.com>.
 
 MicroEMACS was written by Dan Lawrence with contributions by Dana Hoggatt
 and C. Smith.
-
-MicroEMACS 3.12 can be copied and distributed freely for any non-commercial
-purpose, but can be incorporated into commercial software only with the
-permission of the current author.
 
 See License.txt for the MightEMacs license.
