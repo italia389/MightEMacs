@@ -186,11 +186,12 @@ If a punctuation character such as \fI`\fR is entered, it is used for both the l
 .in +1.1i
 .sp -1v
 Open all files matching a shell template and optionally, also matching a search pattern.  The user is prompted for both
-strings.  If a search pattern is entered, it is assumed to be a regular expression and passed to \fIegrep\fR if the
-macro was invoked with n >= 0; otherwise, the pattern is passed to \fIfgrep\fR.  In either case, the grep command is invoked
-with the \fI-i\fR switch if n <= 0.  The files that match are opened in the background and
-their buffer names are saved in a global variable so that they can be subsequently searched by the \fIqueryReplaceAll\fR
-or \fIcNukePPLines\fR macros.
+strings.  The search pattern may contain zero or more of the trailing option characters "eipr" preceded by a colon.
+If a search pattern is entered, the portion preceding the trailing colon (if any) is assumed to be an extended
+regular expression and passed to \fIegrep\fR if the "r" option is specified; otherwise, the pattern is passed to \fIfgrep\fR.
+In either case, the grep command is invoked with the \fI-i\fR switch if the "i" option is specified.
+The files that match are opened in the background and their buffer names are saved in a global variable so that they can be
+subsequently searched by the \fIqueryReplaceAll\fR or \fIcNukePPLines\fR macros.
 .in 1.1i
 \fIjoinLines0\fR
 .in +2.0i

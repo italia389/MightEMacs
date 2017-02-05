@@ -811,10 +811,10 @@ macro openFiles(1) {usage: 'file-list',desc: 'Open list of files in background'}
 	bList
 endmacro
 
-# Find files that match a template and optionally, a pattern, and open them in the background.  Save resulting buffer list in
-# $grepList variable as an array.  The pattern is interpreted as plain text, case-sensitive (default n), plain text,
-# case-insensitive (n < 0), Regexp, case-insensitive (n == 0), or Regexp, case-sensitive (n > 0).
-macro grepFiles(0) {desc: 'Find files and open in background (with RE pattern if n >= 0, ignoring case if n <= 0)'}
+# Find files that match a shell template and optionally, a pattern, and open them in the background.  Save resulting buffer list
+# in $grepList variable as an array.  The pattern is checked for the usual trailing option characters (:eipr) if any, and
+# processed accordingly.
+macro grepFiles(0) {desc: 'Find files and open in background'}
 
 	# Prompt for filename template.  Use last one as default.
 	!defined?('$grepTemplate') or empty?($grepTemplate) and $grepTemplate = nil
@@ -825,14 +825,26 @@ macro grepFiles(0) {desc: 'Find files and open in background (with RE pattern if
 	endif
 	subString($grepTemplate,-1,1) == '/' and $grepTemplate &= '*'
 
-	# Prompt for search pattern.  If null, get all files that match template.
-	prmt = (rePat = $0 >= 0) ? 'Search RE' : 'Search pattern'
-	(ignoreCase = $0 == 0 || ($0 < 0 && $0 != defn)) and prmt &= ' (ignoring case)'
-	pat = prompt prmt,''
+	# Prompt for search pattern.  If null, get all files that match template; otherwise, parse any trailing option
+	# characters and convert to correct grep command and options.
+	x = 'f'
+	swt = ''
+	pat = prompt 'Search pattern',''
+	if pat =~ '^(.+):([a-z]+)$' && !null?(match 1)
+		pat = match 1
+		opts = match 2
+		until nil?(opt = strShift(opts,nil))
+			if opt == 'i'
+				swt = ' -i'
+			elsif opt == 'r'
+				x = 'e'
+			elsif opt != 'e' && opt != 'p'
+				return -1 => notice "Unknown search option '",opt,"'"
+			endif
+		endloop
+	endif
 
 	# Open files and set $grepList to buffer list.
-	x = rePat ? 'e' : 'f'
-	swt = ignoreCase ? ' -i' : ''
 	bList = openFiles(null?(pat) ? "ls -1 #{$grepTemplate}" : "#{x}grep -l#{swt} #{shQuote pat} #{$grepTemplate}")
 	if bList == false
 		false
