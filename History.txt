@@ -1,3 +1,17 @@
+8.5.1	23 Feb 2017
+ 1. Fixed bug where specifying a string containing a printf formatting spec
+    (like "%s") as an argument to the "abort" or "exit" command or "notice"
+    function in a script would cause unpredictable results, including a crash.
+ 2. Changed search commands to display a message when a search is "taking
+    awhile" to complete (which can happen in very large buffers) so the user
+    knows the search is in progress.
+ 3. Fixed problem where the "queryRepl" command was not always terminating if
+    n > 0 and n substitutions were made because the number of matches was being
+    checked instead of the number of substitutions.
+ 4. Fixed problem where a window was not being redrawn when "HScrl" mode was
+    enabled, the display was shifted left (because the point was near the end of
+    a long line), and "HScrl" mode was subsequently disabled.
+
 8.5.0	2 Feb 2017
  1. Converted GeekLib library to new ProLib library which contains several
     improvements, including Datum objects (which replace Value objects and now

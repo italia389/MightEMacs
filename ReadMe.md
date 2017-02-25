@@ -6,8 +6,8 @@ do not want to use the included binaries.
 
 History and Project Goals
 -------------------------
-MightEMacs is designed to be a fast and full-featured text editor.  The goals of
-the project are to create an Emacs text editor that will:
+MightEMacs is designed to be a fast and full-featured text editor.  Goals of the
+project are to create an Emacs text editor that will:
 
 1. Provide the ability to edit code quickly and easily with few keystrokes.
 2. Use key bindings that are well designed and intuitive.
@@ -52,7 +52,7 @@ post questions or comments on the MightEMacs discussion forum on Reddit at
 
 Notes
 -----
-This distribution of MightEMacs is version 8.5.0.   64-bit binaries are included
+This distribution of MightEMacs is version 8.5.1.   64-bit binaries are included
 for CentOS Linux (vers. 6 and later), Debian Linux (vers. 8 and later), macOS
 (vers. 10.6 and later on Intel), and Red Hat Linux (RHEL 6 and later).  The
 sources should compile on other platforms as well; however, this has not been
