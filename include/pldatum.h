@@ -1,4 +1,4 @@
-// ProLib (c) Copyright 2016 Richard W. Marinelli
+// ProLib (c) Copyright 2017 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -10,11 +10,18 @@
 
 #include "pldef.h"
 
+// Definitions for creating and managing strings, integers, and other data types allocated from heap space.
+
+// Definitions for dopenwith() function.
+#define SFClear		0			// Clear data in caller's Datum object.
+#define SFAppend	1			// Append to caller's Datum object.
+#define SFPrepend	2			// Prepend to caller's Datum object.
+#define SFModeMask	0x0003			// Bits for mode value.
+
+// Definitions for debugging.
 #define DDebug		0			// Include debugging code for datum objects.
 #define DCaller		0			// Use "caller-tracking" code and sanity checks for datum objects.
-#define DSFTest		0			// Include string-fabrication test code.
-
-// Definitions for creating and managing strings and integers allocated from heap space.
+#define DSFTest		0			// Include string-fab test code.
 
 // Blob object: used for holding generic chunks of memory, such as a struct or byte string.
 typedef struct {
@@ -62,26 +69,19 @@ typedef struct Datum {
 #define DStrMask	(dat_miniStr | dat_soloStr | dat_soloStrRef)	// String types.
 #define DBlobMask	(dat_blob | dat_blobRef)	// Blob types.
 
-#if DSFTest
-#define DChunkSz0	32			// Starting size of string-fab chunks/pieces.  *TEST VALUE*
-#else
-#define DChunkSz0	128			// Starting size of string-fab chunks/pieces.
-#define DChunkSz4	1024			// Size at which to begin quadrupling until hit maximum.
-#define DChunkSzMax	262144			// Maximum size (256K).
-#endif
-
-// String fabrication object: used to build a string in pieces.
+// String fabrication object: used to build a string in pieces, forward or backward.
 typedef struct {
 	Datum *sf_datp;				// Datum pointer.
 	DChunk *sf_stack;			// Chunk stack (linked list).
 	char *sf_bufp;				// Next byte to store in sf_buf.
 	char *sf_bufpz;				// Ending byte position in sf_buf.
 	char *sf_buf;				// Work buffer.
+	ushort sf_flags;			// Operation mode.
 	} DStrFab;
 
-// String fabrication close types used by dclose().
+// String-fab close types used by dclose().
 typedef enum {
-	sf_string = -1,				// String fabrication object may not contain null bytes.
+	sf_string = -1,				// String-fab object may not contain null bytes.
 	sf_auto,				// Both string and blob types allowed.
 	sf_forceBlob				// Force blob type.
 	} DCloseType;
@@ -91,7 +91,7 @@ extern Datum *datGarbp;				// Head of list of temporary Datum records ("garbage 
 
 // External function declarations and aliases.
 extern int datcpy(Datum *destp,Datum *srcp);
-extern bool dateq(Datum *datp1,Datum *datp2);
+extern bool dateq(Datum *datp1,Datum *datp2,bool ignore);
 extern Datum *datxfer(Datum *destp,Datum *srcp);
 extern void dclear(Datum *datp);
 extern int dclose(DStrFab *sfp,DCloseType type);
@@ -120,15 +120,15 @@ extern int dnew(Datum **datpp,char *caller,char *dName);
 extern int dnewtrk(Datum **datpp,char *caller,char *dName);
 extern int dopen(DStrFab *sfp,char *caller,char *dName);
 extern int dopentrk(DStrFab *sfp,char *caller,char *dName);
-extern int dopenwith(DStrFab *sfp,Datum *datp,bool append,char *caller,char *dName);
+extern int dopenwith(DStrFab *sfp,Datum *datp,ushort mode,char *caller,char *dName);
 #else
 extern int dnew(Datum **datpp);
 extern int dnewtrk(Datum **datpp);
 extern int dopen(DStrFab *sfp);
 extern int dopentrk(DStrFab *sfp);
-extern int dopenwith(DStrFab *sfp,Datum *datp,bool append);
+extern int dopenwith(DStrFab *sfp,Datum *datp,ushort mode);
 #endif
-extern int dputc(int c,DStrFab *sfp);
+extern int dputc(short c,DStrFab *sfp);
 extern int dputd(Datum *datp,DStrFab *sfp);
 extern int dputf(DStrFab *sfp,char *fmt,...);
 extern int dputmem(const void *mem,size_t len,DStrFab *sfp);
@@ -137,7 +137,7 @@ extern int dsalloc(Datum *datp,size_t len);
 extern int dsetblob(void *memp,size_t size,Datum *datp);
 extern void dsetblobref(void *memp,size_t size,Datum *datp);
 extern void dsetbool(bool b,Datum *datp);
-extern void dsetchr(int c,Datum *datp);
+extern void dsetchr(short c,Datum *datp);
 extern void dsetint(long i,Datum *datp);
 extern void dsetmemstr(char *str,Datum *datp);
 #define dsetnil(datp)		dclear(datp)
@@ -150,7 +150,7 @@ extern void dsetuint(ulong u,Datum *datp);
 extern int dshquote(char *str,Datum *datp);
 extern char *dtos(Datum *datp,bool viznil);
 extern int dunputc(DStrFab *sfp);
-extern int dviz(const void *str,size_t len,uint flags,Datum *datp);
-extern int dvizc(int c,uint flags,DStrFab *sfp);
-extern int dvizs(const void *str,size_t len,uint flags,DStrFab *sfp);
+extern int dviz(const void *str,size_t len,ushort flags,Datum *datp);
+extern int dvizc(short c,ushort flags,DStrFab *sfp);
+extern int dvizs(const void *str,size_t len,ushort flags,DStrFab *sfp);
 #endif

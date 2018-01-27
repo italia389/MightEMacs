@@ -1,0 +1,72 @@
+<home>    <exit>
+
+
+~bTabs and Indentation~0
+
+MightEMacs supports both "hard" and "soft" tabs for indenting lines.  When hard
+tabs are in effect, tab characters are inserted into the text when the ~utab~U key
+is pressed, and lines are displayed with tabs converted to spaces using the
+value of the $hardTabSize system variable to determine the tab stops.  When soft
+tabs are in effect, space characters are inserted into the text using the value
+of the $softTabSize system variable to determine the tab stops.
+
+The current tabbing method is determined as follows: if $softTabSize is zero,
+hard tabs are in effect; otherwise, soft tabs.  You can enable soft tabs by
+using the ~ulet~U (~#uESC =~U) command to set the value of the $softTabSize variable to a
+positive number.  Or alternately and more simply, specify a numeric prefix that
+is zero or negative and press the ~utab~U key.  This will set the $softTabSize
+variable to the negated value of the number that you entered.  For example,
+~#uC-_ 4 tab~U will set $softTabSize to 4.
+
+When hard tabs are used (which is the default), you can simply insert or delete
+tab characters in the text to change the indentation.  The point will jump to
+the next tab stop when it is moved past a tab character.  When soft tabs are
+used however, spaces are inserted so you must use the ~uforwTab~U (~#uESC C-f~U) or
+~ubackTab~U (~#uESC C-b~U) command to get the same behavior.  However, these commands are
+infrequently used when coding.  A more common occurrence is the need to delete a
+tab that was just entered.  As it turns out, the ~udelete~U key is bound to the
+~ubackspace~U command, which automatically deletes the previous soft tab when soft
+tabs are in effect (via the ~udeleteBackTab~U command).  So pressing ~udelete~U is usually
+all that is required.
+
+Following are all the commands that are used for managing tabs and indentation:
+
+    ~#uTAB~U         ~utab~U                 Insert hard or soft tab n times (or set soft
+                                    tab size to abs(n) if n <= 0).
+
+    ~#uESC )~U       ~uindentRegion~U        Indent lines in region by n tab stops
+                                    (default 1).
+    ~#uESC (~U       ~uoutdentRegion~U       Outdent lines in region by n tab stops
+                                    (default 1).
+
+    ~#uC-x C-d~U     ~udetabLine~U           Change hard tabs to spaces in [-]n lines
+                                    (default 1, region lines if n == 0).
+    ~#uC-x C-e~U     ~uentabLine~U           Change spaces to hard tabs in [-]n lines
+                                    (default 1, region lines if n == 0).
+
+    ~#uESC C-b~U     ~ubackTab~U             Move point backward [-]n tab stops
+                                    (default 1).
+    ~#uESC C-f~U     ~uforwTab~U             Move point forward [-]n tab stops
+                                    (default 1).
+
+    ~#uS-TAB~U       ~udeleteBackTab~U       Delete backward [-]n hard or soft tabs
+                                    (default 1).
+    ~#uESC TAB~U     ~udeleteForwTab~U       Delete forward [-]n hard or soft tabs
+                                    (default 1).
+
+Of these commands, ~uindentRegion~U and ~uoutdentRegion~U are probably the most commonly
+used (other than the ~utab~U key itself).  These two commands change the indentation
+of all lines in the current region.  The steps to indent or outdent all region
+lines are as follows:
+
+    1.  Move the point to the beginning or end of the block of lines you wish to
+        indent or outdent.  (It can be anywhere on the line.)
+    2.  Type ~uC-SPC~U to set mark ' '.
+    3.  Move the point to the other end of the line block; that is, the first or
+        last line of the block.
+    4.  Type ~#uESC )~U or ~#uESC (~U to indent or outdent the line block one tab stop.
+        To indent or outdent more than one tab stop, enter a numeric prefix
+        first; for example, ~#uC-u 3 ESC )~U.
+
+
+<home>    <exit>

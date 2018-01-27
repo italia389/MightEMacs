@@ -1,4 +1,4 @@
-MightEMacs SCRIPT SYNTAX        Ver. 8.5
+MightEMacs SCRIPT SYNTAX        Ver. 9.0
 
 script =
     compound_statement { compound_statement }
@@ -11,8 +11,8 @@ macro_definition =
     macro_declaration EOL { compound_statement } "endmacro" EOL
 
 macro_declaration =
-    "macro" white_space identifier { "(" integer_expr ")" } { "{" help_clause
-    { "," help_clause } "}" }
+    "macro" white_space identifier { "(" { integer_expr { , { integer-expr } } }
+    ")" } { "{" help_clause { "," help_clause } "}" }
 
 help_clause =
     ( "usage:" | "desc:" ) string_expr
@@ -110,8 +110,10 @@ arg_list =
     and_or_expr { "," arg_list }
 
 primary_expr =
-    identifier | constant | "(" and_or_expr ")" | "[" and_or_expr
-    { "," and_or_expr } "]"
+    identifier | constant | array_expr | "(" and_or_expr ")"
+
+array_expr =
+    "[" and_or_expr { "," and_or_expr } "]"
 
 constant =
     integer_constant | string_constant | "true" | "false" | "nil" | "defn"

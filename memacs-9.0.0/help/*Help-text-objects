@@ -1,0 +1,46 @@
+<home>    <exit>
+
+
+~bText Objects~0
+
+MightEMacs includes a system for text manipulation which allows you to delete,
+copy, and move portions of text around in a buffer with minimal keystrokes.  The
+basic process is to identify the text "object", like a word or line, then
+perform some action on the object, like copy or delete.
+
+The boundaries of all text objects depend on the point.  Its current position
+marks one boundary of an object.  The one exception to this is a line object.
+Its boundaries are always the beginning and end of the line, including the
+delimiter at the end; however, the point identifies the first line of a group of
+lines (a "line block").
+
+Word objects are defined as one or more contiguous characters of the set of
+characters that are contained in the $wordChars system variable.  The variable's
+default value is "A-Za-z0-9_", but it can be changed at any time.
+
+The complete list of text objects follows:
+
+    ~bObject          Description~0
+
+    Word            One or more contiguous $wordChars characters going forward
+                    or backward from point, including any non-word characters
+                    between point and the word.
+    Partial line    One or more characters going forward or backward from point
+                    to a line break.  If no characters exist, the line break
+                    (newline) is selected.
+    Line            A line in the buffer, including its newline delimiter.
+    Region          All text from point to mark ' ' (which may comprise zero
+                    characters).
+    Fenced region   All text from a fence character at point to and including
+                    its matching fence character (forward or backward).  Fence
+                    pairs are ~u(~U ~u)~U, ~u{~U ~u}~U, ~u[~U ~u]~U, and ~u<~U ~u>~U.
+
+A "region" exists at all times and is defined as all text between the point and
+the "space" mark, which is initially placed at the end of a buffer.  Marks are
+printable characters which are used to mark point positions in a buffer.  Mark
+' ' is special in that it always exists (cannot be deleted), and is used for
+delineating a region.  To set mark ' ' at the current point position, you use
+the ~usetMark~U (~uC-SPC~U) command.
+
+
+<home>    <exit>

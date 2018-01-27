@@ -1,0 +1,102 @@
+~bMacro Packages~0
+
+Following is the complete list of the macros available for interactive use.  The
+language-specific macros are loaded (if needed), activated, and deactivated
+automatically when buffers or modes are changed.  For all other macros, note the
+following:
+
+    *   The word processing macros are activated if the $EndSentence variable is
+        set to a non-empty value in "site.mm".
+    *   The block-processing and keyboard macro packages can be loaded by
+        uncommenting the appropriate line(s) in "site.mm" or by adding
+        ~urequire~U statements to the user startup file ".memacs".
+
+See the ~ushowMacros~U (~#uC-h @~U) or ~ushowKey~U (~#uC-h ?~U) displays for details.  A brief
+description of each macro is presented here.
+
+--------------------------------------------------------------------------------
+~bGENERAL USE~0                                     (defined in "memacs.mm")
+
+~udeleteFile~U          ~#uC-x D~U       Delete a file on disk or a buffer and its
+                                associated file.
+~ufenceWord~U           ~#uESC {~U       Wrap a pair of fence characters around one or
+                                more words at point.
+~ugrepFiles~U           ~#uC-x C-g~U     Open all files matching a shell template and
+                                optionally, also matching a search pattern.
+~uindentLine~U          ~#uC-c )~U
+~uoutdentLine~U         ~#uC-c (~U       Indent or outdent a block of lines.
+~ujoinLines0~U          ~#uC-x C-j~U     Join lines with no spacing in between.
+~unextGrepBuf~U         ~#uC-c ]~U
+~uprevGrepBuf~U         ~#uC-c [~U       Switch to next or previous buffer from result of
+                                most recent ~ugrepFiles~U invocation n times.
+~upopFileList~U         ~#uC-h l~U       Display a directory listing in a pop-up window.
+~upwd~U                 ~#uC-h d~U       Display the current working directory on the
+                                message line.
+~uqueryReplaceAll~U     ~#uESC C-q~U     Invoke the ~uqueryReplace~U command on multiple
+                                buffers in succession.
+~urenameFile~U          ~#uC-x R~U       Rename a file.
+~ushowBindings~U        ~#uC-h n~U       Display all possible key bindings and what they
+                                are bound to in a pop-up window.
+~ushowVar~U             ~#uC-h =~U       Display a variable name and its value on the
+                                message line.
+~uunchangeBuf~U         ~#uESC ~~~U       Clear the "changed" attribute of the current
+                                buffer.
+
+--------------------------------------------------------------------------------
+~bWORD PROCESSING~0                                 (defined in "memacs.mm")
+
+~uwpJoinLines~U         ~#uC-c C-j~U     Join lines with extra spacing in between.
+~uwpWrapLine~U          ~#uC-c RTN~U     Wrap line(s) with extra spacing in between.
+
+--------------------------------------------------------------------------------
+~bBLOCK PROCESSING~0                                (defined in "blockFormat.mm")
+
+~ubfFormatItem~U        ~#uESC .~U       Format a block of comment lines or one numbered
+                                list item.
+~ubfFormatList~U        ~#uESC L~U       Format a sequence of numbered list items.
+
+--------------------------------------------------------------------------------
+~bKEYBOARD MACROS~0                                 (defined in "keyMacro.mm")
+
+~ukmDeleteKeyMacro~U    ~#uC-x K~U       Delete a saved keyboard macro by name or number.
+~ukmSaveKeyMacro~U      ~#uESC C-s~U     Save current keyboard macro to disk.
+~ukmSelectKeyMacro~U    ~#uESC K~U       Select a saved keyboard macro by name or number.
+~ukmShowKeyMacros~U     ~#uC-h K~U       Show saved keyboard macros in a pop-up window.
+~ukmXeqKeyMacro~U       ~#uESC e~U       Load and execute a saved keyboard macro by name
+                                or number.
+
+--------------------------------------------------------------------------------
+~bC LANGUAGE~0                                      (defined in "cToolbox.mm")
+
+~ucFindFunc~U           ~#uC-c C-f~U     Find a function declaration in a source file.
+~ucGotoIfEndif~U        ~#uC-c C-g~U     Go to matching ~u#if...~U or ~u#endif~U.
+~ucNukePPLines~U        ~#uC-c #~U       Remove conditional preprocessor lines.
+~ucWrapIf0~U            ~#uESC 0~U       Wrap ~#u#if 0~U and ~u#endif~U around a block of lines.
+~ucWrapIf1~U            ~#uESC 1~U       Wrap ~#u#if 1~U and ~u#endif~U around a block of lines.
+~ucWrapIfElse~U         ~#uESC 2~U       Wrap ~#u#if 0~U and ~u#else~U around a block of lines,
+                                duplicate them, and add ~u#endif~U.
+~ucWrapIfName0~U        ~#uC-c 0~U       Wrap ~#u#if !~UNAME and ~u#endif~U around a block of
+                                lines.
+~ucWrapIfName1~U        ~#uC-c 1~U       Wrap ~u#if~U NAME and ~u#endif~U around a block of
+                                lines.
+~ucWrapIfElseName~U     ~#uC-c 2~U       Wrap ~u#if~U NAME and ~u#else~U around a block of lines,
+                                duplicate them, and add ~u#endif~U.
+~ucWrapList~U           ~#uC-c ,~U       Format a block of lines containing identifiers
+                                separated by commas.
+
+--------------------------------------------------------------------------------
+~bMIGHTEMACS SCRIPT~0                              (defined in "memacsToolbox.mm")
+
+~umemacsFindMacro~U     ~#uC-c C-f~U     Find a macro definition in a file.
+~umemacsGotoBlockEnd~U  ~#uC-c C-g~U     Go to matching block end point.
+~umemacsWrapIf0~U       ~#uESC 0~U       Wrap ~#uif 0~U and ~uendif~U around a block of lines.
+~umemacsWrapIf1~U       ~#uESC 1~U       Wrap ~#uif 1~U and ~uendif~U around a block of lines.
+~umemacsWrapIfElse~U    ~#uESC 2~U       Wrap ~#uif 0~U and ~uelse~U around a block of lines,
+                                duplicate them, and add ~uendif~U.
+
+--------------------------------------------------------------------------------
+~bRUBY SCRIPT~0                                     (defined in "rubyToolbox.mm")
+
+~urubyFindMethod~U      ~#uC-c C-f~U     Find a method definition in a file.
+~urubyGotoBlockEnd~U    ~#uC-c C-g~U     Go to matching block end point.
+~urubyWrapBeginEnd~U    ~#uESC 0~U       Wrap ~u=begin~U and ~u=end~U around a block of lines.

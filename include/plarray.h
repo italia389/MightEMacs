@@ -1,4 +1,4 @@
-// ProLib (c) Copyright 2016 Richard W. Marinelli
+// ProLib (c) Copyright 2017 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -25,7 +25,7 @@ typedef struct {
 extern void aclear(Array *aryp);
 extern Array *aclone(Array *aryp);
 extern Datum *aeach(Array **arypp);
-extern bool aeq(Array *aryp1,Array *aryp2);
+extern bool aeq(Array *aryp1,Array *aryp2,bool ignore);
 extern void afree(Array *aryp);
 extern Datum *aget(Array *srcp,ArraySize index,bool force);
 extern Array *agraph(Array *aryp1,Array *aryp2);
@@ -35,6 +35,6 @@ extern Datum *apop(Array *aryp);
 extern int apush(Array *destp,Datum *srcp);
 extern Datum *ashift(Array *aryp);
 extern Array *aslice(Array *aryp,ArraySize index,ArraySize len);
-extern Array *asplit(uint delim,char *src,int limit);
+extern Array *asplit(short delim,char *src,int limit);
 extern int aunshift(Array *destp,Datum *srcp);
 #endif

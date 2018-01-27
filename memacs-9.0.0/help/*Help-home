@@ -1,0 +1,36 @@
+
+                         ~bM i g h t E M a c s   H e l p~0
+
+Welcome to the MightEMacs Help System.  Topics are listed below.  To get help on
+a particular topic, move the cursor to the link at the beginning of the topic
+line and press ~#uC-h C-h~U.  Links are words in angle brackets, like this: <keys>
+The cursor may be on any character in the link.
+
+~uC-h~U means "control h"; that is, hold down the ~ucontrol~U key and press the ~uh~U key.
+Therefore, you would hold down ~ucontrol~U and press ~uh~U twice for ~#uC-h C-h~U, which will
+go to the topic associated with the link the cursor is on.  Standard links on
+every help page are:
+
+<home>              Go to home page (this page).
+<exit>              Exit the Help System and return to editing session.
+
+To exit MightEMacs at any time, press ~#uC-x C-c~U.
+
+HELP TOPICS (in recommended order):
+
+<introduction>      Introduction to the editor.
+<keys>              How keys are used.
+<terminology>       Display and command terminology.
+<pop-up-wind>       Pop-up windows.
+<numeric-prefix>    Understanding the numeric prefix.
+<getting-help>      Informational commands.
+<mult-files>        Editing multiple files.
+<navigation>        Navigation keys.
+<text-objects>      How text is delineated.
+<kill-ring>         Saving and retrieving text.
+<editing>           Essential editing commands.
+<indentation>       Tabs and indentation.
+<modes>             Modes and their purpose.
+<search>            Searching and replacing.
+<summary>           Summary of concepts and commands.
+<advanced>          How to get "advanced" help.

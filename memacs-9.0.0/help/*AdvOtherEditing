@@ -1,0 +1,41 @@
+~bOther Editing Commands~0
+
+There are a few other editing commands not yet discussed that are very useful
+and worth mentioning.  They are grouped below.
+
+Managing white space:
+
+    ~uSPC~U         ~uspace~U               Insert n spaces (default 1) or abs(n) spaces
+                                    without word wrap or text replacement if
+                                    n < 0.
+    ~#uC-x SPC~U     ~uinsertSpace~U         Insert abs(n) spaces ahead of point, forcing
+                                    text insertion if n < 0.
+    ~#uESC \~U       ~udeleteWhite~U         Remove white space surrounding and
+                                    immediately before point.  If n > 0, non-
+                                    word characters are also deleted.
+    ~#uC-x C-o~U     ~udeleteBlankLines~U    Delete blank lines above and below point.
+                                    If the current line is not blank, blank
+                                    lines immediately below it will be deleted.
+    ~#uC-h C-a~U     ~ubeginWhite~U          Move point to beginning of white space at or
+                                    immediately before point.
+    ~#uC-h C-e~U     ~uendWhite~U            Move point to end of white space at or
+                                    immediately following point.
+
+Inserting lines:
+
+    ~uRTN~U         ~unewline~U             Insert n lines (default 1) or abs(n) lines
+                                    without language formatting, word wrap, or
+                                    text replacement if n < 0.
+    ~uC-j~U         ~unewlineI~U            Insert n lines with same indentation as
+                                    previous line (default 1).
+    ~#uC-x i~U       ~uinsertLineI~U         Insert and indent a line before the [-]nth
+                                    line (default 1).
+    ~uC-o~U         ~uopenLine~U            Insert abs(n) lines ahead of point (default
+                                    1).  If n < 0, also move point to first
+                                    empty line inserted if possible.
+
+Miscellaneous:
+
+    ~uC-q~U         ~uquoteChar~U           Get one keystroke and insert it in raw form
+                                    n times (default 1).
+

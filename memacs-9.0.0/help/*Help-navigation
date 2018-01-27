@@ -1,0 +1,79 @@
+<home>    <exit>
+
+
+~bNavigation~0
+
+Recall that you can move the cursor around in MightEMacs by using the arrow keys
+or by using any of the various navigation commands.  Here is a list of the most
+commonly used ones:
+
+    ~bKey(s)            Command           Description~0
+
+    ~uC-f~U               ~uforwChar~U          Move point forward [-]n characters
+    ~uFNF~U (right arrow)                   (default 1).
+
+    ~uC-b~U               ~ubackChar~U          Move point backward [-]n characters
+    ~uFNB~U (left arrow)                    (default 1).
+
+    ~uC-n~U               ~uforwLine~U          Move point forward [-]n lines
+    ~uFNN~U (down arrow)                    (default 1).
+
+    ~uC-p~U               ~ubackLine~U          Move point backward [-]n lines
+    ~uFNP~U (up arrow)                      (default 1).
+
+    ~uC-a~U               ~ubeginLine~U         Move point to beginning of [-]nth line
+                                        (default 1).
+
+    ~uC-e~U               ~uendLine~U           Move point to end of [-]nth line
+                                        (default 1).
+
+    ~uC-t~U               ~utraverseLine~U      Move point forward or backward $travJump
+                                        characters (or to far right if n == 0).
+
+    ~#uESC g~U             ~ugotoLine~U          Prompt for a line number and move point
+                                        to beginning of that line (or to end of
+                                        buffer if line number is zero).
+
+    ~#uESC C-a~U           ~ubeginText~U         Move point to beginning of text on
+                                        [-]nth line (default 1).
+
+    ~#uESC f~U             ~uforwWord~U          Move point forward [-]n words
+                                        (default 1).
+
+    ~#uESC b~U             ~ubackWord~U          Move point backward [-]n words
+                                        (default 1).
+
+    ~#uESC C-e~U           ~uendWord~U           Move point to end of [-]nth word
+                                        (default 1).
+
+    ~uC-v~U               ~uforwPage~U          Scroll current window forward n pages
+                                        (or half a page if n < 0, default 1).
+
+    ~uC-z~U               ~ubackPage~U          Scroll current window backward n pages
+                                        (or half a page if n < 0, default 1).
+
+    ~#uESC <~U             ~ubeginBuf~U          Move point to beginning of current buffer.
+
+    ~#uESC >~U             ~uendBuf~U            Move point to end of current buffer.
+
+    ~#uC-h .~U             ~ushowPoint~U         Display buffer position of point and
+                                        current character information.
+
+Many of the navigation commands accept a negative argument, which causes a
+backward action or a change in direction.  For example, to move the point to the
+beginning of the previous line, you would use the ~ubeginLine~U command with a
+numeric prefix of -1:
+
+    ~#uC-_ C-a~U
+
+To move the point forward four words, you could enter either of the following:
+
+    ~#uC-u 4 ESC f~U
+    ~#uC-_ 4 ESC b~U
+
+The second sequence invokes the ~ubackWord~U command with a numeric prefix of -4,
+which causes the point to move forward instead of backward.  You probably
+wouldn't do this yourself while typing, but it might be useful in a script.
+
+
+<home>    <exit>

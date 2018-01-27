@@ -1,0 +1,50 @@
+<home>    <exit>
+
+
+~bDisplay Terminology~0
+
+A few terms were introduced in the previous sections which have not been fully
+explained, so let's do that now.  In MightEMacs, the entire terminal screen
+(usually a GUI window) is called the ~bscreen~0.  A screen contains one or more
+~bwindows~0 which are created by splitting the screen vertically, into a top window
+and a bottom window.  This can be done multiple times to create additional
+windows.  It is also possible to create multiple screens; however, all screens
+are stacked on top of (overlay) each other so that only the frontmost one is
+visible at any time.  Lastly, a screen remembers the directory it was created in
+and will automatically switch back to it if needed whenever the screen is
+selected.
+
+Windows display ~bbuffers~0, which are containers that hold the text you are
+editing.  Buffers are usually associated with files, but this is not required.
+Multiple buffers may (and usually do) exist at the same time, some displayed in
+windows and some in the background.  You switch to a buffer in a window in order
+to view or edit it.  You can also display the same buffer in multiple windows,
+each with it's own "cursor" position.
+
+Finally, every window (on every screen) maintains a current buffer position,
+which is where the cursor is when that window is the current window.  This
+position is referred to as the ~bpoint~0.  The point is saved with the buffer when a
+buffer is put into the background, and restored again when it is redisplayed in
+a window.  Points also exist independently in windows; that is, if one buffer is
+being displayed in multiple windows, each window will maintain it's own point
+for that buffer.  So in summary, the cursor on the screen is simply where the
+point is for the buffer in the current window.  We will refer to the "point"
+hereafter in these Help pages when referring to the current place in the text
+where editing operations will occur.
+
+
+~bCommand Terminology~0
+
+In addition to different kinds of display elements, there are different kinds of
+"operatives" in MightEMacs which you should be aware of.  A ~bcommand~0 is the
+primary one.  It is built-in, can be bound to a key (or key sequence), and can
+be run interactively or in a script.  A ~bmacro~0 has the same properties, but can
+be written in a script; hence, is a "custom command" that you can create
+yourself.  A ~bfunction~0 is a built-in operative that cannot be bound or run
+interactively, and is intended for script use only.  Lastly, an ~balias~0 is another
+name that can be created for a command, function, or macro, however it cannot
+be bound.  (An example of the last operative is ~urequire~U, which is a built-in
+alias for the ~uxeqFile~U command.)
+
+
+<home>    <exit>

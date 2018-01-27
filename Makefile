@@ -1,4 +1,4 @@
-# Root Unix makefile for MightEMacs.		Ver. 8.5.0
+# Root Unix makefile for MightEMacs.		Ver. 8.6.0
 
 # Definitions.
 MAKEFLAGS = --no-print-directory
@@ -11,10 +11,8 @@ LIB = prolib
 LIBNAME = libpro.a
 BIN1 = mm
 BIN2 = memacs
-SITEMM = memacs.mm
 USITEMM = site.mm
 UMM = .memacs
-HELP = memacs-help
 INSTALL1 = /usr/local
 INSTALL2 = /usr
 
@@ -141,24 +139,27 @@ install: uninstall
 	[ -n "$$owngrp" ] && chown $$own:$$grp "$$mainDir"/bin/$(BIN2);\
 	chmod $$dmode "$$mainDir"/bin/$(BIN2);\
 	[ -d "$$mainDir/lib/$(MDIR)" ] || install -v -d $$owngrp -m $$dmode "$$mainDir/lib/$(MDIR)" 1>&2;\
-	cd scripts || exit $$?;\
-	install -v $$comp $$owngrp -m $$fmode $(SITEMM) "$$mainDir/lib/$(MDIR)" 1>&2;\
+	cd lib || exit $$?;\
 	for x in *.mm; do \
 		bak=;\
 		[ $$x = $(USITEMM) ] && bak=-b;\
 		install -v $$comp $$bak $$owngrp -m $$fmode $$x "$$mainDir/lib/$(MDIR)" 1>&2;\
 	done;\
-	cd ../doc || exit $$?;\
+	cd ..;\
 	[ -d "$$mainDir"/share/man/man1 ] || install -v -d $$owngrp -m $$dmode "$$mainDir"/share/man/man1 1>&2;\
-	install -v $$comp $$owngrp -m $$fmode $(HELP) "$$mainDir/lib/$(MDIR)" 1>&2;\
 	for x in *.1; do \
 		install -v $$comp $$owngrp -m $$fmode $$x "$$mainDir"/share/man/man1 1>&2;\
+	done;\
+	cd help || exit $$?;\
+	[ -d "$$mainDir"/lib/$(MDIR)/help ] || install -v -d $$owngrp -m $$dmode "$$mainDir"/lib/$(MDIR)/help 1>&2;\
+	for x in *; do \
+		install -v $$comp $$owngrp -m $$fmode $$x "$$mainDir/lib/$(MDIR)/help" 1>&2;\
 	done;\
 	echo "Done.  MightEMacs files installed in '$$mainDir'." 1>&2
 
 user-install:
 	@echo 'Beginning user startup file installation...' 1>&2;\
-	cd $(MDIR)-[0-9]*[0-9]/scripts || exit $$?;\
+	cd $(MDIR)-[0-9]*[0-9]/lib || exit $$?;\
 	install -v -C -b -m 644 $(UMM) ~ 1>&2;\
 	echo "Done.  User startup file '$(UMM)' installed in '`cd; pwd`'." 1>&2
 
