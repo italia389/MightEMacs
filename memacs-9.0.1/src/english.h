@@ -129,9 +129,11 @@ Argument switches:\n\
     corresponding file is read and the action is performed; otherwise, the first\n\
     data file specified is read.\n\
  2. The -r and -rw argument switches may not both be specified.\n\
- 3. The script execution path is initialized to \""  MMPath_Default  "\" or the\n\
-    MMPATH environmental variable if it is defined.  It may subsequently be\n\
-    changed by the -path switch, -exec switch, or a @file script invocation.";
+ 3. The script execution path is initialized to the MMPATH environmental\n\
+    variable if it is defined; otherwise, \"" MMPath_Alt "\" if directory\n\
+    " MMPath_AltDir " exists; otherwise, \"" MMPath_Std "\".  It may\n\
+    subsequently be changed by the -path switch, -exec switch, or a @file script\n\
+    invocation.";
 
 // General text messages.
 char

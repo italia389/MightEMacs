@@ -46,7 +46,7 @@ extern int insertPipe(Datum *rp,int n,Datum **argpp);
 extern int rdfile(Datum *rp,int n,char *fname,ushort flags);
 extern int readin(struct Buffer *bufp,char *fname,ushort flags);
 extern int readPipe(Datum *rp,int n,Datum **argpp);
-#if USG || HPUX8
+#if USG
 extern int rename(const char *file1,const char *file2);
 #endif
 extern int savebufs(int n,ushort flags);

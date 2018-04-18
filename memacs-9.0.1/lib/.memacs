@@ -1,0 +1,57 @@
+# .memacs	Ver. 9.0.1
+#	MightEMacs user startup file.
+
+# Pop or open file whose pathname is at point.
+macro openBufPath(0) {desc: 'Get pathname at point (or from region if n <= 0) and display the file in a pop-up window (or open\
+ it with ~bfindFile~0 if n >= 0).  Pathname at point is assumed to be bounded by white space or line breaks.'}
+	if ($0 <= 0 && $0 != defn)
+		path = $RegionText
+	else
+		# Do sanity checks.
+		while $lineChar == ' ' || $lineChar == "\t"
+			forwChar
+		endloop
+		if $lineChar == "\n"
+			return failure 'Pathname not found'
+		else
+			# Find beginning and end of pathname.
+			formerMsgState = -1 => alterGlobalMode 'Msg'
+			wordChars = $wordChars
+			$wordChars = '!-~'
+			1 => setMark '?'
+			backWord
+			setMark
+			endWord
+			path = $RegionText
+			-1 => gotoMark '?'
+			$wordChars = wordChars
+			formerMsgState => alterGlobalMode 'Msg'
+		endif
+	endif
+
+	if !empty?(path = prompt($0 >= 0 ? 'Find file' : 'Pop file',path,'f'))
+		if $0 >= 0
+			findFile path
+		else
+			1 => popFile path,'a'
+		endif
+	endif
+endmacro
+
+# Pop a list of all buffers.
+macro popBufAll(0) {desc: 'Display all buffers in a pop-up window.'}
+	bufName = (0 => showBuffers)[0]
+	1 => popBuf bufName,'d'
+endmacro
+
+# Put current keyboard macro into a scratch buffer so it can be edited.
+macro editKeyMacro(0) {desc: 'Edit current keyboard macro.'}
+	scratchBuf
+	insert "# Edit next line, then enter \"C-x x\" to execute this buffer and set the new macro contents.\n\
+$keyMacro = '",$keyMacro,"'"
+	beginLine
+endmacro
+
+bindKey 'ESC E',editKeyMacro
+bindKey 'C-x o',openBufPath
+bindKey 'C-h B',popBufAll

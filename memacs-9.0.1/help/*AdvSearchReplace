@@ -34,13 +34,13 @@ the same manner as copied and killed text is saved in the kill ring, except that
 duplicate entries are not saved to mitigate clutter.  You can recall a previous
 pattern whenever you are being prompted to enter a pattern; that is, whenever
 you invoke the ~usearchForw~U, ~usearchBack~U, ~ureplace~U, or ~uqueryReplace~U command
-interactively.  The most recent pattern will be displayed initially.  To display
-the previous one, you enter ~uC-p~U or ~uup-arrow~U.  When you do this, the ring is
-cycled and the current entry is brought into the input buffer.  You may repeat
-this process as often as you like to see the next older entries in sequence.
-You may also cycle the ring in the opposite direction by entering ~uC-n~U or
-~udown-arrow~U.  Once you have found the pattern you want, you can edit it or just
-press the delimiter key as usual to execute the command.
+interactively.  The input area on the message line will be empty initially.  To
+display the previous pattern, you enter ~uC-p~U or ~uup-arrow~U.  When you do this, the
+ring is cycled and the current entry is brought into the input buffer.  You may
+repeat this process as often as you like to see the next older entries in
+sequence.  You may also cycle the ring in the opposite direction by entering ~uC-n~U
+or ~udown-arrow~U.  Once you have found the pattern you want, you can edit it or
+just press the delimiter key as usual to execute the command.
 
 You can view the search or replace ring at any time by entering ~#uC-h s~U
 (~ushowSearchRing~U) or ~#uC-h r~U (~ushowReplaceRing~U).  You can also delete any or all

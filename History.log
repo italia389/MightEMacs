@@ -1,3 +1,12 @@
+9.0.1	16 Apr 2018
+ 1. Simplified Linux building and installation: combined "Debian", "CentOS", and "Red Hat" platforms into single "Linux"
+    platform (and preprocessor macro) so that one binary is created and shared among all GNU/Linux variants.
+ 2. Changed how $execPath is set at startup for Linux version when MMPATH is not set: if directory /usr/lib/memacs exists, path
+    is set to ":/usr/lib/memacs"; otherwise, ":/usr/local/lib/memacs", as usual.
+ 3. Changed the "searchForw", "searchBack", "queryReplace", and "replace" commands to not display the current pattern as the
+    default when prompting for a search or replacement pattern so that the line does not have to be cleared to enter a new
+    pattern.  The most recently-entered pattern can still be accessed if desired by entering C-p, as usual.
+
 9.0.0	13 Jan 2018
  1. Made major improvements to terminal input:
 	* Added cursor movement and line editing capabilities to terminal input,

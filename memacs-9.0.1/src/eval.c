@@ -10,6 +10,7 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 #include "std.h"
 #include "bind.h"
 #include "cmd.h"
@@ -1522,6 +1523,64 @@ static int getkill(Datum *rp,int n) {
 	return rc.status;
 	}
 
+#ifndef OSName
+// Get OS name for getInfo function and return it in rp.  Return status.
+static int getOS(Datum *rp) {
+	static char myname[] = "getOS";
+	static char *osname = NULL;
+	char *name;
+
+	// Get uname() info if first call.
+	if((name = osname) == NULL) {
+		struct utsname utsname;
+		struct osinfo {
+			char *vkey;
+			char *oname;
+			} osi[] = {
+				{VersKey_MacOS,OSName_MacOS},
+				{VersKey_Debian,OSName_Debian},
+				{VersKey_Ubuntu,OSName_Ubuntu},
+				{NULL,NULL}},
+			*osip = osi;
+
+		if(uname(&utsname) != 0)
+			return rcset(OSError,0,text44,"uname",myname);
+				// "calling %s() from %s() function"
+
+		// OS name in "version" string?
+		do {
+			if(strcasestr(utsname.version,osip->vkey) != NULL) {
+				name = osip->oname;
+				goto Save;
+				}
+			} while((++osip)->vkey != NULL);
+
+		// Nope.  CentOS or Red Hat release file exist?
+		struct stat s;
+
+		if(stat(CentOS_Release,&s) == 0) {
+			name = OSName_CentOS;
+			goto Save;
+			}
+		if(stat(RedHat_Release,&s) == 0) {
+			name = OSName_RedHat;
+			goto Save;
+			}
+
+		// Nope.  Use system name from uname() call.
+		name = utsname.sysname;
+Save:
+		// Save OS name on heap for future calls, if any.
+		if((osname = (char *) malloc(strlen(name) + 1)) == NULL)
+			return rcset(Panic,0,text94,myname);
+				// "%s(): Out of memory!"
+		strcpy(osname,name);
+		}
+
+	return dsetstr(name,rp) != 0 ? librcset(Failure) : rc.status;
+	}
+#endif
+
 // Build array for getInfo function and return it in rp.  Return status.
 static int getary(Datum *rp,int n,InfoTab *itp) {
 	Array *aryp0,*aryp1;
@@ -1715,8 +1774,11 @@ static int tabcheck(Datum *rp,int n,InfoTab *itp,int type,Buffer *bufp,char *myn
 				if(strcasecmp(keyword,itp->keyword) == 0) {
 					if(itp->value != NULL)
 						return dsetstr(itp->value,rp) != 0 ? librcset(Failure) : rc.status;
-
-					// Not a string return value.  Build array and return it.
+#ifndef OSName
+					if(strcmp(itp->keyword,"os") == 0)
+						return getOS(rp);
+#endif
+					// Not a string constant return value.  Build array and return it.
 					return getary(rp,n,itp);
 					}
 				} while((++itp)->keyword != NULL);
@@ -1740,7 +1802,11 @@ static int getInfo(Datum *rp,int n,Datum **argpp,char *myname) {
 		{"hooks",NULL,cf_showHooks},		// [[hook-name,macro-name],...]
 		{"language",Language,-1},
 		{"modes",NULL,cf_showModes},		// [[mode-name,global?,active?,shown?],...]
+#ifdef OSName
 		{"os",OSName,-1},
+#else
+		{"os",NULL,-1},
+#endif
 		{"screens",NULL,cf_showScreens},	// [[screen-num,wind-count,work-dir],...]
 		{"version",Version,-1},
 		{"windows",NULL,-1},			// [[windNum,bufName],...] or [[screenNum,windNum,bufName],...]

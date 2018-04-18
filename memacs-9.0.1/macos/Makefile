@@ -1,4 +1,4 @@
-# Unix makefile for MightEMacs.		Ver. 9.0.0
+# Unix makefile for MightEMacs.		Ver. 9.0.1
 
 # Definitions.
 BinName = mm
@@ -6,15 +6,14 @@ ObjDir = obj
 SrcDir = ../src
 InclDir = ../../include
 LibDir = ../../prolib-1.3.0
-#Libs = -ltermcap -lc -lm $(LibDir)/libpro.a
-#Libs = -ltermcap -lc -lm $(LibDir)/macos/libpro-debug.a
-Libs = -lcurses -lc -lm $(LibDir)/libpro.a
+#Libs = $(LibDir)/libpro.a -ltermcap -lc -lm
+Libs = $(LibDir)/libpro.a -lcurses -lc -lm
 
 # Options and arguments to the C compiler.
 CC = cc
 CFLAGS = -funsigned-char -W -Wall -Wunused\
- -Wno-comment -Wno-missing-field-initializers -Wno-missing-braces -Wno-pointer-sign\
- -Wno-unused-parameter\
+ -Wno-comment -Wno-missing-field-initializers -Wno-missing-braces -Wno-parentheses\
+ -Wno-pointer-sign -Wno-unused-parameter -Wno-unused-result\
  -O2 -I$(InclDir) -I$(SrcDir)
 
 # List of header files.

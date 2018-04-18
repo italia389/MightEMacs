@@ -10,31 +10,16 @@
 
 // OS selection.  Set one of the following to "1".
 #define BSD		0		// Unix BSD 4.2 and ULTRIX.
-#define CENTOS		0		// CentOS Linux.
-#define DEBIAN		0		// Debian Linux.
-#define HPUX8		0		// HPUX HP 9000 ver. 8 and earlier.
-#define HPUX		0		// HPUX HP 9000 ver. 9. and later.
-#define MACOS		0		// Apple MacOS for Macintosh.
-#define REDHAT		0		// Red Hat Linux.
-#define SOLARIS		0		// Sun Solaris 2.5 and later.
+#define LINUX		0		// Linux system (CentOS, Debian, GNU/Linux, Red Hat, Ubuntu, and others).
+#define MACOS		0		// Apple macOS for Macintosh.
 #define USG		0		// Generic Unix System V.
 
 // OS-dependent definitions.
-#if !BSD && !CENTOS && !DEBIAN && !HPUX8 && !HPUX && !MACOS && !REDHAT && !SOLARIS && !USG
+#if !BSD && !LINUX && !MACOS && !USG
 #error	"Unknown OS (a supported Unix platform was not selected in os.h)"
 #endif
 
-#if SOLARIS
-#undef USG
-#define USG		1
-#endif
-
-#if REDHAT && !CENTOS
-#undef CENTOS
-#define CENTOS		1
-#endif
-
-#if CENTOS || DEBIAN
+#if LINUX
 #define _GNU_SOURCE
 #include <features.h>
 #endif

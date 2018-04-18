@@ -336,9 +336,7 @@ int getpat(Datum **argpp,char *prmt,bool srchpat) {
 	if(opflags & OpScript)
 		datxfer(tpatp,argpp[0]);
 	else {
-		char patbuf[srch.m.patlen + OptCh_N + 1];
-		TermInp ti = {srchpat ? mkpat(patbuf,&srch.m) : srch.m.rpat,srch.sdelim,0,srchpat ? &sring : &rring};
-
+		TermInp ti = {NULL,srch.sdelim,0,srchpat ? &sring : &rring};
 		if(terminp(tpatp,prmt,srchpat ? CFNotNull1 | CFNil1 : CFNil1,0,&ti) != Success)
 			return rc.status;
 		if(tpatp->d_type == dat_nil)

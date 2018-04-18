@@ -37,6 +37,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <errno.h>
+#if LINUX
+#include <sys/stat.h>
+#endif
 #include "plgetswitch.h"
 
 // Local definitions.
@@ -1605,8 +1608,18 @@ int main(int argc,char *argv[]) {
 	 vtinit() == Success &&				// Initialize the virtual terminal.
 	 edinit2() == Success) {			// Initialize buffers, windows, and screens.
 
-		// At this point, we are fully operational (ready to process commands).  Set execpath.
-		if(setpath((path = getenv(MMPath_Name)) == NULL ? MMPath_Default : path,false) != Success)
+		// At this point, we are fully operational (ready to process commands).  Set $execPath.
+		if((path = getenv(MMPath_Name)) == NULL) {
+#if LINUX
+			struct stat s;
+
+			// MMPATH not set.  Check if alternate MightEMacs directory exists.
+			path = stat(MMPath_AltDir,&s) == 0 ? MMPath_Alt : MMPath_Std;
+#else
+			path = MMPath_Std;
+#endif
+			}
+		if(setpath(path,false) != Success)
 			goto Retn;
 
 		// Run site and user startup files and check for macro error.

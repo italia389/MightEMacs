@@ -1,8 +1,8 @@
 You are looking at the ReadMe file for MightEMacs, an Emacs-style text editor
 which runs on Unix and Linux platforms.  See file *Install.txt* for build and
 installation instructions.  A C99 C compiler is required if you are not
-installing on a CentOS Linux, Debian Linux, macOS, or Red Hat Linux platform, or
-do not want to use the included binaries.
+installing on a Linux or macOS platform, or do not want to use the included
+binaries.
 
 History and Project Goals
 -------------------------
@@ -55,13 +55,13 @@ post questions or comments on the MightEMacs discussion forum on Reddit at
 
 Notes
 -----
-This distribution of MightEMacs is version 9.0.0.   64-bit binaries are included
-for CentOS Linux vers. 6 and later, Debian Linux vers. 8 and later, macOS vers.
-10.10 and later on Intel, and Red Hat Enterprise Linux vers. 6 and later.  The
-sources should compile on other platforms as well; however, this has not been
-tested and there may be some (hopefully minor) issues which will need to be
-resolved.  If you are compiling on a platform other than one of those listed
-above and encounter any problems, please contact the author with the details.
+This distribution of MightEMacs is version 9.0.1.   64-bit binaries are included
+for GNU/Linux variants (built on a CentOS vers. 6 machine) and macOS vers. 10.10
+and later on Intel.  The sources should compile on other platforms as well;
+however, this has not been tested and there may be some (hopefully minor) issues
+which will need to be resolved.  If you are compiling on a platform other than
+one of those listed above and encounter any problems, please contact the author
+with the details.
 
 Note that a portion of a library (ProLib) is included which contains routines
 that are used by the editor.  The most important ones are in datum.c.  These

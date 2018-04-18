@@ -1,4 +1,4 @@
-.\" (c) Copyright 2018 Richard W. Marinelli    Ver. 9.0.0
+.\" (c) Copyright 2018 Richard W. Marinelli    Ver. 9.0.1
 .\"
 .\" This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 .\" "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -135,7 +135,7 @@
 .rm #[ #] #H #V #F C
 .\" ========================================================================
 .\"
-.TH MEMACS 1 "2018-01-13" "memacs 9.0" "MightEMacs Documentation"
+.TH MEMACS 1 "2018-04-16" "memacs 9.0" "MightEMacs Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -314,8 +314,9 @@ MightEMacs takes the following steps at startup to initialize its environment an
 Buffer "untitled" is created and set as the current buffer.
 .Le
 .Lb 2.
-The script execution path is initialized to ":/usr/local/lib/memacs" (or ":/usr/lib/memacs" on a Debian system)
-or to the value of the MMPATH environmental variable if it is defined.
+The script execution path is initialized to the value of the MMPATH environmental variable if it is defined; otherwise,
+if the Linux executable is being used and directory /usr/lib/memacs exists, the path is set to ":/usr/lib/memacs"; otherwise,
+it is set to ":/usr/local/lib/memacs".
 .Le
 .Lb 3.
 If the \fB-no-startup\fR switch was not specified,

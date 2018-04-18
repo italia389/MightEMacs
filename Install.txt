@@ -1,17 +1,18 @@
 Instructions for installing MightEMacs.
 
 This distribution includes an installer package for the macOS platform and
-64-bit binaries and make files for the CentOS Linux, Debian Linux, macOS, and
-Red Hat Linux platforms.  If you are installing on a different platform, the
-installation scripts will automatically select and use the appropriate make
-files from the included platforms for compilation.  However, compilation on
-other platforms has not been tested, so it is possible that there may be errors.
-If this occurs, please contact the author with the details so that the problem
-can be resolved.  (See the ReadMe.md file for contact information.)  For
-reference, make file locations are (for example, Debian):
+64-bit binaries and make files for macOS and Linux platforms (CentOS, Debian,
+GNU/Linux, Red Hat, Ubuntu, and others).  If you are not installing on a macOS
+or GNU/Linux platform, the installation scripts will automatically select and
+use the appropriate make files from the included platforms for compilation.
+However, compilation on other platforms has not been tested, so it is possible
+that there may be errors.  If this occurs, please contact the author with the
+details so that the problem can be resolved.  (See the ReadMe.md file for
+contact information.)  For reference, make file locations are (for example,
+Linux):
 
-	prolib-1.3.0/debian/Makefile
-	memacs-9.0.0/debian/Makefile
+	prolib-1.3.0/linux/Makefile
+	memacs-9.0.1/linux/Makefile
 
 To install MightEMacs, perform the following steps:
 
@@ -19,36 +20,35 @@ To install MightEMacs, perform the following steps:
     installing on a macOS platform,  want to do a site-wide install, and have
     administrator privileges, go to the next step; otherwise, go to step 5.
 
- 2. The macOS installer is memacs-9.0.0.pkg.  Either open the file from a Finder
+ 2. The macOS installer is memacs-9.0.1.pkg.  Either open the file from a Finder
     window or open it from the shell with the following command:
 
-	$ open memacs-9.0.0.pkg
+	$ open memacs-9.0.1.pkg
 
     and run the installer.  Files will be installed in /usr/local.
 
  3. If you want to install the sample user startup file (.memacs) into your HOME
     directory:
 
-	$ cp memacs-9.0.0/lib/.memacs ~
+	$ cp memacs-9.0.1/lib/.memacs ~
 
  4. Go to step 14.
 
- 5. MightEMacs 64-bit binaries are included for CentOS Linux vers. 6 and later,
-    Debian Linux vers. 8 and later, macOS vers. 10.10 and later, and Red Hat
-    Enterprise Linux vers. 6 and later.  If you want to use one of these
-    binaries and skip compilation, go to step 10; otherwise, go to the next
-    step.  Note that if you are installing on a macOS system, Xcode must already
-    be installed (vers. 7.2.1 or later recommended) so that command-line tools
-    are available.
+ 5. MightEMacs 64-bit binaries are included for GNU/Linux (built on a CentOS
+    vers. 6 machine) and macOS vers. 10.10 and later.  If you want to use one of
+    these binaries and skip compilation, go to step 10; otherwise, go to the
+    next step.  Note that if you are installing on a macOS system, Xcode must
+    already be installed (vers. 7.2.1 or later recommended) so that command-line
+    tools are available.
 
  6. Remove package binaries.
 
 	$ make clean
 
- 7. Review and/or edit beginning portion of memacs-9.0.0/src/std.h to customize
+ 7. Review and/or edit beginning portion of memacs-9.0.1/src/std.h to customize
     MightEMacs compilation (optional).
 
- 8. Review and/or edit memacs-9.0.0/src/bind.h if you want to change the default
+ 8. Review and/or edit memacs-9.0.1/src/bind.h if you want to change the default
     key bindings (not recommended).
 
  9. To see a list of available platforms (optional):
@@ -61,9 +61,9 @@ To install MightEMacs, perform the following steps:
     ..." or other warnings with some compilers.  These may be ignored.
 
     To proceed, supply the desired platform name in lower case as the value of
-    the PLATFORM variable; for example, Debian:
+    the PLATFORM variable; for example, Linux:
 
-	$ make PLATFORM=debian
+	$ make PLATFORM=linux
 
 11. Install MightEMacs.  If you have customized file "site.mm" (site-wide
     defaults) from a previous installation and want to save it, copy the file to
@@ -123,9 +123,10 @@ To install MightEMacs, perform the following steps:
 
 19. Review and/or edit file "site.mm" in the .../lib/memacs installation
     directory to customize site-wide defaults for the editor.  If you saved an
-    old version of the file in step 11, you will have to change the settings in
-    the new "site.mm" file to match the old settings.  You cannot use the old
-    file directly because some of the syntax has changed.
+    old version of the file in step 11, you may have to change the settings in
+    the new "site.mm" file to match the old settings because some of the syntax
+    may have changed, depending on the previous version of MightEMacs you were
+    using.  Significant changes occurred from version 8.5 to 9.0.
 
 Note that MightEMacs can be run with the command "memacs" or "mm" with optional
 switches and/or arguments.  See memacs(1) for details.

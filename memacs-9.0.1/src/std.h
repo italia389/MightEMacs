@@ -53,25 +53,9 @@
 #define execbuf		execbufDebug
 #endif
 
-// Program identification.  Scripts can query these via the "getInfo" function.  REDHAT must be checked before CENTOS because
-// both are defined for Red Hat Linux.
+// Program identification.
 #define ProgName	"MightEMacs"
-#define ProgVer		"9.0.0"
-#if DEBIAN
-#	define OSName	"Debian Linux"
-#elif HPUX8 || HPUX
-#	define OSName	"HP/UX"
-#elif MACOS
-#	define OSName	"macOS"
-#elif REDHAT
-#	define OSName	"Red Hat Linux"
-#elif CENTOS
-#	define OSName	"CentOS Linux"
-#elif SOLARIS
-#	define OSName	"Solaris"
-#else
-#	define OSName	"Unix"
-#endif
+#define ProgVer		"9.0.1"
 
 /***** BEGIN CUSTOMIZATIONS *****/
 
@@ -99,11 +83,9 @@
 #define UserStartup	".memacs"	// User start-up file (in HOME directory).
 #define SiteStartup	"memacs.mm"	// Site start-up file.
 #define MMPath_Name	"MMPATH"	// Shell environmental variable name.
-#if DEBIAN
-#define MMPath_Default	":/usr/lib/memacs"	// Default search directories.
-#else
-#define MMPath_Default	":/usr/local/lib/memacs"	// Default search directories.
-#endif
+#define MMPath_Std	":/usr/local/lib/memacs"	// Standard search path.
+#define MMPath_Alt	":/usr/lib/memacs"	// Alternate search path (Debian platform).
+#define MMPath_AltDir	"/usr/lib/memacs"	// Alternate MightEMacs directory (Debian platform).
 #define RestoreTerm	1		// Restore original terminal display on exit from editor.
 #define Logfile		"memacs.log"	// Log file (for debugging).
 
@@ -128,6 +110,22 @@
 #define JumpMaxStr	"49"		// JumpMax in string form.
 
 /***** END CUSTOMIZATIONS *****/
+
+// OS identification.
+#if MACOS || LINUX
+#	define OSName_CentOS	"CentOS Linux"
+#	define OSName_Debian	"Debian Linux"
+#	define OSName_MacOS	"macOS"
+#	define OSName_RedHat	"Red Hat Linux"
+#	define OSName_Ubuntu	"Ubuntu Linux"
+#	define VersKey_Debian	"debian"
+#	define VersKey_MacOS	"darwin"
+#	define VersKey_Ubuntu	"ubuntu"
+#	define CentOS_Release	"/etc/centos-release"
+#	define RedHat_Release	"/etc/redhat-release"
+#else
+#	define OSName	"Unix"
+#endif
 
 // Miscellaneous.
 #define MLExtend	0		// Include additional printf specifiers in mlprintf() function (deprecated).

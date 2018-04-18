@@ -64,28 +64,28 @@
 #include <string.h>
 
 // Additional include files.
-#if CENTOS || DEBIAN
+#if LINUX
 #include <time.h>
 #elif BSD || MACOS
 #include <sys/time.h>			// Timer definitions.
 #endif
 #include <signal.h>			// Signal definitions.
-#if HPUX8 || HPUX || USG
+#if USG
 #include <termio.h>			// Terminal I/O definitions.
-#elif CENTOS || DEBIAN || MACOS
+#elif LINUX || MACOS
 #include <termios.h>			// Terminal I/O definitions.
 #endif
-#if TT_Curses || (TT_TermCap && (CENTOS || DEBIAN || MACOS))
+#if TT_Curses || (TT_TermCap && (LINUX || MACOS))
 #include <curses.h>			// Curses screen output.
 #include <term.h>
 #endif
 
 // Completion include files.
 // Directory accessing: try and figure this out... if you can!
-#if BSD || CENTOS || DEBIAN || MACOS
+#if BSD || LINUX || MACOS
 #include <sys/dir.h>			// Directory entry definitions.
 #define DIRENTRY	direct
-#elif HPUX8 || HPUX || USG
+#elif USG
 #include <dirent.h>			// Directory entry definitions.
 #define DIRENTRY	dirent
 #endif
@@ -146,10 +146,10 @@ static struct ltchars oldlchars;	// Current ltchars.
 static char blank[6] =			// Blank out character set.
 	{-1,-1,-1,-1,-1,-1};
 #endif
-#if HPUX8 || HPUX || USG
+#if USG
 static struct termio curterm;		// Current modes.
 static struct termio oldterm;		// Original modes.
-#elif CENTOS || DEBIAN || MACOS
+#elif LINUX || MACOS
 static struct termios curterm;		// Current modes.
 static struct termios oldterm;		// Original modes.
 #endif
@@ -369,9 +369,6 @@ ETerm term = {
 	scul,				// Set underline routine.
 	scattroff			// All attributes off routine.
 	};
-#if HPUX8 || HPUX
-int hpterm;				// Global flag braindead HP-terminal.
-#endif
 
 // Initialize attributes of terminal device.  Return status.
 static int ttinit(void) {
@@ -394,7 +391,7 @@ static int ttinit(void) {
 	if(ioctl(0,TIOCSETP,&cursgtty) == -1 || ioctl(0,TIOCSETC,blank) == -1 || ioctl(0,TIOCSLTC,blank) == -1)
 		return rcset(OSError,0,text44,name_ioctl,myname);
 			// "calling %s() from %s() function"
-#elif HPUX8 || HPUX || USG
+#elif USG
 
 	// Get tty modes.
 	if(ioctl(0,TCGETA,&oldterm) == -1)
@@ -419,7 +416,7 @@ static int ttinit(void) {
 	if(ioctl(0,TCSETA,&curterm) == -1)
 		return rcset(OSError,0,text44,name_ioctl,myname);
 			// "calling %s() from %s() function"
-#elif CENTOS || DEBIAN || MACOS
+#elif LINUX || MACOS
 	// Get tty modes.
 	if(tcgetattr(0,&oldterm))
 		return rcset(OSError,0,text44,"tcgetattr",myname);
@@ -457,11 +454,11 @@ static int ttrestore(void) {
 	 ioctl(0,TIOCSLTC,&oldlchars) == -1)
 		return rcset(OSError,0,text44,name_ioctl,myname);
 			// "calling %s() from %s() function"
-#elif HPUX8 || HPUX || USG
+#elif USG
 	if(ioctl(0,TCSETA,&oldterm) == -1)
 		return rcset(OSError,0,text44,name_ioctl,myname);
 			// "calling %s() from %s() function"
-#elif CENTOS || DEBIAN || MACOS
+#elif LINUX || MACOS
 	// Set tty mode.
 	if(tcsetattr(0,TCSANOW,&oldterm) == -1)
 		return rcset(OSError,0,text44,name_tcsetattr,myname);
@@ -612,12 +609,12 @@ static int grabwait(short *cp) {
 	uchar ch;
 	static char myname[] = "grabwait";
 
-#if HPUX8 || HPUX || CENTOS || DEBIAN || MACOS || USG
+#if LINUX || MACOS || USG
 	// Change mode, if necessary.
 	if(curterm.c_cc[VTIME]) {
 		curterm.c_cc[VMIN] = 1;		// Minimum number of characters for noncanonical read.
 		curterm.c_cc[VTIME] = 0;	// Timeout in deciseconds for noncanonical read.
-#if HPUX8 || HPUX || USG
+#if USG
 		if(ioctl(0,TCSETA,&curterm) == -1)
 			return rcset(OSError,0,text44,name_ioctl,myname);
 				// "calling %s() from %s() function"
@@ -659,7 +656,7 @@ static int grabnowait(short *cp) {
 	// Perform read.
 	return grabwait(cp);
 
-#elif HPUX8 || HPUX || CENTOS || DEBIAN || MACOS || USG
+#elif LINUX || MACOS || USG
 	int count;
 	uchar ch;
 
@@ -667,7 +664,7 @@ static int grabnowait(short *cp) {
 	if(curterm.c_cc[VTIME] == 0) {
 		curterm.c_cc[VMIN] = 0;		// Minimum number of characters for noncanonical read.
 		curterm.c_cc[VTIME] = 2;	// Timeout in deciseconds for noncanonical read.
-#if HPUX8 || HPUX || USG
+#if USG
 		if(ioctl(0,TCSETA,&curterm) == -1)
 			return rcset(OSError,0,text44,name_ioctl,myname);
 				// "calling %s() from %s() function"
@@ -891,9 +888,9 @@ static int scopen2(void) {
 	// Set speed for padding sequences.
 #if BSD
 	ospeed = cursgtty.sg_ospeed;
-#elif HPUX8 || HPUX || USG
+#elif USG
 	ospeed = curterm.c_cflag & CBAUD;
-#elif CENTOS || DEBIAN || MACOS
+#elif LINUX || MACOS
 	ospeed = cfgetospeed(&curterm);
 #endif
 #endif
@@ -993,7 +990,7 @@ static int scopen(void) {
 #endif // TT_TermCap
 
 	// Get key bindings.
-#if CENTOS || DEBIAN || MACOS
+#if LINUX || MACOS
 	// These keys don't make it into keymap for some reason (in loop below) so we add them here as a workaround.
 	addkey("\033[Z",Shft|Ctrl | 'I');	// Shift-Tab (bt)
 	addkey("\033[1;2D",Shft|FKey | 'B');	// Shift-left arrow (#4)
@@ -1011,10 +1008,6 @@ static int scopen(void) {
 		++kp;
 		}
 
-#if TT_TermCap && (HPUX8 || HPUX)
-	// Check for HP-Terminal (so we can label its function keys).
-	hpterm = tgetflag("xs");
-#endif
 #endif // TT_TermCap || TT_Curses
 
 	// Finish up.
@@ -1306,7 +1299,7 @@ char *timeset(void) {
 	time_t buf;
 	char *str1,*str2;
 
-#if !(BSD || CENTOS || DEBIAN || MACOS)
+#if !(BSD || LINUX || MACOS)
 	char *ctime();
 #endif
 	// Get system time.
@@ -1322,7 +1315,7 @@ char *timeset(void) {
 	return str1;
 	}
 
-#if USG || HPUX8
+#if USG
 // Rename a file, given old and new.
 int rename(const char *file1,const char *file2) {
 	struct stat buf1,buf2;
@@ -1348,7 +1341,7 @@ int rename(const char *file1,const char *file2) {
 	// Unlink original file.
 	return unlink(file1);
 	}
-#endif // USG || HPUX8.
+#endif
 
 // Create temporary filename, store in datp, and return status code.
 static int tmpfname(Datum *datp) {
