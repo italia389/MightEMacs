@@ -1904,6 +1904,12 @@ static int tcstr(Datum *destp,Datum *srcp) {
 	return rc.status;
 	}
 
+// Set pattern at top of search or replace ring.
+static int setTopPat(Ring *ringp) {
+	char *pat = (ringp->r_size == 0) ? "" : ringp->r_entryp->re_data.d_str;
+	return (ringp == &sring) ? newspat(pat,&srch.m,NULL) : newrpat(pat,&srch.m);
+	}
+
 // Delete entri(es) from search or replace ring and update or delete current pattern in Match record, if applicable.
 static int delpat(Ring *ringp,int n) {
 
@@ -2160,9 +2166,14 @@ BufAttr:
 			case cf_cycleKillRing:
 			case cf_cycleReplaceRing:
 			case cf_cycleSearchRing:
-				// Cycle the kill ring forward or backward.
-				(void) rcycle(fnum == cf_cycleKillRing ? &kring : fnum == cf_cycleSearchRing ? &sring :
-				 &rring,n,true);
+				// Cycle a ring forward or backward.  If search or replace ring, also set pattern at top
+				// when done.
+				if(n != 0) {
+					Ring *ringp = (fnum == cf_cycleKillRing) ? &kring : (fnum == cf_cycleSearchRing) ?
+					 &sring : &rring;
+					if(ringp->r_size > 1 && rcycle(ringp,n,true) == Success && fnum != cf_cycleKillRing)
+						(void) setTopPat(ringp);
+					}
 				break;
 			case cf_definedQ:
 				(void) checkdef(rp,n,argp[0]);

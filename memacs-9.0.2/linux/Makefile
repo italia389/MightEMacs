@@ -13,7 +13,7 @@ Libs = $(LibDir)/libpro.a -lcurses -lc -lm
 CC = cc
 CFLAGS = -funsigned-char -W -Wall -Wunused\
  -Wno-comment -Wno-missing-field-initializers -Wno-missing-braces -Wno-parentheses\
- -Wno-pointer-sign -Wno-unused-parameter -Wno-unused-result\
+ -Wno-pointer-sign -Wno-unused-parameter -Wno-unused-result $(COPTS)\
  -O2 -I$(InclDir) -I$(SrcDir)
 
 # List of header files.

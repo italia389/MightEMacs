@@ -489,6 +489,7 @@ static KeyItem keyitems[] = {
 	{Meta | 'a',cf_apropos},
 	{Meta | 'b',cf_backWord},
 	{Meta | 'd',cf_dupLine},
+	{Meta | 'e',cf_exit},			// Alternative binding.
 	{Meta | 'f',cf_forwWord},
 	{Meta | 'g',cf_gotoLine},
 	{Meta | 'i',cf_seti},

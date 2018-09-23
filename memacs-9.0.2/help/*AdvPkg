@@ -62,7 +62,7 @@ description of each macro is presented here.
 ~ukmSaveKeyMacro~U      ~#uESC C-s~U     Save current keyboard macro to disk.
 ~ukmSelectKeyMacro~U    ~#uESC K~U       Select a saved keyboard macro by name or number.
 ~ukmShowKeyMacros~U     ~#uC-h K~U       Show saved keyboard macros in a pop-up window.
-~ukmXeqKeyMacro~U       ~#uESC e~U       Load and execute a saved keyboard macro by name
+~ukmXeqKeyMacro~U       ~#uC-c K~U       Load and execute a saved keyboard macro by name
                                 or number.
 
 --------------------------------------------------------------------------------

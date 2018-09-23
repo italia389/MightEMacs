@@ -59,7 +59,7 @@ int getswitch(int *argcp,char ***argvp,SwitchDescriptor **swtabp,SwitchResult *r
 	char *digits = "0123456789";
 	static struct {
 		SwitchDescriptor *swdp;		// Pointer to first descriptor in switch table.
-		Hash *htabp;			// Hash of switches expected and found (for duplicate checking).
+		Hash *hp;			// Hash of switches expected and found (for duplicate checking).
 		} state;
 
 
@@ -72,17 +72,17 @@ fprintf(GSDebugFile,"%s(): argcp %.8X (%d), argvp %.8X, *argvp %.8X (%s)...\n",m
 #ifdef GSDebugFile
 fputs("getswitch(): Initializing...\n",GSDebugFile);
 #endif
-		if(hnew(&state.htabp,19) != 0)
+		if(hnew(&state.hp,19) != 0)
 			return -1;
 		for(state.swdp = swdp = *swtabp; swdp->flags != 0; ++swdp) {
 			if(swdp->flags & SF_NumericSwitch) {
 
 				// Numeric switch.  Check if duplicate.
 				tabsw = (swdp->flags & SF_PlusType) ? NSPlusKey : NSMinusKey;
-				if(hsearch(state.htabp,tabsw) != NULL)
+				if(hsearch(state.hp,tabsw) != NULL)
 					return emsgf(-1,"%s(): Multiple numeric (%c) switch descriptors found",myname,
 					 (swdp->flags & SF_PlusType) ? '+' : '-');
-				if(hcreate(state.htabp,tabsw,NULL,NULL) != 0)
+				if(hcreate(state.hp,tabsw,NULL,NULL) != 0)
 					return -1;
 				}
 			else {
@@ -92,16 +92,16 @@ fputs("getswitch(): Initializing...\n",GSDebugFile);
 
 				// Check switch name plus any aliases for duplicates.
 				for(tabswp = swdp->namep; (tabsw = *tabswp) != NULL; ++tabswp) {
-					if(hsearch(state.htabp,tabsw) != NULL)
+					if(hsearch(state.hp,tabsw) != NULL)
 						return emsgf(-1,"%s(): Multiple -%s switch descriptors found",myname,tabsw);
-					if(hcreate(state.htabp,tabsw,NULL,NULL) != 0)
+					if(hcreate(state.hp,tabsw,NULL,NULL) != 0)
 						return -1;
 					}
 				}
 			}
 
 		// Switch table is valid.  Clear hash table and table pointer.
-		hclear(state.htabp);
+		hclear(state.hp);
 		*swtabp = NULL;
 		}
 	else if(state.swdp == NULL)
@@ -236,13 +236,13 @@ MatchFound:
 	fprintf(GSDebugFile,"### Match found, checking hash table for key '%s'...\n",tabsw); fflush(GSDebugFile);
 #endif
 				// Found match; check for duplicate.
-				if(!(swdp->flags & SF_AllowRepeat) && hsearch(state.htabp,tabsw) != NULL)
+				if(!(swdp->flags & SF_AllowRepeat) && hsearch(state.hp,tabsw) != NULL)
 					goto DupNotAllowed;
 #ifdef GSDebugFile
 	fputs("### Not a dup, adding to hash...\n",GSDebugFile); fflush(GSDebugFile);
 #endif
 				// Not a duplicate or repeat allowed; save it.
-				if(hcreate(state.htabp,tabsw,NULL,NULL) != 0)
+				if(hcreate(state.hp,tabsw,NULL,NULL) != 0)
 					return -1;
 				--*argcp;
 				++*argvp;
@@ -316,14 +316,14 @@ NoSwitchesLeft:
 		if(swdp->flags & SF_RequiredSwitch) {
 			tabsw = !(swdp->flags & SF_NumericSwitch) ? swdp->namep[0] : (swdp->flags & SF_PlusType) ? NSPlusKey :
 			 NSMinusKey;
-			if(hsearch(state.htabp,tabsw) == NULL)
+			if(hsearch(state.hp,tabsw) == NULL)
 				return (swdp->flags & SF_NumericSwitch) ? emsgf(-1,"Numeric (%c) switch required",
 				 (swdp->flags & SF_PlusType) ? '+' : '-') : emsgf(-1,"-%s switch required",tabsw);
 			}
 		}
 
 	// Scan completed.  Delete hash, reset static pointer, and return result.
-	hfree(state.htabp);
+	hfree(state.hp);
 	state.swdp = NULL;
 	return 0;
 

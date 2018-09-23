@@ -206,4 +206,4 @@ bindKey 'ESC C-s',kmSaveKeyMacro
 bindKey 'C-x K',kmDeleteKeyMacro
 bindKey 'ESC R',kmRenameKeyMacro
 bindKey 'C-h K',kmShowKeyMacros
-bindKey 'ESC e',kmXeqKeyMacro
+bindKey 'C-c K',kmXeqKeyMacro

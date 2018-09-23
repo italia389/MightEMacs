@@ -55,7 +55,7 @@ post questions or comments on the MightEMacs discussion forum on Reddit at
 
 Notes
 -----
-This distribution of MightEMacs is version 9.0.1.   64-bit binaries are included
+This distribution of MightEMacs is version 9.0.2.   64-bit binaries are included
 for GNU/Linux variants (built on a CentOS vers. 6 machine) and macOS vers. 10.10
 and later on Intel.  The sources should compile on other platforms as well;
 however, this has not been tested and there may be some (hopefully minor) issues

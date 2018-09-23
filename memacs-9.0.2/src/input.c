@@ -1034,11 +1034,22 @@ static int cListCFAB(InpState *isp,Buffer **bufpp,uint selector) {
 	return bpop(*bufpp,RendShift);
 	}
 
+// Compare two filenames (for qsort()).
+static int fncmp(const void *fnp1,const void *fnp2) {
+
+	return strcmp(*((char **) fnp1),*((char **) fnp2));
+	}
+
 // Make a completion list based on a partial filename, given pointer to InpState object (containing partial name) and indirect
 // work buffer pointer.  Return status.
 static int cListFile(InpState *isp,Buffer **bufpp) {
-	char *fname;			// Trial file to complete.
+	char *fname,*str;
+	char **fnlist = NULL;		// Array of matching filenames (to be sorted after scan).
+	char **fnlp;
+	uint fnct = 0;
+	uint fnsize = 32;
 	char dirbuf[MaxPathname + 1];
+	static char myname[] = "cListFile";
 
 	// Open the directory.
 	ibuftos(dirbuf,isp);
@@ -1049,14 +1060,43 @@ static int cListFile(InpState *isp,Buffer **bufpp) {
 	while(ereaddir() == Success) {
 
 		// Is this a match?
-		if(ibufcmp(isp,fname))
-			if(bappend(*bufpp,fname) != Success)
-				return rc.status;
+		if(ibufcmp(isp,fname)) {
+			if(fnlist == NULL || fnct == fnsize) {
+				fnsize *= 2;
+				if((fnlist = (char **) realloc(fnlist,sizeof(char *) * fnsize)) == NULL)
+					return rcset(Panic,0,text94,myname);
+						// "%s(): Out of memory!"
+				fnlp = fnlist + fnct;
+				}
+
+			// Get space for filename and store in array.
+			if((str = (char *) malloc(strlen(fname) + 1)) == NULL)
+				return rcset(Panic,0,text94,myname);
+					// "%s(): Out of memory!"
+			strcpy(str,fname);
+			*fnlp++ = str;
+			++fnct;
+			}
 		}
 
 	// Error?
 	if(rc.status != Success)
 		return rc.status;
+
+	// Have all matching filenames.  Sort the list if two or more.
+	if(fnct > 1)
+		qsort((void *) fnlist,fnct,sizeof(char *),fncmp);
+
+	// Copy sorted list to completion buffer and free the array.
+	if(fnct > 0) {
+		char **fnlpz = (fnlp = fnlist) + fnct;
+		do {
+			if(bappend(*bufpp,*fnlp) != Success)
+				return rc.status;
+			free((void *) *fnlp++);
+			} while(fnlp < fnlpz);
+		}
+	free((void *) fnlist);
 
 	return bpop(*bufpp,RendShift);
 	}
@@ -1249,6 +1289,7 @@ int terminp(Datum *rp,char *prmt,uint aflags,uint cflags,TermInp *tip) {
 	bool quotef = false;		// Quoting next character?
 	bool popup = false;		// Completion pop-up window being displayed?
 	bool refresh = false;		// Update screen before getting next key.
+	bool cycleRing = false;		// Don't cycle search or replacement ring for first C-p key.
 	enum e_termcmd cmd;
 	uint vct;			// Variable list size.
 	Datum *datp;
@@ -1349,7 +1390,9 @@ DelChar:
 GetRing:
 						if(ti.ringp->r_size == 0)
 							goto BadKey;
-						(void) rcycle(ti.ringp,n,false);	// Can't fail.
+						if(cycleRing || n != 1)
+							(void) rcycle(ti.ringp,n,false);	// Can't fail.
+						cycleRing = true;
 						if(mli_trunc(&istate,tc_erase) != Success ||
 						 mli_puts(ti.ringp->r_entryp->re_data.d_str,&istate) != Success)
 							return rc.status;

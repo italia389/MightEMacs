@@ -1,3 +1,11 @@
+9.0.2	23 Sep 2018
+ 1. Fixed terminal input for the searchForw, searchBack, queryReplace, and replace commands so that the most recently-entered
+    pattern will be displayed first when C-p is typed.
+ 2. Changed the cycleSearchRing and cycleReplaceRing commands to set the pattern at top of ring if possible, after the ring is
+    cycled (like deleteSearchPat).
+ 3. Changed filename completions to sort the filename list before displaying it.
+ 4. Added return-value information to command descriptions for lastBuf, scratchBuf, beginText, beginLine, and endLine.
+
 9.0.1	16 Apr 2018
  1. Simplified Linux building and installation: combined "Debian", "CentOS", and "Red Hat" platforms into single "Linux"
     platform (and preprocessor macro) so that one binary is created and shared among all GNU/Linux variants.

@@ -1233,7 +1233,7 @@ int setvar(Datum *rp,int n,Datum **argpp) {
 		}
 	else if(vd.vd_type == VTyp_SVar && (vd.p.vd_svp->sv_flags & (V_GetKey | V_GetKeySeq))) {
 		if(dputs(text76,&sf) != 0)
-				// " (key): "
+				// " (key)"
 			goto LibFail;
 		}
 	if(dclose(&sf,sf_string) != 0)

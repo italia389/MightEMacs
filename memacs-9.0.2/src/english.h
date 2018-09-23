@@ -213,7 +213,7 @@ char
  *text73 = "%s narrowed",
  *text74 = "%s '%s' is not narrowed",
  *text75 = "%s widened",
- *text76 = " (key): ",
+ *text76 = " (key)",
  *text77 = "%s() bug: Mark '%c' not found in buffer '%s'!",
  *text78 = "Search",
  *text79 = "Not found",
@@ -579,8 +579,10 @@ char
 #define CFLit_beep		"Sound beeper n times (default 1)."
 #define CFLit_beginBuf		"Move point to beginning of current buffer (or named buffer if n argument)."
 #define CFLit_beginKeyMacro	"Begin recording a keyboard macro."
-#define CFLit_beginLine		"Move point to beginning of [-]nth line (default 1)."
-#define CFLit_beginText		"Move point to beginning of text on [-]nth line (default 1)."
+#define CFLit_beginLine		"Move point to beginning of [-]nth line (default 1).  Returns: false if hit a buffer boundary;\
+ otherwise, true."
+#define CFLit_beginText		"Move point to beginning of text on [-]nth line (default 1).  Returns: false if hit a buffer\
+ boundary; otherwise, true."
 #define CFLit_beginWhite	"Move point to beginning of white space at or immediately before point."
 #define CFLit_bgets		"Return nth next line (default 1) without trailing newline from named buffer beginning at\
  point.  If no lines left, nil is returned."
@@ -660,7 +662,8 @@ char
 #define CFLit_emptyQ		"Return true if expression value is nil, a null string, or empty array; otherwise, false."
 #define CFLit_endBuf		"Move point to end of current buffer (or named buffer if n argument)."
 #define CFLit_endKeyMacro	"End recording a keyboard macro."
-#define CFLit_endLine		"Move point to end of [-]nth line (default 1)."
+#define CFLit_endLine		"Move point to end of [-]nth line (default 1).  Returns: false if hit a buffer boundary;\
+ otherwise, true."
 #define CFLit_endWhite		"Move point to end of white space at or immediately following point."
 #define CFLit_endWord		"Move point to end of [-]nth word (default 1).  Returns: false if hit a buffer boundary;\
  otherwise, true."
@@ -741,7 +744,7 @@ macro-name],...] (where macro-name is nil if hook not set), \"Language\" -> lang
 #define CFLit_killWord		"Delete and save [-]n words to kill ring (default 1, without trailing white space if n == 0). \
  Non-word characters between point and first word are included."
 #define CFLit_lastBuf		"Switch to last buffer exited from in current screen (and delete current buffer if n < 0). \
- Returns: name of buffer switched to."
+ Returns: ~bselectBuf~0 value for n == 1."
 #define CFLit_length		"Return length of string or size of an array."
 #define CFLit_let		"Assign a value (or an expression if n argument) to a system or global variable interactively."
 #define CFLit_lowerCaseLine	"Change [-]n lines to lower case (default 1, region lines if n == 0)."
@@ -840,7 +843,7 @@ macro-name],...] (where macro-name is nil if hook not set), \"Language\" -> lang
 #define CFLit_saveScreen	"Remember current screen."
 #define CFLit_saveWind		"Remember current window."
 #define CFLit_scratchBuf	"Create and switch to a buffer with unique name, with ~bselectBuf~0 options.  Returns:\
- Name of buffer that is created."
+ ~bselectBuf~0 values."
 #define CFLit_searchBack	"Search backward for the nth occurrence of a pattern (default 1).  Returns: string\
  found, or false if not found."
 #define CFLit_searchForw	"Search forward for the nth occurrence of a pattern (default 1).  Returns: string\

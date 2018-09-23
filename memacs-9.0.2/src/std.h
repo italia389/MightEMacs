@@ -55,7 +55,7 @@
 
 // Program identification.
 #define ProgName	"MightEMacs"
-#define ProgVer		"9.0.1"
+#define ProgVer		"9.0.2"
 
 /***** BEGIN CUSTOMIZATIONS *****/
 
