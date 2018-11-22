@@ -10,7 +10,7 @@
 
 #include "pldef.h"
 
-// Switch descriptor and result objects.
+// Switch objects.
 typedef struct {
 	char **namep;				// Pointer to array of switch names.
 	ushort flags;				// Descriptor flags.
@@ -19,6 +19,10 @@ typedef struct {
 	char *name;				// Pointer to source switch name.
 	char *value;				// Pointer to switch argument if found; otherwise, NULL.
 	} SwitchResult;
+typedef struct {
+	SwitchDescriptor *swdp;			// Pointer to switch descriptor in switch table.
+	uint foundCount;			// Number of occurrences of found switch.
+	} SwitchState;
 
 // Switch descriptor flags.
 #define SF_NumericSwitch	0x0001		// Numeric switch; otherwise, standard.
@@ -35,10 +39,8 @@ typedef struct {
 #define SF_AllowRepeat		0x0080		// Switch may be repeated.
 #define SF_AllowNullArg		0x0100		// Switch argument may be null.
 
-//#define NSMinusKey		"-\7\1-"	// Dummy hash key to use for - numeric switch.
-//#define NSPlusKey		"+\7\1+"	// Dummy hash key to use for + numeric switch.
-#define NSMinusKey		"-zzz-"
-#define NSPlusKey		"+zzz+"
+#define NSMinusKey		"-zzz-"		// Dummy hash key to use for - numeric switch.
+#define NSPlusKey		"+zzz+"		// Dummy hash key to use for + numeric switch.
 
 // External function declarations.
 extern int getswitch(int *argcp,char ***argvp,SwitchDescriptor **swtabp,SwitchResult *resultp);

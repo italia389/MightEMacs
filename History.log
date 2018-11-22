@@ -1,3 +1,177 @@
+MightEMacs RELEASE HISTORY
+
+----------
+9.1.0	19 Nov 2018
+
+
+*** Changes From Previous Version
+
+ 1. Made major improvements to mode system:
+	* Eliminated "show" modes -- deleted "alterShowMode" command, "showMode?" function, and $ShowModes variable.
+	* Added support for user-defined modes, in addition to built-in ones.
+	* Created mode groups, which provide a means to group similar modes (like programming languages) so that their states
+	  and types can be controlled.
+	* Added ability to change type (global or buffer) of most modes at any time.
+	* Created "editMode" (C-c m) and "editModeGroup" (C-c g) commands, which provide the means to create and edit modes and
+	  mode groups.
+	* Changed "Bak" mode to be a buffer mode by default instead of global.
+	* Added option to "defined?" function to check for the existence of modes and groups.
+	* Created "groupMode?" function, which checks if a mode in a group is enabled and returns its name if so; otherwise,
+	  nil.
+	* Renamed "alterBufMode" and "alterGlobalMode" commands to "chgBufMode" and "chgGlobalMode", and changed both to not do
+	  a "clear all" when n < -1, and allow no arguments when n > 1 instead, which serves the same purpose.
+	* Changed "mode" hook to take two arguments, either: nil and old $GlobalModes value if a global mode was changed, or
+	  buffer name and old $BufModes value if a buffer mode was changed.
+	* Changed "getInfo 'Modes'" function to return an array containing all modes, their parent group (if any), and their
+	  attributes.
+	* Created "Fence" mode, which enables left fence highlighting when a right fence is typed; for example, the matching '{'
+	  is highlighted when '}' is typed.
+	* Changed default binding for "showModes" commmand to "C-h m" (instead of "C-h M").
+    Now modes can be created, modified, and deleted, and used to control user- defined operations such as programming language
+    formatting.
+ 2. Removed all built-in language formatting (for C, MightEMacs, Perl, Ruby, and Shell), reimplemented it in external script
+    libraries, and created libraries for most other major programming languages.  Editor now does auto-formatting for C, C++,
+    HTML, Java, JavaScript, MightEMacs, Perl, PHP, macOS PList, Python, Ruby, Rust, Shell, SQL, and Swift languages.
+ 3. Changed internal buffer management:
+	* Changed how lines are managed such that the last line of a buffer no longer contains an implicit newline delimiter.
+	* Created "ATerm" ("auto-termination") mode, which, when enabled, causes a newline to be automatically appended to a
+	  buffer if it is missing when the buffer is written to disk.
+	* Changed "insertBuf", "insertFile", and "insertPipe" commands to insert lines (possibly without a terminating newline)
+	  at point instead of at the beginning of the current line, as previously.
+ 4. Changed message line management:
+	* Renamed "clearMsg" function to "clearMsgLine", to clarify its purpose.
+	* Changed "clearMsgLine", "print", and "printf" functions to always write to message line regardless of "Msg" mode
+	  state, and removed "force" option from the functions, which is no longer needed.
+	* Changed "showPoint" command to write results directly to message line instead of setting a return message, as
+	  previously.
+	* Renamed "Msg" global mode to "RtnMsg" to clarify that it now controls return messages only.
+	* Changed "run" command to set "RtnMsg" mode when interactive state is enabled, then restore the mode's previous state.
+	* Replaced "success" and "failure" functions with new "message" function, which takes options ("NoWrap", "TermAttr") as
+	  its first argument and uses the n argument to control the "force" option and return value.
+    Now "RtnMsg" global mode controls return messages only, messages from new "message" function have same priority as built-in
+    commands by default (are no longer implicitly forced), and text that is written directly to message line during script
+    execution will always be displayed.
+ 5. Improved hook system:
+	* Created "filename" hook, which is called whenever a filename in a buffer is changed.
+	* Changed hook execution to not allow recursion.
+	* Changed "prekey" hook to not pass a key literal argument (which can be obtained from $lastKeySeq variable), and
+	  changed "postKey" hook to pass return value from "preKey" hook as an argument, or nil if "preKey" hook not set.
+	* Changed "showHooks" display to be easier to read, wrap lines properly, and show macro arguments more clearly.
+ 6. Made changes to the scripting language:
+	* Implemented in-line comments of form "/#...#/" so that a comment can be added to a line in a script without adversely
+	  affecting any continuation lines that follow it.
+	* Changed evaluation of an array slice "ary[i,len]" to allow length to exceed the number of elements beyond index and to
+	  return all remaining elements in that case.
+	* Implemented a pseudo "char" type as an 8-bit integer.
+	* Added ability to use the Ruby-style "?x" character literal in an expression (which evaluates it to a 8-bit integer),
+	  where "x" may be a character or any \x escape sequence allowed in a double-quoted string; for example, ?" or ?\s (for
+	  a space).
+	* Changed $lineChar system variable to return/set current character in line as an ASCII integer value (char) instead of
+	  a string, and insert a newline into the buffer if the variable is set to a newline character.
+	* Changed the following commands and functions to interpret specific arguments as char (ASCII integer) instead of
+	  string: "defined?", "deleteMark", "gotoMark", "markBuf", "setMark", "swapMark" (mark argument), "split", "strPop",
+	  "strShift" (delimiter argument), and "wordChar?" (character argument).
+	* Added "constrain" modifier which can be specified immediately before the word "macro" in a macro definition.  If
+	  specified, the macro that is defined is designated to be a "helper" routine and may not be bound to a key or run
+	  interactively, and is not included in the "showMacros" display by default.  Additionally, a macro must be defined as
+	  contrained to be set to a hook.
+	* Nested macro definitions are no longer allowed, which was a non-standard feature of dubious value.
+ 7. Made command and function changes:
+	* Changed detabLine and entabLine commands to accept a tab size argument so that $hardTabSize can be overridden.
+	* Created "glob" function, which returns a (possibly empty) array of pathnames that match a shell glob pattern.
+	* Changed "pathname" function to accept an array as an argument and return an array of absolute pathnames in that case
+	  instead of a string.
+	* Changed "xPathname" function to treat its argument as an absolute pathname only if it begins with a slash (/) instead
+	  of "contains a slash", as previously; accept a glob pattern as an argument and return a (possibly empty) array of
+	  pathnames that match in that case instead of a string; and skip null directories in $execPath during scan if n <= 0.
+	* Created "getWord" function, which extracts the previous, current, or next word from current buffer relative to point
+	  and returns it.
+	* Fixed "sub" function so that any value of n is valid, and first occurrence of pattern is substituted if n <= 1;
+	  otherwise, all.
+	* Changed "gotoFence" command to accept "from" fence as an argument if n is not the default.
+	* Changed "prompt" function to allow quoting for single character input ('c' type) via C-q so that C-q, RTN, C-j, and
+	  C-SPC can be input in raw form.
+	* Changed "index" function to interpret its pattern argument as a character if n <= 0 and find rightmost occurrence of
+	  pattern or character if n >= 0.
+	* Changed "prompt" function to return result as an ASCII (int) character when type is 'c' and require the default value
+	  to also be char, if specified.
+	* Changed "empty?" function to accept a character (int) argument and return true if it's an ASCII null (zero).
+	* Changed "eval" command to not provide an evaluation option during terminal input, which was overkill.
+	* Changed "binding" function to accept a command or macro name as an argument if n > 0 and return an array of its key
+	  bindings in that case, or return a standardized key literal (as previously) if n <= 0.
+	* Changed "alterBufAttr" command to not do a "clear all" when n < -1, and allow no arguments when n > 1 instead, which
+	  serves the same purpose.
+	* Changed "alias" command to replace any existing alias if n > 0.
+ 8. Changed mark system:
+	* Changed region mark from ' ' to '.' and "work" mark from '.' to '`'.
+	* Changed mark system to no longer allow a space character or tilde (~) to be used as a mark, which are problematic to
+	  display.
+	* Changed mark commands to display marks on message line underlined instead of in single quotes so that they do not look
+	  like strings.
+ 9. Changed mode line updating so that the editor name and version are displayed on the mode line at the bottom of the screen
+    only, are at the far right instead of the beginning of the line, and displayed only if room is available.
+10. Created $LastKey system variable, which holds the ordinal value of the last 7-bit ASCII character entered, or -1 if an
+    extended key or 8-bit character was entered.  This is intended to be used by language-formatting macros for quick access to
+    user keystrokes.
+11. Created "selectLine" function, which gets a line block (default) or text block (if n argument) per its numeric argument;
+    moves point to beginning of region if region not empty; and returns number of lines selected.  This is intended to be used
+    in scripts by macros that emulate line or text commands.
+12. Renamed "lowerCaseString", "titleCaseString", "upperCaseString", and "toString" to "lowerCaseStr", "titleCaseStr",
+    "upperCaseStr", and "toStr" to be consistent with other function names.
+13. Changed "detabLine", "entabLine", "indentRegion", "outdentRegion", "trimLine", "lowerCaseLine", "titleCaseLine", and
+    "upperCaseLine" commands to mark target line block as a region after processing completed (in addition to moving point to
+    end of block).
+14. Modified working directory commands and hooks:
+	* Renamed "chDir" command and hook to "chgDir" to be consistent with "chgBufMode" and "chgGlobalMode" commands.
+	* Created "showDir" (C-h d) command, which displays current working directory on message line.
+	* Created "pwd" alias to "showDir" command.
+	* Removed "pwd" macro and key binding from memacs.mm.
+15. Fixed bug where entries on the search ring could be duplicated in certain situations.
+
+
+*** Implementation Notes
+
+ 1. Changes to the scripting language:
+	* Removed "alterShowMode" command, "showMode?" function, and $ShowModes variable.
+	* Renamed "alterBufMode" and "alterGlobalMode" commands to "chgBufMode" and "chgGlobalMode" and changed how n is
+	  interpreted.
+	* "getInfo('Modes')" now returns more information.
+	* Renamed "Msg" global mode to "RtnMsg".
+	* Changed "Bak" mode to be a buffer mode by default instead of global.
+	* Changed "clearMsg", "print", and "printf" functions to always write to message line regardless of "Msg" mode state,
+	  and removed "force" option from the functions.
+	* Replaced "success" and "failure" functions with new "message" function.
+	* Implemented in-line comments of form "/#...#/".
+	* Changed evaluation of an array slice "ary[i,len]" to allow a large length value.
+	* Added "?x" character literal.
+	* Changed the following to require a "char" argument or value: "defined?", "deleteMark", "gotoMark", "markBuf",
+	  "setMark", "split", "strPop", "strShift", "swapMark", "wordChar?", and $lineChar.
+	* Changed "detabLine" and "entabLine" commands to require a tab-size argument.
+	* Changed operation of "alterBufAttr" command, and "binding", "empty?", "index", "prompt", and "sub" functions.
+	* Changed region mark from ' ' to ?. and "work" mark from '.' to ?`.
+	* Space and tilde marks are no longer allowed.
+	* Macros may now be defined with a "constrain" modifier, which immediately precedes the "macro" keyword.
+	* New commands: "editMode", "editModeGroup", and "showDir".
+	* New functions: "getWord", "groupMode?", "glob", and "selectLine".
+	* New variables: $LastKey.
+	* Renamed command "chDir" to "chgDir".
+	* Renamed functions "clearMsg", "lowerCaseString", "titleCaseString", "upperCaseString", and "toString" to
+	  "clearMsgLine", "lowerCaseStr", "titleCaseStr", "upperCaseStr", and "toStr".
+ 2. Hook changes:
+	* Renamed "chDir" hook to "chgDir".
+	* Changed "mode" hook to take two arguments, either: nil and old $GlobalModes value if a global mode was changed, or
+	  buffer name and old $BufModes value if a buffer mode was changed.
+	* Created "filename" hook, which is called whenever a filename in a buffer is changed.
+	* Changed "prekey" hook to not pass a key literal argument, and changed "postKey" hook to pass return value from
+	  "preKey" hook as an argument, or nil if "preKey" hook not set.
+ 3. Changes to mode system and language formatting:
+	* The editor now loads additional initialization files at startup which define modes and formatting parameters for
+	  programming languages.  New languages may be added by creating an "Init" file and optional "Lib" file in the library
+	  directory (usually /usr/local/lib/memacs).  See comments at beginning of file lang.mm for details.
+	* The types of most modes may now be changed from global to buffer or vice versa via the "editMode" command.  The
+	  "showModes" display indicates which ones are "scope locked" and which ones are not.
+
+----------
 9.0.2	23 Sep 2018
  1. Fixed terminal input for the searchForw, searchBack, queryReplace, and replace commands so that the most recently-entered
     pattern will be displayed first when C-p is typed.
@@ -6,6 +180,7 @@
  3. Changed filename completions to sort the filename list before displaying it.
  4. Added return-value information to command descriptions for lastBuf, scratchBuf, beginText, beginLine, and endLine.
 
+----------
 9.0.1	16 Apr 2018
  1. Simplified Linux building and installation: combined "Debian", "CentOS", and "Red Hat" platforms into single "Linux"
     platform (and preprocessor macro) so that one binary is created and shared among all GNU/Linux variants.
@@ -15,6 +190,7 @@
     default when prompting for a search or replacement pattern so that the line does not have to be cleared to enter a new
     pattern.  The most recently-entered pattern can still be accessed if desired by entering C-p, as usual.
 
+----------
 9.0.0	13 Jan 2018
  1. Made major improvements to terminal input:
 	* Added cursor movement and line editing capabilities to terminal input,
@@ -455,6 +631,7 @@
     prepend text to a string-fab object, parse switches and values from the
     command line, and create and manage arrays and hash tables.
 
+----------
 8.5.1	23 Feb 2017
  1. Fixed bug where specifying a string containing a printf formatting spec
     (like "%s") as an argument to the "abort" or "exit" command or "notice"
@@ -469,6 +646,7 @@
     enabled, the display was shifted left (because the point was near the end of
     a long line), and "HScrl" mode was subsequently disabled.
 
+----------
 8.5.0	2 Feb 2017
  1. Converted GeekLib library to new ProLib library which contains several
     improvements, including Datum objects (which replace Value objects and now
@@ -662,6 +840,7 @@
 21. Reorganized source header files: replaced the e*.h files with bind.h, cmd.h,
     english.h, exec.h, file.h, lang.h, main.h, search.h, std.h, and var.h.
 
+----------
 8.4.0	23 Oct 2016
  1. Changed internal line delimiters from CR to NL:
 	* Changed all terminal input to allow either "return" (C-m) or "newline"
@@ -717,6 +896,7 @@
     error.
 15. Removed the "reverse" function, which had dubious value.
 
+----------
 8.3.1	18 Sep 2016
  1. Bug fixes:
 	* Fixed bug where it was not possible to specify an explicit RegExp
@@ -758,6 +938,7 @@
     addition to (), [], {}, and <> pairs) and use it for both the left and right
     fence characters.
 
+----------
 8.3.0	18 Jun 2016
  1. For Debian Linux: changed default value of $execPath global variable to
     ":/etc/memacs.d:/etc" in memacs binary, and changed installation process to
@@ -779,6 +960,7 @@
     instead of inserting n lines before or after the current line, as was done
     previously.
 
+----------
 8.2.1	22 Apr 2016
  1. Bug fixes:
 	* Fixed bug where all integer global variables were being converted to
@@ -810,6 +992,7 @@
  7. The Red Hat Linux binary has been replaced with an equivalent one built on
     CentOS Linux, and a new Debian Linux binary is now included.
 
+----------
 8.2.0	11 Mar 2016
  1. Made search and replacement changes:
 	* Search and replacement patterns may now be any length.
@@ -998,6 +1181,7 @@
     buffer was narrowed and then widened.
 20. Fixed some other minor bugs.
 
+----------
 8.1.1	14 Nov 2015
  1. Fixed various bugs, including an issue where entering a right brace in the
     first column of a line when C mode was enabled could cause random text to be
@@ -1006,6 +1190,7 @@
     terminal window.
  2. Changed the license for the project to GNU General Public License (GPLv3).
 
+----------
 8.1.0	25 Oct 2015
  1. Created "undelete" command, which restores the most recently deleted text
     from a deleteXXX or truncBuf command, and bound it to M-U.
@@ -1022,5 +1207,6 @@
  6. Fixed some minor bugs.
  7. Simplified the installation procedure.
 
+----------
 8.0.0	29 Sep 2015
  1. First public release.

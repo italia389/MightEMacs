@@ -1,0 +1,71 @@
+~bBuffer Commands~0
+
+As explained in the ~bDisplay Terminology~0 section, all editing of text occurs in a
+buffer.  A buffer may or may not be attached to a file.  If it is, the filename
+will be shown in the mode line of the window displaying the buffer.  The
+filename is completely independent of the buffer.  It may be changed at any time
+or deleted.  It really only comes into play when an I/O operation is performed
+on the buffer, at which point it must exist and be valid for the I/O operation
+to complete successfully.  As you may have guessed, MightEMacs opens a file,
+performs I/O, and closes the file at the moment a file command is executed.  The
+file is not opened until then and is closed immediately afterward.
+
+The ~usetBufFile~U (~#uC-x F~U) command is used to associate a filename with a buffer.
+When invoking the command, if you clear the line and press ~ureturn~U, or press
+~uC-SPC~U at the prompt, the filename will be deleted.
+
+MightEMacs provides several other commands for working with buffers, which you
+may want to try out.  See the ~ushowCommands~U (~#uC-h c~U) display for details.
+Following is a summary of the buffer commands which are used most often and also
+those that are not discussed on other help pages:
+
+    ~ualterBufAttr~U    ~#uC-x a~U       Clear or set user-modifiable attributes of a
+                                buffer: "Changed", "Hidden", and "TermAttr".
+                                (All other attributes are maintained by the
+                                editor and cannot be modified.)
+    ~uclearBuf~U        ~#uC-x DEL~U     Delete all text from a buffer and clear the
+                                "Changed" buffer attribute.
+    ~udeleteBuf~U       ~#uC-x C-b~U     Delete a named buffer or buffers which meet
+                                certain criteria if a numeric prefix is given.
+    ~uinsertBuf~U       ~#uC-x ^~U       Insert a named buffer into the current buffer at
+                                point.
+    ~ulastBuf~U         ~#uC-x \~U       Switch back to last buffer exited from.  If the
+                                numeric prefix is negative, the current buffer
+                                is deleted after the switch.
+    ~unextBuf~U         ~#uC-x ]~U       Switch to the next (alphabetically higher)
+                                buffer n times.  If the numeric prefix is
+                                negative, the current buffer is deleted after
+                                the switch.
+    ~uprevBuf~U         ~#uC-x [~U       Switch to the previous (alphabetically lower)
+                                buffer n times.  If the numeric prefix is
+                                negative, the current buffer is deleted after
+                                the switch.
+    ~urenameBuf~U       ~#uC-x B~U       Rename a buffer.
+    ~uscratchBuf~U      ~#uC-x #~U       Create a "scratch" buffer with a unique name and
+                                switch to it.
+    ~uselectBuf~U       ~#uC-x b~U       Switch to a named buffer in the current window.
+                                The selected buffer can be "rendered" in various
+                                other ways if a numeric prefix is given.
+    ~utruncBuf~U        ~#uESC t~U       Truncate current buffer; that is, delete all
+                                text from the point to the beginning or end of
+                                the buffer.
+    ~uxeqBuf~U          ~#uC-x x~U       Execute a named buffer as a macro.
+
+There are two other buffer commands worth mentioning: ~unarrowBuf~U (~#uC-x <~U) and
+~uwidenBuf~U (~#uC-x >~U).  The ~unarrowBuf~U command temporarily shrinks the current buffer
+to a block of contiguous lines, which is determined by the numeric prefix.  When
+buffer "narrowing" is in effect, a "<" character is displayed in the first
+column of the mode line.  Narrowing a buffer can be useful for performing
+editing operations on a portion of it without affecting the excluded text; for
+example, when doing a search and replace, or running a keyboard macro repeatedly
+until the "end" of the buffer is reached.  A buffer can remain narrowed for as
+long as you like and edited normally, although you will not be able to access
+any of the hidden lines or marks while it is narrowed.  To restore it (keeping
+any changes that were made), enter ~#uC-x >~U.
+
+Note that you will be warned if you attempt to save a narrowed buffer to disk.
+If you choose to proceed, the narrowed portion (only) will be written, the
+hidden portion will be permanently discarded, and the buffer will no longer be
+in a narrowed state.  This can happen unexpectedly if the "ASave" global mode is
+enabled.  To cancel the save, simply press ~ureturn~U or enter ~un~U (the default) at
+the prompt.

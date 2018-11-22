@@ -1,0 +1,141 @@
+<home>    <exit>
+
+
+~bEditing Multiple Files~0
+
+Multiple files can be edited in a couple of ways.  One way is to simply specify
+more than one file when invoking the editor.  For example, you could type the
+following at a shell prompt:
+
+    $ mm Notes.txt myscript.mm
+
+As usual, a full-screen window will open displaying the first portion of the
+first file; for example:
+
+     ~u                                                                     ~U
+    | ~u ~U1. Note one.                                                       |
+    |  2. And this would be note number two.                              |
+    |                                                                     |
+    |                                                                     |
+    |                                                                     |
+    |                                                                     |
+    |                                                                     |
+    |                                                                     |
+    |                                                                     |
+    |                                                                     |
+    |~r== (Exact) == Notes == File: Notes.txt ============ MightEMacs 9.1.0 ~0|
+
+A buffer for the second file will be created also, but it will be in the
+background.  To bring it to the foreground, you typically would type ~#uC-x ]~U
+(~unextBuf~U) or ~#uC-x [~U (~uprevBuf~U).  When you do this, the file will be read at the
+same time.  (To save time and conserve memory, MightEMacs delays reading a file
+if possible, until its buffer is selected.)
+
+To see all the buffers that have been created in your editing session, you use
+the ~ushowBuffers~U (~#uC-h b~U) command, which displays their names in a pop-up window.
+For example, you would see something like the following in our example session:
+
+     ~u                                                                     ~U
+    | ~bACHMPNT    Size       Buffer               File~0                     |
+    | ------- --------- -------------------- ---------------------------- |
+    | :            6940 myscript             myscript.mm                  |
+    | :            1286 Notes                Notes.txt                    |
+    |                                                                     |
+    |                                                                     |
+    |                                                                     |
+    |                                                                     |
+    |                                                                     |
+    |                                                                     |
+    |                                                                     |
+    |                                                                     |
+    |~r== (Exact) == Notes == File: Notes.txt ============ MightEMacs 9.1.0 ~0|
+    | End: ~b_~0                                                              |
+     ---------------------------------------------------------------------
+
+You could try this yourself now.  Type ~#uC-h b~U.  You will see a list of all
+visible buffers (if any) shown in alphabetical order.  Note that this help
+buffer will not be shown in the list because it is hidden.  To include hidden
+buffers, use a numeric prefix of -1.  Type ~#uC-_ C-h b~U.  You will now see
+buffer(s) whose names begin with "*Help-".  Press ~uq~U or ~uESC~U to get back to the
+edit window.
+
+Continuing with our example editing session, you would be viewing one of the
+buffers ("Notes" or "myscript") at this point and could edit it.  Recall that
+you can always see which buffer you are in by looking at the mode line at the
+bottom of the window.  The buffer name and filename (if any) are at the end of
+the line.  As explained previously, you can switch to the next or previous
+buffer at any time by typing ~#uC-x ]~U or ~#uC-x [~U, which would put the current buffer
+into the background and bring the next or previous buffer into the current
+window (the foreground).  You can also select a buffer directly by name.  To do
+this, type ~#uC-x b~U (~uselectBuf~U) and enter the name of the buffer at the prompt.
+
+Now let's say you wanted to rename the "myscript.mm" file to "myscript2.mm", or
+more precisely, you wanted to write its buffer to a different file.  To do this,
+you use the ~usetBufFile~U (~#uC-x F~U) command to change the buffer's filename before
+you save the buffer to disk.  The steps would be:
+
+    1.  Switch to the "myscript" buffer.
+    2.  Type ~#uC-x F~U and enter "myscript2.mm" at the prompt (and notice that the
+        buffer name is changed to match the filename).
+    3.  Type ~#uC-x C-s~U to save the buffer to the new file.  If the file already
+        exists, it will be overwritten.
+
+Note that the ~usaveFile~U command will not do anything if the buffer you are saving
+is not changed.  You can change its state by editing the buffer or by using the
+~ualterBufAttr~U (~#uC-x a~U) command.
+
+When you are working on multiple buffers, it is possible to save the changes in
+all buffers at once by specifying a positive numeric prefix to the ~usaveFile~U
+command.  You would enter ~#uC-u C-x C-s~U to do this, which instructs the editor to
+scan the buffer list for changed buffers.  For each one that is found, the
+buffer is saved to disk and the name is displayed briefly on the message line.
+
+Let's say you wanted to open one more file in this editing session for output:
+"src/main.c".  However, the "src" directory does not exist so we'll have to
+create it first.  To do that, we can use the ~ushellCmd~U command.  You would press
+~#uC-x !~U and the following would be displayed:
+
+    |~r== (Exact) == Notes == File: Notes.txt ============ MightEMacs 9.1.0 ~0|
+    | > ~b_~0                                                                 |
+     ---------------------------------------------------------------------
+
+At the "> " prompt, you would type the "mkdir src" shell command and hit ~ureturn~U,
+then press any key to dismiss the "[End]" prompt.
+
+Now we're ready to open our C file, which is done with the ~ufindFile~U command.
+You would type ~#uC-x C-f~U and at the prompt, enter "src/main.c":
+
+    |~r== (Exact) == Notes == File: Notes.txt ============ MightEMacs 9.1.0 ~0|
+    | Find file: src/main.c~b_~0                                              |
+     ---------------------------------------------------------------------
+
+MightEMacs would create a new empty buffer for the file and switch to it in the
+current window.  Note that the file would not yet be created on disk (and if you
+exited the editor at this point without making any changes to the buffer, it
+wouldn't be).  Additionally, the mode line would show the "C" buffer mode, which
+enables automatic indentation and fence matching as you type your C code:
+
+    |~r== (Exact) [C] == main == File: src/main.c ======== MightEMacs 9.1.0 ~0|
+    |                                                                     |
+     ---------------------------------------------------------------------
+
+Lastly, you could use the ~uquickExit~U (~#uESC z~U) command again when you finished
+editing all your files.  Recall that this command saves all changed buffers to
+disk and displays the pathnames as you return to the shell.  You would see the
+following upon exit from our example session:
+
+    Saved file "Notes.txt"
+    Saved file "src/main.c"
+    $
+
+Note that MightEMacs can edit text files containing ~uCR-LF~U, ~uCR~U, or ~uNL~U line
+delimiters.  The line delimiter is determined automatically (by default) when a
+file is read.  However, regardless of which delimiter(s) a file contains, all
+lines in a buffer are assumed to end with ~uNL~U.  MightEMacs remembers the real
+line delimiter for each buffer and writes it back to disk at the end of each
+line when a file is saved.  The output delimiter can be changed however, by
+setting the $otpDelim system variable.  Additionally, the input delimiter(s) can
+be forced to be a certain value by setting the $inpDelim system variable.
+
+
+<home>    <exit>

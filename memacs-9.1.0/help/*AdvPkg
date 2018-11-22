@@ -1,0 +1,166 @@
+~bMacro Packages~0
+
+Following is the complete list of the macros available for interactive use.  The
+language-specific macros are loaded, activated, and deactivated automatically
+when buffers, filenames, or modes are changed.  For all other macros, note the
+following:
+
+    *   The word processing macros are activated if the $EndSentence variable is
+        set to a non-empty value in "site.mm".
+    *   The block-processing and keyboard macro packages can be loaded by
+        uncommenting the appropriate line(s) in "site.mm" or by adding
+        ~urequire~U statements to the user startup file ".memacs".
+
+See the ~ushowMacros~U (~#uC-h @~U) or ~ushowKey~U (~#uC-h ?~U) displays for details.  A brief
+description of each macro is presented here.
+
+--------------------------------------------------------------------------------
+~bGENERAL USE~0                                     (defined in "memacs.mm")
+
+~uchgIndent~U           ~#uC-c TAB~U     Change indentation at beginning of current
+                                line without moving point.
+~udeleteFile~U          ~#uC-x D~U       Delete a file on disk or a buffer and its
+                                associated file.
+~uenumLine~U            ~#uESC #~U       Insert sequential numbers at beginning of all
+                                lines in a block.
+~ufenceWord~U           ~#uESC {~U       Wrap a pair of fence characters around one or
+                                more words at point.
+~ugrepFiles~U           ~#uC-x C-g~U     Open all files matching a shell template and
+                                optionally, also matching a search pattern.
+~uindentLine~U          ~#uC-c )~U
+~uoutdentLine~U         ~#uC-c (~U       Indent or outdent a block of lines.
+~ujoinLines0~U          ~#uC-x C-j~U     Join lines with no spacing in between.
+~unextGrepBuf~U         ~#uC-c ]~U
+~uprevGrepBuf~U         ~#uC-c [~U       Switch to next or previous buffer from result of
+                                most recent ~ugrepFiles~U invocation n times.
+~upopFileList~U         ~#uC-h l~U       Display a directory listing in a pop-up window.
+~uqueryReplaceAll~U     ~#uESC C-q~U     Invoke the ~uqueryReplace~U command on multiple
+                                buffers in succession.
+~urenameFile~U          ~#uC-x R~U       Rename a file.
+~ushowBindings~U        ~#uC-h n~U       Display all possible key bindings and what they
+                                are bound to in a pop-up window.
+~ushowVar~U             ~#uC-h =~U       Display a variable name and its value on the
+                                message line.
+~utrimBuf~U             ~#uESC C-\~U     Trim white space from end of all lines in
+                                current buffer.
+~uunchangeBuf~U         ~#uESC ~~~U       Clear the "changed" attribute of the current
+                                buffer.
+
+--------------------------------------------------------------------------------
+~bWORD PROCESSING~0                                 (defined in "memacs.mm")
+
+~uwpJoinLines~U         ~#uC-c C-j~U     Join lines with extra spacing in between.
+~uwpWrapLine~U          ~#uC-c RTN~U     Wrap line(s) with extra spacing in between.
+
+--------------------------------------------------------------------------------
+~bBLOCK PROCESSING~0                                (defined in "blockFormat.mm")
+
+~ubfFormatItem~U        ~#uESC .~U       Format a block of comment lines or one numbered
+                                list item.
+~ubfFormatList~U        ~#uESC L~U       Format a sequence of numbered list items.
+
+--------------------------------------------------------------------------------
+~bKEYBOARD MACROS~0                                 (defined in "keyMacro.mm")
+
+~ukmDeleteKeyMacro~U    ~#uC-x K~U       Delete a saved keyboard macro by name or number.
+~ukmSaveKeyMacro~U      ~#uESC C-s~U     Save current keyboard macro to disk.
+~ukmSelectKeyMacro~U    ~#uESC K~U       Select a saved keyboard macro by name or number.
+~ukmShowKeyMacros~U     ~#uC-h K~U       Show saved keyboard macros in a pop-up window.
+~ukmXeqKeyMacro~U       ~#uC-c K~U       Load and execute a saved keyboard macro by name
+                                or number.
+
+--------------------------------------------------------------------------------
+~bC LANGUAGE~0                                      (defined in "cLib.mm")
+
+~ucFindFunc~U           ~#uC-c C-f~U     Find a function definition in a source file.
+
+--------------------------------------------------------------------------------
+~bC++ LANGUAGE~0                                    (defined in "cppLib.mm")
+
+~ucppFindClass~U        ~#uC-c C-c~U     Find a class definition in a source file.
+~ucppFindFunc~U         ~#uC-c C-f~U     Find a function definition in a source file.
+
+--------------------------------------------------------------------------------
+~bJAVA LANGUAGE~0                                   (defined in "javaLib.mm")
+
+~ujavaFindClass~U       ~#uC-c C-c~U     Find a class definition in a source file.
+~ujavaFindFunc~U        ~#uC-c C-f~U     Find a function definition in a source file.
+
+--------------------------------------------------------------------------------
+~bJAVASCRIPT~0                                      (defined in "jsLib.mm")
+
+~ujsFindFunc~U          ~#uC-c C-f~U     Find a function definition in a script file.
+
+--------------------------------------------------------------------------------
+~bMIGHTEMACS SCRIPT~0                               (defined in "memacsLib.mm")
+
+~umemacsFindMacro~U     ~#uC-c C-f~U     Find a macro definition in a script file.
+~umemacsGotoBlockEnd~U  ~#uC-c C-g~U     Go to matching block end point.
+~umemacsWrapIf0~U       ~#uESC 0~U       Wrap ~#uif 0~U and ~uendif~U around a block of lines.
+~umemacsWrapIf1~U       ~#uESC 1~U       Wrap ~#uif 1~U and ~uendif~U around a block of lines.
+~umemacsWrapIfElse~U    ~#uESC 2~U       Wrap ~#uif 0~U and ~uelse~U around a block of lines,
+                                duplicate them, and add ~uendif~U.
+
+--------------------------------------------------------------------------------
+~bPERL SCRIPT~0                                     (defined in "perlLib.mm")
+
+~uperlFindSub~U         ~#uC-c C-f~U     Find a subroutine definition in a script file.
+
+--------------------------------------------------------------------------------
+~bPHP SCRIPT~0                                      (defined in "phpLib.mm")
+
+~uphpFindClass~U        ~#uC-c C-c~U     Find a class definition in a script file.
+~uphpFindFunc~U         ~#uC-c C-f~U     Find a function definition in a script file.
+
+--------------------------------------------------------------------------------
+~bPYTHON SCRIPT~0                                   (defined in "pythonLib.mm")
+
+~upythonFindFunc~U      ~#uC-c C-f~U     Find a function definition in a script file.
+
+--------------------------------------------------------------------------------
+~bRUBY SCRIPT~0                                     (defined in "rubyLib.mm")
+
+~urubyFindCM~U          ~#uC-c C-c~U     Find a class or module definition in a script
+                                file.
+~urubyFindMethod~U      ~#uC-c C-f~U     Find a method definition in a script file.
+~urubyGotoBlockEnd~U    ~#uC-c C-g~U     Go to matching block end point.
+~urubyWrapBeginEnd~U    ~#uESC 0~U       Wrap ~u=begin~U and ~u=end~U around a block of lines.
+
+--------------------------------------------------------------------------------
+~bRUST LANGUAGE~0                                   (defined in "rustLib.mm")
+
+~urustFindFunc~U        ~#uC-c C-f~U     Find a function definition in a source file.
+~urustFindMod~U         ~#uC-c C-c~U     Find a module definition in a source file.
+
+--------------------------------------------------------------------------------
+~bSHELL SCRIPT~0                                    (defined in "shLib.mm")
+
+~ushGotoIfEndif~U       ~#uC-c C-g~U     Go to matching ~u#if...~U or ~u#endif~U.
+~ushWrapIf0~U           ~#uESC 0~U       Wrap ~#u#if 0~U and ~u#endif~U around a block of lines.
+~ushWrapIf1~U           ~#uESC 1~U       Wrap ~#u#if 1~U and ~u#endif~U around a block of lines.
+~ushWrapIfElse~U        ~#uESC 2~U       Wrap ~#u#if 0~U and ~u#else~U around a block of lines,
+                                duplicate them, and add ~u#endif~U.
+
+--------------------------------------------------------------------------------
+~bSWIFT LANGUAGE~0                                  (defined in "swfLib.mm")
+
+~uswfFindFunc~U         ~#uC-c C-f~U     Find a function definition in a source file.
+
+--------------------------------------------------------------------------------
+~bPREPROCESSOR (C, C++, Swift)~0                    (defined in "ppLib.mm")
+
+~uppDeletePPLines~U     ~#uC-c #~U       Remove conditional preprocessor lines.
+~uppGotoIfEndif~U       ~#uC-c C-g~U     Go to matching ~u#if...~U or ~u#endif~U.
+~uppWrapIf0~U           ~#uESC 0~U       Wrap ~#u#if 0~U and ~u#endif~U around a block of lines.
+~uppWrapIf1~U           ~#uESC 1~U       Wrap ~#u#if 1~U and ~u#endif~U around a block of lines.
+~uppWrapIfElse~U        ~#uESC 2~U       Wrap ~#u#if 0~U and ~u#else~U around a block of lines,
+                                duplicate them, and add ~u#endif~U.
+~uppWrapIfName0~U       ~#uC-c 0~U       Wrap ~#u#if !~UNAME and ~u#endif~U around a block of
+                                lines.
+~uppWrapIfName1~U       ~#uC-c 1~U       Wrap ~u#if~U NAME and ~u#endif~U around a block of
+                                lines.
+~uppWrapIfElseName~U    ~#uC-c 2~U       Wrap ~u#if~U NAME and ~u#else~U around a block of lines,
+                                duplicate them, and add ~u#endif~U.
+~uppWrapList~U          ~#uC-c ,~U       Format a block of lines containing identifiers
+                                separated by commas.
+
