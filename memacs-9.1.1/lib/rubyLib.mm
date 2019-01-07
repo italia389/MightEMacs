@@ -3,7 +3,7 @@
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# rubyLib.mm		Ver. 9.1.0
+# rubyLib.mm		Ver. 9.1.1
 #	MightEMacs library for Ruby script editing.
 
 ## Define regular expression that will match the first line of a method definition.  The rubyFindMethod macro will replace the
@@ -27,7 +27,7 @@ nil]								/# Slot for search directory obtained from user #/
 
 # Wrap "=begin" and "=end" around a block of lines.
 macro rubyWrapBeginEnd(0) {desc: 'Wrap ~u=begin~U and ~u=end~U around [-]n lines (default 1).'}
-	selectLine $0					# Mark block boundaries and position point.
+	-1 => selectLine $0				# Mark block boundaries and position point.
 	openLine					# Insert "=begin".
 	insert '=begin'
 	swapMark

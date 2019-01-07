@@ -1376,7 +1376,7 @@ int kdctext(int n,int kdc,Region *regp) {
 	// Copy.
 	regp = &region;
 Kopy:
-	return copyreg(regp) != Success ? rc.status : rcset(Success,RCForce,"%s %s",text261,text262);
+	return copyreg(regp) != Success ? rc.status : rcset(Success,RCHigh,"%s %s",text261,text262);
 									// "Text","copied"
 	}
 
@@ -1393,7 +1393,7 @@ int kdcline(int n,int kdc) {
 	if(kdc <= 0)
 		si.curwp->w_face.wf_dot = region.r_dot;
 	return kdctext(0,kdc,&region) != Success || kdc <= 0 ? rc.status :
-	 rcset(Success,RCForce,text307,region.r_linect,region.r_linect == 1 ? "" : "s",text262);
+	 rcset(Success,RCHigh,text307,region.r_linect,region.r_linect == 1 ? "" : "s",text262);
 						// "%d line%s %s"		// "copied"
 	}
 
@@ -1996,7 +1996,7 @@ Nuke:
 	// Copy the word(s).
 	if(copyreg(&region) != Success)
 		return rc.status;
-	return rcset(Success,RCForce,"%s%s %s",text115,oneword ? "" : "s",text262);
+	return rcset(Success,RCHigh,"%s%s %s",text115,oneword ? "" : "s",text262);
 				// "Word","copied"
 	}
 
@@ -2050,6 +2050,6 @@ CopyNuke:
 	region.r_linect = 0;				// Not used.
 	if(copyreg(&region) != Success)
 		return rc.status;
-	return rcset(Success,RCForce,"%s%s %s",text115,oneword ? "" : "s",text262);
+	return rcset(Success,RCHigh,"%s%s %s",text115,oneword ? "" : "s",text262);
 				// "Word","copied"
 	}

@@ -1,4 +1,4 @@
-# Root Unix makefile for MightEMacs.		Ver. 8.6.0
+# Root Unix makefile for MightEMacs.		Ver. 9.1.1
 
 # Definitions.
 MAKEFLAGS = --no-print-directory
@@ -70,23 +70,18 @@ uninstall:
 	@echo 'Uninstalling...' 1>&2;\
 	if [ -n "$(INSTALL)" ] && [ -x "$(INSTALL)/bin/$(BIN2)" ]; then \
 		mainDir="$(INSTALL)";\
-		if [ "$(INSTALL)" = $(INSTALL2) ]; then \
-			oldConfDir=/etc;\
-		else \
-			oldConfDir="$(INSTALL)/etc";\
-		fi;\
 	elif [ -x "$(INSTALL1)/bin/$(BIN2)" ]; then \
-		mainDir=$(INSTALL1); oldConfDir="$(INSTALL1)/etc";\
+		mainDir=$(INSTALL1);\
 	elif [ -x "$(INSTALL2)/bin/$(BIN2)" ]; then \
-		mainDir=$(INSTALL2); oldConfDir=/etc;\
+		mainDir=$(INSTALL2);\
 	else \
 		mainDir=;\
 	fi;\
 	if [ -z "$$mainDir" ]; then \
 		echo "'$(BIN2)' binary not found." 1>&2;\
 	else \
-		for f in "$$mainDir/bin/$(BIN1)" "$$mainDir/bin/$(BIN2)" "$$oldConfDir/memacs.mm" "$$oldConfDir/memacs.d"\
-		 "$$mainDir/lib/$(MDIR)" "$$mainDir/share/man/man1/memacs"*.1; do \
+		for f in "$$mainDir/bin/$(BIN1)" "$$mainDir/bin/$(BIN2)" "$$mainDir/lib/$(MDIR)"\
+		 "$$mainDir/share/man/man1/memacs"*; do \
 			if [ -e "$$f" ]; then \
 				rm -rf "$$f" && echo "Deleted '$$f'" 1>&2;\
 			fi;\

@@ -36,10 +36,10 @@ the ~ushowBuffers~U (~#uC-h b~U) command, which displays their names in a pop-up
 For example, you would see something like the following in our example session:
 
      ~u                                                                     ~U
-    | ~bACHMPNT    Size       Buffer               File~0                     |
-    | ------- --------- -------------------- ---------------------------- |
-    | :            6940 myscript             myscript.mm                  |
-    | :            1286 Notes                Notes.txt                    |
+    | ~bACHMCPNT    Size       Buffer               File~0                    |
+    | -------- --------- -------------------- ----------------------------|
+    | :             6940 myscript             myscript.mm                 |
+    | :             1286 Notes                Notes.txt                   |
     |                                                                     |
     |                                                                     |
     |                                                                     |

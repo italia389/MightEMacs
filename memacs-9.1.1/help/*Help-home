@@ -18,6 +18,7 @@ To exit MightEMacs at any time, press ~#uC-x C-c~U or ~#uESC e~U.
 
 HELP TOPICS (in recommended order):
 
+<quick-start>       Basic steps and keys to edit and save a file.
 <introduction>      Introduction to the editor.
 <keys>              How keys are used.
 <terminology>       Display and command terminology.

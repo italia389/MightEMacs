@@ -1,10 +1,36 @@
 MightEMacs RELEASE HISTORY
 
 ----------
+9.1.1	6 Jan 2019
+
+
+*** Changes from Previous Version
+
+ 1. Bug fixes:
+	* Fixed issue where the "detabLine" and "entabLine" commands would not accept an integer argument (the tab size) when
+	  executed in a script.
+	* Fixed issue where a new filename for a buffer would not be set if it matched the buffer name.
+ 2. Changed return message processing:
+	* created "high priority" option for informational messages which causes a message tagged as such to override
+	  any non-high-priority message set previously.
+	* changed most built-in commands which previously forced a return message to use the "high priority" tag instead so
+	  that messages such as "nn substitutions" (from the "replace" and "queryReplace" commands) can be suppressed in a
+	  script by disabling "RtnMsg" global mode.
+	* changed "message" function to set the high priority flag for a message if abs(n) == 1 and force the message if
+	  abs(n) > 1, instead of force (only) if n != 0, as previously.
+ 3. Added "quick start" topic to Help System.
+
+
+*** Implementation Notes
+
+ 1. Changes to the scripting language:
+	* "message" function now forces a message when abs(n) > 1 instead of n != 0.
+
+----------
 9.1.0	19 Nov 2018
 
 
-*** Changes From Previous Version
+*** Changes from Previous Version
 
  1. Made major improvements to mode system:
 	* Eliminated "show" modes -- deleted "alterShowMode" command, "showMode?" function, and $ShowModes variable.

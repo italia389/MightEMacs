@@ -31,10 +31,10 @@ See the `memacs(1)` man page and on-line help (via `ESC ?`) for further informat
 
 Examples
 --------
-Following are some examples of MightEMacs' features and how it can be used to edit code.  The cursor (point) is shown as <span
-style="color:red">(^)</span> and keys that are typed are shown in <span style="color:blue">blue</span>. Control keys are shown
-as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore) can be typed without holding down the shift key
-(control + dash).
+Following are some examples of MightEMacs' features and how it can be used to edit code.  The cursor (point) is shown as (^)
+and keys that are typed are shown in <b>bold</b>.  Control keys are shown as `C-X`, where `X` is usually a letter.  Note
+that the `C-_` (control + underscore) key, which is used often, can be entered without holding down the shift key (control +
+dash), which makes it much easier to type.
 
 1. Duplicate a block of lines in JavaScript:
 
@@ -42,12 +42,12 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
     switch(grade) {
         case 'A':
             "Good job"
-            break<span style="color:red">(^)</span>
+            break(^)
     </pre>
 
     <pre>
-    <code style="color:blue">C-_ 2</code> (n == -2)
-    <code style="color:blue">ESC d</code> (duplicate current line + prior two)
+    <b>C-_ 2</b> (n == -2)
+    <b>ESC d</b> (duplicate current line + prior two)
     </pre>
     Yields:
 
@@ -56,7 +56,7 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
         case 'A':
             "Good job"
             break
-        <span style="color:red">(^)</span>case 'A':
+        (^)case 'A':
             "Good job"
             break
     </pre>
@@ -66,24 +66,24 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
     <pre>
     if [ $x -lt 0 ]; then
         echo 'Error: x cannot be negative' 1>&2
-    <span style="color:red">(^)</span>
+    (^)
     </pre>
 
     <pre>
-    <code style="color:blue">C-SPC</code> (set mark)
-    <code style="color:blue">C-p C-p</code> (move up two lines)
-    <code style="color:blue">C-c C-l</code> (copy current line to kill ring)
-    <code style="color:blue">C-x C-x</code> (swap point and mark)
-    <code style="color:blue">C-u C-u</code> (n == 0)
-    <code style="color:blue">C-y</code> (yank line that was copied without moving point)
-    <code style="color:blue">el</code> (enter more text)
+    <b>C-SPC</b> (set mark)
+    <b>C-p C-p</b> (move up two lines)
+    <b>C-c C-l</b> (copy current line to kill ring)
+    <b>C-x C-x</b> (swap point and mark)
+    <b>C-u C-u</b> (n == 0)
+    <b>C-y</b> (yank line that was copied without moving point)
+    <b>el</b> (enter more text)
     </pre>
     Yields:
 
     <pre>
     if [ $x -lt 0 ]; then
         echo 'Error: x cannot be negative' 1>&2
-    el<span style="color:red">(^)</span>if [ $x -lt 0 ]; then
+    el(^)if [ $x -lt 0 ]; then
     </pre>
 
 3. Cut and paste in C++:
@@ -91,23 +91,23 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
     <pre>
     do {
         process(i);
-        } while(++i < 5);<span style="color:red">(^)</span>
+        } while(++i < 5);(^)
     </pre>
 
     <pre>
-    <code style="color:blue">ESC C-a</code> (move to beginning of text: "}")
-    <code style="color:blue">C-f</code> (forward character)
-    <code style="color:blue">C-d</code> (delete character at point: " ")
-    <code style="color:blue">C-h C-k</code> (kill to end of current line)
-    <code style="color:blue">C-_ C-_</code> (n == -2)
-    <code style="color:blue">ESC C-a</code> (move to beginning of text two lines above)
-    <code style="color:blue">C-d C-d C-y</code> (delete "do" and yank "while" clause)
-    <code style="color:blue">DEL</code> (delete previous character: ";")
+    <b>ESC C-a</b> (move to beginning of text: "}")
+    <b>C-f</b> (forward character)
+    <b>C-d</b> (delete character at point: " ")
+    <b>C-h C-k</b> (kill to end of current line)
+    <b>C-_ C-_</b> (n == -2)
+    <b>ESC C-a</b> (move to beginning of text two lines above)
+    <b>C-d C-d C-y</b> (delete "do" and yank "while" clause)
+    <b>DEL</b> (delete previous character: ";")
     </pre>
     Yields:
 
     <pre>
-    while(++i < 5)<span style="color:red">(^)</span> {
+    while(++i < 5)(^) {
         process(i);
         }
     </pre>
@@ -115,7 +115,7 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
 4. Search forward and backward in Python:
 
     <pre>
-    &#35; Print function.<span style="color:red">(^)</span>
+    &#35; Print function.(^)
     def printme(str):
         "This prints a string passed into this function"
         print str
@@ -127,11 +127,11 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
     </pre>
 
     <pre>
-    <code style="color:blue">C-u</code> (n == 2)
-    <code style="color:blue">C-s print ESC</code> (search forward for "print" two times)
-    <code style="color:blue">C-u 3</code> (n == 3)
-    <code style="color:blue">C-]</code> (find next occurrence three more times)
-    <code style="color:blue">C-r Call ESC</code> (search backward for "Call" once)
+    <b>C-u</b> (n == 2)
+    <b>C-s print ESC</b> (search forward for "print" two times)
+    <b>C-u 3</b> (n == 3)
+    <b>C-]</b> (find next occurrence three more times)
+    <b>C-r Call ESC</b> (search backward for "Call" once)
     </pre>
     Yields:
 
@@ -142,7 +142,7 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
         print str
         return
     &nbsp;
-    &#35; <span style="color:red">(^)</span>Call function.
+    &#35; (^)Call function.
     printme("Jack and Jill...")
     printme("went up the hill.")
     </pre>
@@ -150,7 +150,7 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
 5. Replace a string pattern in Ruby:
 
     <pre>
-    <span style="color:red">(^)</span>files.each do |fileInfo|
+    (^)files.each do |fileInfo|
         fileName = fileInfo[1]
         if fileInfo[0].nil?
             fileInfo[0] = fileName
@@ -159,9 +159,9 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
     </pre>
 
     <pre>
-    <code style="color:blue">C-u</code> (n == 2)
-    <code style="color:blue">ESC r fileName ESC</code> (replace "fileName"...)
-    <code style="color:blue">pathname ESC</code> (with "pathname" two times)
+    <b>C-u</b> (n == 2)
+    <b>ESC r fileName ESC</b> (replace "fileName"...)
+    <b>pathname ESC</b> (with "pathname" two times)
     </pre>
     Yields:
 
@@ -169,7 +169,7 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
     files.each do |fileInfo|
         pathname = fileInfo[1]
         if fileInfo[0].nil?
-            fileInfo[0] = pathname<span style="color:red">(^)</span>
+            fileInfo[0] = pathname(^)
         end
     end
     </pre>
@@ -177,7 +177,7 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
 6. Query replace a regular expression pattern in C:
 
     <pre>
-    if(flags & OpEval)<span style="color:red">(^)</span>
+    if(flags & OpEval)(^)
         mset(mkp,NULL);
     else if(n >= 0)
         mset(mkp,wkbuf);
@@ -187,12 +187,12 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
     </pre>
 
     <pre>
-    <code style="color:blue">ESC q</code> (query replace...)
-    <code style="color:blue">(mset\()([^,]+),([^)]+):r ESC</code> ("from" regular expression...)
-    <code style="color:blue">\1\3,\2 ESC</code> ("to" replacement pattern)
-    <code style="color:blue">SPC SPC n SPC</code> (replace first two occurrences, skip third, do last)
+    <b>ESC q</b> (query replace...)
+    <b>(mset\()([^,]+),([^)]+):r ESC</b> ("from" regular expression...)
+    <b>\1\3,\2 ESC</b> ("to" replacement pattern)
+    <b>SPC SPC n SPC</b> (replace first two occurrences, skip third, do last)
     </pre>
-    Yields (reversed `mset()` arguments):
+    Yields (reversed <b>mset()</b> arguments):
 
     <pre>
     if(flags & OpEval)
@@ -201,7 +201,7 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
         mset(wkbuf,mkp);
     else
         // mset(a,b) where a is a char buffer.
-        mset(wkbuf,NULL<span style="color:red">(^)</span>);
+        mset(wkbuf,NULL(^));
     </pre>
 
 7. Rewrap comment block in Java:
@@ -212,14 +212,14 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
     // comments.  Indentation of first comment line is
     // used for whole block.  Also, the
     // prefixes (for example, "//" or "#") can be
-            // conf<span style="color:red">(^)</span>igured.
+            // conf(^)igured.
     </pre>
 
     <pre>
-    <code style="color:blue">C-SPC</code> (set mark)
-    <code style="color:blue">C-r wrap ESC</code> (search backward for "wrap" -- first line)
-    <code style="color:blue">C-u 0</code> (n == 0)
-    <code style="color:blue">ESC .</code> (rewrap lines in region)
+    <b>C-SPC</b> (set mark)
+    <b>C-r wrap ESC</b> (search backward for "wrap" -- first line)
+    <b>C-u 0</b> (n == 0)
+    <b>ESC .</b> (rewrap lines in region)
     </pre>
     Yields:
 
@@ -227,7 +227,7 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
     // MightEMacs can rewrap comment blocks composed of contiguous
     // single-line comments.  Indentation of first comment line is
     // used for whole block.  Also, the prefixes (for example, "//"
-    // or "#") can be configured.<span style="color:red">(^)</span>
+    // or "#") can be configured.(^)
     </pre>
 
 8. Add numbers to a block of lines in Swift:
@@ -240,13 +240,13 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
         "City",
         "State",
         "Home phone",
-        "Cell phone"]<span style="color:red">(^)</span>
+        "Cell phone"](^)
     </pre>
 
     <pre>
-    <code style="color:blue">C-_ 5</code> (n == -5)
-    <code style="color:blue">ESC #</code> (enumerate lines)
-    <code style="color:blue">0 RTN 1 RTN /* %u %/ ESC</code> (enter parameters)
+    <b>C-_ 5</b> (n == -5)
+    <b>ESC #</b> (enumerate lines)
+    <b>0 RTN 1 RTN /* %u %/ ESC</b> (enter parameters)
     </pre>
     Yields:
 
@@ -259,14 +259,14 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
     /* 3 */    "State",
     /* 4 */    "Home phone",
     /* 5 */    "Cell phone"]
-    <span style="color:red">(^)</span>
+    (^)
     </pre>
 
 9. Mark and swap positions in HTML:
 
     <pre>
     &lt;head&gt;
-        &lt;title&gt;Example<span style="color:red">(^)</span>&lt;/title&gt;
+        &lt;title&gt;Example(^)&lt;/title&gt;
         Header.
     &lt;/head&gt;
     &lt;body&gt;
@@ -278,10 +278,10 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
     </pre>
 
     <pre>
-    <code style="color:blue">C-SPC</code> (set mark "." -- default)
-    <code style="color:blue">C-u ESC C-e</code> (move forward to end of second word: "Header")
-    <code style="color:blue">C-u C-SPC x</code> (set mark "x")
-    <code style="color:blue">C-u 7 C-e</code> (move down to end of seventh line)
+    <b>C-SPC</b> (set mark "." -- default)
+    <b>C-u ESC C-e</b> (move forward to end of second word: "Header")
+    <b>C-u C-SPC x</b> (set mark "x")
+    <b>C-u 7 C-e</b> (move down to end of seventh line)
     </pre>
     Yields:
 
@@ -294,23 +294,23 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
         &lt;h3&gt;Mark and Swap&lt;/h3&gt;
         Marks, which are visible characters like X or /, can be set
         at various places in a buffer and returned to later.  The
-        default mark "." is also used to define a region.<span style="color:red">(^)</span>
+        default mark "." is also used to define a region.(^)
     &lt;/body&gt;
     </pre>
 
     <pre>
-    <code style="color:blue">C-x C-x</code> (swap point with default mark "." -- now at "Example")
-    <code style="color:blue">C-x C-x</code> (swap again -- back at "region.")
-    <code style="color:blue">C-u C-x C-x x</code> (swap with mark "x" -- now at "Header")
-    <code style="color:blue">C-u C-x C-x x</code> (swap again -- back at "region.")
-    <code style="color:blue">ESC SPC x</code> (go to mark "x")
+    <b>C-x C-x</b> (swap point with default mark "." -- now at "Example")
+    <b>C-x C-x</b> (swap again -- back at "region.")
+    <b>C-u C-x C-x x</b> (swap with mark "x" -- now at "Header")
+    <b>C-u C-x C-x x</b> (swap again -- back at "region.")
+    <b>ESC SPC x</b> (go to mark "x")
     </pre>
     Yields:
 
     <pre>
     &lt;head&gt;
         &lt;title&gt;Example&lt;/title&gt;
-        Header<span style="color:red">(^)</span>.
+        Header(^).
     &lt;/head&gt;
     &lt;body&gt;
         &lt;h3&gt;Mark and Swap&lt;/h3&gt;
@@ -323,9 +323,9 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
 10. Multi-file query replace in C:
 
     <pre>
-    <code style="color:blue">C-x C-g</code> (grep files...)
-    <code style="color:blue">*.c</code> (enter filename template...)
-    <code style="color:blue">mset( ESC</code> (enter search pattern)
+    <b>C-x C-g</b> (grep files...)
+    <b>*.c</b> (enter filename template...)
+    <b>mset( ESC</b> (enter search pattern)
     </pre>
     Yields (on message line):
 
@@ -334,10 +334,10 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
     </pre>
 
     <pre>
-    <code style="color:blue">C-_ ESC C-q</code> (query replace on files found...)
-    <code style="color:blue">ESC</code> (accept "mset(" search pattern...)
-    <code style="color:blue">markSet( ESC</code> (enter replacement pattern)
-    <code style="color:blue">SPC SPC !</code> (do replacement twice, then do rest unprompted)
+    <b>C-_ ESC C-q</b> (query replace on files found...)
+    <b>ESC</b> (accept "mset(" search pattern entered previously...)
+    <b>markSet( ESC</b> (enter replacement pattern)
+    <b>SPC SPC !</b> (do replacement twice, then do rest unprompted)
     (repeat on 9 remaining files)
     </pre>
     Yields (in all files):
@@ -349,7 +349,7 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
         markSet(wkbuf,mkp);
     else
         // markSet(a,b) where a is a char buffer.
-        markSet(<span style="color:red">(^)</span>wkbuf,NULL);
+        markSet((^)wkbuf,NULL);
     </pre>
 
 11. Move text and change case of letters in PHP:
@@ -361,34 +361,34 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
     else {
         echo "Complete address list";
         $found = TRUE;
-        }<span style="color:red">(^)</span>
+        }(^)
     </pre>
 
     <pre>
-    <code style="color:blue">C-_ C-_ C-a</code> (move up two lines to beginning of line)
-    <code style="color:blue">C-u ESC f</code> (move forward two words)
-    <code style="color:blue">C-u 3 ESC C-t</code> (change next three words to title case)
-    <code style="color:blue">C-p C-b</code> (move up one line and backward one character: "{")
-    <code style="color:blue">C-h }</code> (kill fenced region: "{" through "}")
-    <code style="color:blue">DEL</code> (delete previous character: " ")
-    <code style="color:blue">C-p C-h C-l</code> (move to previous line and kill it)
+    <b>C-_ C-_ C-a</b> (move up two lines to beginning of line)
+    <b>ESC f</b> (move forward one word)
+    <b>C-u 3 ESC C-t</b> (change next three words to title case)
+    <b>C-p C-b</b> (move up one line and backward one character: "{")
+    <b>C-h }</b> (kill fenced region: "{" through "}")
+    <b>DEL</b> (delete previous character: " ")
+    <b>C-p C-h C-l</b> (move to previous line and kill it)
     </pre>
     Yields:
 
     <pre>
     $found = FALSE;
     if($r == 0)
-    <span style="color:red">(^)</span>else
+    (^)else
     </pre>
 
     <pre>
-    <code style="color:blue">C-b</code> (move backward one character to end of previous line)
-    <code style="color:blue">SPC C-_ C-y</code> (insert a space and yank -1th entry from kill ring)
-    <code style="color:blue">C-u 3 C-a</code> (move to beginning of third line down)
-    <code style="color:blue">C-y</code> (yank 0th entry from kill ring)
-    <code style="color:blue">C-p C-x u</code> (move to previous line and convert it to upper case)
-    <code style="color:blue">C-p</code> (move to beginning of previous line...)
-    <code style="color:blue">ESC C-l</code> (and convert first word to lower case)
+    <b>C-b</b> (move backward one character to end of previous line)
+    <b>SPC C-_ C-y</b> (insert a space and yank -1th entry from kill ring)
+    <b>C-u 3 C-a</b> (move to beginning of third line down)
+    <b>C-y</b> (yank 0th entry from kill ring)
+    <b>C-p C-x u</b> (move to previous line and convert it to upper case)
+    <b>C-p</b> (move to beginning of previous line...)
+    <b>ESC C-l</b> (and convert first word to lower case)
     </pre>
     Yields:
 
@@ -399,21 +399,21 @@ as `C-X`, where `X` is usually a letter.  Note that `C-_` (control + underscore)
         $found = TRUE;
         }
     else
-        echo<span style="color:red">(^)</span> "NO ADDRESSES FOUND";
+        echo(^) "NO ADDRESSES FOUND";
     </pre>
 
 12. Other things you can do:
 
     <pre>
-    <code style="color:blue">ESC C-\</code> (trim white space from end of all lines in buffer)
-    <code style="color:blue">C-_ 4 TAB</code> (set tabbing style to four spaces)
-    <code style="color:blue">C-u ESC )</code> (indent all lines in region two tab stops)
-    <code style="color:blue">C-u 5 C-x C-e 4</code> (change 4-space tabs to hard tabs in next five lines)
-    <code style="color:blue">C-x ( ... C-x ) C-u 10 C-x e</code> (record keystrokes, then play back 10 times)
-    <code style="color:blue">C-x v sort RTN</code> (filter buffer through "sort" command and replace with result)
-    <code style="color:blue">C-x ` date RTN</code> (execute "date" command and insert its output at point)
-    <code style="color:blue">ESC t</code> (truncate buffer -- delete all text from point to end of buffer)
-    <code style="color:blue">ESC u</code> (undelete -- restore most recently-deleted text)
+    <b>ESC C-\</b> (trim white space from end of all lines in buffer)
+    <b>C-_ 4 TAB</b> (set tabbing style to four spaces)
+    <b>C-u ESC )</b> (indent all lines in region two tab stops)
+    <b>C-u 5 C-x C-e 4</b> (change 4-space tabs to hard tabs in next five lines)
+    <b>C-x ( ... C-x ) C-u 10 C-x e</b> (record keystrokes, then play back 10 times)
+    <b>C-x v sort RTN</b> (filter buffer through "sort" command and replace with result)
+    <b>C-x ` date RTN</b> (execute "date" command and insert its output at point)
+    <b>ESC t</b> (truncate buffer -- delete all text from point to end of buffer)
+    <b>ESC u</b> (undelete -- restore most recently-deleted text)
     </pre>
 
 
@@ -430,7 +430,7 @@ on Reddit at `http://reddit.com/r/memacs`.
 
 Notes
 -----
-This distribution of MightEMacs is version 9.1.0.   64-bit binaries are included for GNU/Linux variants (built on a CentOS vers.
+This distribution of MightEMacs is version 9.1.1.   64-bit binaries are included for GNU/Linux variants (built on a CentOS vers.
 6 machine) and macOS vers. 10.10 and later on Intel.  The sources should compile on other platforms as well; however, this has
 not been tested and there may be some (hopefully minor) issues which will need to be resolved.  If you are compiling on a
 platform other than one of those listed above and encounter any problems, please contact the author with the details.

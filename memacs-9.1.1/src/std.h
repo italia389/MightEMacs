@@ -61,7 +61,7 @@
 
 // Program identification.
 #define ProgName	"MightEMacs"
-#define ProgVer		"9.1.0"
+#define ProgVer		"9.1.1"
 
 /***** BEGIN CUSTOMIZATIONS *****/
 
@@ -277,9 +277,11 @@ typedef struct {
 #define RCNoFormat	0x0001		// Don't call vasprintf() or parse terminal attributes; use format string verbatim.
 #define RCNoWrap	0x0002		// Don't wrap Success message.
 #define RCForce		0x0004		// Force-save new message of equal severity.
-#define RCKeepMsg	0x0008		// Don't replace any existing message (just change severity).
-#define RCUnFail	0x0010		// Reset severity to Success if currently Failure.
-#define RCTermAttr	0x0020		// Enable terminal attributes in message.
+#define RCHigh		0x0008		// High priority Success message.  Overwrite any non-high one that wasn't forced.
+#define RCKeepMsg	0x0010		// Don't replace any existing message (just change severity).
+#define RCUnFail	0x0020		// Reset severity to Success if currently Failure.
+#define RCTermAttr	0x0040		// Enable terminal attributes in message.
+#define RCMsgSet	0x0080		// A new message was set by rcset().
 
 // Sample string buffer used for error reporting -- allocated at program launch according to the terminal width.
 typedef struct {

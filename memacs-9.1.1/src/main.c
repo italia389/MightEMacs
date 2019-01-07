@@ -44,6 +44,8 @@
 #include "pllib.h"
 
 // Local definitions.
+#define ErrRtn		1	// Error return code to OS (otherwise, zero).
+
 enum h_type {h_copyright,h_version,h_usage,h_help};
 static char					// Command switch names.
 	*sw_buf_mode[] = {"buf-mode","B",NULL},
@@ -157,24 +159,58 @@ static int rccpy(RtnCode *destp,RtnCode *srcp) {
 #endif
 	}
 
-// Write text into the return code message (unless RCKeepMsg flag) and return most severe status.  If status is Success, RCForce
-// flag is not set, and global 'Msg' mode is not set, do nothing; otherwise, if status is the same, keep existing message (do
-// nothing) unless it's a force or existing message is null.
+// Set a return code and message, with exceptions, and return most severe status.  If RCUnFail flag set, clear any existing
+// Failure status and message first, then check status.  If status is less severe, do nothing; otherwise, if status is more
+// severe or RCForce flag is set, set new severity and message; otherwise (status is the same)...
+// If status is Success:
+//	- if global 'RtnMsg' mode is disabled, do nothing; otherwise,
+//	- if existing message is null or RCHigh flag set (high priority) and existing RCForce and RCHigh flags are clear,
+//	  set new message; otherwise, do nothing.
+// If other (non-Success) status:
+//	- if existing message is null, set new message; otherwise, do nothing.
+// In all cases, if action is being taken:
+//	- new message is set unless fmt is NULL or RCKeepMsg flag is set and message is not null.
+//	- current message is cleared if fmt is NULL, RCForce is set, and RCKeepMsg is not set.
+//	- new serverity is always set (which may be the same).
+// Additionally, the RCMsgSet flag is cleared at the beginning of this routine, then set again if a message is actually set so
+// that the calling routine can append to the message if desired.
 int rcset(int status,ushort flags,char *fmt,...) {
 
+	// Clear RCMsgSet flag and check RCUnFail.
+	rc.flags &= ~RCMsgSet;
 	if((flags & RCUnFail) && rc.status == Failure)
 		rcclear(flags);
 
 	// Check status.  If this status is not more severe, or not force and either (1), Success and not displaying messages;
 	// or (2), same status but already have a message, return old one.
-	if(status > rc.status || (!(flags & RCForce) &&
-	 ((status == Success && !(mi.cache[MdIdxRtnMsg]->ms_flags & MdEnabled)) || 
-	 (status == rc.status && !disnull(&rc.msg)))))
-		return rc.status;
+	if(status > rc.status)				// Return if new status is less severe.
+		goto Retn;
+	if(status < rc.status || (flags & RCForce))	// Set new message if more severe status or a force.
+		goto Set;
 
+	// Same status.  Check special conditions.
+	if(status == Success) {
+
+		// If 'RtnMsg' global mode enabled and either (1), existing message is null; or (2), RCHigh flag set and
+		// existing RCForce and RCHigh flags are clear, set new message.
+		if((mi.cache[MdIdxRtnMsg]->ms_flags & MdEnabled) &&
+		 ((disnull(&rc.msg) || ((flags & RCHigh) && !(rc.flags & (RCForce | RCHigh))))))
+			goto Set;
+		goto Retn;
+		}
+	else {
+		// Same non-Success status... set only if existing message is null.
+		if(disnull(&rc.msg))
+			goto Set;
+Retn:
+		return rc.status;
+		}
+Set:
 	// Save message (if RCKeepMsg flag is not set) and new status.
-	if(status == HelpExit)
+	if(status == HelpExit) {
 		rc.helpText = fmt;
+		rc.flags |= RCMsgSet;
+		}
 	else if(fmt != NULL) {
 		if(!(flags & RCKeepMsg) || disnull(&rc.msg)) {
 			va_list ap;
@@ -195,11 +231,7 @@ int rcset(int status,ushort flags,char *fmt,...) {
 			// If Panic serverity or vasprintf() failed, panic!  That is, we're most likely out of memory, so bail
 			// out with "great expediency".
 			if(status == Panic || str == NULL) {
-				(void) TTclose(
-#if RestoreTerm
-				 TermCup |
-#endif
-				 TermForce);
+				(void) TTclose(false);
 				fprintf(stderr,"%s: ",text189);
 						// "Abort"
 				if(status == Panic) {
@@ -211,16 +243,17 @@ int rcset(int status,ushort flags,char *fmt,...) {
 					fprintf(stderr,text94,"rcset");
 							// "%s(): Out of memory!"
 				fputc('\n',stderr);
-				exit(255);
+				exit(ErrRtn);
 				}
 			dsetmemstr(str,&rc.msg);
+			rc.flags |= RCMsgSet;
 			}
 		}
 	else if((flags & (RCForce | RCKeepMsg)) == RCForce)
 		dsetnull(&rc.msg);
 
 	// Preserve RCNoWrap and RCTermAttr flags if RCKeepMsg set.
-	rc.flags = (flags & RCKeepMsg) ? (rc.flags & (RCNoWrap | RCTermAttr)) | flags : flags;
+	rc.flags = (rc.flags & ((flags & RCKeepMsg) ? (RCNoWrap | RCTermAttr | RCMsgSet) : RCMsgSet)) | flags;
 #if MMDebug & Debug_Datum
 	fprintf(logfile,"rcset(%d,%.4X,...): set msg '%s', status %d, new flags %.4X\n",
 	 status,(uint) flags,rc.msg.d_str,status,(uint) rc.flags);
@@ -373,8 +406,9 @@ int abortOp(Datum *rp,int n,Datum **argpp) {
 #define MsgNoWrap	0x0002
 #define MsgTermAttr	0x0003
 
-// Concatenate arguments and set result as a return message.  Force if n != 0.  Parse message options from first argument and
-// build message from following argument(s).  Set return value to false if n <= 0; otherwise, true.
+// Concatenate arguments and set result as a return message.  Set as high priority if abs(n) == 1; force if abs(n) > 1.  Parse
+// message options from first argument and build message from following argument(s).  Set return value to false if n <= 0;
+// otherwise, true.
 int message(Datum *rp,int n,Datum **argpp) {
 	bool result = (n == INT_MIN || n > 0);
 	ushort flags;
@@ -392,7 +426,7 @@ int message(Datum *rp,int n,Datum **argpp) {
 	if(!result)
 		flags |= RCNoWrap;
 	if(n != 0 && n != INT_MIN)
-		flags |= RCForce;
+		flags |= (abs(n) == 1 ? RCHigh : RCForce);
 
 	// Get option string.
 	if(funcarg(rp,ArgFirst | ArgNil1) != Success)
@@ -1667,7 +1701,7 @@ int main(int argc,char *argv[]) {
 			// Set help "return" message if appropriate and enter user-command loop.  The message will only be
 			// displayed if a message was not previously set in a startup file.
 			if(helpmsg[0] != '\0')
-				(void) rcset(Success,RCForce | RCTermAttr,"%s",helpmsg);
+				(void) rcset(Success,RCHigh | RCTermAttr,"%s",helpmsg);
 			si.curwp->w_flags |= WFMode;
 			(void) editloop();
 			}
@@ -1711,7 +1745,7 @@ Retn:
 			fputc('\n',stderr);
 			}
 
-		return scriptrc.status == ScriptExit ? 255 : 0;
+		return scriptrc.status == ScriptExit ? ErrRtn : 0;
 		}
 
 	// Error or help exit.
@@ -1740,7 +1774,7 @@ Retn:
 			fputc('\n',stderr);
 			}
 		}
-	return 255;
+	return ErrRtn;
 	}
 
 // Give me some help!  Execute help hook.

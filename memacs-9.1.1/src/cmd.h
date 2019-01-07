@@ -122,7 +122,7 @@ CmdFunc cftab[] = {
 	{"deleteWhite",		CFEdit,0,			0,0,	NULL,		NULL,		CFLit_deleteWhite},
 	{"deleteWind",		0,0,				0,0,	deleteWind,	NULL,		CFLit_deleteWind},
 	{"deleteWord",		CFEdit,0,			0,0,	NULL,		NULL,		CFLit_deleteWord},
-	{"detabLine",		CFEdit,ArgNil1,			1,1,	detabLine,	Literal63,	CFLit_detabLine},
+	{"detabLine",	CFEdit,ArgInt1 | ArgNil1 | ArgMay,	1,1,	detabLine,	Literal63,	CFLit_detabLine},
 	{"dirname",		CFFunc,0,			1,1,	NULL,		Literal15,	CFLit_dirname},
 		// Returns directory component of pathname.
 	{"dupLine",		CFEdit,0,			0,0,	dupLine,	NULL,		CFLit_dupLine},
@@ -136,7 +136,7 @@ CmdFunc cftab[] = {
 	{"endWhite",		0,0,				0,0,	NULL,		NULL,		CFLit_endWhite},
 	{"endWord",		CFNCount,0,			0,0,	endWord,	NULL,		CFLit_endWord},
 		// Returns false if hit buffer boundary; otherwise, true.
-	{"entabLine",		CFEdit,ArgNil1,			1,1,	entabLine,	Literal63,	CFLit_entabLine},
+	{"entabLine",	CFEdit,ArgInt1 | ArgNil1 | ArgMay,	1,1,	entabLine,	Literal63,	CFLit_entabLine},
 	{"env",			CFFunc,0,			1,1,	NULL,		Literal4,	CFLit_env},
 		// Returns value of environmental variable, or nil if not found.
 	{"eval",		CFNoLoad,0,			1,-1,	eval,		Literal10,	CFLit_eval},

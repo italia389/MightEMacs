@@ -457,7 +457,7 @@ Retn:
 		}
 Rpt:
 	// Report the results.
-	(void) rcset(Success,RCForce | RCTermAttr,text92,numsub,numsub == 1 ? "" : "s");
+	(void) rcset(Success,RCHigh | RCTermAttr,text92,numsub,numsub == 1 ? "" : "s");
 		// "%d substitution%s"
 	if(dotp->lnp != origdot.mk_dot.lnp || dotp->off != origdot.mk_dot.off) {
 		Mark *mkp;
@@ -467,11 +467,15 @@ Rpt:
 			return rc.status;
 		mkp->mk_dot = origdot.mk_dot;
 		mkp->mk_rfrow = origdot.mk_rfrow;
-		if(dopenwith(&msg,&rc.msg,SFAppend) != 0 || dputs(", ",&msg) != 0 ||
-		 dputc(chcase(*text233),&msg) != 0 || dputf(&msg,text233 + 1,WrkMark) != 0 || dclose(&msg,sf_string) != 0)
+
+		// Append to return message if it was set successfully.
+		if(rc.flags & RCMsgSet) {
+			if(dopenwith(&msg,&rc.msg,SFAppend) != 0 || dputs(", ",&msg) != 0 || dputc(chcase(*text233),&msg) != 0
+			 || dputf(&msg,text233 + 1,WrkMark) != 0 || dclose(&msg,sf_string) != 0)
 				// "Mark ~u%c~U set to previous position"
 LibFail:
-			return librcset(Failure);
+				return librcset(Failure);
+			}
 		}
 
 	if(si.opflags & OpScript)

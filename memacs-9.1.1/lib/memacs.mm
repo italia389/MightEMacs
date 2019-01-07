@@ -3,7 +3,7 @@
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# memacs.mm		Ver. 9.1.0
+# memacs.mm		Ver. 9.1.1
 #	MightEMacs startup file.
 
 ##### Global variables. #####
@@ -18,7 +18,7 @@ constrain macro restoreSearchRing(1)
 	while !empty?($searchPat) && $searchPat != $1
 		deleteSearchPat
 	endloop
-	1 => message nil,nil
+	2 => message nil,nil
 endmacro
 
 # Unchange current buffer.
@@ -637,11 +637,15 @@ endmacro
 # Perform replace (n > 0) or queryReplace (otherwise) on current buffer and return custom result message.  Called from
 # queryReplaceAll macro.
 constrain macro queryReplaceOne(0)
+	oldMsgState = 1 => chgGlobalMode 'RtnMsg'
+	2 => message nil,nil
 	if $0 > 0
 		replace $searchPat,$replacePat
 	elsif not queryReplace $searchPat,$replacePat
+		oldMsgState => chgGlobalMode 'RtnMsg'
 		return false
 	endif
+	oldMsgState => chgGlobalMode 'RtnMsg'
 	(i = index $ReturnMsg,',') != nil ? substr($ReturnMsg,0,i) : $ReturnMsg
 endmacro
 

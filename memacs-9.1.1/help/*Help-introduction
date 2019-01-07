@@ -39,11 +39,11 @@ and press the ~ub~U key.  On the other hand, ~#uESC <~U means press the ~uesc~U 
 then press the ~u<~U key (two separate keystrokes).  Additionally, a capitalized
 word may be used for a key, as follows:
 
-        DEL     ~udelete~U key.
-        ESC     ~uescape~U key.
-        RTN     ~ureturn~U key.
-        SPC     Spacebar.
-        TAB     ~utab~U key.
+    DEL     ~udelete~U key.
+    ESC     ~uescape~U key.
+    RTN     ~ureturn~U key.
+    SPC     Spacebar.
+    TAB     ~utab~U key.
 
 Lastly, ~uS-TAB~U means hold down the ~ushift~U key and press the ~utab~U key.
 

@@ -1532,7 +1532,7 @@ int gotoScreen(int n,ushort flags) {
 			// and display its working directory if interactive, 'WkDir' global mode not enabled, and changed.
 			if(!(si.opflags & OpScript) && !(mi.cache[MdIdxWkDir]->ms_flags & MdEnabled) &&
 			 strcmp(si.cursp->s_wkdir,olddir) != 0)
-				rcset(Success,RCForce | RCNoFormat | RCNoWrap,scrp->s_wkdir);
+				rcset(Success,RCHigh | RCNoFormat | RCNoWrap,scrp->s_wkdir);
 		}
 	return rc.status;
 	}

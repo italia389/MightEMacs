@@ -3,14 +3,15 @@
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# genInit.mm		Ver. 9.1.0
+# genInit.mm		Ver. 9.1.1
 #	MightEMacs initialization file for generic scripting language.  Returns registration array as described in lang.mm.
 
 ['Generic Script',						/# Library name (if different from mode name) #/\
  'Gen',								/# Mode name #/\
  'Generic script auto-formatting.',				/# Mode description #/\
  'gen',								/# Macro and library name prefix #/\
- ['cl','go','latex','lisp','m','r','scala','scm','tex','xml'],	/# Array of extensions used for source files #/\
+ ['asm','cl','go','latex','lisp','m','md','r','S','s','scala',\
+  'scm','tex','xml'],						/# Array of extensions used for source files #/\
  nil,								/# Unix binary name, or array of names #/\
  nil,								/# Word characters #/\
 	/# preKey hook triggers #/\

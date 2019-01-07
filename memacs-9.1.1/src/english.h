@@ -732,7 +732,7 @@ char
 #define CFLit_env		"Return value of given environmental variable."
 #define CFLit_eval		"Concatenate argument(s) (or get string if interactive) and execute result as an expression. \
  Returns: result of evaluation."
-#define CFLit_exit		"Exit editor with optional message (and ignore changes if n != 0, force 255 return code if\
+#define CFLit_exit		"Exit editor with optional message (and ignore changes if n != 0, force return code 1 if\
  n < 0).  Argument(s) are converted to string and concatenated to form the message."
 #define CFLit_filterBuf		"Feed current buffer to shell command and replace its contents with result.  Argument(s) are\
  converted to string and concatenated to form the command.  Returns: false if failure; otherwise, true."
@@ -831,8 +831,9 @@ macro-name],...] (where macro-name is nil if hook not set), \"Language\" -> lang
  none), and return true (or false if n <= 0).  Argument(s) following opts are converted to string and concatenated to form the\
  message.  By default, a message is set only if one has not already been set, and is wrapped in brackets (thus informational)\
  if default n or n > 0.  Case-insensitive options are: \"NoWrap\" (do not wrap message in brackets), and \"TermAttr\" (enable\
- terminal attributes in message).  If n != 0, any existing message is replaced unconditionally.  If message is nil or a null\
- string, any existing message is cleared."
+ terminal attributes in message).  If abs(n) == 1, message is considered high priority and will replace any existing message\
+ that is not high priority and was not forced; if abs(n) > 1, any existing message is replaced unconditionally (forced).  If\
+ message is nil or a null string, any existing message is cleared."
 #define CFLit_metaPrefix	"Begin meta key sequence."
 #define CFLit_moveWindDown	"Move window frame [-]n lines down (default 1)."
 #define CFLit_moveWindUp	"Move window frame [-]n lines up (default 1)."

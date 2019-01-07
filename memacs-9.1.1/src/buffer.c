@@ -260,7 +260,7 @@ int setfname(Buffer *bufp,char *fname,bool *changedp) {
 		fnChange = true;
 		}
 	else {
-		if(fnChange = (strcmp(bufp->b_bname,fname) != 0)) {
+		if(fnChange = (strcmp(bufp->b_fname,fname) != 0)) {
 ClearSet:
 			clfname(bufp);
 			if((bufp->b_fname = (char *) malloc(strlen(fname) + 1)) == NULL)
@@ -1342,12 +1342,12 @@ int insertBuf(Datum *rp,int n,Datum **argpp) {
 	if(bactivate(bufp) != Success)
 		return rc.status;
 	if(bempty(bufp))
-		return rcset(Success,RCForce,"%s 0 %ss",text154,text205);
+		return rcset(Success,RCHigh,"%s 0 %ss",text154,text205);
 						// "Inserted","line"
 
 	// Buffer not empty.  Insert lines and report results.
 	return inslines(&lineCt,bufp,si.curbp,NULL,NULL,NULL) != Success ? rc.status :
-	 rcset(Success,RCForce,"%s %u %s%s%s",text154,lineCt,text205,lineCt == 1 ? "" : "s",text355);
+	 rcset(Success,RCHigh,"%s %u %s%s%s",text154,lineCt,text205,lineCt == 1 ? "" : "s",text355);
 					// "Inserted","line"," and marked as region"
 	}
 
@@ -1733,7 +1733,7 @@ int deleteBuf(Datum *rp,int n,Datum **argpp) {
 
 		if(rc.status == Success) {
 			dsetint((long) count,rp);
-			(void) rcset(Success,RCForce,text368,count,count != 1 ? "s" : "");
+			(void) rcset(Success,RCHigh,text368,count,count != 1 ? "s" : "");
 						// "%u buffer%s deleted"
 			}
 		return rc.status;
