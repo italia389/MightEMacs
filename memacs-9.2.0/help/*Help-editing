@@ -1,0 +1,98 @@
+<home>    <exit>
+
+
+~bEssential Editing Commands~B
+
+The ~bText Objects~B and ~bKill Ring~B sections explained what the various text objects
+are, how they are delineated, and introduced the "kill ring", which is used for
+saving and retrieving text.  Now we will explain what the primary commands are
+that use text objects and the kill ring, and how to use them in an editing
+session.  Once these commands are learned, you will be able to edit text quickly
+and easily.
+
+The commands that manipulate text objects do so in combination with a numeric
+prefix.  They are invoked using the following sequence of keys:
+
+    1.  An optional numeric prefix.
+    2.  An optional copy, kill, or delete prefix key.
+    3.  A text object key.
+
+The numeric prefix specifies a direction and quantity (with a default of one
+item forward).
+
+The prefix key specifies the type of operation:
+
+    ~uC-c~U         for ~bcopy~B.
+    ~uC-h~U         for ~bhomicide~B (kill).
+    (No prefix) for ~bdelete~B.
+
+And finally, the text object key specifies the type of object to operate on:
+
+    ~uC-\~U         Word.
+    ~uC-k~U         Partial line.
+    ~uC-l~U         Line.
+    ~uC-w~U         Region.
+    ~u}~U           Fenced region.
+
+Copy and kill operations save the target text in the kill ring (for later
+yanking); deletes do not.
+
+So for example, the following key sequence would kill the current line and the
+next line: ~#uC-u C-h C-l~U.  This translates to "for 2 items forward", "kill",
+"line".  (Note that line operations always include an entire line plus the
+delimiter, and the first line is always the current line.)  To ~bdelete~B two
+lines forward instead, you would enter: ~#uC-u C-l~U.  Other examples:
+
+    ~#uC-u 3 C-k~U           Delete text from the point up to, but not including the
+                        third line break.
+
+    ~#uC-_ C-\~U             Delete previous word, including any non-word characters
+                        between point and the word.
+
+    ~#uC-_ C-c C-\~U         Copy previous word (without moving the point).
+
+    ~#uC-h }~U               Kill fenced region.  (Point must be positioned on a
+                        ~u(~U, ~u)~U, ~u[~U, ~u]~U, ~u{~U, ~u}~U, ~u<~U, or ~u>~U character first).
+
+    ~#uC-c C-w~U             Copy region (text from point to current position of mark
+                        ' ').
+
+    ~#uC-u C-u C-h C-k~U     Kill text from point to beginning of line (per zero
+                        numeric prefix).
+
+There is one exception to this rule: the ~udeleteFencedText~U command, which is
+~#uC-x }~U.  Being that the fenced region text object (a right brace) is a printable
+character and would be inserted into the text if entered by itself, the ~uC-x~U
+prefix (for ~bexterminate~B) is needed.
+
+The commands that are used for text object operations are as follows:
+
+    ~#uC-c C-\~U     ~ucopyWord~U
+    ~#uC-c C-k~U     ~ucopyToBreak~U
+    ~#uC-c C-l~U     ~ucopyLine~U
+    ~#uC-c C-w~U     ~ucopyRegion~U
+    ~#uC-c }~U       ~ucopyFencedRegion~U
+
+    ~#uC-h C-\~U     ~ukillWord~U
+    ~#uC-h C-k~U     ~ukillToBreak~U
+    ~#uC-h C-l~U     ~ukillLine~U
+    ~#uC-h C-w~U     ~ukillRegion~U
+    ~#uC-h }~U       ~ukillFencedRegion~U
+
+    ~uC-\~U         ~udeleteWord~U
+    ~uC-k~U         ~udeleteToBreak~U
+    ~uC-l~U         ~udeleteLine~U
+    ~uC-w~U         ~udeleteRegion~U
+    ~#uC-x }~U       ~udeleteFencedRegion~U
+
+Note that even though delete commands do not save the target text in the kill
+ring, the text ~bis~B saved in a special internal buffer, and the most recently
+deleted text can always be restored via the ~uundelete~U (~#uESC u~U) command.
+
+You are encouraged to practice copying, killing, and deleting text with these
+commands and yanking the text at various places in the buffer so you get a good
+feel for how it is done (and commit the key bindings to memory).  These are core
+editing commands which are used frequently.
+
+
+<home>    <exit>

@@ -1,0 +1,43 @@
+~bFile Commands~B
+
+In our examples thus far, we have used two file commands: ~usaveFile~U and
+~ufindFile~U.  There are several other file commands as well.  The file commands
+provide various ways to read and write files and manage their associated
+buffers.  Here is the complete list:
+
+    ~uappendFile~U      ~#uC-x C-a~U     Prompt for a filename (waiting for ~ureturn~U to be
+                                entered when completing the name) and append the
+                                current buffer to the given file.  The filename
+                                is ~bnot~B attached to the buffer to prevent
+                                accidental overwrite of the file if the buffer
+                                is subsequently modified and saved.
+    ~ufindFile~U        ~#uC-x C-f~U     Prompt for a filename (waiting for ~ureturn~U to be
+                                entered when completing the name if the numeric
+                                prefix is 0 or 1) and find the file.  Check
+                                pathnames associated with existing buffers
+                                first, then files on disk.  Switch to the
+                                existing buffer if found; otherwise, create a
+                                buffer, switch to it, and read in the file from
+                                disk.
+    ~uinsertFile~U      ~#uC-x C-i~U     Insert a file from disk into the current buffer
+                                at point, without moving point if n is zero, and
+                                mark inserted text as a region.
+    ~ureadFile~U        ~#uC-x C-r~U     Read a file from disk into the current buffer,
+                                replacing its contents, and clear the "Changed"
+                                attribute.
+    ~usaveFile~U        ~#uC-x C-s~U     Write the current buffer to its associated file,
+                                overwriting the file if it already exists.
+    ~uviewFile~U        ~#uC-x C-v~U     Find a file in the same manner as the findFile
+                                command, but also enable the "RdOnly" buffer
+                                mode.
+    ~uwriteFile~U       ~#uC-x C-w~U     Prompt for a filename (waiting for ~ureturn~U to be
+                                entered when completing the name), write the
+                                current buffer to the given file, overwriting it
+                                if it already exists, and attach the filename to
+                                the buffer.
+    ~uxeqFile~U         ~#uC-x /~U       Search for a file with the ~uxPathname~U function,
+                                then execute the file that is found as a macro
+                                in the same manner as the ~uxeqBuf~U command.
+
+If an OS error occurs when reading or writing a file, the operation will be
+aborted and an error message will be displayed on the message line.

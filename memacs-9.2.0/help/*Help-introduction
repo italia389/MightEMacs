@@ -1,0 +1,73 @@
+<home>    <exit>
+
+
+~bIntroduction~B
+
+MightEMacs is started from the shell by typing the ~bmm~B or ~bmemacs~B command.  You
+may optionally specify one or more files to edit.  If a file is given, it is
+read into a "buffer" and displayed in a full-screen window, ready for you to
+begin editing it.  If the file does not exist, the window will be blank
+(allowing you to create a new file).  If a file is not specified, a new buffer
+called "untitled" is created with no associated filename.
+
+The line displayed in reverse video at the bottom of the screen is the "mode
+line".  It contains basic information about the editing session.  For example,
+let's say you typed:
+
+    $ mm myscript.ms
+
+to start MightEMacs.  The mode line would then look something like this:
+
+  ~r== (Exact) [Memacs] == myscript == File: myscript.ms === MightEMacs 9.2.0 ~B
+
+This says that global mode "Exact" and buffer mode "Memacs" are enabled, the
+buffer name is "myscript" (derived from the filename), the file pathname is
+"myscript.ms", and we are running version 9.2.0 of the editor.  Global modes are
+shown in parentheses and buffer modes in brackets.
+
+If you typed some text into the buffer, you would notice that an asterisk
+appears at the beginning of the mode line in the second column.  This is an
+indicator that the buffer has been modified.  To move the cursor around, you can
+use the arrow keys or press ~uC-f~U (~uforwChar~U), ~uC-b~U (~ubackChar~U), ~uC-p~U (~uprevline~U),
+or ~uC-n~U (~unextline~U).  You can also jump to the end of a line (~uC-e~U), the beginning
+(~uC-a~U), traverse a line quickly in either direction (press ~uC-t~U repeatedly), move
+forward a page (~uC-v~U), back a page (~uC-z~U), jump to the beginning of the buffer
+(~#uESC <~U), or to the end (~#uESC >~U).
+
+The key description ~uC-b~U means ~ucontrol~U + ~ub~U; that is, hold the ~ucontrol~U key down
+and press the ~ub~U key.  On the other hand, ~#uESC <~U means press the ~uesc~U key, let go,
+then press the ~u<~U key (two separate keystrokes).  Additionally, a capitalized
+word may be used for a key, as follows:
+
+    DEL     ~udelete~U key.
+    ESC     ~uescape~U key.
+    RTN     ~ureturn~U key.
+    SPC     Spacebar.
+    TAB     ~utab~U key.
+
+Lastly, ~uS-TAB~U means hold down the ~ushift~U key and press the ~utab~U key.
+
+Note that you can type ~uC-v~U and ~uC-z~U to scroll forward and backward through this
+page and other help pages.
+
+Note also that a key is usually shown in the Help System with a command name
+following it, such as ~uC-f~U (~uforwChar~U).  This indicates (in this example) that the
+~uC-f~U key is "bound" to the ~uforwChar~U command and the command is what is executed
+when the key is pressed.  Key bindings and commands are explained in more detail
+in the next section.
+
+Now back to our editing session.  If we were done editing our file (assuming the
+editor was started with a file argument), the obvious next steps would be to
+save the buffer to disk and exit.  To save the buffer, you would press ~#uC-x C-s~U
+(~usaveFile~U).  The asterisk in the mode line will change back to "=" and you
+will get some feedback on the "message line" at the bottom of the screen that
+the buffer was written to disk.
+
+Let's say you needed to make a few more changes first.  When you were done (and
+the buffer was modified again), you could save the buffer as before by pressing
+~#uC-x C-s~U and then exit MightEMacs by pressing ~#uC-x C-c~U (~uexit~U).  However, you can
+do this in one step instead.  You would press ~#uESC z~U (~uquickExit~U).  The file is
+saved and you're back to the shell.
+
+
+<home>    <exit>

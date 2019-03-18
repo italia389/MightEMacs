@@ -1,0 +1,38 @@
+~bBinding and Unbinding Keys~B
+
+As was discussed previously in the ~bKeys and Key Bindings~B section, any key or key
+sequence can be bound to a command or macro (or more precisely, a non-
+constrained macro), including the printable characters like letters (each of
+which are bound separately by case), digits, and punctuation characters.  And
+when you type a key or key sequence, the command or macro that it is bound to is
+executed.  By default, the printable keys (except the spacebar) are bound to the
+"self insert" pseudo-command and thus, insert one copy of themselves into the
+text when typed.  Non-printable keys and key sequences however, have no default
+action and will generate an error if typed when not bound to anything.
+Additionally, if an executed key or key sequence returns a Boolean ~ufalse~U
+value, any running keyboard macro is stopped and "False return" is displayed on
+the message line.  (Keyboard macros are discussed in the ~bKeyboard Macros~B
+section.)
+
+Generally, all key bindings used during an editing session are either built-in
+or are set in startup macros.  You can change them interactively, however.  To
+create a key binding, enter:
+
+    ~#uESC k~U       ~#ubindKey~U
+
+You will be prompted for the key sequence and command or macro name to bind it
+to.  To delete a key binding, enter:
+
+    ~#uESC C-k~U     ~#uunbindKey~U
+
+You will be prompted for the key sequence to unbind.  To bind or unbind a single
+key, use a numeric prefix that is negative or zero.
+
+Recall that the ~#uC-h c~U (~#ushowCommands~U) and ~#uC-h @~U (~#ushowMacros~U) commands display all
+commands and macros and their key bindings.  Also, ~ushowKey~U (~#uC-h ?~U) shows what a
+particular key sequence is bound to and ~ushowBindings~U (~#uC-h n~U) shows all possible
+key bindings (or just those matching an apropos pattern) and what they are bound
+to.
+
+See the ~bKey Binding Syntax~B section for the use and syntax of key bindings in
+coded string form (for use in a script).

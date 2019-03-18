@@ -430,10 +430,10 @@ on Reddit at `http://reddit.com/r/memacs`.
 
 Notes
 -----
-This distribution of MightEMacs is version 9.1.1.   64-bit binaries are included for GNU/Linux variants (built on a CentOS vers.
-6 machine) and macOS vers. 10.10 and later on Intel.  The sources should compile on other platforms as well; however, this has
-not been tested and there may be some (hopefully minor) issues which will need to be resolved.  If you are compiling on a
-platform other than one of those listed above and encounter any problems, please contact the author with the details.
+This distribution of MightEMacs is version 9.2.0.  Installer packages containing 64-bit binaries are included for Linux
+platforms and macOS vers. 10.10 and later.  The sources can be compiled as well if desired; however, the build process has not
+been tested on other Unix platforms and there may be some (hopefully minor) issues which will need to be resolved.  If you are
+compiling the sources and encounter any problems, please contact the author with the details.
 
 Note that a portion of a library (ProLib) is included which contains routines that are used by the editor.  The most important
 ones are in datum.c.  These functions manage "Datum" objects, which are objects that contain data of various types, including
@@ -444,12 +444,6 @@ included with it for convenience.
 
 Credits
 -------
-MightEMacs (c) Copyright 2018 Richard W. Marinelli was originally based on the MicroEMACS 3.12 text editor (c) Copyright 1993
-Daniel M. Lawrence, et al., but it has been extensively rewritten and enhanced.  Consequently, little or none of the original
-code remains.
-
-MightEMacs is written by Rick Marinelli <italian389@yahoo.com>.
-
-MicroEMACS was written by Dan Lawrence with contributions by Dana Hoggatt and C. Smith.
+MightEMacs (c) Copyright 2019 Richard W. Marinelli was written by Rick Marinelli <italian389@yahoo.com>.
 
 See License.txt for the MightEMacs license.

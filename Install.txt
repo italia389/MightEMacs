@@ -1,89 +1,50 @@
-Instructions for installing MightEMacs.
+Instructions for Installing MightEMacs
 
-This distribution includes an installer package for the macOS platform and
-64-bit binaries and make files for macOS and Linux platforms (CentOS, Debian,
-GNU/Linux, Red Hat, Ubuntu, and others).  If you are not installing on a macOS
-or GNU/Linux platform, the installation scripts will automatically select and
-use the appropriate make files from the included platforms for compilation.
-However, compilation on other platforms has not been tested, so it is possible
-that there may be errors.  If this occurs, please contact the author with the
-details so that the problem can be resolved.  (See the ReadMe.md file for
-contact information.)  For reference, make file locations are (for example,
-Linux):
+Installer packages are included for the macOS platform and Linux platforms
+(CentOS, Debian, GNU/Linux, Red Hat, Ubuntu, and others).  The standard
+installation packages place files in /usr/local and require superuser (root)
+privileges.  If you are not installing on a macOS or GNU/Linux platform, want to
+install MightEMacs in your HOME directory, or want to customize the installation
+process, please refer to file CustomInstall.txt for instructions.
 
-	prolib-2.0.0/linux/Makefile
-	memacs-9.1.1/linux/Makefile
+For a standard installation of MightEMacs, perform the following steps:
 
-To install MightEMacs, perform the following steps:
+ 1. Move to the directory that contains this Install.txt file:
 
- 1. A package installer is included for macOS vers. 10.10 and later.  If you are
-    installing on a macOS platform,  want to do a site-wide install, and have
-    administrator privileges, go to the next step; otherwise, go to step 5.
+	$ cd MightEMacs-master
 
- 2. The macOS installer is memacs-9.1.1.pkg.  Either open the file from a Finder
-    window or open it from the shell with the following command:
+ 2. Note that if you already have MightEMacs installed (in /usr/local), the
+    installers will save any existing site.ms file in /usr/local/lib/memacs as
+    site.ms.bak.
 
-	$ open memacs-9.1.1.pkg
+    If you are installing on a Linux platform, go to the next step; otherwise,
+    go to step 5.
 
-    and run the installer.  Files will be installed in /usr/local.
-
- 3. If you want to install the sample user startup file (.memacs) into your HOME
-    directory:
-
-	$ cp memacs-9.1.1/lib/.memacs ~
-
- 4. Go to step 14.
-
- 5. MightEMacs 64-bit binaries are included for GNU/Linux (built on a CentOS
-    vers. 6 machine) and macOS vers. 10.10 and later.  If you want to use one of
-    these binaries and skip compilation, go to step 10; otherwise, go to the
-    next step.  Note that if you are installing on a macOS system, Xcode must
-    already be installed (vers. 7.2.1 or later recommended) so that command-line
-    tools are available.
-
- 6. Remove package binaries.
-
-	$ make clean
-
- 7. Review and/or edit beginning portion of memacs-9.1.1/src/std.h to customize
-    MightEMacs compilation (optional).
-
- 8. Review and/or edit memacs-9.1.1/src/bind.h if you want to change the default
-    key bindings (not recommended).
-
- 9. To see a list of available platforms (optional):
-
-	$ make
-
-10. Build and/or link MightEMacs.  This will create files "libpro.a" in the
-    prolib directory and "mm" in the memacs directory.  Note that if you are
-    compiling the sources, you may see several "... may be used uninitialized
-    ..." or other warnings with some compilers.  These may be ignored.
-
-    To proceed, supply the desired platform name in lower case as the value of
-    the PLATFORM variable; for example, Linux:
-
-	$ make PLATFORM=linux
-
-11. Install MightEMacs.  If you have customized file "site.mm" (site-wide
-    defaults) from a previous installation and want to save it, copy the file to
-    another directory now.  For example, to copy the file to your home directory
-    (assuming MightEMacs was previously installed in /usr/local):
-
-	$ cp /usr/local/lib/memacs/site.mm ~
-
-12. If you have superuser privileges and want to do a site-wide install, go to
-    the next step; otherwise, go to step 16.
-
-13. Perform a site-wide install:
+ 3. The Linux installer is memacs-9.2.0.sh, which includes a 64-bit binary built
+    on a CentOS vers. 6 machine.  To run the installer, type the following
+    commands:
 
 	$ su root
-	# make install
+	# ./memacs-9.2.0.sh
 	# exit
 
-14. If you are not installing on a Debian system, make sure directory
-    /usr/local/bin is in your shell PATH so that the shell can find the
-    MightEMacs binary:
+ 4. Go to step 6.
+
+ 5. The macOS installer is memacs-9.2.0.pkg, which includes a 64-bit binary
+    built for macOS vers. 10.10 (Yosemite) and later.  Open the installer
+    package with the following command:
+
+	$ open memacs-9.2.0.pkg
+
+    and run the installer.
+
+ 6. If you want to install the sample user startup file (.memacs) into your HOME
+    directory, enter the following command:
+
+	$ cp memacs-9.2.0/lib/.memacs ~
+
+ 7. Make sure directory /usr/local/bin is in your shell PATH so that the shell
+    can find the MightEMacs binary.  Display it with the following command:
 
 	$ echo $PATH
 
@@ -96,37 +57,17 @@ To install MightEMacs, perform the following steps:
     MightEMacs looks for its startup files in directory /usr/local/lib/memacs by
     default.  If you want to create your own scripts in another directory (for
     example, "$HOME/scripts"), you can include it in the MMPATH environmental
-    variable so that MightEMacs will search that directory also:
+    variable so that MightEMacs will search that directory also.  To accomplish
+    this, add this line to the startup file you modified above:
 
 	export MMPATH=":/usr/local/lib/memacs:$HOME/scripts"
 
-15. Go to step 18.
-
-16. Perform a local (user) install.  Supply the pathname of the local
-    installation directory as the value of the INSTALL variable; for example,
-    "$HOME/MightEMacs":
-
-	$ make install INSTALL=$HOME/MightEMacs
-
-17. Modify your shell startup file in your HOME directory so that the shell can
-    find the MightEMacs binary and MightEMacs can find its startup files.  For
-    example, add the following two lines to file $HOME/.profile if you are using
-    the Bourne shell (bash) or to file $HOME/.zshenv if you are using zsh:
-
-	export PATH="$PATH:$HOME/MightEMacs/bin"
-	export MMPATH=":$HOME/MightEMacs/lib/memacs"
-
-18. If you want to install the sample user startup file (.memacs) into your HOME
-    directory (and rename any existing file to ".memacs.old"):
-
-	$ make user-install
-
-19. Review and/or edit file "site.mm" in the .../lib/memacs installation
-    directory to customize site-wide defaults for the editor.  If you saved an
-    old version of the file in step 11, you may have to change the settings in
-    the new "site.mm" file to match the old settings because some of the syntax
-    may have changed, depending on the previous version of MightEMacs you were
-    using.  Significant changes occurred from version 8.5 to 9.0.
+ 8. Review and/or edit file /usr/local/lib/memacs/site.ms to customize site-wide
+    defaults for the editor, such as scrolling options, the search string
+    delimiter, etc.  If an old version of the file was saved in step 3 or 5, you
+    may have to change settings in the new "site.ms" file to match the old
+    settings because some of the syntax may have changed, depending on the
+    previous version of MightEMacs you were using.
 
 Note that MightEMacs can be run with the command "memacs" or "mm" with optional
 switches and/or arguments.  See memacs(1) for details.

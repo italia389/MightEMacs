@@ -1,0 +1,118 @@
+~bSearch Pattern Syntax~B
+
+As discussed previously, there is a group of commands for searching for a
+pattern in a buffer and optionally, replacing one or more occurrences of the
+matching text with a string or another pattern.  MightEMacs supports searching
+using regular expressions (REs) or plain text patterns.  Additionally, either
+type of search can be case-sensitive or case-insensitive, and searching can be
+done either forward or backward.  The type of pattern matching is controlled by
+option characters appended to the pattern string, and by two global modes:
+"Exact" and "Regexp".  When enabled, the former mode specifies case-sensitive
+pattern matching by default and the latter specifies RE matching by default.
+Either or both can be enabled or disabled at any time.
+
+The following regular expression pattern-matching metacharacters are supported:
+
+    ~b^~B       Match beginning of line (including the position following a ~unewline~U
+            character) or negate a character class.
+    ~b$~B       Match end of line (including the position preceding a ~unewline~U
+            character).
+    ~b.~B       Match any character except ~unewline~U.
+    ~b*~B       Match zero or more occurrences of the previous character or
+            character class in "as many as possible" mode.
+    ~b+~B       Match one or more occurrences of the previous character or character
+            class in "as many as possible" mode.
+    ~b?~B       Match zero or one occurrence of the previous character or character
+            class, or specify closure modification.
+    ~b{m,n}~B   Match a minimum of ~bm~B and a maximum of ~bn~B occurrences of the previous
+            character or character class, where ~bm~B and ~bn~B are unsigned integers.
+            ~bm~B is required; however, ~bn~B or ~b,~B may be omitted.  In the ~b{m,}~B form, ~bn~B
+            defaults to an infinite value.  In the ~b{m}~B form, exactly ~bm~B
+            occurrences must match.
+    ~b[~B       Begin a character class definition.
+    ~b]~B       End a character class definition.
+    ~b(~B       Mark the beginning of a group.
+    ~b)~B       Mark the end a group.
+
+The ~b?~B character is used for "zero or one of the previous item" or as a modifier
+following itself, ~b*~B, ~b+~B, or ~b{m,n}~B meaning "as few as possible".
+
+Whitespace characters and some control characters may be specified with the ~b\x~B
+notation:
+
+    ~b\t~B      Tab character.
+    ~b\r~B      Carriage return.
+    ~b\n~B      Newline.
+    ~b\f~B      Form feed.
+    ~b\s~B      All of the above plus the space character (a character class).
+
+Special anchor and positional metacharacteers may be specified with the ~b\x~B
+notation also:
+
+    ~b\A~B      Match beginning of string.
+    ~b\z~B      Match end of string.
+    ~b\Z~B      Match end of string, but just before any trailing ~unewline~U character
+            if present.
+    ~b\b~B      Match a word boundary, as defined by the value of the $wordChars
+            global variable.
+    ~b\B~B      Match a non-word boundary, as defined by the value of the $wordChars
+            global variable.
+
+Character classes ~b[]~B may contain range(s) or be negated with a leading ~b^~B
+metacharacter; for example, "[a-zA-Z0-9_]" or "[^0-9]".  A few common character
+classes may be specified with the ~b\x~B notation as well:
+
+    ~b\d~B      [0-9]           Digit.
+    ~b\D~B      [^0-9]          Non-digit.
+    ~b\l~B      [a-zA-Z]        Letter.
+    ~b\L~B      [^a-zA-Z]       Non-letter.
+    ~b\s~B      [ \t\r\n\f]     Whitespace character.
+    ~b\S~B      [^ \t\r\n\f]    Non-whitespace character.
+    ~b\w~B      [a-zA-Z0-9_]    Word character, as defined by the $wordChars
+                            variable.
+    ~b\W~B      [^a-zA-Z0-9_]   Non-word character, as defined by the $wordChars
+                            variable.
+
+Additionally, any of the ~b\t~B, ~b\r~B, ~b\n~B, or ~b\f~B control characters and the ~b\d~B,
+~b\l~B, ~b\s~B, or ~b\w~B metacharacters may be specified inside a character class as
+combinations, such as "[\l\d]" to specify any letter or digit.
+
+Plain parentheses ~b(~B and ~b)~B are used for grouping and escaped versions ~b\(~B and ~b\)~B
+are used to search for the literal characters.  Grouped match strings may be
+included in a replacement pattern by specifying ~b\n~B, where n is a digit in the
+range 1-9 and refers to the nth group.  Groups are numbered in sequence by the
+opening parenthesis in the search pattern, beginning at 1.  The entire matched
+string is represented by ~b\0~B or the ~b&~B metacharacter.
+
+Lastly, a colon and one or more lowercase letters may be appended to any pattern
+to specify options, as follows:
+
+    ~be~B       Exact pattern matching.  Case of letters is significant.
+    ~bi~B       Ignore case.  Case of letters is not significant.
+    ~bp~B       Plain text matching.  The pattern is matched literally.
+    ~br~B       Regexp matching.  The pattern is matched as a regular expression.
+    ~bm~B       Multi-line mode.  When performing RE matching, the ~b.~B metacharacter
+            and a negative character class ~b[^...]~B will match a ~unewline~U, which
+            they do not by default (but only if, in the latter case, the
+            character class does not contain a ~unewline~U).
+
+Pattern options always override the corresponding global modes.  For example,
+the pattern "abc.:ri" would be processed as a regular expression and case would
+be ignored, whether or not the ~uExact~U or ~uRegexp~U global modes were enabled.
+Whereas "abc.:e" would cause case to be significant, but would be processed as a
+regular expression if ~uRegexp~U mode was enabled, and as plain text if not.  Also,
+to allow a pattern option string to be part of a pattern and avoid ambiguity
+when a pattern is interpreted, the following rule is used:
+
+    "If a pattern ends with a colon followed by one or more valid option
+    letters, and the colon is not the first character of the pattern, then
+    everything preceding the colon is the pattern.  In all other cases, the
+    entire string is the pattern (with no options)."
+
+So for example, the pattern "abc:ri" would be interpreted as RE pattern /abc/i,
+"abc:r:p" would be interpreted as plain text pattern 'abc:r', "abc::r" would be
+interpreted as RE pattern /abc:/, and "abc:rx" would be interpreted as plain
+text pattern 'abc:rx' (because it contains invalid option letter ~bx~B).
+
+The ~b|~B metacharacter is not currently supported, and the closure metacharacters
+~b*~B ~b+~B ~b?~B may not be applied to a group.

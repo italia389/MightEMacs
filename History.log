@@ -1,6 +1,65 @@
 MightEMacs RELEASE HISTORY
 
 ----------
+9.2.0	17 Mar 2019
+
+
+*** Changes from Previous Version
+
+ 1. Added color:
+	* Created "showColors" command, which displays all colors available for the terminal being used.
+	* Created "$displayColors" system variable, which provides a means to set colors for mode lines and informational
+	  displays.
+	* Changed startup processing to display mode lines in color by default.
+	* Redesigned informational displays ("show*" commands) to be easier to read and to be shown in color by default.
+	* Created "setColorPair" function, which assigns a foreground and background color of your choosing to a "color pair
+	  number", and added terminal attribute specifications for enabling (~<n>c) and disabling (~C) color, which can be used
+	  in combination with color pair number(s) to display colored strings in a buffer or on the message line.
+	* Added "Colors" item to "getInfo" function which returns an array of basic color information, or nil if color not
+	  enabled.
+ 2. Improved shell command processing:
+	* Renamed "filterBuf" command to "pipeBuf", changed default key binding to "C-x |", changed to allow a shell pipeline as
+	  the command to execute, and changed to provide the option of saving the command result to a new buffer instead of
+	  always reading the result into the current buffer, as previously.
+	* Changed all shell commands to operate internally with OS pipes instead of temporary files, to capture results in
+	  buffers, and display any errors in a pop-up window.
+    Now the shell family of commands work very efficiently and handle errors cleanly.
+ 3. Eliminated the "False return" message that was displayed when attempting to move the point beyond a buffer boundary (which
+    was annoying and confusing), except when a keyboard macro is executing.
+ 4. Changed display code to skip over invalid terminal attribute specifications in a buffer or on the message line instead of
+    displaying them literally, which makes more sense.
+ 5. Changed "quoteChar" command to operate abs(n) times and ignore "Over" and "Repl" buffer modes if n < 0, and changed
+    self-insertion code to operate the same way for unbound characters.
+ 6. Added automatic calls to "resetTerm" command when the terminal window is resized (with the mouse) so that the editor's
+    screen(s) always match the size of the terminal window.
+ 7. Provided option for "bufMode?", "globalMode?", and "groupMode?" functions to ignore any non-existent mode or group name so
+    that a running script will not fail in that case.
+ 8. Created official name for the scripting language: MScript, changed filename extension for script files from ".mm" to ".ms"
+    to match language name, and renamed all "memacs*" macros in script files to "ms*".
+ 9. Changed default installation directory for Debian Linux to /usr/local (just like all other platforms), so it is no longer
+    treated as a special case.
+10. Bug fixes:
+	* Fixed issue where the current line in a buffer containing a terminal attribute specification was being left in the
+	  "rendered" state after (a), a right fence character was typed; (b), its matching fence character was displayed; and
+	  (c), the cursor was returned to the line.
+	* Fixed issue where a language buffer mode was sometimes not being set when switching windows.
+	* Fixed issue where setting a variable to an expression interactively was sometimes failing and returning a non-sensical
+	  error message.
+	* Fixed other minor issues.
+
+
+*** Implementation Notes
+
+ 1. Script files now use a ".ms" filename extension instead of ".mm".
+ 2. Changed "~0" terminal attribute specification to "~Z" so that a numeric prefix can be specified in an attribute
+    specification without ambiguity (such as "~<n>c" to enable color, where <n> is a number).
+ 3. Changes to the scripting language (MScript):
+	* Changed "bufMode?" and "globalMode?" functions to check if all modes are enabled if n >= 0 (instead of when n is not
+	  the default, as previously), and to ignore any non-existent mode if n <= 0.
+	* Changed "groupMode?" function to do a global mode check if n >= 0 (instead of when n is not the default, as
+	  previously), and to ignore any non-existent group name (and return nil) if n <= 0.
+
+----------
 9.1.1	6 Jan 2019
 
 
@@ -11,12 +70,12 @@ MightEMacs RELEASE HISTORY
 	  executed in a script.
 	* Fixed issue where a new filename for a buffer would not be set if it matched the buffer name.
  2. Changed return message processing:
-	* created "high priority" option for informational messages which causes a message tagged as such to override
+	* Created "high priority" option for informational messages which causes a message tagged as such to override
 	  any non-high-priority message set previously.
-	* changed most built-in commands which previously forced a return message to use the "high priority" tag instead so
+	* Changed most built-in commands which previously forced a return message to use the "high priority" tag instead so
 	  that messages such as "nn substitutions" (from the "replace" and "queryReplace" commands) can be suppressed in a
 	  script by disabling "RtnMsg" global mode.
-	* changed "message" function to set the high priority flag for a message if abs(n) == 1 and force the message if
+	* Changed "message" function to set the high priority flag for a message if abs(n) == 1 and force the message if
 	  abs(n) > 1, instead of force (only) if n != 0, as previously.
  3. Added "quick start" topic to Help System.
 

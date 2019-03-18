@@ -1,4 +1,4 @@
-# Root Unix makefile for MightEMacs.		Ver. 9.1.1
+# Root Unix makefile for MightEMacs.		Ver. 9.2.0
 
 # Definitions.
 MAKEFLAGS = --no-print-directory
@@ -11,8 +11,8 @@ LIB = prolib
 LIBNAME = libpro.a
 BIN1 = mm
 BIN2 = memacs
-USITEMM = site.mm
-UMM = .memacs
+USITEMS = site.ms
+UMS = .memacs
 INSTALL1 = /usr/local
 INSTALL2 = /usr
 
@@ -135,9 +135,9 @@ install: uninstall
 	chmod $$dmode "$$mainDir"/bin/$(BIN2);\
 	[ -d "$$mainDir/lib/$(MDIR)" ] || install -v -d $$owngrp -m $$dmode "$$mainDir/lib/$(MDIR)" 1>&2;\
 	cd lib || exit $$?;\
-	for x in *.mm; do \
+	for x in *.ms; do \
 		bak=;\
-		[ $$x = $(USITEMM) ] && bak=-b;\
+		[ $$x = $(USITEMS) ] && bak=-b;\
 		install -v $$comp $$bak $$owngrp -m $$fmode $$x "$$mainDir/lib/$(MDIR)" 1>&2;\
 	done;\
 	cd ..;\
@@ -155,8 +155,8 @@ install: uninstall
 user-install:
 	@echo 'Beginning user startup file installation...' 1>&2;\
 	cd $(MDIR)-[0-9]*[0-9]/lib || exit $$?;\
-	install -v -C -b -m 644 $(UMM) ~ 1>&2;\
-	echo "Done.  User startup file '$(UMM)' installed in '`cd; pwd`'." 1>&2
+	install -v -C -b -m 644 $(UMS) ~ 1>&2;\
+	echo "Done.  User startup file '$(UMS)' installed in '`cd; pwd`'." 1>&2
 
 clean:
 	@for x in $(LIB) $(MDIR); do \
