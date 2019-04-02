@@ -83,6 +83,10 @@ To install MightEMacs with optional customizations, perform the following steps:
 
 	export PATH="$PATH:/usr/local/bin"
 
+    To determine your shell, enter the following command:
+
+	$ echo $0
+
     MightEMacs looks for its startup files in directory /usr/local/lib/memacs by
     default.  If you want to create your own scripts in another directory (for
     example, "$HOME/scripts"), you can include it in the MMPATH environmental

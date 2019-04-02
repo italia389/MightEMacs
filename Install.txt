@@ -20,28 +20,28 @@ For a standard installation of MightEMacs, perform the following steps:
     If you are installing on a Linux platform, go to the next step; otherwise,
     go to step 5.
 
- 3. The Linux installer is memacs-9.2.0.sh, which includes a 64-bit binary built
+ 3. The Linux installer is memacs-9.3.0.sh, which includes a 64-bit binary built
     on a CentOS vers. 6 machine.  To run the installer, type the following
     commands:
 
 	$ su root
-	# ./memacs-9.2.0.sh
+	# ./memacs-9.3.0.sh
 	# exit
 
  4. Go to step 6.
 
- 5. The macOS installer is memacs-9.2.0.pkg, which includes a 64-bit binary
+ 5. The macOS installer is memacs-9.3.0.pkg, which includes a 64-bit binary
     built for macOS vers. 10.10 (Yosemite) and later.  Open the installer
     package with the following command:
 
-	$ open memacs-9.2.0.pkg
+	$ open memacs-9.3.0.pkg
 
     and run the installer.
 
  6. If you want to install the sample user startup file (.memacs) into your HOME
     directory, enter the following command:
 
-	$ cp memacs-9.2.0/lib/.memacs ~
+	$ cp memacs-9.3.0/lib/.memacs ~
 
  7. Make sure directory /usr/local/bin is in your shell PATH so that the shell
     can find the MightEMacs binary.  Display it with the following command:
@@ -53,6 +53,10 @@ For a standard installation of MightEMacs, perform the following steps:
     Bourne shell (bash) or file /etc/zshenv for zsh:
 
 	export PATH="$PATH:/usr/local/bin"
+
+    To determine your shell, enter the following command:
+
+	$ echo $0
 
     MightEMacs looks for its startup files in directory /usr/local/lib/memacs by
     default.  If you want to create your own scripts in another directory (for

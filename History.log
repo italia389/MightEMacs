@@ -1,6 +1,45 @@
 MightEMacs RELEASE HISTORY
 
 ----------
+9.3.0	31 Mar 2019
+
+
+*** Changes from Previous Version
+
+ 1. Fixed bugs in "let" command:
+	* Fixed issue where the value of a variable was being set (interactively) to the prompt string instead of the value that
+	  was entered unless the value was an expression or an integer.  This usually caused a bogus error to be displayed as a
+	  result and the variable was not changed.
+	* Fixed problem where the program would crash when attempting to set the $lastKeySeq or $searchDelim system variable.
+ 2. Fixed problem on Linux platforms where pressing "control+h" would generate "DEL" instead of "C-h" unless TERM was
+    xterm-256color.
+ 3. Replaced $displayColors system variable with new "setDispColor" function, which provides a means to set colors for a display
+    item, and changed its operation to always set "no color" for an item if its color is set to nil.
+ 4. Changed "getInfo" function to return an array of current color numbers for all display items when the keyword is "Colors",
+    and return number of colors and pairs avaiable (as previously) if an n argument is specified.
+ 5. Made library changes:
+	* Renamed "grepFiles" macro to "findFiles", changed its key binding to "C-x f", and added option to bypass the search
+	  pattern prompt if n <= 0.
+	* Created "getFile" (C-x C-g) macro, which finds a file and opens it in a new screen (and also sets its buffer to
+	  read-only if n <= 0).
+	* Fixed problem in "showBindings" (C-x n) macro where tildes (~) were not being displayed in key bindings.
+ 6. Changed buffer editing when assigning a value to the $lineText system variable so that the target line is not deleted if it
+    is empty, and the point is left at the end of the assigned text.
+ 7. Combined $TermCols and $TermRows system constants into new $TermSize constant which contains the same values as a two-
+    element array.
+ 8. Changed screen display so that the keyboard macro recording indicator is always displayed on the mode line of the bottom
+    window (making it more conspicuous) instead of the current window, as previously.
+
+
+*** Implementation Notes
+
+ 1. Deleted $displayColors system constant.
+ 2. Created "setDispColor" function, which sets (or removes) color for a display item.
+ 3. Changed "getInfo" function to return current colors of display items by default for the "Colors" keyword.
+ 4. Renamed "grepFiles" macro to "findFiles".
+ 5. Combined $TermCols and $TermRows system constants into new $TermSize constant.
+
+----------
 9.2.0	17 Mar 2019
 
 

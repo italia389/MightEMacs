@@ -21,11 +21,11 @@ multiple buffers, windows, and screens, built-in and user-defined modes of diffe
 macros, sophisticated navigation, searching, and editing commands, multiple working directories, language-specific
 auto-formatting, fence matching, extensibility, a built-in help system, and more.
 
-It also supports a C-like scripting language that is very powerful and fairly easy to learn (assuming you already have
-programming experience).  The distribution package includes several scripts as well that perform various tasks, such as finding
-a file that contains a particular function or method definition and opening it at that location, naming and storing keyboard
-macros in a file, wrapping a pair of fence characters or quotes around one or more words in the text, or grepping for files and
-performing a global search and replace on them.
+It also supports a C-like scripting language called MScript that is very powerful and fairly easy to learn (assuming you already
+have programming experience).  The distribution package includes several scripts as well that perform various tasks, such as
+finding a file that contains a particular function or method definition and opening it at that location, naming and storing
+keyboard macros in a file, wrapping a pair of fence characters or quotes around one or more words in the text, or grepping for
+files and performing a global search and replace on them.
 
 See the `memacs(1)` man page and on-line help (via `ESC ?`) for further information.
 
@@ -430,8 +430,8 @@ on Reddit at `http://reddit.com/r/memacs`.
 
 Notes
 -----
-This distribution of MightEMacs is version 9.2.0.  Installer packages containing 64-bit binaries are included for Linux
-platforms and macOS vers. 10.10 and later.  The sources can be compiled as well if desired; however, the build process has not
+This distribution of MightEMacs is version 9.3.0.  Installer packages containing 64-bit binaries are included for Linux
+platforms and macOS ver. 10.10 and later.  The sources can be compiled as well if desired; however, the build process has not
 been tested on other Unix platforms and there may be some (hopefully minor) issues which will need to be resolved.  If you are
 compiling the sources and encounter any problems, please contact the author with the details.
 
