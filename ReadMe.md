@@ -34,7 +34,7 @@ Examples
 Following are some examples of MightEMacs' features and how it can be used to edit code.  The cursor (point) is shown as (^)
 and keys that are typed are shown in <b>bold</b>.  Control keys are shown as `C-X`, where `X` is usually a letter.  Note
 that the `C-_` (control + underscore) key, which is used often, can be entered without holding down the shift key (control +
-dash), which makes it much easier to type.
+dash), which makes it much easier to type.  Hence, it is shown as  `C--` in the examples.
 
 1. Duplicate a block of lines in JavaScript:
 
@@ -46,7 +46,7 @@ dash), which makes it much easier to type.
     </pre>
 
     <pre>
-    <b>C-_ 2</b> (n == -2)
+    <b>C-- 2</b> (n == -2)
     <b>ESC d</b> (duplicate current line + prior two)
     </pre>
     Yields:
@@ -73,7 +73,7 @@ dash), which makes it much easier to type.
     <b>C-SPC</b> (set mark)
     <b>C-p C-p</b> (move up two lines)
     <b>C-c C-l</b> (copy current line to kill ring)
-    <b>C-x C-x</b> (swap point and mark)
+    <b>C-x C-x .</b> (swap point and mark)
     <b>C-u C-u</b> (n == 0)
     <b>C-y</b> (yank line that was copied without moving point)
     <b>el</b> (enter more text)
@@ -99,7 +99,7 @@ dash), which makes it much easier to type.
     <b>C-f</b> (forward character)
     <b>C-d</b> (delete character at point: " ")
     <b>C-h C-k</b> (kill to end of current line)
-    <b>C-_ C-_</b> (n == -2)
+    <b>C-- C--</b> (n == -2)
     <b>ESC C-a</b> (move to beginning of text two lines above)
     <b>C-d C-d C-y</b> (delete "do" and yank "while" clause)
     <b>DEL</b> (delete previous character: ";")
@@ -190,7 +190,7 @@ dash), which makes it much easier to type.
     <b>ESC q</b> (query replace...)
     <b>(mset\()([^,]+),([^)]+):r ESC</b> ("from" regular expression...)
     <b>\1\3,\2 ESC</b> ("to" replacement pattern)
-    <b>SPC SPC n SPC</b> (replace first two occurrences, skip third, do last)
+    <b>SPC SPC n SPC q</b> (replace first two occurrences, skip third, do last)
     </pre>
     Yields (reversed <b>mset()</b> arguments):
 
@@ -213,13 +213,11 @@ dash), which makes it much easier to type.
     // used for whole block.  Also, the
     // prefixes (for example, "//" or "#") can be
             // conf(^)igured.
+    public class HelloWorld {
     </pre>
 
     <pre>
-    <b>C-SPC</b> (set mark)
-    <b>C-r wrap ESC</b> (search backward for "wrap" -- first line)
-    <b>C-u 0</b> (n == 0)
-    <b>ESC .</b> (rewrap lines in region)
+    <b>ESC .</b> (rewrap block of comment lines)
     </pre>
     Yields:
 
@@ -228,6 +226,7 @@ dash), which makes it much easier to type.
     // single-line comments.  Indentation of first comment line is
     // used for whole block.  Also, the prefixes (for example, "//"
     // or "#") can be configured.(^)
+    public class HelloWorld {
     </pre>
 
 8. Add numbers to a block of lines in Swift:
@@ -244,9 +243,9 @@ dash), which makes it much easier to type.
     </pre>
 
     <pre>
-    <b>C-_ 5</b> (n == -5)
+    <b>C-- 5</b> (n == -5)
     <b>ESC #</b> (enumerate lines)
-    <b>0 RTN 1 RTN /* %u %/ ESC</b> (enter parameters)
+    <b>0 RTN /* %u %/ ESC 1 RTN</b> (enter parameters)
     </pre>
     Yields:
 
@@ -299,10 +298,10 @@ dash), which makes it much easier to type.
     </pre>
 
     <pre>
-    <b>C-x C-x</b> (swap point with default mark "." -- now at "Example")
-    <b>C-x C-x</b> (swap again -- back at "region.")
-    <b>C-u C-x C-x x</b> (swap with mark "x" -- now at "Header")
-    <b>C-u C-x C-x x</b> (swap again -- back at "region.")
+    <b>C-x C-x .</b> (swap point with mark "." -- now at "Example")
+    <b>C-x C-x .</b> (swap again -- back at "region.")
+    <b>C-x C-x x</b> (swap with mark "x" -- now at "Header")
+    <b>C-x C-x x</b> (swap again -- back at "region.")
     <b>ESC SPC x</b> (go to mark "x")
     </pre>
     Yields:
@@ -323,7 +322,7 @@ dash), which makes it much easier to type.
 10. Multi-file query replace in C:
 
     <pre>
-    <b>C-x C-g</b> (grep files...)
+    <b>C-x f</b> (find files...)
     <b>*.c</b> (enter filename template...)
     <b>mset( ESC</b> (enter search pattern)
     </pre>
@@ -334,7 +333,7 @@ dash), which makes it much easier to type.
     </pre>
 
     <pre>
-    <b>C-_ ESC C-q</b> (query replace on files found...)
+    <b>C-- ESC C-q</b> (query replace on files found...)
     <b>ESC</b> (accept "mset(" search pattern entered previously...)
     <b>markSet( ESC</b> (enter replacement pattern)
     <b>SPC SPC !</b> (do replacement twice, then do rest unprompted)
@@ -365,11 +364,11 @@ dash), which makes it much easier to type.
     </pre>
 
     <pre>
-    <b>C-_ C-_ C-a</b> (move up two lines to beginning of line)
+    <b>C-- C-- C-a</b> (move up two lines to beginning of line)
     <b>ESC f</b> (move forward one word)
     <b>C-u 3 ESC C-t</b> (change next three words to title case)
     <b>C-p C-b</b> (move up one line and backward one character: "{")
-    <b>C-h }</b> (kill fenced region: "{" through "}")
+    <b>C-h '</b> (kill fenced region: "{" through "}")
     <b>DEL</b> (delete previous character: " ")
     <b>C-p C-h C-l</b> (move to previous line and kill it)
     </pre>
@@ -383,10 +382,10 @@ dash), which makes it much easier to type.
 
     <pre>
     <b>C-b</b> (move backward one character to end of previous line)
-    <b>SPC C-_ C-y</b> (insert a space and yank -1th entry from kill ring)
+    <b>SPC C-- C-y</b> (insert a space and yank -1th entry from kill ring)
     <b>C-u 3 C-a</b> (move to beginning of third line down)
     <b>C-y</b> (yank 0th entry from kill ring)
-    <b>C-p C-x u</b> (move to previous line and convert it to upper case)
+    <b>C-p C-x C-u</b> (move to previous line and convert it to upper case)
     <b>C-p</b> (move to beginning of previous line...)
     <b>ESC C-l</b> (and convert first word to lower case)
     </pre>
@@ -406,13 +405,13 @@ dash), which makes it much easier to type.
 
     <pre>
     <b>ESC C-\</b> (trim white space from end of all lines in buffer)
-    <b>C-_ 4 TAB</b> (set tabbing style to four spaces)
+    <b>C-- 4 TAB</b> (set tabbing style to four spaces)
     <b>C-u ESC )</b> (indent all lines in region two tab stops)
     <b>C-u 5 C-x C-e 4</b> (change 4-space tabs to hard tabs in next five lines)
     <b>C-x ( ... C-x ) C-u 10 C-x e</b> (record keystrokes, then play back 10 times)
-    <b>C-x v sort RTN</b> (filter buffer through "sort" command and replace with result)
+    <b>C-x | sort RTN</b> (pipe buffer through "sort" command and replace with result)
     <b>C-x ` date RTN</b> (execute "date" command and insert its output at point)
-    <b>ESC t</b> (truncate buffer -- delete all text from point to end of buffer)
+    <b>ESC t y</b> (truncate buffer -- delete all text from point to end of buffer)
     <b>ESC u</b> (undelete -- restore most recently-deleted text)
     </pre>
 
@@ -430,7 +429,7 @@ on Reddit at `http://reddit.com/r/memacs`.
 
 Notes
 -----
-This distribution of MightEMacs is version 9.3.0.  Installer packages containing 64-bit binaries are included for Linux
+This distribution of MightEMacs is version 9.4.0.  Installer packages containing 64-bit binaries are included for Linux
 platforms and macOS ver. 10.10 and later.  The sources can be compiled as well if desired; however, the build process has not
 been tested on other Unix platforms and there may be some (hopefully minor) issues which will need to be resolved.  If you are
 compiling the sources and encounter any problems, please contact the author with the details.

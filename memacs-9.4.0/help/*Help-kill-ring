@@ -1,0 +1,30 @@
+<home>    <exit>
+
+
+~bKill Ring~B
+
+As discussed in the previous section, editing is generally done by manipulating
+"text objects" in various ways.  There are three actions which may be performed
+on text objects: delete, copy, and "kill".  Kill is the same as delete, except
+that the text is saved before it is deleted.
+
+Whenever a text object is copied or killed, it is saved in the "kill ring".  The
+kill ring is an area of memory which can hold any amount of text in multiple
+internal buffers, which are linked to each other in a circular fashion.  (The
+number of buffers is determined by the $killRingSize system variable, which
+defaults to 40.)  When a new kill occurs, previous kills are "pushed back" one
+position around the ring so that the most recent kill is always the first one to
+be retrieved.  If the ring is full, the oldest kill is discarded to make room
+for the new kill.
+
+The "yank" (~uC-y~U) command is used to insert text from the kill ring into the
+current buffer at point.  It inserts the most recent copy or kill by default.
+The yanked text is also marked as a region.
+
+There are several commands for using and manipulating marks, regions, and the
+kill ring, which are explained in Advanced Help.  For now, you just need to
+remember that ~uC-SPC~U sets the dot mark at point for delineating a region, and
+~uC-y~U inserts (yanks) the most recent copy or kill from the kill ring.
+
+
+<home>    <exit>

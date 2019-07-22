@@ -18,27 +18,27 @@ typedef ssize_t ArraySize;
 typedef struct {
 	ArraySize a_size;		// Number of elements allocated.
 	ArraySize a_used;		// Number of elements currently in use.
-	Datum **a_elpp;			// Array of (Datum *) elements.  Elements 0..(a_used -1) always point to allocated
+	Datum **a_elp;			// Array of (Datum *) elements.  Elements 0..(a_used -1) always point to allocated
 					// Datum objects and elements a_used..(a_size - 1) are always undefined (un-allocated).
 	} Array;
 
 // External function declarations.
-extern Array *aclear(Array *aryp);
-extern Array *aclone(Array *aryp);
-extern void acompact(Array *aryp);
-extern Datum *adelete(Array *aryp,ArraySize index);
-extern Datum *aeach(Array **arypp);
-extern bool aeq(Array *aryp1,Array *aryp2,bool ignore);
-extern Datum *aget(Array *srcp,ArraySize index,bool force);
-extern Array *agraph(Array *aryp1,Array *aryp2);
-extern Array *ainit(Array *aryp);
-extern int ainsert(Array *aryp,ArraySize index,Datum *datp,bool copy);
-extern int ajoin(Datum *destp,Array *srcp,char *delim);
-extern Array *anew(ArraySize len,Datum *initp);
-extern Datum *apop(Array *aryp);
-extern int apush(Array *aryp,Datum *datp,bool copy);
-extern Datum *ashift(Array *aryp);
-extern Array *aslice(Array *aryp,ArraySize index,ArraySize len,bool force,bool cut);
+extern Array *aclear(Array *ary);
+extern Array *aclone(Array *ary);
+extern void acompact(Array *ary);
+extern Datum *adelete(Array *ary,ArraySize index);
+extern Datum *aeach(Array **aryp);
+extern bool aeq(Array *ary1,Array *ary2,bool ignore);
+extern Datum *aget(Array *src,ArraySize index,bool force);
+extern Array *agraph(Array *ary1,Array *ary2);
+extern Array *ainit(Array *ary);
+extern int ainsert(Array *ary,ArraySize index,Datum *datum,bool copy);
+extern int ajoin(Datum *dest,Array *src,char *delim);
+extern Array *anew(ArraySize len,Datum *val);
+extern Datum *apop(Array *ary);
+extern int apush(Array *ary,Datum *datum,bool copy);
+extern Datum *ashift(Array *ary);
+extern Array *aslice(Array *ary,ArraySize index,ArraySize len,bool force,bool cut);
 extern Array *asplit(short delim,char *src,int limit);
-extern int aunshift(Array *aryp,Datum *datp,bool copy);
+extern int aunshift(Array *ary,Datum *datum,bool copy);
 #endif

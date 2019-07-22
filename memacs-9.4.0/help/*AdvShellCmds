@@ -1,0 +1,23 @@
+~bShell Commands~B
+
+There is a group of commands for accessing the shell.  Following is the list:
+
+    ~bKeys        Command         Description~B
+
+    ~#uC-x `~U       insertPipe      Execute shell pipeline and insert its output
+                                into current buffer at point, without moving
+                                point if n == 0.
+
+    ~#uC-x |~U       pipeBuf         Feed current buffer through shell pipeline and
+                                read its output into current buffer (or another
+                                buffer), with same options as "readFile"
+                                command.
+
+    ~#uC-x ~~~U       readPipe        Execute shell pipeline and read its output into
+                                current buffer (or another buffer), with same
+                                options as "readFile" command.
+
+    ~#uC-x $~U       shell           Spawn an interactive shell session.
+
+    ~#uC-x !~U       shellCmd        Execute a shell command and optionally,
+                                display result in a pop-up window.

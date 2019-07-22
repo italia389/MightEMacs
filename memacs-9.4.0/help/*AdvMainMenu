@@ -1,0 +1,105 @@
+
+		      ~bA D V A N C E D   H E L P   M E N U~B
+
+
+         1. Line Blocks and Line Commands       13. Screens
+         2. Other Editing Commands              14. Line Wrapping
+         3. Marks                               15. Buffer Rendering
+         4. Kill Ring                           16. Keyboard Macros
+         5. Undeleting Text                     17. Hooks
+         6. Completions                         18. Binding and Unbinding Keys
+         7. Modes and Mode Groups               19. Writing Scripts
+         8. Buffer Commands                     20. Shell Commands
+         9. File Commands                       21. Terminal Dimensions
+        10. Search Pattern Syntax               22. Macro Packages
+        11. Searching and Replacing             23. memacs(1) man Page
+        12. Windows
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+back:^
+1:F:*AdvLineBlocks
+2:F:*AdvOtherEditing
+3:F:*AdvMarks
+4:F:*AdvKillRing
+5:F:*AdvUndelete
+6:F:*AdvCompletions
+7:F:*AdvModes
+8:F:*AdvBufferCommands
+9:F:*AdvFileCommands
+10:F:*AdvSearchPatterns
+11:F:*AdvSearchReplace
+12:F:*AdvWindows
+13:F:*AdvScreens
+14:F:*AdvLineWrapping
+15:F:*AdvBufferRendering
+16:F:*AdvKeyboardMacros
+17:F:*AdvHooks
+18:F:*AdvKeyBindings
+19:M:*AdvScriptMenu
+20:F:*AdvShellCmds
+21:F:*AdvTerminal
+22:F:*AdvPkg
+23:m:memacs

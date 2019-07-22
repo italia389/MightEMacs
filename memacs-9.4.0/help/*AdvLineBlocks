@@ -1,0 +1,40 @@
+~bLine Blocks and Line Commands~B
+
+As discussed in the ~bEssential Editing Commands~B section, a numeric prefix may
+be used for the "copyLine", "killLine", and "delLine" commands to select a block
+of contiguous lines to operate on.  This method of selecting lines is used by
+several other commands as well which operate on line blocks.  Each of these
+commands use the numeric prefix to select one or more adjacent lines as follows:
+
+    n < 0       Select current line and abs(n) previous lines.
+    n > 0       Select current line and n - 1 following lines.
+    n == 0      Select all lines in current region.
+
+The commands and macros that operate on line blocks are:
+
+    copyLine        ~#uC-c C-l~U     Copy line block to kill buffer.
+    delLine         ~uC-l~U         Delete line block.
+    detabLine       ~#uC-x C-d~U     Change hard tabs to spaces in line block.
+    dupLine         ~#uESC d~U       Duplicate line block and place point at
+                                beginning of text of duplicated block.
+    entabLine       ~#uC-x C-e~U     Change spaces to hard tabs in line block.
+    indentLine      ~#uC-c )~U       Indent line block.  User is prompted for number
+                                of tab stops if interactive.
+    joinLines       ~#uESC C-j~U     Convert line block to single line with white
+                                space between lines replaced with a single
+                                space.
+    joinLines0      ~#uC-x C-j~U     Convert line block to single line with white
+                                space between lines deleted.
+    killLine        ~#uC-h C-l~U     Delete line block and save to kill buffer.
+    lowerCaseLine   ~#uC-x C-l~U     Convert text in line block to lower case.
+    outdentLine     ~#uC-c (~U       Outdent line block.  User is prompted for number
+                                of tab stops if interactive.
+    titleCaseLine   ~#uC-x C-t~U     Convert words in line block to title case.
+    trimLine        ~#uC-x C-\~U     Trim white space from end of each line in line
+                                block.
+    upperCaseLine   ~#uC-x C-u~U     Convert text in line block to upper case.
+    wrapLine        ~#uESC RTN~U     Rewrap lines in line block.
+
+Additionally, the "wpJoinLines" (~#uC-c C-j~U) and "wpWrapLine" (~#uC-c RTN~U) macros,
+which provide additional features, also operate on line blocks.  See the
+"showMacros" (~#uC-h @~U) help display for details.

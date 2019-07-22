@@ -1,0 +1,58 @@
+~bBuffer Rendering~B
+
+As explained in the ~bWindows~B section, you can create multiple windows in
+MightEMacs, which is especially useful for working with multiple buffers.  It
+can be tedious however, to set up the windows the way you want them.  MightEMacs
+provides some help with this by employing the following convention.  Mostly all
+buffer and file commands may be given a numeric prefix in the range -3 to +3,
+which controls the disposition or "rendering" of its buffer after the command
+completes.  The values of the numeric prefix and their actions are:
+
+    < -2        Display the buffer in a different window and switch to that
+                window.
+    -2          Display the buffer in a different window but stay in the current
+                window.
+    -1          Display the buffer in a pop-up window.  If the buffer was just
+                created, delete it after the window is dismissed.
+    0           Leave the buffer as is (usually in the background).
+    1           Switch to the buffer in the current window (the default action).
+    2           Display the buffer in a new window but stay in the current
+                window.
+    > 2         Display the buffer in a new window and switch to that window.
+
+Note that -2 and -3 use an existing window if possible, whereas 2 and 3 always
+create a window for the buffer.
+
+If the buffer does not exist and n == -1 (a pop-up request), an error is
+generated; otherwise, the buffer is created.  Additionally, if n <= -2 and
+multiple windows exist, the buffer is displayed in a window already displaying
+the buffer, or the window immediately above the current one if possible.
+                        
+These numeric prefixes take a little while to learn and get used to, but they
+can definitely give you better control of your editing sessions.  Here are some
+examples:
+
+    ~#uC-u 3 C-x C-f~U       Find a file, display it in a new window, and switch to
+                        it.
+    ~#uC-- C-x C-r~U         Display the on-disk version of a file in a pop-up window
+                        (whether or not it is currently being edited) and delete
+                        the temporary buffer after the window is dismissed.
+    ~#uC-- C-x C-f~U         Display a file in a pop-up window, using any existing
+                        buffer attached to that file (instead of the on-disk
+                        version) if it exists.  If a buffer was created, delete
+                        it after the window is dismissed.
+    ~#uC-u C-x b~U           Select a buffer (creating it if necessary) and display
+                        it in a new window.
+    ~#uC-- 3 C-x #~U         Create a scratch buffer in a different (existing)
+                        window and switch to it.  If only one window exists,
+                        create another one.
+    ~#uC-u C-u C-x C-f~U     Find a file, but don't select its buffer (to be edited
+                        later).  Leave its buffer in the background.
+
+You can also use the "popFile" (~#uC-h C-p~U) or "popBuf" (~#uC-h p~U) command to display
+a file or buffer in a pop-up window.  These commands are designed just for this
+purpose and provides options for controlling how the pop-up window is displayed
+(like left-shifting long lines).  A common use of the "popFile" command is to
+pop a file on disk during an editing session, scroll through it, then dismiss
+the window and return to where you left off.  See the "showCommands"
+descriptions for details.

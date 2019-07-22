@@ -12,8 +12,8 @@
 
 // External function declarations.
 extern bool binsearch(char *key,void *table,ssize_t n,int (*cmp)(const char *s1,const char *s2),
- char *(*fetch)(void *table,ssize_t i),ssize_t *indexp);
-extern int getdel(char *spec,ushort *delimp);
+ char *(*fetch)(void *table,ssize_t i),ssize_t *index);
+extern int getdel(char *spec,ushort *delim);
 extern char *intf(long i);
 extern uint prime(uint n);
 extern int estrtol(const char *s,int base,long *resultp);

@@ -1,4 +1,4 @@
-// ProLib (c) Copyright 2017 Richard W. Marinelli
+// ProLib (c) Copyright 2019 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -12,16 +12,16 @@
 
 // Switch objects.
 typedef struct {
-	char **namep;				// Pointer to array of switch names.
+	char **namev;				// Pointer to array of switch names.
 	ushort flags;				// Descriptor flags.
-	} SwitchDescriptor;
+	} Switch;
 typedef struct {
 	char *name;				// Pointer to source switch name.
 	char *value;				// Pointer to switch argument if found; otherwise, NULL.
 	} SwitchResult;
 typedef struct {
-	SwitchDescriptor *swdp;			// Pointer to switch descriptor in switch table.
-	uint foundCount;			// Number of occurrences of found switch.
+	Switch *sw;				// Pointer to switch descriptor in switch table.
+	uint foundCount;			// Number of occurrences found.
 	} SwitchState;
 
 // Switch descriptor flags.
@@ -43,5 +43,5 @@ typedef struct {
 #define NSPlusKey		"+zzz+"		// Dummy hash key to use for + numeric switch.
 
 // External function declarations.
-extern int getswitch(int *argcp,char ***argvp,SwitchDescriptor **swtabp,SwitchResult *resultp);
+extern int getswitch(int *argcp,char ***argvp,Switch **swp,SwitchResult *resultp);
 #endif

@@ -1,0 +1,258 @@
+~bMScript Rules and Guidelines~B
+
+When writing in MScript, take note of the following:
+
+  * A script consists of zero or more lines.  Blank lines and lines that begin
+    with ~u#~U as the first non-whitespace character (a comment) are ignored.
+    Comments beginning with ~u#~U may also occur at the end of a line.
+    Additionally, an embedded comment which begins with ~u/#~U and ends with ~u#/~U on
+    the same line is allowed.  All remaining lines or portions of lines are
+    interpreted as statements.
+
+  * Any line except a line containing a ~u#~U comment may be continued to the next
+    line by placing a backslash (~u\~U) at the end of it.  The line and the
+    following line will be interpreted as if they were joined and the backslash
+    was removed.  Backslashes may be appended to multiple consecutive lines as
+    well, to join more than two lines.  The entire block of lines will be
+    interpreted as a single statement.
+
+  * A statement consists of an optional statement keyword followed by an
+    optional ~uand-or-expr~U, which is a series of one or more expressions separated
+    by ~uand~U or ~uor~U.
+
+  * There are two types of variables: global and local.  Global variables begin
+    with a dollar sign (~u$~U), have global scope, and are permanent.  Local
+    variables do not have a leading dollar sign, are accessible only within the
+    script or macro in which they are created (assigned to), and are deleted
+    when the script or macro exits.  Predefined global variables whose names
+    begin with a capital letter (for example, $LineLen) are read-only and thus,
+    cannot be assigned to.
+
+  * Multiple variables may be assigned to elements of an array by separating the
+    variable names with a comma on the left side of the assignment operator; for
+    example:
+
+        arr = []
+        a,b,arr[0] = [1,false,'xyz']
+
+    If there are more elements than variables, the extra elements will be
+    ignored.  If there are more variables than elements, the extra variables
+    will be set to ~unil~U.
+
+  * A command, alias, function, or macro may be called with zero or more
+    argument(s) separated by commas, and may also be called with an n argument.
+    An n argument is passed via the binary operator ~u=>~U using the syntax:
+
+        int-expr ~u=>~U name
+
+    where ~uint-expr~U is the n argument and ~uname~U is the command, alias, function,
+    or macro name.  The ~u=>~U operator has high precedence in an expression.  (See
+    the ~bExpressions~B section for a description of all expressions, operators,
+    and their precedences.)
+
+  * A buffer containing a script may be executed just like a macro by using the
+    "xeqBuf" command.  The command essentially acts as a "macro proxy" and is
+    called with an optional n argument and a comma-separated list of arguments,
+    the first of which must evaluate to the name of the buffer to execute.  The
+    n argument (if any) and all arguments after the first are passed to the
+    script.
+
+  * A command, alias, function, or macro that is called with argument(s) may be
+    coded with or without parentheses around the argument list; that is, in
+    either of the following forms:
+
+        name(arg1,arg2,...)
+        name arg1,arg2,...
+
+    However, be aware that the second form is prone to ambiguity and may induce
+    a syntax error.  If parentheses are used, there must not be any white space
+    between the function name and the left ~u(~U parenthesis; otherwise, it will
+    be interpreted as an unparenthesized function call (the second form) with
+    the first argument in parentheses.  The first form is also used to specify
+    zero arguments, as in ~uname~U().  The parentheses may be required in this case
+    to prevent tokens that follow ~uname~U from being interpreted as its arguments.
+
+  * The n argument is accessed from a macro or executing buffer via the $0
+    variable.  Other arguments are accessed via the $1, $2, ... variables or the
+    $ARGV array.  All $~un~U variables may be assigned to, although $0 must be an
+    integer value.  The $ARGV variable may not be assigned to; however, its
+    (array) contents may be modified just like any other array.  Note that the
+    $1, $2, ... variables are just "shortcuts" for $ARGV[0], $ARGV[1], ... and
+    will change if the $ARGV array is changed.
+
+  * When writing a macro, an important aspect to consider is whether it will be
+    called interactively, as a "function" with arguments, or both.  If either
+    calling mode is desired, then the macro can use the "interactive?" function
+    to determine the mode.  If the function returns true, the macro is being
+    called directly by the user (for example, via a key binding) and $ARGV will
+    be empty.  In this case, the macro will have to query the user via the
+    "prompt" function to obtain its argument(s), if any.
+
+    If the "interactive?" function returns false instead, the macro is being
+    called in script mode, possibly with arguments.  In this case, all arguments
+    are available in the $ARGV array.  Recall in the ~bStatements~B section that a
+    macro can be declared to accept (and require) a fixed, minimum, and/or
+    maximum number of arguments by using one of the following forms:
+
+        macro ~uname~U(~uf~U)
+        macro ~uname~U(~um~U,[~un~U])
+
+    where ~uf~U is a fixed argument count, ~um~U is a minimum argument count, and ~un~U is
+    an optional maximum argument count.  It can also be declared to accept a
+    variable number of arguments (including zero) by simply omitting the ~u(...)~U
+    that follows the macro name.
+
+    Another aspect to consider is whether the macro will be bound to a key (and
+    run interactively) or should be known to the user.  If neither is true, it
+    should be defined with the ~uconstrain~U modifier so that it is kept mostly
+    hidden and does not clutter the help displays.
+
+  * All scripts and macros are invoked as functions and return a value, which is
+    one of the following, in order of precedence:
+
+         1. The argument of a ~ureturn~U statement (~unil~U if not specified).
+         2. The result of the last expression statement evaluated.
+         3. ~unil~U (by default).
+
+    The return value may be of any type, including array.  In general, the
+    editor will execute commands, scripts, and macros without regard for the
+    return values, except as follows.  If a Boolean value is returned that
+    evaluates to ~ufalse~U, then:
+
+          * If the ~ufalse~U return is from a command or macro being executed
+            interactively via a keyboard macro, the keyboard macro will be
+            stopped and "False return" will be displayed on the message line.
+          * If the ~ufalse~U return is from a macro bound to a hook that is being
+            executed, an error message will be displayed and the hook will be
+            disabled.
+
+    Note that you can code an "abort" command with optional arguments in a
+    script or macro to abort it if needed and return control back to the user.
+    If arguments are specified, they will be concatenated and displayed on the
+    message line as a return message (explained below).  You can also exit the
+    editor with the "exit" or "quickExit" command.  If the "exit" command is
+    coded with arguments, they will be concatenated and displayed after
+    returning to the shell.  Additionally, a 0 or 255 shell return code may be
+    specified via the numeric prefix specified with the "exit" command.  (See
+    the "showCommands" display for details.)
+
+  * Return messages (which are different from return ~bvalues~B) are generated by
+    certain commands and by using the "message" function in a script or macro.
+    When a script is executing, the most recent return message is available in
+    the $ReturnMsg variable.  Messages have low and high priority, the latter of
+    which will replace the former.  A message from a command (like "setMark" or
+    "copyLine") has low priority and will not replace an existing message.  The
+    "message" function operates the same way by default; however, it can set a
+    message to high priority if called with the "High" option.  It can also
+    force message replacement if called with the "Force" option.
+
+    The disposition of a message is also dependent on the current state of the
+    "RtnMsg" global mode.  If the mode is off, command messages are not saved,
+    nor are those from the "message" function unless they are ~bforced~B.  When
+    control is eventually returned to the user, the final saved message (if any)
+    is displayed on the message line.
+
+    Note that if a script writes a message directly to the message line (via the
+    "print" or "printf" function), it will be overwritten by any return message
+    and thus may not be seen, depending on script execution time.  The "pause"
+    function can be used in this case as a workaround.
+
+  * The "printf" and "sprintf" functions and the ~u%~U format operator support most
+    of the conversion specifications described in the printf(3) man page, except
+    the ones associated with floating point numbers.
+
+See the "showCommands", "showFunctions", "showMacros", and "showVariables"
+listings for descriptions of all the commands, functions, macros, and variables
+which are available for use in MScript.
+
+Lastly, note that all commands (and macros) return ~unil~U by default.  The
+following commands however, have different return values.  Most buffer and file
+commands listed below return one of three values, depending on the numeric
+prefix that was used: (1), if called with n == -1, returns name of buffer that
+was popped if not deleted afterward; otherwise, nil; (2), if n == 0, returns
+two-element array containing buffer name and Boolean value indicating whether
+the buffer was created; or (3), if n is any other value, returns four-element
+array containing same first two elements as for n == 0 plus ordinal number of
+window displaying the buffer, and Boolean value indicating whether the window
+was created.  These three return values will be shown as [1], [2], and [3] in
+the descriptions below.
+
+    ~bCommand~B             ~bReturn value~B
+
+    chgBufAttr          Former state (-1 or 1) of last buffer attribute changed.
+                        (The value can be used as the n argument of a subsequent
+                        command to restore the former state of that attribute.)
+    backChar
+    backLine
+    backWord
+    beginLine
+    beginText           ~ufalse~U if hit a buffer boundary; otherwise, ~utrue~U.
+
+    chgMode             Former state (-1 or 1) of last mode changed.  (The value
+                        can be used as the n argument of a subsequent command to
+                        restore the former state of that mode.)
+
+    chDir               Absolute pathname of new directory.
+
+    clearBuf            ~ufalse~U if buffer is not cleared; otherwise, ~utrue~U.
+
+    delAlias
+    delBuf
+    delMacro            Zero if failure; otherwise, number of items deleted.
+
+    eval                Result of evaluation.
+
+    findFile            [1], [2], or [3].
+
+    endLine
+    endWord
+    forwChar
+    forwLine
+    forwWord            ~ufalse~U if hit a buffer boundary; otherwise, ~utrue~U.
+
+    huntBack
+    huntForw            String found, or ~ufalse~U if not found.
+
+    insertPipe          ~ufalse~U if failure; otherwise, ~utrue~U.
+
+    lastBuf             [3].
+
+    nextBuf             Name of last buffer switched to.
+
+    pipeBuf             ~ufalse~U if failure; otherwise, [1], [2], or [3].
+
+    popBuf
+    popFile             [1].
+
+    prevBuf             Name of last last buffer switched to.
+
+    queryReplace        ~ufalse~U if search stopped prematurely; otherwise, ~utrue~U.
+
+    readFile            [1], [2], or [3].
+
+    readPipe            ~ufalse~U if failure; otherwise, [1], [2], or [3].
+
+    renameBuf           New buffer name.
+
+    run                 Execution result.
+
+    scratchBuf          [1], [2], or [3].
+
+    searchBack
+    searchForw          String found, or ~ufalse~U if not found.
+
+    selectBuf           [1], [2], or [3].
+
+    setBufFile          Two-element array containing new buffer name and new
+                        filename.
+    shell
+    shellCmd            ~ufalse~U if failure; otherwise, ~utrue~U.
+
+    splitWind           Ordinal number of new window not containing point.
+
+    unbindKey           ~utrue~U if successful; otherwise, ~ufalse~U.
+
+    viewFile            [1], [2], or [3].
+
+    xeqBuf
+    xeqFile             Execution result.

@@ -1,0 +1,58 @@
+~bMarks~B
+
+During an editing session, you will often have the need to mark a "region" of
+text so that you can perform some operation on it; for example, to delete it or
+"cut" it so that you can insert it elsewhere.  You may also want to mark your
+place so you can easily return to it later.  To do this, you set a "mark" at the
+current point location in the buffer, which is a single visible character of
+your choosing (a letter, digit, or punctuation character) except a tilde (~u~~~U).
+The period (dot) mark is special -- it is used to delineate a region and is the
+default mark that is set.
+
+A region exists at all times and is defined as all text between the point and
+the "dot" mark (which may may be none, if the point is at the mark).  When a
+buffer is created, the mark is initially set to be at end of buffer.  Some
+commands operate only on regions (like "indentRegion"), and several will
+alternately operate on all lines in the current region if a numeric prefix of
+zero is specified for the command.
+
+Note that each buffer has its own set of marks.  Therefore, if multiple windows
+are displaying the same buffer, they will all have the same marks defined.  Note
+also that a mark is a "char" type in a script (an 8-bit integer) and is usually
+coded as a character literal; for example, ~u?.~U for the dot mark.  We will use
+syntax '.' however to refer to the dot mark and all others for readability.
+
+The commands for managing marks are as follows:
+
+    delMark     ~#uC-x C-SPC~U       Delete a mark, obtained via a prompt.  If a
+                                numeric prefix is specified, all marks are
+                                deleted without prompting.
+    gotoMark    ~#uESC SPC~U         Go to a mark, obtained via a prompt.  If a
+                                negative numeric prefix is specified, delete the
+                                mark after moving to it.
+    markBuf     ~#uESC C-SPC~U       Mark the entire current buffer as the current
+                                region (presumably for a subsequent region
+                                command).
+    setMark     ~uC-SPC~U           Set a mark.  Default action is to set mark '.'
+                                without prompting.  If a numeric prefix is
+                                specified, prompts for the mark to set.
+    showMarks   ~#uC-h SPC~U         Shows all marks set in the current buffer in a
+                                pop-up window.
+    swapMark    ~#uC-x C-x~U         Swap point with a mark, obtained via a prompt.
+
+For example, to indent a block of lines by one level, set mark '.' anywhere on
+the first (or last) line by pressing ~uC-SPC~U, move the point to the other end of
+the line block, then press ~#uESC )~U, optionally with a numeric prefix to specify
+the number of levels.  To copy a block of lines to the kill ring instead, mark
+the block in the same mannner, then press ~#uC-u C-u C-c C-l~U, which executes the
+"copyLine" command with a numeric prefix of zero.
+
+As a final example, to save the point position and window framing at say, the
+beginning of a routine called "myfunc" which is currently being displayed, press
+~#uC-u C-SPC~U (setMark) and enter ~um~U (or some other character) at the prompt.  You
+can then return to this exact location at any time (in any window displaying
+this buffer) and restore the window framing by pressing ~#uESC SPC~U (gotoMark) and
+entering ~um~U again.  You can also move back and forth between the current location
+and that mark by entering ~#uC-x C-x m~U (swapMark) instead, which exchanges the
+positions of point and the specified mark.  Each time you enter the key
+sequence, you will move to the other of the two locations in the buffer.

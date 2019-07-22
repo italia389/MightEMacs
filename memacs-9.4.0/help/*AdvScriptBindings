@@ -1,0 +1,68 @@
+~bKey Binding Syntax~B
+
+The "bindKey" and "unbindKey" commands take a key binding as their first
+argument and the "binding" function optionally takes a key binding as its second
+argument.  Key bindings are specified in a coded string form as one or two "key
+literals" separated by a space.  A key literal is defined as:
+
+    Zero or more of the following with no intervening space:
+
+        M-      Meta prefix key.
+        C-      Control key.
+        S-      Shift key.
+        FN      Function key (including the arrow keys).
+
+    which is followed by a printable character or character literal with no
+    intervening space.  Character literals are any of the following in any case
+    (although upper case is preferred):
+
+        DEL     ~udelete~U key.
+        ESC     ~uescape~U key.
+        RTN     ~ureturn~U key.
+        SPC     Spacebar.
+        TAB     ~utab~U key.
+
+    Additionally, "^~ux~U" may be substituted for "C-~ux~U" to specify a control
+    character, although the latter syntax is preferred.  Some examples are:
+
+        ~bKey(s)~B                          ~bCoded string form~B
+        ~ucontrol~U + ~uf~U                     "C-f" (or "^F")
+
+        ~uesc~U                             "ESC" (or "C-[")
+
+        ~ureturn~U                          "RTN" (or "C-m" or "C-M")
+
+        Right arrow                     "FNF"
+
+        Shift left arrow                "S-FNB"
+
+        ~ucontrol~U + ~ux~U followed by ~uk~U       "C-x k" (or "^x k")
+
+        ~uesc~U followed by ~uesc~U             "M-ESC" (or "M-C-[" or "ESC ESC")
+
+        The carat key ~u^~U                 "^"
+
+        ~ucontrol~U + ~uh~U followed
+        by carat ~u^~U                      "C-h ^" (or "^H ^")
+
+        ~ucontrol~U + carat                 "C-^" (or "^^")
+
+        ~ucontrol~U + ~uspacebar~U
+        (null character)                "C-SPC" (or "C-@" or "^@")
+
+        ~udelete~U key                      "DEL" (or "C-?" or "^?")
+
+        ~uesc~U followed by
+        ~ucontrol~U + space                 "M-C-SPC" (or "ESC C-SPC" or
+                                        "^[ ^SPC")
+
+        ~uesc~U followed by space           "M-SPC" (or "ESC SPC")
+
+        The letter ~uQ~U (upper case)       "Q" (or "S-q" or "S-Q")
+
+Coded bindings are not case-sensitive, with the exception of a single-letter
+binding (like "f") or a key sequence where the second key is a letter (like
+"C-c f"), which are.  Consequently, "C-h F" is the same key sequence as
+"c-H s-f", but "x" is different than "X".  Also, raw 7-bit characters greater
+than zero may be specified for any control character and the delete key, so the
+pairs "C-a" and "\1", "C-m" and "\r", and "DEL" and "\x7f" are the same.

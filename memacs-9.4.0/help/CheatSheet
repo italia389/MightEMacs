@@ -1,0 +1,320 @@
+
+		~bM i g h t E M a c s   C H E A T   S H E E T~B
+
+~bHelp and Information~B
+C-h ?		Display help for key(s) entered at prompt.
+ESC a		Apropos: display help for keyword entered at prompt.
+C-h c		Apropos command name.
+C-h @		Apropos macro name.
+C-h v		Apropos variable name.
+C-h n		Apropos key binding literal.
+ESC ?		Enter Help System.
+C-h t		Begin, resume, or save MightEMacs Tutorial.
+C-h e		Display or hide cheat sheet (this document).
+
+NOTE: press ~uTAB~U at any name prompt to do name completion.
+
+~bPoint (cursor) Movement~B
+C-b		Move point left (~ub~Uackward).
+C-f		Move point right (~uf~Uorward).
+C-n		Move point down (~un~Uext line).
+C-p		Move point up (~up~Urevious line).
+ESC f		Jump forward to the beginning of next word.
+ESC C-e		Jump forward to the end of current word.
+ESC b		Jump backward to the beginning of current word.
+C-a		Jump to the beginning of the line.
+C-e		Jump to the end of the line.
+ESC C-a		Jump to the first non-blank character of the line.
+
+NOTE: Use a numeric argument with a command above to either repeat it or jump to
+lines below (+n) or above (-n).  For example:
+	C-u 3 ESC C-e	Jump forward to end of third word.
+	C-- C-a		Jump to beginning of previous line.
+	C-u C-e		Jump to end of next line.
+
+C-t		Jump across (~ut~Uraverse) line quickly in both directions (press
+		C-t repeatedly).
+ESC g		Go to line number entered at prompt.
+ESC <		Jump to beginning of buffer.
+ESC >		Jump to end of buffer.
+C-h C-h		Display matching fence (pairs: '()', '{}', '[]', '<>').
+ESC '		Jump to matching fence (pairs: '()', '{}', '[]', '<>').
+C-h .		Display location of point in buffer (line number, etc.).
+
+~bWindow Control~B
+C-x .		Center point in window.
+C-u n C-x .	Make point the nth line of window (or nth from bottom if
+		n < 0).
+C-x C-p		Move window down one line (without moving point).
+C-u n C-x C-p	Move window down n lines (without moving point).
+C-x C-n		Move window up one line (without moving point).
+C-z		Move back one full window (page).
+C-v		Move forward one full window (page).
+C-- C-v		Move forward 1/2 a window.
+C-- C-z		Move backward 1/2 a window.
+
+~bEditing~B
+C-o		Open a new line at point.
+ESC d		Duplicate current line.
+C-u 5 ESC d	Duplicate five lines.
+ESC \		Delete white space surrounding point.
+C-x C-\		Trim white space from end of line.
+ESC C-\		Trim white space from end of all lines in buffer.
+C-x C-o		Delete all blank lines above and below point, or immediately
+		below it if current line not blank.
+ESC C-j		Join current line with one above with one space in between.
+C-x C-j		Join current line with one above with no space in between.
+C-u n ESC C-j	Join n lines forward with one space in between.
+C-- n C-x C-j	Join n lines backward with no space in between.
+ESC w		Set wrap column to value entered at prompt ($wrapCol variable).
+C-u n ESC RTN	Rewrap n lines forward at wrap column.
+ESC .		Rewrap lines in current comment block or line block delimited by
+		blank lines.
+C-j		Start a new line with same indentation as previous one.
+C-x o		Insert and indent a line before current line.
+ESC "		Wrap fence characters or other character around current word.
+ESC u		Undelete: restore most recently deleted text at point.
+ESC U		Undelete cycle: restore next older deleted text at point.
+
+~bMarking Text~B
+C-SPC		Set region mark '.' at point.
+C-u C-SPC	Set mark entered at prompt at point.
+C-x C-x		Swap point with mark entered at prompt.
+ESC SPC		Jump to mark entered at prompt.
+C-x C-SPC	Delete mark entered at prompt.
+ESC C-SPC	Mark whole buffer as a region.
+C-h SPC		List buffer marks.
+
+NOTES:	a mark is a single visible character, like 'a' or ','.
+	a region is text between point and mark '.', and always exists.
+
+~bDelete, Kill (cut), and Copy~B
+C-\		Delete forward one word (characters from point to beginning of
+		next word).
+C-- C-\		Delete backward one word (characters from point to beginning of
+		current word).
+C-k		Delete to end of line (n == 1).
+C-u C-k		Delete to end of next line (n == 2).
+C-u C-u C-k	Delete to beginning of line (n == 0).
+C-- C-k		Delete to beginning of previous line (n == -1).
+C-l		Delete one line.
+C-u C-l		Delete two lines forward (first line is current line).
+C-- C-l		Delete two lines backward (first line is current line).
+C-u C-u C-l	Delete all lines in current region (n == 0).
+C-w		Delete text in current region.
+C-x '		Delete text between fences (pairs: '{}', '()', '[]', or '<>').
+
+NOTE: precede any command above with ~uC-h~U to ~bkill~B text instead of deleting it, or
+precede with ~uC-c~U to ~bcopy~B text instead of deleting it.  For example:
+	C-h C-l		Kill current line (to kill ring).
+	C-u C-h C-\	Kill two words.
+	C-c C-w		Copy region to kill ring.
+
+~bYanking (pasting) Text and Managing the Kill Ring~B
+C-y		Yank (insert) top entry from kill ring at point and mark as
+		region.
+C-- C-y		Yank -1th entry (second from top).
+ESC C-y		Replace yanked text just inserted with next ring entry and
+		cycle ring.
+C-x C-y		Remove yanked text just inserted (revert).
+C-h k		Display kill ring.
+C-c k		Cycle kill ring.
+C-x k		Delete top entry from kill ring (n == 1).
+C-u n C-x k	Delete n entries from top of kill ring (or all entries if
+		n == 0).
+~bExiting~B
+C-x C-s		Save current buffer to disk, but don't exit.
+C-u C-x C-s	Save all changed buffers to disk, but don't exit.
+ESC z		Save all changed buffers to disk and exit.
+ESC e		Exit (asks for confirmation if there are unsaved changes).
+C-u ESC e	(Force) exit without saving changes.
+
+~bSearch and Replace~B
+C-s		Search forward for pattern entered at prompt (press ~uC-p~U
+		at prompt to access previous patterns).
+C-r		Search backward (reverse) for pattern entered at prompt (press
+		~uC-p~U at prompt to access previous patterns).
+C-]		Repeat last search forward.
+C-^		Repeat last search backward (control + shift + ^).
+C-h s		List search patterns (search ring).
+C-- n C-x s	Delete -nth entry from search ring (or all entries if n == 0).
+ESC r		Replace old pattern entered at prompt with new one entered at
+		prompt from point to end of buffer.
+C-u n ESC r	Replace n occurrences of old pattern with new.
+ESC q		Query: replace old pattern with new to end of buffer with
+		confirmation at each occurrence.
+ESC C-q		Query all: do query replace on all visible buffers (also see use
+		in Multiple Files below).
+C-h r		List replace patterns (replace ring).
+C-u n C-x r	Delete n entries from top of replace ring (or all entries if
+		n == 0).
+
+NOTE: enter ~u?~U at replacement prompt (for ESC q or ESC C-q) to see all possible
+confirmation responses.
+
+~bSearch Patterns~B
+xxx		Plain text (unless "RegExp" mode set), ignoring case (unless
+		"Exact" mode set).
+xxx:p		Plain text.
+xxx:r		Regular expression.
+xxx:i		Ignore case.
+xxx:e		Exact: case-sensitive.
+xxx:rem		Regular expression, exact, multi-line mode ("." matches
+		newline).
+:		Search for a colon.
+::		Search for two colons.
+abc::i		Search for "abc:", ignoring case.
+
+Commonly-used regular expression metacharacters:
+  ^	Beginning of line		( )   Grouping (for replace)
+  $	End of line			\b    Word boundary
+  .	Any character except newline	\B    Not word boundary
+  [ ]	Character class			\s    White space character
+  [^ ]	Negative character class	\S    Not white space character
+  *	Zero or more of prev. char	\w    Word character ($wordChars var)
+  +	One or more of prev. char	\t    Tab character
+  ?	Zero or one of prev. char	\n    Newline
+  {m,n} Min. m, max. n of prev. char	\x    Literal character x
+*?,+?,??  As few as possible
+
+Example regular expression search patterns:
+  ^\s*$:r		matches blank line.
+  \babc\([^,]+,:re	matches C func abc() called with at least two arguments.
+NOTE: most extended RE metacharacters can be used, except '|' (or).
+
+~bReplacement Patterns~B
+xxx		Plain text.
+& or \0		Text that matched whole RE pattern.
+\1		Text that matched first parenthesized grouping in RE pattern.
+\2abc\1		Text that matched second grouping, "abc", then first grouping.
+
+~bSearch and Replace in Multiple Files~B
+C-x f		Search for pattern and glob entered at prompt in multiple files.
+C-- C-x f	Skip pattern prompt; open all files matching shell glob.
+C-c ]		Switch to next file found.
+C-c [		Switch to previous file found.
+C-- ESC C-q	Do query replace in all files (buffers) that were found.
+
+~bWorking with Multiple Files and Buffers~B
+C-x C-f		Find file: open a file in a new buffer (or existing one if
+		already opened).
+C-x C-v		View file: same as find file but open in read-only mode.
+C-x ]		Switch to the next buffer.
+C-- C-x ]	Switch to the next buffer and delete current one.
+C-x [		Switch to the previous buffer.
+C-x \		Switch to last buffer exited from.
+C-x b		Select buffer by name (and create if it does not exist).
+C-x B		Set buffer's name.
+C-x F		Set buffer's filename.
+C-x a		Toggle a buffer attribute.
+ESC ~~		Mark buffer as unchanged.
+C-x C-r		Read a file into current buffer, replacing its contents.
+C-x C-w		Write current buffer to new file.
+C-x C-s		Save current buffer to disk.
+C-x C-i		Insert a file at point.
+C-x C-b		Delete named buffer.
+C-u C-x C-b	Delete multiple buffers per selector(s) in prompt.
+C-h b		List all visible buffers.
+C-u C-x C-f	Open file entered at prompt in a new window (n == 2).
+C-u 3 C-x C-f	Open file entered at prompt in a new window and move to that
+		window (n == 3).
+
+NOTE: press ~uTAB~U at any buffer or filename prompt to do name completion.
+
+~bWorking with Multiple Windows~B
+C-x 2		Split current window.
+C-x +		Grow window by one line.
+C-u n C-x +	Grow window by n lines.
+C-x -		Shrink window by one line.
+C-u n C-x z	Set window size to n lines (or make all windows the same size if
+		n == 0).
+C-x n		Switch to next window (down).
+C-x p		Switch to previous window (up).
+ESC C-v		Scroll next window down one page.
+ESC C-z		Scroll next window up one page.
+C-h C-v		Scroll previous window down one page.
+C-h C-z		Scroll previous window up one page.
+C-x j		Join current window with window above.
+C-u C-x j	Join current window with "options" prompt.
+C-x 0		Delete current window.
+C-u C-x 0	Delete current window with "options" prompt.
+C-x 1		Delete all other windows.
+
+~bWorking with Multiple Screens~B
+ESC s		Switch to screen no. entered at prompt.  If zero, create screen
+		and switch to it.
+C-x C-g		Find (get) a file and open it in a new screen.
+ESC ]		Switch to next screen.
+ESC [		Switch to previous screen.
+ESC C-d		Delete screen no. entered at prompt.
+C-h s		List screens.
+C-c D		Change working directory.
+C-h D		Show working directory on message line.
+
+NOTE: each screen maintains its own working directory and state.
+
+~bIndentation Control~B
+C-- n TAB	Enable soft tabs (spaces) and set tab size to -n (n < 0).
+C-u C-u TAB	Disable soft tabs and enable hard tabs (n == 0).
+TAB~U		Insert tab at point.
+DEL		Delete previous character or tab.
+ESC C-f		Jump forward to next tab stop.
+ESC C-b		Jump backward to next tab stop.
+ESC TAB		Delete tab at point.
+S-TAB		Delete previous tab.
+ESC )		Indent all lines in current region by one level.
+C-u n ESC )	Indent all lines in current region by n levels.
+ESC (		Outdent all lines in current region by one level.
+C-u n C-c )	Indent n lines (forward) by number of levels entered at prompt.
+C-- 2 C-c (	Outdent current line and previous two lines by number of levels
+		entered at prompt.
+C-x C-d		Detab: change all hard tabs to spaces in current line.
+C-u n C-x C-d	Detab: change all hard tabs to spaces in n-line block.
+C-x C-e		Entab: change all spaces to hard tabs in current line.
+C-u C-u C-x C-e	Entab: change all spaces to hard tabs in current region
+		(n == 0).
+
+NOTE: tabs in commands above are hard tab characters or runs of spaces,
+depending on value of $softTabSize system variable.
+
+~bKeyboard Macro~B
+C-x (		Begin recording keystrokes.
+C-x )		End recording.
+C-x e		Run macro once.
+C-u n C-x e	Run macro n times (or repeatedly until a failed operation if
+		n == 0).
+
+~bAccessing the OS~B
+C-x !		Run a shell command and display result in a pop-up window.
+C-x $		Spawn a shell session.
+C-x C-z		Suspend MightEMacs and return to shell.
+C-x ~~		Read output of shell command into current buffer, replacing its
+		contents.
+C-x `		Insert output of shell command at point.
+C-x |		Pass current buffer through shell pipeline and read result back
+		in, replacing old contents.
+C-u C-x |	Pass current buffer through shell pipeline and read result into
+		new window (and new buffer).
+~bModes~B
+ESC m		Toggle global or buffer mode entered at prompt.
+C-h m		List modes.
+
+Commonly-used global modes:
+	ASave		Auto-save buffers every $autoSave keystrokes.
+	Exact		Searches are case-sensitive by default.
+	Regexp 		Search patterns are regular expressions by default.
+Commonly-used buffer modes:
+	Bak		Create file backup with ".bak" extension when saving.
+	Col		Display column number of point in mode line.
+	Line		Display line number of point in mode line.
+	Over		Overwrite characters when typing.
+	Wrap		Wrap text as you type.
+
+NOTE: press ~uTAB~U at any mode name prompt to do name completion.
+
+~bVariables~B
+ESC =		Set a variable.
+C-h =		Display a variable and its value.
+C-h v		Apropos variable name.
+
+NOTE: press ~uTAB~U at any variable name prompt to do name completion.

@@ -14,9 +14,9 @@
 #include "pldatum.h"
 
 typedef struct HashRec {
-	struct HashRec *nextp;
+	struct HashRec *next;
 	char *key;
-	Datum *valuep;
+	Datum *value;
 	} HashRec;
 typedef size_t HashSize;
 typedef struct {
@@ -28,17 +28,17 @@ typedef struct {
 	} Hash;
 
 // External function declarations.
-extern void hclear(Hash *hp);
+extern void hclear(Hash *htab);
 extern int hcmp(const void *t1,const void *t2);
-extern Datum *hdelete(Hash *hp,char *key);
-extern HashRec *heach(Hash **hpp);
-extern void hfree(Hash *hp);
+extern Datum *hdelete(Hash *htab,char *key);
+extern HashRec *heach(Hash **hashp);
+extern void hfree(Hash *htab);
 extern Hash *hnew(HashSize hashSize,float loadFactor,float rebuildTrig);
-extern int hrename(Hash *hp,char *oldkey,char *newkey,int *resultp);
-extern HashRec *hsearch(Hash *hp,char *key);
-extern HashRec *hset(Hash *hp,char *key,Datum *datp,bool copy);
-extern int hsort(Hash *hp,int (*hcmp)(const void *hrp1,const void *hrp2),HashRec ***hrppp);
+extern int hrename(Hash *htab,char *oldkey,char *newkey,int *resultp);
+extern HashRec *hsearch(Hash *htab,char *key);
+extern HashRec *hset(Hash *htab,char *key,Datum *datum,bool copy);
+extern int hsort(Hash *htab,int (*hcmp)(const void *hrec1,const void *hrec2),HashRec ***hrecpp);
 #ifdef HDebug
-extern void hstats(Hash *hp);
+extern void hstats(Hash *htab);
 #endif
 #endif

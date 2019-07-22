@@ -1,0 +1,22 @@
+<home>    <exit>
+
+
+~bUndeleting Text~B
+
+Whenever text is deleted, other than single characters or a whole buffer, it is
+saved on the "delete ring".  The delete ring works just like the kill ring; that
+is, deleted text is "pushed" on to the ring so that the most recent deletion is
+always the first one to be restored.
+
+The "undelete" (~#uESC u~U) command is used to insert text from the delete ring into
+the current buffer at point.  If you delete some text by mistake, like a line or
+word, you can immediately restore it by pressing ~#uESC u~U.  The inserted text is
+also marked as a region, just like for the "yank" (~uC-y~U) command.
+
+There are several commands for using and manipulating the delete ring, which are
+explained in Advanced Help.  For now, you just need to remember that deleted
+text is automatically saved, and ~#uESC u~U restores the most recently-deleted text
+at point.
+
+
+<home>    <exit>

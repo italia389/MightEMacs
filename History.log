@@ -1,6 +1,214 @@
 MightEMacs RELEASE HISTORY
 
 ----------
+9.4.0	22 Jul 2019
+
+
+*** Changes from Previous Version
+
+ 1. Made significant improvements to the Help System:
+	* created "hands on" tutorial and cheat sheet.
+	* changed "showAliases" (C-h a), "showCommands" (C-h c), "showFunctions" (C-h f), "showMacros" (C-h m), and
+	  "showVariables" (C-h v) commands to always prompt for an apropos pattern when run interactively, instead of only when
+	  n < 0, as previously.
+ 2. Implemented a "delete ring", which works just like the kill ring:
+	* changed default key bindings for "chgDir (C-c d)" and "showDir (C-h d)" commands to "C-c D" and "C-h D", respectively.
+ 	* created $delRingSize system variable, which controls the size of the delete ring.
+	* created "delDelEntry" (C-x d), "cycleDelRing" (C-c d), "showDelRing" (C-h d), and "undeleteCycle" (ESC U) commands for
+	  managing the delete ring.
+    Now the editor maintains a deletion history and older deletes can be accessed with the "ESC u" (undelete) and "ESC U"
+    (undeleteCycle) commands.
+ 3. Simplified "yank revert" process:
+	* created "revertYank" (C-x C-y) command, which reverts text insertion from a prior "yank" (C-y), "yankCycle" (ESC C-y),
+	  "undelete" (ESC u), or "undeleteCycle" (ESC U) command.
+	* changed "yankCycle" (ESC C-y) command to do nothing if n == 0 instead of removing text just inserted, as previously.
+ 4. Simplified line insertion:
+	* renamed "insertLineI" (C-x i) command to "openLineI" and changed default key binding to "C-x o".
+	* changed to use indentation from line preceding the target line instead of the target line itself.
+    Now a line can be opened above the current line with the same indentation as the line preceding the opened line by pressing
+    "C-x o".
+ 5. Combined "chgBufMode" (C-x m) and "chgGlobalMode" (ESC m) commands into new "chgMode" (ESC m) command, which can change the
+    state of either a buffer mode or a global mode.
+ 6. Changed "read only" feature:
+	* deleted "RdOnly" buffer mode and created "ReadOnly" buffer attribute.
+	* modified "chgBufAttr" (C-x a) and "showBuffers" (C-h b) commands to process and display the new attribute, including
+	  changing "chgBufAttr" command to not allow "ReadOnly" and "Changed" attributes to both be set at the same time.
+	* changed mode line so that a '#' character is displayed in same place as '*' if the "ReadOnly" attribute is set.
+ 7. Simplified operation of several commands and functions:
+	* Simplified use of the n argument by adding keyword options in lieu of n argument values, which were hard to remember.
+	* Standardized use of keyword arguments (except mode names) to conform to the following rules:
+		1. All keywords are specified as comma-separated values in a single argument in a script.
+		2. When obtained interactively:
+			- keywords are listed in prompt with a unique letter highlighted for each.
+			- zero or more of the highlighted letters may be entered.
+	* Changed operation of several commands and functions accordingly (see Implementation Notes below).
+ 8. Greatly improved fence matching and fence commands:
+	* created "showFence" (C-h C-h) command, which briefly displays the fence matching the one at point.
+	* changed default key bindings for all of the fence commands so that they are easier to type (see Implementation Notes
+	  below).
+	* renamed "Fence" global mode to "Fence1" and added "Fence2" global mode, which includes "< >" fences, so that angle
+	  brackets can be automatically highlighted in addition to other fences (or not) by setting the correct fence mode.
+ 9. Simplified mark usage:
+	* changed "markBuf" (ESC C-SPC) and "setMark" (C-SPC) commands to use mark ?` (markBuf) or mark ?. (setMark) if n is the
+	  default, and prompt for a mark otherwise.
+	* changed "swapMark" (C-x C-x) command to always prompt for a mark, instead of only when n >= 0, as previously.
+	* changed "gotoMark" (ESC SPC) command to delete the mark if n < 0, instead of when n is not the default, as previously.
+    Now mark ?` is no longer used automatically when n < 0 (which was somewhat confusing), and custom marks are easier to use.
+10. Change "wrapLine" (ESC RTN) command and auto-wrapping (when "Wrap" mode is set) to wrap lines correctly (ignoring invisible
+    characters) when they contain terminal attribute specifications and the "TermAttr" buffer attribute is set.
+11. Changed "bfFormatItem" (ESC .) macro in "blockFormat" package to recognize and rewrap plain line blocks (bounded by blank
+    lines or a buffer boundary at top or bottom) in addition to comment blocks and numbered list items.
+12. Changed "truncBuf" (ESC t) command to prompt for confirmation when run interactively.
+13. Made improvements to "queryReplace" (ESC q) command:
+	* added 'r' Restart option, which restarts search from original buffer position.
+	* added special prompt when scan completed so that user can decide whether to quit, go back, undo, or restart
+	  (instead of just quitting and staying at last position, as previously).
+14. Changed "delBlankLines" (C-x C-o) command to delete blank lines immediately above current line instead of below if n < 0.
+15. Changed multi-buffer save process:
+	* changed to skip multi-homed check when saving a buffer if all screens have the same working directory.
+	* changed to skip narrowed buffers and display count of any that were skipped so that user is aware of it.
+16. Created "writeBuf" (C-x *) command, which:
+	- writes lines (or characters if n >= 0) in a region from current buffer to another buffer.
+	- deletes the text that was written if n <= 0.
+17. Changed "writeFile" (C-x C-w) command to not set the buffer's filename or change the buffer name if n <= 0 (instead of
+    always setting the filename but not changing the buffer name if n <= 0, as previously).  Now a portion of a buffer can be
+    written to a file by narrowing the buffer, invoking writeFile with n <= 0, then widening the buffer again.
+18. Swapped default key bindings of "lowerCaseRegion", "titleCaseRegion", and "upperCaseRegion" commands with "lowerCaseLine",
+    "titleCaseLine", and "upperCaseLine".
+19. Improved display of information on message line generated by "showPoint" (C-h .) command.
+20. Changed "showBuffers" (C-h b) command to include an indicator that shows which buffers are in the "background".
+21. Simplified screen creation and redrawing process:
+	* changed "selectScreen" (ESC s) command to:
+		- require an integer argument (always) and ignore the numeric argument.
+		- create a screen and switch to it if the argument is zero.
+		- no longer refresh the current screen when n <= 0.
+	* changed "resetTerm" (ESC ESC ) command to always redraw the current screen (even if the terminal size has not changed)
+	  and ignore the numeric argument.
+	* changed default binding for "reframeWind" command from "ESC l" to "C-x .", which makes more sense and puts it in the
+	  "C-x family" with the other window-management commands.
+22. Made improvements to the scripting language (MScript):
+	* combined "bufMode?" and "globalMode?" functions into new "mode?" function, which checks if one or more buffer or
+	  global modes are enabled and returns Boolean result.
+	* improved file pathname processing:
+		- created "expandPath" function, which expands "~/", "~user/", "$var", and "${var}" in its given string argument
+		  and returns the result.
+		- changed all file commands and functions so that "~/" or "~user/" (at beginning of a string), "$var", and
+		  "${var}" can be specified in any filename argument and will be expanded automatically, as is done
+		  interactively.
+	* changed how buffer size information is obtained:
+		- eliminated "bufSize" function.
+		- created "bufInfo" function, which returns various information about a buffer or multiple buffers per an option
+		  argument.
+		- created "bempty?" function, which checks if current buffer is empty (or named buffer if n argument) and
+		  returns Boolean result.
+	* renamed $bufName system variable to $bufname.
+	* fixed problem where case-insensitive array comparisons in "include?" function were failing.
+	* renamed all commands and macros containing the word "delete" to "del" (see Implementation Notes).
+	* changed syntax and/or functionality of several commands and functions (see Implementation Notes).
+23. Fixed some bugs:
+	* Fixed problem where the "Col" and "Line" modes were not being displayed correctly on the mode line.
+	* Fixed problem where executing the "shellCmd" (C-x !) command would sometimes cause program to hang; for example, when
+	  running the "man less" shell command.
+	* Fixed issues in "bindKey" (ESC k) and "unbindKey" (ESC C-k) commands where the return messages were not being
+	  displayed properly on the message line when the commands were run interactively.
+	* Fixed bug where pressing "C-q" (quoteChar) immediately after starting the editor caused the cursor to move to the
+	  bottom-left corner of screen.
+	* Fixed issue where the program could crash during terminal input if the input line contained multiple control
+	  characters.
+	* Fixed bug where text following a hard tab was not aligned at a tab stop if the "TermAttr" buffer attribute was set and
+	  the text before the tab character contained one or more "~~" sequences.
+
+
+*** Implementation Notes
+
+ 1. The following commands, macros, and functions were renamed:
+	COMMANDS AND MACROS				FUNCTIONS
+	deleteAlias	    -> delAlias			bufMode?	-> mode? bufname,modes[,opts]
+	deleteBackChar	    -> delBackChar		globalMode?	-> mode? bufname,modes[,opts]
+	deleteBackTab	    -> delBackTab
+	deleteBlankLines    -> delBlankLines
+	deleteBuf	    -> delBuf
+	deleteFencedRegion  -> delFencedRegion
+	deleteFile	    -> delFile
+	deleteForwChar	    -> delForwChar
+	deleteForwTab	    -> delForwTab
+	deleteKill	    -> delKillEntry
+	deleteLine	    -> delLine
+	deleteMacro	    -> delMacro
+	deleteMark	    -> delMark
+	deleteRegion	    -> delRegion
+	deleteReplacePat    -> delReplacePat
+	deleteScreen	    -> delScreen
+	deleteSearchPat	    -> delSearchPat
+	deleteToBreak	    -> delToBreak
+	deleteWhite	    -> delWhite
+	deleteWind	    -> delWind
+	deleteWord	    -> delWord.
+	insertLineI	    -> openLineI
+ 2. The syntax and/or functionality of the following commands and functions was changed (see "showCommands" (C-h c) or
+    "showFunctions" (C-h f) descriptions for details):
+	COMMANDS					FUNCTIONS
+	chgBufAttr bufname,attrs	  C-x a		binding op,{key-lit | name}
+	clearBuf [bufname]		  C-x DEL	bufAttr? bufname,attr
+	delBlankLines			  C-x C-o	binding op,{key-lit | name}
+	delBuf {op | name}[,bufname,...]  C-x C-b	chgBufAttr name,attrs
+	delWind [opts]			  C-x 0		defined? op,name
+	gotoMark m			  ESC SPC	getKey [opts]
+	joinWind [opts]			  C-x j		groupMode? bufname,group[,opt]
+	markBuf [m]			  ESC C-SPC	include? opts,array,expr,...
+	popBuf bufname[,opts]		  C-h p		index str,{pat | c}[,opts]
+	popFile file[,opts]		  C-h C-p	message opts,arg,...
+	renameBuf old,new		  C-x B		print arg,...
+	resetTerm			  ESC ESC	printf fmt,...
+	saveFile			  C-x C-s	prompt p[,def][,opt,...]
+	selectScreen N			  ESC s		toStr expr[,opts]
+	setBufFile bufname,file		  C-x F		updateScreen [opts]
+	seti val[,fmt[,incr]]		  ESC i		xPathname {file | glob}[,opts]
+	setMark [m]			  C-SPC
+	shellCmd opts,arg,...		  C-x !
+	showAliases pat			  C-h a
+	showCommands pat		  C-h c
+	showFunctions pat		  C-h f
+	showMacros pat			  C-h m
+	showVariables pat		  C-h v
+	swapMark m			  C-x C-x
+	unbindKey key-lit		  ESC C-k
+	writeFile file			  C-x C-w
+	yankCycle			  ESC C-y
+ 3. The following commands have different default key bindings:
+	chgDir			C-c d	-> C-c D
+	copyFencedRegion	C-c }	-> C-c '
+	delFencedRegion		C-x }	-> C-x '
+	editMode		C-c m	-> C-x m
+	editModeGroup		C-c g	-> C-x g
+	gotoFence		ESC }	-> ESC '
+	killFencedRegion	C-h }	-> C-h '
+	openLineI		C-x i	-> C-x o
+	reframeWind		ESC l	-> C-x .
+	showDir			C-h d	-> C-h D
+ 4. The following commands and functions were eliminated:
+	COMMANDS			FUNCTIONS
+	chgBufMode			bufSize
+	chgGlobalMode
+ 5. New commands and functions:
+	COMMANDS					FUNCTIONS
+	chgMode bufname,modes		ESC m		bempty? [bufname]
+	delDelEntry			C-x d		bufInfo bufname[,opts]
+	cycleDelRing			C-c d
+	revertYank			C-x C-y
+	showDelRing			C-h d
+	showFence [c]			C-h C-h
+	undeleteCycle			ESC U
+	writeBuf			C-x *
+ 6. The following system variables were renamed:
+	$bufName	-> $bufname.
+ 7. New system variables:
+	$delRingSize
+ 8. Mode and buffer attribute changes:
+	* "RdOnly" buffer mode was deleted and a "ReadOnly" buffer attribute was created to replace it.
+	* "Fence" global mode was renamed to "Fence1" and "Fence2" mode was created, which includes "< >" fences.
+
+----------
 9.3.0	31 Mar 2019
 
 
