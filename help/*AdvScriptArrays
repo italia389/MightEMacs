@@ -1,0 +1,75 @@
+~bArrays~B
+
+There are several operators and functions for creating and manipulating arrays.
+Arrays are defined by enclosing zero or more comma-separated values within
+brackets ~#u[ ]~U.  Array elements are specified using an integer index in brackets
+immediately following the array expression with no intervening white space.  It
+is also possible to create an array "slice" by using two integers which specify
+an offset and length.  For example:
+
+    x = ['blue', true, [$bufname, 0], env 'HOME']
+
+    y = x[0]                # y is the string "blue".
+    z = x[2]                # z is the array [$bufname, 0].
+    new = x[0, 2]           # new is the array ["blue", true].
+
+The slice length may be greater than the number of elements past the offset, in
+which case all elements beginning at the offset through the end of the array are
+selected.  For example, [1, 2, 3, 4, 5][2, 99] evaluates to [3, 4, 5].
+
+Arrays may also be created by using the following functions:
+
+    array [~usize~U[, ~uinitializer~U]]
+        Create an array.  If ~usize~U is omitted, an empty array will be created;
+        otherwise, an array of ~usize~U elements will be created with each element
+        set to ~unil~U.  If ~uinitializer~U is given, each of the ~usize~U elements will be
+        set to a copy of the ~uinitializer~U value instead (which may also be an
+        array).
+
+    clone ~uary~U
+        Create a copy of ~uary~U and return it.  The new array is an exact copy of
+        the original, including nested arrays if any.
+
+    split ~udelim~U, ~ustring~U[, ~ulimit~U]
+        Convert a delimited string into an array.  The delimiter must be a
+        single character, including ?\s for white space.  In the latter case,
+        leading white space in ~ustring~U is ignored.  If ~ulimit~U < 0, each delimiter
+        found in ~ustring~U is significant and delineates two substrings, either or
+        both of which may be null.  If ~ulimit~U == 0 (default), trailing null
+        substrings are ignored.  If ~ulimit~U > 0, it is the maximum number of array
+        elements to create.  In this case, the last element of the array will
+        contain embedded delimiter(s) if the number of delimiters in the string
+        is >= ~ulimit~U.
+
+Arrays may be "auto extended" by assigning a value to an element beyond the end
+of the array.  The intervening elements if any, are set to ~unil~U.  For example,
+the sequence:
+
+    x = [1, 2]
+    x[3] = false
+
+would set local variable "x" to [1, 2, nil, false].
+
+Arrays may be compared with the ~u==~U or ~u!=~U operators, and may be specified as the
+second argument to the "include?" function, such as:
+
+   include? [1, [2, 3], 4], [2, 3]
+
+which would return ~utrue~U.
+
+Arrays may also be concatenated with other values via the ~u&~U or ~u&=~U operators.  If
+the first argument of the expression is string, all following arguments will be
+converted to string, including arrays, and the result will be string.  However,
+arrays will be processed recursively as if each element was specified
+separately.  If the first argument of the concatenation expression is an array,
+the result will be a new array containing a clone of the first array plus all
+following arguments appended to it as separate elements.  Any array argument
+will be "exploded" into separate arguments first.  Following are some examples:
+
+    'Blue' & 'Sky' & nil & 5            # -> "BlueSky5".
+    'Red' & [01, ['Green', false]]      # -> "Red1Greenfalse".
+    [0] & true & [nil, [3, 4]]          # -> [0, true, nil, [3, 4]].
+    x = []
+    x & 'Red'                           # x is []; result is ["Red"].
+    x = []
+    x &= 'Red'                          # x is ["Red"]; result is ["Red"].

@@ -1,0 +1,1963 @@
+MightEMacs RELEASE HISTORY
+
+----------
+9.5.0	1 Sep 2020
+
+ 1. Changed switch processing:
+	- modified -path switch to replace existing search path with specified
+	  list if it begins with a circumflex (^) instead of prepending it (the
+	  default).
+	- renamed -N (-no-read) switch to -R.
+	- created -N (-no-user-startup) switch, which prevents the user startup
+	  file (~/.memacs) from being loaded.
+ 2. Changed regular expression engine:
+	- replaced built-in regular expression functions to equivalent calls to
+	  the (external) XRE library.
+	- changed "match" function to allow numeric argument (N) to be any
+	  non-negative value (instead of only 0-9, as previously), but return
+	  nil if N specifies a captured group that does not exist.
+    Now additional regular expression functionality is available, most notably
+    the "or" metacharacter '|', group iteration (e.g., "(abc)+"), and back
+    references.
+ 3. Added fuzzy matching:
+	- created 'f' search pattern option, which enables approximate matching
+	  on the pattern using default parameters set by the XRE xregainit()
+	  function.
+	- changed processing of search pattern options so that the 'r' option is
+	  assumed if 'm' or 'f' is specified (so that 'm' and 'f' are allowed
+	  shorthand for 'mr' and 'fr').
+ 4. Added ability to use "\0" and escaped characters (like "\n") in a
+    replacement pattern for a plain text search and eliminated "&" (for the
+    matched string), which was unusual and non-standard.  Now standard
+    metacharacters will always be recognized in a replacement pattern for the
+    "queryReplace" (ESC q) and "replace" (ESC r) commands and the "sub"
+    function, whether or not the search pattern is a regular expression.
+ 5. Added explanation of pattern options to help text for "SearchForw" and
+    "SearchBack" commands.
+ 6. Changed "replace" and "queryReplace" commands to return Boolean result when
+    run interactively as well as in script mode for consistency, and so that a
+    key macro will terminate if the command fails.
+ 7. Changed "queryReplace" command to do final replacement and stop if response
+    is 'Y', instead of issuing final action prompt, as previously.
+ 8. Improved "delBuf" command:
+	- changed to allow deletion of a buffer that is being displayed, instead
+	  of returning an error, as previously.
+	- added "Displayed" option to include buffers being displayed when
+	  multiple buffers are deleted.
+	- renamed option "AllVisible" to "Visible" to be consistent with other
+	  commands.
+    Now the "delBuf" command allows any displayed buffer to be deleted,
+    including the current one, as long as at least one other "regular" buffer
+    exists that can be switched to.
+ 9. Redesigned how directories are managed and associated with buffers:
+	- when a buffer is created, the current screen's directory is now
+	  remembered as the buffer's "home" directory.
+	- changed processing so that an error is returned if the home directory
+	  of a buffer being activated does not match the current screen's
+	  directory (which will prevent an accidental read of a file on the
+	  command line from the wrong directory).
+	- changed "saveFile" command to:
+		. save a changed buffer if it is in the background and its home
+		  directory is set; otherwise, return an error.
+		. prompt for confirmation if a changed buffer is in the
+		  foreground and its home directory is different than the
+		  directory of the screen it is being displayed on.
+    This fixes a problem where a file could have been saved to the wrong
+    directory when multiple screens existed in different directories.  Now the
+    last screen a buffer was displayed on has no effect on where it is saved,
+    and the directory a buffer is saved to is much more rigidly controlled and
+    scrutinized to prevent an unintentional save to the wrong place.
+10. Changed "prevBuf" and "nextBuf" commands to switch once and limit selection
+    to buffers having same home directory as current screen if n == 0 (instead
+    of including hidden buffers in selection, as previously).
+11. Changed macro definition and use in scripts:
+	- eliminated "constrain" macro modifier.
+	- replaced "macro" reserved word with "command" and "function", and
+	  "endmacro" with "endroutine" so that user routines can be defined
+	  either as a command or function (in the same manner as built-in
+	  "system" commands and functions).
+	- changed "usage" and "desc" labels in user routine header to
+	  "arguments" and "description", which are more accurate.
+	- replaced "Macro" attribute and option in "bufAttr?" and "bufInfo"
+	  functions with "Command" and "Function".
+	- changed "showBuffers" command to display "command" or "function"
+	  buffer flag instead of "macro" flag, and to not display "constrained"
+	  flag (which no longer exists).
+	- changed "setHook" command to:
+		. require that a hook be set to a user function or the
+		  "wrapWord" system function instead of a constrained macro.
+		. require that the function's expected argument count(s) match
+		  the hook's argument count.
+	- set "wrap" hook internally to "wrapWord" system function.
+	- replaced "delMacro" (C-x @) command with "delRoutine" (C-x U), which
+	  deletes user command(s) and function(s).
+	- changed "defined?" function to return:
+		. "user command" or "user function" for a user-defined command
+		  or function instead of "macro".
+		. "system command" or "system function" for a system-defined
+		  command or function.
+		. "pseudo command" instead of "pseudo-command" for consistency.
+	- changed "apropos", "showCommands", and "showFunctions" commands to:
+		. display user commands and functions in their own sections
+		  following their system counterparts.
+		. accept "System" and/or "User" keyword options if n argument to
+		  select which command/function report section(s) to display or
+		  search.
+	- changed "apropos" and "showFunctions" commands to:
+		. display user functions by default only if they have help text
+		  or are bound to a hook (whether or not an apropos string has
+		  been specified).
+		. accept "All" keyword option if n argument to include functions
+		  with no help text.
+	- renamed $maxMacroDepth system variable to $maxCallDepth.
+    Now user routines are coded as either a "command" or "function" in MScript,
+    any user function and the "wrapWord" system function can be bound to a hook
+    as long as its argument counts match that of the hook, and user functions
+    are displayed in the "showFunctions" listing by default if they have help
+    text (instead of non-constrained macros, as previously).
+12. Renamed all "*KeyMacro" commands, functions, and variables to "*Macro" and
+    greatly expanded key macro functionality:
+	- created "Macro" ring and "renameMacro" command.
+	- changed string format of a key macro to always have the macro's name
+	  (which is now mandatory) as the first item.
+	- replaced $keyMacro global variable with new "manageMacro" function,
+	  which perform various key macro operations, including setting and
+	  retrieving key macros.
+	- changed "xeqMacro" command to get a macro name (interactively or via a
+	  script) if n <= 0 and execute the macro abs(n) times.
+	- made "beginMacro" and "endMacro" commands interactive only.
+	- added "Macro" type to "prompt" function, which provides the means
+	  to do key macro name completions from a script.
+	- renamed keyMacro.ms library file to macroUtil.ms and renamed all km*()
+	  commands and functions within it to names without "km" prefix.
+	- changed name of macro file in HOME directory from ".memacs-key" to
+	  ".memacs-macros".
+    Now key macros are known and referenced simply as "macros" everywhere; the
+    leading "key" word is no longer needed.
+13. Changed how rings are managed:
+	- replaced all cycle*Ring, del*Ring, and show*Ring commands with
+	  "cycleRing ring" (C-c &), "delRingEntry ring[, name]" (C-x &), and
+	  "showRing ring" (C-h &) commands, and created user (shortcut) commands
+	  in memacs.ms with same bindings as old commands that call the new
+	  commands.
+	- added ability to delete a macro by name to "delRingEntry" command.
+	- eliminated all $*RingSize system variables (such as $killRingSize).
+	- created "ringSize" (ESC R) command that provides the ability to get or
+	  set the size of a ring, or get the current number of entries.
+	- created $RingNames system constant, which returns array of ring names.
+    Also changed default number of search ring entries from 20 to 40.
+14. Added ability to do mode name and ring name completions with the "prompt"
+    function via new "Mode" and "RingName" prompt types.
+15. Changed "Mode" option of 'defined?' system function to return "buffer",
+    "global", or nil instead of a Boolean result, so that the type of mode can
+    be determined if it exists.
+16. Changed "bufInfo" function to:
+	- include a buffer's home directory (or nil if none) in the default
+	  array that is returned.
+	- use keyword option "Extended" instead of "Verbose", which better
+	  describes its purpose.
+	- not select visible buffers by default when processing multiple
+	  buffers.
+	- require that at least one of "Visible", "Hidden", "Command", or
+	  "Function" keywords be specified when processing multiple buffers, to
+	  be consistent with other buffer commands and functions that use
+	  keywords.
+17. Changed word characters to always be "a-zA-Z0-9_" (a constant), instead of
+    the current value of $wordChars, and eliminated the $wordChars system
+    variable.  Now word characters in regular expressions, word commands, and
+    functions are always the same, regardless of programming language, which is
+    simpler, consistent with widespread conventions, and easier to remember.
+18. Switched internals library from ProLib to CXL.
+19. Added CXL and XRE library versions to "about" command.
+20. Created "sortRegion" (C-x S) command, which sorts region line(s) in a buffer
+    in ascending or descending order and/or ignoring case in line comparisons,
+    depending on options given.
+21. Improved return message functionality:
+	- eliminated feature where certain commands (like "selectScreen") would
+	  only set a return message when run interactively.
+	- changed processing so that 'RtnMsg' global mode is disabled before a
+	  script is executed so that return messages are disabled by default
+	  when a script is running.  The mode is restored to the previous state
+	  after execution is completed.
+	- changed "message" function to always set a return message (if
+	  applicable), regardless of the state of the 'RtnMsg' global mode.
+    Now return messages are disabled by default when scripts are executed,
+    instead of enabled, as previously, which eliminates extraneous return
+    messages and greatly simplifies the task of retaining and managing desirable
+    ones.
+22. Changed "writeFile" command to preserve "buffer changed" flag when temporary
+    (n <= 0) write is performed.
+23. Improved and fixed some "show" displays and options:
+	- changed "showScreens" display so that the CWD line is first instead of
+	  last.
+	- changed "showBuffers" command to accept options if n argument that
+	  control which buffers are included in display.
+	- fixed ring-display commands to display tilde (~) characters properly.
+24. Made hook changes:
+	- created "exit" hook, which is run at program exit with n argument
+	  given to 'exit' or 'quickExit' command.
+	- converted "setHook" command to a function and changed to not allow nil
+	  for the user function name (which previously cleared a hook).
+	- created "clearHook" function, which clears named hook(s), or all hooks
+	  if n <= 0.
+25. Changed "findFiles" (C-x f) user command to do internal "grep" instead of
+    [ef]grep via shell command so that full XRE syntax can be used, and
+    (possibly changed) buffers for files that are already opened will be
+    searched instead of files on disk.
+26. Added options to "gotoMark" and "swapMark" commands to force reframing if
+    n >= 0.
+27. Changed the following functions and command to accept options only if n
+    argument is not the default:
+	include? [opts,] array, expr, ...
+	message [opts,] arg, ...
+	shellCmd [opts,] arg, ...
+    and added 'Fail' option to 'message' function, which causes a false return
+    (instead of using n < 0, as previously).
+28. Changed all commands and functions that operate on white space to check for
+    it via isspace() function instead of explicity checking for spaces and tabs,
+    and to also treat null characters as white space where appropriate.
+29. Changed script processing so that all arguments, including numeric literals,
+    will be passed as strings to the -S, @file, or editor-startup script.  This
+    is consistent with how shell scripts operate and simplifies argument
+    checking and processing.
+30. Modified Help System:
+	- eliminated "help" command and "help" hook.
+	- changed startup processing so that:
+		. the site startup file (memacs.ms) and user startup file
+		  (.memacs) are invoked with all command line arguments passed
+		  as arguments.
+		. all @file script arguments are invoked with all remaining
+		  command line arguments passed as arguments.
+	- modified routines in memacs.ms to handle entrance into Help System when
+	  "ESC ?" is entered.
+31. Changed processing at program termination so that newline and tab characters
+    are passed unchanged to the terminal from an "exit" command message.
+32. Renamed "Delimiters" option of "toStr" function to "Delimiter".
+33. Fixed bug where the "shellCmd" command would occassionally not display any
+    results when run interactively with no options.
+34. Fixed bug where the top entry of the search or replace ring was not being
+    set after deletion if more than one entry was deleted.
+35. Reorganized project files on GitHub and in the installation directory
+    (/usr/local) to be more in line with established conventions:
+	- removed 'prolib-*' directory (which is superceded by CXL library).
+	- moved contents of 'memacs-*' directory to top level and removed
+	  the directory, which is no longer needed.
+	- renamed 'lib' directory to 'scripts'.
+	- moved all headers from 'src' directory to new 'include' directory.
+	- changed installers to place files in /usr/local/share/memacs instead
+	  of /usr/local/lib/memacs, as previously, and to create a 'scripts'
+	  subdirectory for all scripts.
+
+----------
+9.4.0	22 Jul 2019
+
+
+*** Changes from Previous Version
+
+ 1. Made significant improvements to the Help System:
+	- created "hands on" tutorial and cheat sheet.
+	- changed "showAliases" (C-h a), "showCommands" (C-h c), "showFunctions"
+	  (C-h f), "showMacros" (C-h m), and "showVariables" (C-h v) commands to
+	  always prompt for an apropos pattern when run interactively, instead
+	  of only when n < 0, as previously.
+ 2. Implemented a "delete ring", which works just like the kill ring:
+	- changed default key bindings for "chgDir (C-c d)" and "showDir (C-h
+	  d)" commands to "C-c D" and "C-h D", respectively.
+	- created $delRingSize system variable, which controls the size of the
+	  delete ring.
+	- created "delDelEntry" (C-x d), "cycleDelRing" (C-c d), "showDelRing"
+	  (C-h d), and "undeleteCycle" (ESC U) commands for managing the delete
+	  ring.
+    Now the editor maintains a deletion history and older deletes can be
+    accessed with the "ESC u" (undelete) and "ESC U" (undeleteCycle) commands.
+ 3. Simplified "yank revert" process:
+	- created "revertYank" (C-x C-y) command, which reverts text insertion
+	  from a prior "yank" (C-y), "yankCycle" (ESC C-y), "undelete" (ESC u),
+	  or "undeleteCycle" (ESC U) command.
+	- changed "yankCycle" (ESC C-y) command to do nothing if n == 0 instead
+	  of removing text just inserted, as previously.
+ 4. Simplified line insertion:nnn
+	- renamed "insertLineI" (C-x i) command to "openLineI" and changed
+	  default key binding to "C-x o".
+	- changed to use indentation from line preceding the target line instead
+	  of the target line itself.
+    Now a line can be opened above the current line with the same indentation as
+    the line preceding the opened line by pressing "C-x o".
+ 5. Combined "chgBufMode" (C-x m) and "chgGlobalMode" (ESC m) commands into new
+    "chgMode" (ESC m) command, which can change the state of either a buffer
+    mode or a global mode.
+ 6. Changed "read only" feature:
+	- deleted "RdOnly" buffer mode and created "ReadOnly" buffer attribute.
+	- modified "chgBufAttr" (C-x a) and "showBuffers" (C-h b) commands to
+	  process and display the new attribute, including changing "chgBufAttr"
+	  command to not allow "ReadOnly" and "Changed" attributes to both be
+	  set at the same time.
+	- changed mode line so that a '#' character is displayed in same place
+	  as '*' if the "ReadOnly" attribute is set.
+ 7. Simplified operation of several commands and functions:
+	- Simplified use of the n argument by adding keyword options in lieu of
+	  n argument values, which were hard to remember.
+	- Standardized use of keyword arguments (except mode names) to conform
+	  to the following rules:
+		1. All keywords are specified as comma-separated values in a
+		  single argument in a script.
+		2. When obtained interactively:
+			- keywords are listed in prompt with a unique letter
+			  highlighted for each.
+			- zero or more of the highlighted letters may be entered.
+	- Changed operation of several commands and functions accordingly (see
+	  Implementation Notes below).
+ 8. Greatly improved fence matching and fence commands:
+	- created "showFence" (C-h C-h) command, which briefly displays the
+	  fence matching the one at point.
+	- changed default key bindings for all of the fence commands so that
+	  they are easier to type (see Implementation Notes below).
+	- renamed "Fence" global mode to "Fence1" and added "Fence2" global
+	  mode, which includes "< >" fences, so that angle brackets can be
+	  automatically highlighted in addition to other fences (or not) by
+	  setting the correct fence mode.
+ 9. Simplified mark usage:
+	- changed "markBuf" (ESC C-SPC) and "setMark" (C-SPC) commands to use
+	  mark ?` (markBuf) or mark ?. (setMark) if n is the default, and prompt
+	  for a mark otherwise.
+	- changed "swapMark" (C-x C-x) command to always prompt for a mark,
+	  instead of only when n >= 0, as previously.
+	- changed "gotoMark" (ESC SPC) command to delete the mark if n < 0,
+	  instead of when n is not the default, as previously.
+    Now mark ?` is no longer used automatically when n < 0 (which was somewhat
+    confusing), and custom marks are easier to use.
+10. Change "wrapLine" (ESC RTN) command and auto-wrapping (when "Wrap" mode is
+    set) to wrap lines correctly (ignoring invisible characters) when they
+    contain terminal attribute specifications and the "TermAttr" buffer
+    attribute is set.
+11. Changed "bfFormatItem" (ESC .) macro in "blockFormat" package to recognize
+    and rewrap plain line blocks (bounded by blank lines or a buffer boundary at
+    top or bottom) in addition to comment blocks and numbered list items.
+12. Changed "truncBuf" (ESC t) command to prompt for confirmation when run
+    interactively.
+13. Made improvements to "queryReplace" (ESC q) command:
+	- added 'r' Restart option, which restarts search from original buffer
+	  position.
+	- added special prompt when scan completed so that user can decide
+	  whether to quit, go back, undo, or restart (instead of just quitting
+	  and staying at last position, as previously).
+14. Changed "delBlankLines" (C-x C-o) command to delete blank lines immediately
+    above current line instead of below if n < 0.
+15. Changed multi-buffer save process:
+	- changed to skip multi-homed check when saving a buffer if all screens
+	  have the same working directory.
+	- changed to skip narrowed buffers and display count of any that were
+	  skipped so that user is aware of it.
+16. Created "writeBuf" (C-x *) command, which:
+	- writes lines (or characters if n >= 0) in a region from current buffer
+	  to another buffer.
+	- deletes the text that was written if n <= 0.
+17. Changed "writeFile" (C-x C-w) command to not set the buffer's filename or
+    change the buffer name if n <= 0 (instead of always setting the filename but
+    not changing the buffer name if n <= 0, as previously).  Now a portion of a
+    buffer can be written to a file by narrowing the buffer, invoking writeFile
+    with n <= 0, then widening the buffer again.
+18. Swapped default key bindings of "lowerCaseRegion", "titleCaseRegion", and
+    "upperCaseRegion" commands with "lowerCaseLine", "titleCaseLine", and
+    "upperCaseLine".
+19. Improved display of information on message line generated by "showPoint"
+    (C-h .) command.
+20. Changed "showBuffers" (C-h b) command to include an indicator that shows
+    which buffers are in the "background".
+21. Simplified screen creation and redrawing process:
+	- changed "selectScreen" (ESC s) command to:
+		. require an integer argument (always) and ignore the numeric
+		  argument.
+		. create a screen and switch to it if the argument is zero.
+		. no longer refresh the current screen when n <= 0.
+	- changed "resetTerm" (ESC ESC ) command to always redraw the current
+	  screen (even if the terminal size has not changed) and ignore the
+	  numeric argument.
+	- changed default binding for "reframeWind" command from "ESC l" to
+	  "C-x .", which makes more sense and puts it in the "C-x family" with
+	  the other window-management commands.
+22. Made improvements to the scripting language (MScript):
+	- combined "bufMode?" and "globalMode?" functions into new "mode?"
+	  function, which checks if one or more buffer or global modes are
+	  enabled and returns Boolean result.
+	- improved file pathname processing:
+		. created "expandPath" function, which expands "~/", "~user/",
+		  "$var", and "${var}" in its given string argument and returns
+		  the result.
+		. changed all file commands and functions so that "~/" or
+		  "~user/" (at beginning of a string), "$var", and "${var}" can
+		  be specified in any filename argument and will be expanded
+		  automatically, as is done interactively.
+	- changed how buffer size information is obtained:
+		. eliminated "bufSize" function.
+		. created "bufInfo" function, which returns various information
+		  about a buffer or multiple buffers per an option argument.
+		. created "bempty?" function, which checks if current buffer is
+		  empty (or named buffer if n argument) and returns Boolean
+		  result.
+	- renamed $bufName system variable to $bufname.
+	- fixed problem where case-insensitive array comparisons in "include?"
+	  function were failing.
+	- renamed all commands and macros containing the word "delete" to "del"
+	  (see Implementation Notes).
+	- changed syntax and/or functionality of several commands and functions
+	  (see Implementation Notes).
+23. Fixed some bugs:
+	- Fixed problem where the "Col" and "Line" modes were not being
+	  displayed correctly on the mode line.
+	- Fixed problem where executing the "shellCmd" (C-x !) command would
+	  sometimes cause program to hang; for example, when running the "man
+	  less" shell command.
+	- Fixed issues in "bindKey" (ESC k) and "unbindKey" (ESC C-k) commands
+	  where the return messages were not being displayed properly on the
+	  message line when the commands were run interactively.
+	- Fixed bug where pressing "C-q" (quoteChar) immediately after starting
+	  the editor caused the cursor to move to the bottom-left corner of
+	  screen.
+	- Fixed issue where the program could crash during terminal input if the
+	  input line contained multiple control characters.
+	- Fixed bug where text following a hard tab was not aligned at a tab
+	  stop if the "TermAttr" buffer attribute was set and the text before
+	  the tab character contained one or more "~~" sequences.
+
+
+*** Implementation Notes
+
+ 1. The following commands, macros, and functions were renamed:
+	COMMANDS AND MACROS				FUNCTIONS
+	deleteAlias	    -> delAlias			bufMode?	-> mode? bufname,modes[,opts]
+	deleteBackChar	    -> delBackChar		globalMode?	-> mode? bufname,modes[,opts]
+	deleteBackTab	    -> delBackTab
+	deleteBlankLines    -> delBlankLines
+	deleteBuf	    -> delBuf
+	deleteFencedRegion  -> delFencedRegion
+	deleteFile	    -> delFile
+	deleteForwChar	    -> delForwChar
+	deleteForwTab	    -> delForwTab
+	deleteKill	    -> delKillEntry
+	deleteLine	    -> delLine
+	deleteMacro	    -> delMacro
+	deleteMark	    -> delMark
+	deleteRegion	    -> delRegion
+	deleteReplacePat    -> delReplacePat
+	deleteScreen	    -> delScreen
+	deleteSearchPat	    -> delSearchPat
+	deleteToBreak	    -> delToBreak
+	deleteWhite	    -> delWhite
+	deleteWind	    -> delWind
+	deleteWord	    -> delWord.
+	insertLineI	    -> openLineI
+ 2. The syntax and/or functionality of the following commands and functions was
+    changed (see "showCommands" (C-h c) or "showFunctions" (C-h f) descriptions
+    for details):
+	COMMANDS					FUNCTIONS
+	chgBufAttr bufname,attrs	  C-x a		binding op,{key-lit | name}
+	clearBuf [bufname]		  C-x DEL	bufAttr? bufname,attr
+	delBlankLines			  C-x C-o	binding op,{key-lit | name}
+	delBuf {op | name}[,bufname,...]  C-x C-b	chgBufAttr name,attrs
+	delWind [opts]			  C-x 0		defined? op,name
+	gotoMark m			  ESC SPC	getKey [opts]
+	joinWind [opts]			  C-x j		groupMode? bufname,group[,opt]
+	markBuf [m]			  ESC C-SPC	include? opts,array,expr,...
+	popBuf bufname[,opts]		  C-h p		index str,{pat | c}[,opts]
+	popFile file[,opts]		  C-h C-p	message opts,arg,...
+	renameBuf old,new		  C-x B		print arg,...
+	resetTerm			  ESC ESC	printf fmt,...
+	saveFile			  C-x C-s	prompt p[,def][,opt,...]
+	selectScreen N			  ESC s		toStr expr[,opts]
+	setBufFile bufname,file		  C-x F		updateScreen [opts]
+	seti val[,fmt[,incr]]		  ESC i		xPathname {file | glob}[,opts]
+	setMark [m]			  C-SPC
+	shellCmd opts,arg,...		  C-x !
+	showAliases pat			  C-h a
+	showCommands pat		  C-h c
+	showFunctions pat		  C-h f
+	showMacros pat			  C-h m
+	showVariables pat		  C-h v
+	swapMark m			  C-x C-x
+	unbindKey key-lit		  ESC C-k
+	writeFile file			  C-x C-w
+	yankCycle			  ESC C-y
+ 3. The following commands have different default key bindings:
+	chgDir			C-c d	-> C-c D
+	copyFencedRegion	C-c }	-> C-c '
+	delFencedRegion		C-x }	-> C-x '
+	editMode		C-c m	-> C-x m
+	editModeGroup		C-c g	-> C-x g
+	gotoFence		ESC }	-> ESC '
+	killFencedRegion	C-h }	-> C-h '
+	openLineI		C-x i	-> C-x o
+	reframeWind		ESC l	-> C-x .
+	showDir			C-h d	-> C-h D
+ 4. The following commands and functions were eliminated:
+	COMMANDS			FUNCTIONS
+	chgBufMode			bufSize
+	chgGlobalMode
+ 5. New commands and functions:
+	COMMANDS					FUNCTIONS
+	chgMode bufname,modes		ESC m		bempty? [bufname]
+	delDelEntry			C-x d		bufInfo bufname[,opts]
+	cycleDelRing			C-c d
+	revertYank			C-x C-y
+	showDelRing			C-h d
+	showFence [c]			C-h C-h
+	undeleteCycle			ESC U
+	writeBuf			C-x *
+ 6. The following system variables were renamed:
+	$bufName	-> $bufname.
+ 7. New system variables:
+	$delRingSize
+ 8. Mode and buffer attribute changes:
+	- "RdOnly" buffer mode was deleted and a "ReadOnly" buffer attribute was
+	  created to replace it.
+	- "Fence" global mode was renamed to "Fence1" and "Fence2" mode was
+	  created, which includes "< >" fences.
+
+----------
+9.3.0	31 Mar 2019
+
+
+*** Changes from Previous Version
+
+ 1. Fixed bugs in "let" command:
+	- Fixed issue where the value of a variable was being set
+	  (interactively) to the prompt string instead of the value that was
+	  entered unless the value was an expression or an integer.  This
+	  usually caused a bogus error to be displayed as a result and the
+	  variable was not changed.
+	- Fixed problem where the program would crash when attempting to set the
+	  $lastKeySeq or $searchDelim system variable.
+ 2. Fixed problem on Linux platforms where pressing "control+h" would generate
+    "DEL" instead of "C-h" unless TERM was xterm-256color.
+ 3. Replaced $displayColors system variable with new "setDispColor" function,
+    which provides a means to set colors for a display item, and changed its
+    operation to always set "no color" for an item if its color is set to nil.
+ 4. Changed "getInfo" function to return an array of current color numbers for
+    all display items when the keyword is "Colors", and return number of colors
+    and pairs avaiable (as previously) if an n argument is specified.
+ 5. Made library changes:
+	- Renamed "grepFiles" macro to "findFiles", changed its key binding to
+	  "C-x f", and added option to bypass the search pattern prompt if
+	  n <= 0.
+	- Created "getFile" (C-x C-g) macro, which finds a file and opens it in
+	  a new screen (and also sets its buffer to read-only if n <= 0).
+	- Fixed problem in "showBindings" (C-x n) macro where tildes (~) were
+	  not being displayed in key bindings.
+ 6. Changed buffer editing when assigning a value to the $lineText system
+    variable so that the target line is not deleted if it is empty, and the
+    point is left at the end of the assigned text.
+ 7. Combined $TermCols and $TermRows system constants into new $TermSize
+    constant which contains the same values as a two- element array.
+ 8. Changed screen display so that the keyboard macro recording indicator is
+    always displayed on the mode line of the bottom window (making it more
+    conspicuous) instead of the current window, as previously.
+
+
+*** Implementation Notes
+
+ 1. Deleted $displayColors system constant.
+ 2. Created "setDispColor" function, which sets (or removes) color for a display
+    item.
+ 3. Changed "getInfo" function to return current colors of display items by
+    default for the "Colors" keyword.
+ 4. Renamed "grepFiles" macro to "findFiles".
+ 5. Combined $TermCols and $TermRows system constants into new $TermSize
+    constant.
+
+----------
+9.2.0	17 Mar 2019
+
+
+*** Changes from Previous Version
+
+ 1. Added color:
+	- Created "showColors" command, which displays all colors available for
+	  the terminal being used.
+	- Created "$displayColors" system variable, which provides a means to
+	  set colors for mode lines and informational displays.
+	- Changed startup processing to display mode lines in color by default.
+	- Redesigned informational displays ("show*" commands) to be easier to
+	  read and to be shown in color by default.
+	- Created "setColorPair" function, which assigns a foreground and
+	  background color of your choosing to a "color pair number", and added
+	  terminal attribute specifications for enabling (~<n>c) and disabling
+	  (~C) color, which can be used in combination with color pair number(s)
+	  to display colored strings in a buffer or on the message line.
+	- Added "Colors" item to "getInfo" function which returns an array of
+	  basic color information, or nil if color not enabled.
+ 2. Improved shell command processing:
+	- Renamed "filterBuf" command to "pipeBuf", changed default key binding
+	  to "C-x |", changed to allow a shell pipeline as the command to
+	  execute, and changed to provide the option of saving the command
+	  result to a new buffer instead of always reading the result into the
+	  current buffer, as previously.
+	- Changed all shell commands to operate internally with OS pipes instead
+	  of temporary files, to capture results in buffers, and display any
+	  errors in a pop-up window.
+    Now the shell family of commands work very efficiently and handle errors
+    cleanly.
+ 3. Eliminated the "False return" message that was displayed when attempting to
+    move the point beyond a buffer boundary (which was annoying and confusing),
+    except when a keyboard macro is executing.
+ 4. Changed display code to skip over invalid terminal attribute specifications
+    in a buffer or on the message line instead of displaying them literally,
+    which makes more sense.
+ 5. Changed "quoteChar" command to operate abs(n) times and ignore "Over" and
+    "Repl" buffer modes if n < 0, and changed self-insertion code to operate the
+    same way for unbound characters.
+ 6. Added automatic calls to "resetTerm" command when the terminal window is
+    resized (with the mouse) so that the editor's screen(s) always match the
+    size of the terminal window.
+ 7. Provided option for "bufMode?", "globalMode?", and "groupMode?" functions to
+    ignore any non-existent mode or group name so that a running script will not
+    fail in that case.
+ 8. Created official name for the scripting language: MScript, changed filename
+    extension for script files from ".mm" to ".ms" to match language name, and
+    renamed all "memacs*" macros in script files to "ms*".
+ 9. Changed default installation directory for Debian Linux to /usr/local (just
+    like all other platforms), so it is no longer treated as a special case.
+10. Bug fixes:
+	- Fixed issue where the current line in a buffer containing a terminal
+	  attribute specification was being left in the "rendered" state after
+	  (a), a right fence character was typed; (b), its matching fence
+	  character was displayed; and (c), the cursor was returned to the line.
+	- Fixed issue where a language buffer mode was sometimes not being set
+	  when switching windows.
+	- Fixed issue where setting a variable to an expression interactively
+	  was sometimes failing and returning a non-sensical error message.
+	- Fixed other minor issues.
+
+
+*** Implementation Notes
+
+ 1. Script files now use a ".ms" filename extension instead of ".mm".
+ 2. Changed "~0" terminal attribute specification to "~Z" so that a numeric
+    prefix can be specified in an attribute specification without ambiguity
+    (such as "~<n>c" to enable color, where <n> is a number).
+ 3. Changes to the scripting language (MScript):
+	- Changed "bufMode?" and "globalMode?" functions to check if all modes
+	  are enabled if n >= 0 (instead of when n is not the default, as
+	  previously), and to ignore any non-existent mode if n <= 0.
+	- Changed "groupMode?" function to do a global mode check if n >= 0
+	  (instead of when n is not the default, as previously), and to ignore
+	  any non-existent group name (and return nil) if n <= 0.
+
+----------
+9.1.1	6 Jan 2019
+
+
+*** Changes from Previous Version
+
+ 1. Bug fixes:
+	- Fixed issue where the "detabLine" and "entabLine" commands would not
+	  accept an integer argument (the tab size) when executed in a script.
+	- Fixed issue where a new filename for a buffer would not be set if it
+	  matched the buffer name.
+ 2. Changed return message processing:
+	- Created "high priority" option for informational messages which causes
+	  a message tagged as such to override any non-high-priority message set
+	  previously.
+	- Changed most built-in commands which previously forced a return
+	  message to use the "high priority" tag instead so that messages such
+	  as "nn substitutions" (from the "replace" and "queryReplace" commands)
+	  can be suppressed in a script by disabling "RtnMsg" global mode.
+	- Changed "message" function to set the high priority flag for a message
+	  if abs(n) == 1 and force the message if abs(n) > 1, instead of force
+	  (only) if n != 0, as previously.
+ 3. Added "quick start" topic to Help System.
+
+
+*** Implementation Notes
+
+ 1. Changes to the scripting language:
+	- "message" function now forces a message when abs(n) > 1 instead of
+	  n != 0.
+
+----------
+9.1.0	19 Nov 2018
+
+
+*** Changes from Previous Version
+
+ 1. Made major improvements to mode system:
+	- Eliminated "show" modes -- deleted "alterShowMode" command,
+	  "showMode?" function, and $ShowModes variable.
+	- Added support for user-defined modes, in addition to built-in ones.
+	- Created mode groups, which provide a means to group similar modes
+	  (like programming languages) so that their states and types can be
+	  controlled.
+	- Added ability to change type (global or buffer) of most modes at any
+	  time.
+	- Created "editMode" (C-c m) and "editModeGroup" (C-c g) commands, which
+	  provide the means to create and edit modes and mode groups.
+	- Changed "Bak" mode to be a buffer mode by default instead of global.
+	- Added option to "defined?" function to check for the existence of
+	  modes and groups.
+	- Created "groupMode?" function, which checks if a mode in a group is
+	  enabled and returns its name if so; otherwise, nil.
+	- Renamed "alterBufMode" and "alterGlobalMode" commands to "chgBufMode"
+	  and "chgGlobalMode", and changed both to not do a "clear all" when
+	  n < -1, and allow no arguments when n > 1 instead, which serves the
+	  same purpose.
+	- Changed "mode" hook to take two arguments, either: nil and old
+	  $GlobalModes value if a global mode was changed, or buffer name and
+	  old $BufModes value if a buffer mode was changed.
+	- Changed "getInfo 'Modes'" function to return an array containing all
+	  modes, their parent group (if any), and their attributes.
+	- Created "Fence" mode, which enables left fence highlighting when a
+	  right fence is typed; for example, the matching '{' is highlighted
+	  when '}' is typed.
+	- Changed default binding for "showModes" commmand to "C-h m" (instead
+	  of "C-h M").
+    Now modes can be created, modified, and deleted, and used to control user-
+    defined operations such as programming language formatting.
+ 2. Removed all built-in language formatting (for C, MightEMacs, Perl, Ruby, and
+    Shell), reimplemented it in external script libraries, and created libraries
+    for most other major programming languages.  Editor now does auto-formatting
+    for C, C++, HTML, Java, JavaScript, MightEMacs, Perl, PHP, macOS PList,
+    Python, Ruby, Rust, Shell, SQL, and Swift languages.
+ 3. Changed internal buffer management:
+	- Changed how lines are managed such that the last line of a buffer no
+	  longer contains an implicit newline delimiter.
+	- Created "ATerm" ("auto-termination") mode, which, when enabled, causes
+	  a newline to be automatically appended to a buffer if it is missing
+	  when the buffer is written to disk.
+	- Changed "insertBuf", "insertFile", and "insertPipe" commands to insert
+	  lines (possibly without a terminating newline) at point instead of at
+	  the beginning of the current line, as previously.
+ 4. Changed message line management:
+	- Renamed "clearMsg" function to "clearMsgLine", to clarify its purpose.
+	- Changed "clearMsgLine", "print", and "printf" functions to always
+	  write to message line regardless of "Msg" mode state, and removed
+	  "force" option from the functions, which is no longer needed.
+	- Changed "showPoint" command to write results directly to message line
+	  instead of setting a return message, as previously.
+	- Renamed "Msg" global mode to "RtnMsg" to clarify that it now controls
+	  return messages only.
+	- Changed "run" command to set "RtnMsg" mode when interactive state is
+	  enabled, then restore the mode's previous state.
+	- Replaced "success" and "failure" functions with new "message"
+	  function, which takes options ("NoWrap", "TermAttr") as its first
+	  argument and uses the n argument to control the "force" option and
+	  return value.
+    Now "RtnMsg" global mode controls return messages only, messages from new
+    "message" function have same priority as built-in commands by default (are
+    no longer implicitly forced), and text that is written directly to message
+    line during script execution will always be displayed.
+ 5. Improved hook system:
+	- Created "filename" hook, which is called whenever a filename in a
+	  buffer is changed.
+	- Changed hook execution to not allow recursion.
+	- Changed "prekey" hook to not pass a key literal argument (which can be
+	  obtained from $lastKeySeq variable), and changed "postKey" hook to
+	  pass return value from "preKey" hook as an argument, or nil if
+	  "preKey" hook not set.
+	- Changed "showHooks" display to be easier to read, wrap lines properly,
+	  and show macro arguments more clearly.
+ 6. Made changes to the scripting language:
+	- Implemented in-line comments of form "/#...#/" so that a comment can
+	  be added to a line in a script without adversely affecting any
+	  continuation lines that follow it.
+	- Changed evaluation of an array slice "ary[i,len]" to allow length to
+	  exceed the number of elements beyond index and to return all remaining
+	  elements in that case.
+	- Implemented a pseudo "char" type as an 8-bit integer.
+	- Added ability to use the Ruby-style "?x" character literal in an
+	  expression (which evaluates it to a 8-bit integer), where "x" may be a
+	  character or any \x escape sequence allowed in a double-quoted string;
+	  for example, ?" or ?\s (for a space).
+	- Changed $lineChar system variable to return/set current character in
+	  line as an ASCII integer value (char) instead of a string, and insert
+	  a newline into the buffer if the variable is set to a newline
+	  character.
+	- Changed the following commands and functions to interpret specific
+	  arguments as char (ASCII integer) instead of string: "defined?",
+	  "deleteMark", "gotoMark", "markBuf", "setMark", "swapMark" (mark
+	  argument), "split", "strPop", "strShift" (delimiter argument), and
+	  "wordChar?" (character argument).
+	- Added "constrain" modifier which can be specified immediately before
+	  the word "macro" in a macro definition.  If specified, the macro that
+	  is defined is designated to be a "helper" routine and may not be bound
+	  to a key or run interactively, and is not included in the "showMacros"
+	  display by default.  Additionally, a macro must be defined as
+	  contrained to be set to a hook.
+	- Nested macro definitions are no longer allowed, which was a
+	  non-standard feature of dubious value.
+ 7. Made command and function changes:
+	- Changed detabLine and entabLine commands to accept a tab size argument
+	  so that $hardTabSize can be overridden.
+	- Created "glob" function, which returns a (possibly empty) array of
+	  pathnames that match a shell glob pattern.
+	- Changed "pathname" function to accept an array as an argument and
+	  return an array of absolute pathnames in that case instead of a
+	  string.
+	- Changed "xPathname" function to treat its argument as an absolute
+	  pathname only if it begins with a slash (/) instead of "contains a
+	  slash", as previously; accept a glob pattern as an argument and return
+	  a (possibly empty) array of pathnames that match in that case instead
+	  of a string; and skip null directories in $execPath during scan if n
+	  <= 0.
+	- Created "getWord" function, which extracts the previous, current, or
+	  next word from current buffer relative to point and returns it.
+	- Fixed "sub" function so that any value of n is valid, and first
+	  occurrence of pattern is substituted if n <= 1; otherwise, all.
+	- Changed "gotoFence" command to accept "from" fence as an argument if n
+	  is not the default.
+	- Changed "prompt" function to allow quoting for single character input
+	  ('c' type) via C-q so that C-q, RTN, C-j, and C-SPC can be input in
+	  raw form.
+	- Changed "index" function to interpret its pattern argument as a
+	  character if n <= 0 and find rightmost occurrence of pattern or
+	  character if n >= 0.
+	- Changed "prompt" function to return result as an ASCII (int) character
+	  when type is 'c' and require the default value to also be char, if
+	  specified.
+	- Changed "empty?" function to accept a character (int) argument and
+	  return true if it's an ASCII null (zero).
+	- Changed "eval" command to not provide an evaluation option during
+	  terminal input, which was overkill.
+	- Changed "binding" function to accept a command or macro name as an
+	  argument if n > 0 and return an array of its key bindings in that
+	  case, or return a standardized key literal (as previously) if n <= 0.
+	- Changed "alterBufAttr" command to not do a "clear all" when n < -1,
+	  and allow no arguments when n > 1 instead, which serves the same
+	  purpose.
+	- Changed "alias" command to replace any existing alias if n > 0.
+ 8. Changed mark system:
+	- Changed region mark from ' ' to '.' and "work" mark from '.' to '`'.
+	- Changed mark system to no longer allow a space character or tilde (~)
+	  to be used as a mark, which are problematic to display.
+	- Changed mark commands to display marks on message line underlined
+	  instead of in single quotes so that they do not look like strings.
+ 9. Changed mode line updating so that the editor name and version are displayed
+    on the mode line at the bottom of the screen only, are at the far right
+    instead of the beginning of the line, and displayed only if room is
+    available.
+10. Created $LastKey system variable, which holds the ordinal value of the last
+    7-bit ASCII character entered, or -1 if an extended key or 8-bit character
+    was entered.  This is intended to be used by language-formatting macros for
+    quick access to user keystrokes.
+11. Created "selectLine" function, which gets a line block (default) or text
+    block (if n argument) per its numeric argument; moves point to beginning of
+    region if region not empty; and returns number of lines selected.  This is
+    intended to be used in scripts by macros that emulate line or text commands.
+12. Renamed "lowerCaseString", "titleCaseString", "upperCaseString", and
+    "toString" to "lowerCaseStr", "titleCaseStr", "upperCaseStr", and "toStr" to
+    be consistent with other function names.
+13. Changed "detabLine", "entabLine", "indentRegion", "outdentRegion",
+    "trimLine", "lowerCaseLine", "titleCaseLine", and "upperCaseLine" commands
+    to mark target line block as a region after processing completed (in
+    addition to moving point to end of block).
+14. Modified working directory commands and hooks:
+	- Renamed "chDir" command and hook to "chgDir" to be consistent with
+	  "chgBufMode" and "chgGlobalMode" commands.
+	- Created "showDir" (C-h d) command, which displays current working
+	  directory on message line.
+	- Created "pwd" alias to "showDir" command.
+	- Removed "pwd" macro and key binding from memacs.mm.
+15. Fixed bug where entries on the search ring could be duplicated in certain
+    situations.
+
+
+*** Implementation Notes
+
+ 1. Changes to the scripting language:
+	- Removed "alterShowMode" command, "showMode?" function, and $ShowModes
+	  variable.
+	- Renamed "alterBufMode" and "alterGlobalMode" commands to "chgBufMode"
+	  and "chgGlobalMode" and changed how n is interpreted.
+	- "getInfo('Modes')" now returns more information.
+	- Renamed "Msg" global mode to "RtnMsg".
+	- Changed "Bak" mode to be a buffer mode by default instead of global.
+	- Changed "clearMsg", "print", and "printf" functions to always write to
+	  message line regardless of "Msg" mode state, and removed "force"
+	  option from the functions.
+	- Replaced "success" and "failure" functions with new "message"
+	  function.
+	- Implemented in-line comments of form "/#...#/".
+	- Changed evaluation of an array slice "ary[i,len]" to allow a large
+	  length value.
+	- Added "?x" character literal.
+	- Changed the following to require a "char" argument or value:
+	  "defined?", "deleteMark", "gotoMark", "markBuf", "setMark", "split",
+	  "strPop", "strShift", "swapMark", "wordChar?", and $lineChar.
+	- Changed "detabLine" and "entabLine" commands to require a tab-size
+	  argument.
+	- Changed operation of "alterBufAttr" command, and "binding", "empty?",
+	  "index", "prompt", and "sub" functions.
+	- Changed region mark from ' ' to ?. and "work" mark from '.' to ?`.
+	- Space and tilde marks are no longer allowed.
+	- Macros may now be defined with a "constrain" modifier, which
+	  immediately precedes the "macro" keyword.
+	- New commands: "editMode", "editModeGroup", and "showDir".
+	- New functions: "getWord", "groupMode?", "glob", and "selectLine".
+	- New variables: $LastKey.
+	- Renamed command "chDir" to "chgDir".
+	- Renamed functions "clearMsg", "lowerCaseString", "titleCaseString",
+	  "upperCaseString", and "toString" to "clearMsgLine", "lowerCaseStr",
+	  "titleCaseStr", "upperCaseStr", and "toStr".
+ 2. Hook changes:
+	- Renamed "chDir" hook to "chgDir".
+	- Changed "mode" hook to take two arguments, either: nil and old
+	  $GlobalModes value if a global mode was changed, or buffer name and
+	  old $BufModes value if a buffer mode was changed.
+	- Created "filename" hook, which is called whenever a filename in a
+	  buffer is changed.
+	- Changed "prekey" hook to not pass a key literal argument, and changed
+	  "postKey" hook to pass return value from "preKey" hook as an argument,
+	  or nil if "preKey" hook not set.
+ 3. Changes to mode system and language formatting:
+	- The editor now loads additional initialization files at startup which
+	  define modes and formatting parameters for programming languages.  New
+	  languages may be added by creating an "Init" file and optional "Lib"
+	  file in the library directory (usually /usr/local/lib/memacs).  See
+	  comments at beginning of file lang.mm for details.
+	- The types of most modes may now be changed from global to buffer or
+	  vice versa via the "editMode" command.  The "showModes" display
+	  indicates which ones are "scope locked" and which ones are not.
+
+----------
+9.0.2	23 Sep 2018
+ 1. Fixed terminal input for the searchForw, searchBack, queryReplace, and
+    replace commands so that the most recently-entered pattern will be displayed
+    first when C-p is typed.
+ 2. Changed the cycleSearchRing and cycleReplaceRing commands to set the pattern
+    at top of ring if possible, after the ring is cycled (like deleteSearchPat).
+ 3. Changed filename completions to sort the filename list before displaying it.
+ 4. Added return-value information to command descriptions for lastBuf,
+    scratchBuf, beginText, beginLine, and endLine.
+
+----------
+9.0.1	16 Apr 2018
+ 1. Simplified Linux building and installation: combined "Debian", "CentOS", and
+    "Red Hat" platforms into single "Linux" platform (and preprocessor macro) so
+    that one binary is created and shared among all GNU/Linux variants.
+ 2. Changed how $execPath is set at startup for Linux version when MMPATH is not
+    set: if directory /usr/lib/memacs exists, path is set to ":/usr/lib/memacs";
+    otherwise, ":/usr/local/lib/memacs", as usual.
+ 3. Changed the "searchForw", "searchBack", "queryReplace", and "replace"
+    commands to not display the current pattern as the default when prompting
+    for a search or replacement pattern so that the line does not have to be
+    cleared to enter a new pattern.  The most recently-entered pattern can still
+    be accessed if desired by entering C-p, as usual.
+
+----------
+9.0.0	13 Jan 2018
+ 1. Made major improvements to terminal input:
+	- Added cursor movement and line editing capabilities to terminal input,
+	  including automatic horizontal scrolling and several editing keys; for
+	  example: C-u (erase line), C-k (erase to end of line), and C-SPC
+	  (erase line and return a null string).
+	- Changed all terminal input to display the default value (if any) in
+	  the input area instead of at the end of prompt string so that it can
+	  be edited.
+	- Added new input types to the "prompt" function, including: 'o' and 'O'
+	  for reading one keystroke or one key sequence verbatim.
+	- Created $maxPromptPct system variable, which is the maximum percentage
+	  of current terminal width to use for a prompt string (default 80).
+ 2. Redesigned kill ring:
+	- Changed kill ring to operate as a true circular ring, where the ring
+	  contains and cycles only the kills that were added to the ring (no
+	  empty slots), and the oldest kill is pushed out only when the ring
+	  is full.
+	- Changed processing so that successive copies or kills can now be
+	  prepended to the previous one in addition to being appended.
+	- Changed kill-retrieval process:
+		. Renamed "yankPop" command to "yankCycle" (which better
+		  describes its purpose) and changed its binding from "ESC y"
+		  to "ESC C-y", which is more consistent with the "C-y" binding
+		  for the "yank" command.
+		. Changed "yank" and "yankCycle" commands to operate more
+		  intuitively and mark yanked text as a region.  Also added
+		  "undo" feature to "yankCycle".
+		. Created "deleteKill" (C-x k) command which deletes one or
+		  more kills from the kill ring.
+	- Changed key binding of "cycleKillRing" command to "C-c k".
+ 3. Created "search" and "replace" rings:
+	- Integrated search and replace system with new search and replace
+	  rings, which hold recent patterns that have been entered.
+	- Changed terminal input for the "searchForw", "searchBack", "replace",
+	  and "queryReplace" commands so that entries on the search and replace
+	  rings can be retrieved by pressing C-p, up-arrow, C-n, or down-arrow.
+	- Created "showSearchRing" (C-h s), "showReplaceRing" (C-h r),
+	  "cycleSearchRing" (C-c s), "cycleReplaceRing" (C-c r),
+	  "deleteSearchPat" (C-x s), and "deleteReplacePat" (C-x r) commands,
+	  which display, cycle, and delete entries from the search and replace
+	  rings.
+	- Added 'K' (kill ring), 'S' (search ring), and 'R' (replace ring) input
+	  types to the "prompt" function, which enable ring access during
+	  terminal input.
+ 4. Greatly improved handling of soft tabs:
+	- Created "backspace" command, which deletes characters or soft tabs
+	  backward, giving preference to the latter if soft tabs are enabled.
+	- Set default binding of "backspace" command to "DEL" and
+	  "deleteBackChar" command to "ESC DEL".
+	- Changed the "tab" command to insert soft tabs such that the first non-
+	  space character at or ahead of point (instead of point) is moved to
+	  the next tab stop, which mimics the deletion process.
+ 5. Created $killRingSize, $searchRingSize, and $replaceRingSize system
+    variables, which specify a maximum size for the corresponding ring (or an
+    unlimited size if set to zero) and provide a means for changing the size of
+    any ring during an editing session.
+ 6. Changed key binding system:
+	- Redesigned key binding tables so that any key in addition to a plain
+	  character (like a function key or S-TAB) can be used as the second key
+	  of a key sequence.
+	- Changed interpretation of a key sequence such that upper and lower
+	  case letters produce unique and separate bindings instead of the same
+	  binding as previously.  For example, "C-c a" and "C-c A" are now
+	  different key bindings.
+	- Key literals (like "TAB") may now be in any case.
+	- The meta prefix is now encoded as "ESC " instead of "M-".  The latter
+	  syntax is still recognized, but is no longer preferred.
+	- Added option to "binding" function to return a key binding in
+	  standardized (string) form if an n argument is specified.
+    Now any single key, including a function key, can be used as the second key
+    of a key sequence, key sequences containing a letter as the second key can
+    be bound separately by case (just like non-prefixed letters), and key
+    sequences containing an upper case letter as the second key are unbound by
+    default.
+ 7. Added support for terminal attributes in windows and on message line:
+	- Text displayed in a window, a pop-up window, or on the message line
+	  may now include phrases that are underlined, in bold, or in reverse
+	  video (or all three) by coding special formating sequences in the text
+	  that begin with the '~' (tilde) character.  Specifications are "~b"
+	  (begin bold), "~r" (begin reverse video), "~u" (begin underlining),
+	  "~#u" (begin underlining, skipping spaces), "~U" (end underlining),
+	  "~0" (end all attributes), and "~~" (display literal "~").  A
+	  "terminal attributes" buffer attribute was also created so that this
+	  feature can be enabled or disabled in a window.
+	- Changed n arguments of "abort", "failure", "print", "printf",
+	  "prompt", and "success" functions so that attribute processing can
+	  be enabled for the prompt argument of the prompt function and the
+	  string that is produced by the other functions if desired.
+	- Changed several messages displayed on message line to include bolding
+	  and/or underlining to improve readability; for example, output from
+	  the "showKey" command, and the help text displayed when viewing a pop-
+	  up window and pressing the '?' key.
+ 8. Redesigned informational displays:
+	- Eliminated memacs-guide.1 and memacs-macros.1 man pages and
+	  incorporated their content into new interactive Help System which is
+	  entered via the "help" command (ESC ?) and provides help pages for
+	  both the beginner and advanced user.
+	- Changed display format for "show" commands to be less terse and easier
+	  to read, including multiple lines per item, automatic wrapping of
+	  descriptive text to fit in the current terminal width, and the use of
+	  bolded and underlined text where appropriate.
+	- Renamed "showBindings" (C-h n) command to "showCommands" (C-h c) and
+	  created "showAliases" (C-h a) and "showMacros" (C-h @) commands.
+	- Changed key binding of "about" command to "C-h A".
+	- Replaced "apropos" macro in "memacs.mm" with "apropos" command
+	  (ESC a), which creates a combined listing of all commands, functions,
+	  aliases, macros, and variables which match the search pattern.
+	- Changed matching process for the "apropos" command and the apropos
+	  function of the "show" commands such that regular expression or
+	  case-sensitive matching may be done by appending option letters to the
+	  search pattern.
+	- Changed "showKey" command to display the key description in a pop-up
+	  window by default or if n < 0 so that long descriptions, which may be
+	  truncated on the message line, can be viewed on the screen in their
+	  entirety.
+	- Added descriptions of numeric argument and macro arguments to
+	  "showHooks" display.
+	- Changed "showBuffers" command to include hidden, non-macro buffers in
+	  display if n == -1 and to show all buffers if n < -1 (instead of n < 0
+	  as previously).
+	- Created "showBindings" macro (C-h n), which displays all possible key
+	  bindings in a pop-up window.
+ 9. Changed command-line switch processing:
+	- Changed editor to use the getswitch() routine in ProLib to parse
+	  switches and arguments.
+	- Renamed and/or added word aliases to most switches (formerly single
+	  letters) and changed parsing to require white space between a switch
+	  and its argument, like most other Unix/Linux commands; for example,
+	  -d or -dir may be used to specify an initial working directory.
+	- Replaced +<num>[:pos] "go to" switch with +<num> and -<num> switches,
+	  which now move point to the specified line number from the beginning
+	  (+) or end (-) of the buffer (and eliminated the line position
+	  option).
+	- Added validation checks to -s, +, and - argument switches.  Any one of
+	  these switches may now be specified after any file argument, which
+	  will trigger that file to be read at startup instead of the first
+	  file, as previously.
+	- Replaced -r and -R switches with a -r command switch and -r and -rw
+	  argument switches.
+	- Added -otp-delim (-o) switch for specifying output file record
+	  delimiter(s), and -buf-mode (-B) argument switch for specifying
+	  initial buffer modes for a data file.
+	- Removed -D (default mode) switch.
+10. Made command and function improvements:
+	- Changed handling of the current working directory so that the
+	  directory may be set on a per screen basis and automatically changed
+	  when switching screens.
+	- Added 'Y' response option to "queryReplace" command for "replace and
+	  stop here".
+	- Split "notice" function into two functions: "success" and "failure",
+	  which always return true and false, respectively.  Now it is very
+	  obvious if a macro is returning success or failure, and the new
+	  function options are greatly simplified.
+	- Created "printf" function, which operates identically to the "print"
+	  function, except that it accepts a format string and optional
+	  arguments, like the "sprintf" function.
+	- Renamed "readBuf" and "writeBuf" functions to "bgets" and "bprint",
+	  and created "bprintf" function, which writes a formatted string to a
+	  buffer.
+	- Changed "lastBuf" command to operate on a per screen basis.
+	- Added option to "truncBuf" command to delete backward from point to
+	  beginning of buffer if n <= 0.
+	- Created "interactive?" function, which returns true if script is being
+	  executed interactively; otherwise, false.
+	- Added options to "backPage", "backPageNext", "backPagePrev",
+	  "forwPage", "forwPageNext", and "forwPagePrev" commands to scroll
+	  window backward or forward by half a page if n < 0.
+	- Added options to stat? function: (1), returns true if any type letter
+	  matches, for default n (as previously); and (2), returns true if all
+	  type letters match, for non-default n.
+	- Changed include? function to: (1), accept multiple value arguments;
+	  (2), return true if any of the values are in the array (default n or
+	  n == 0) or all values are in the array (n != 0); and (3), ignore case
+	  in string comparisons if n <= 0.
+	- Changed all commands which prompt for a buffer name (such as
+	  "selectBuf") to not display a default value (a guess) at the prompt
+	  unless only two visible buffers exist.
+	- Changed "let" command (C-x =) to display the current value of the
+	  variable being changed in the prompt and read a key or key sequence
+	  instead of a key-binding literal for the $searchDelim and $lastKeySeq
+	  variables.
+	- Changed "seti" command to set i (only) if n >= 0, but display all
+	  parameters on message line instead if n < 0.
+	- Added optional buffer name argument to "setBufName" and "setBufFile"
+	  commands and renamed the former to "renameBuf".
+	- Changed "deleteBuf" command to ignore any buffers being displayed when
+	  deleting all unmodified buffers (n == 0) or all buffers (n == 1).
+	- Changed "setWrapCol" command to remember previous wrap column and
+	  switch back to it if n < 0.
+	- Changed "beginWhite" and "deleteWhite" commands to operate on white
+	  space immediately before point (if any) if character at point is not
+	  white space.
+	- Renamed "sysInfo" function to "getInfo", changed to use keywords (such
+	  as "Version") instead of the numeric prefix to select an informational
+	  item, and added keywords such as "Buffers" and "Windows".  Also
+	  deleted "bufList" and "windList" functions, which are no longer
+	  needed.
+	- Renamed the following constants, functions, and commands to add
+	  clarity and be consistent with other object names in MightEMacs and in
+	  other programming languages:
+		$ArgVector	->	$ARGV
+		lcString	->	lowerCaseString
+		tcString	->	titleCaseString
+	  	ucString	->	upperCaseString
+	  	subLine		->	subline
+	  	subString	->	substr
+	  	stringFit	->	strFit
+		lcLine		->	lowerCaseLine
+		lcRegion	->	lowerCaseRegion
+		lcWord		->	lowerCaseWord
+		tcWord		->	titleCaseWord
+		ucLine		->	upperCaseLine
+		ucRegion	->	upperCaseRegion
+		ucWord		->	upperCaseWord
+		copyFencedText	->	copyFencedRegion
+		deleteFencedText->	deleteFencedRegion
+		killFencedText	->	killFencedRegion
+		whence		->	showPoint
+	- Improved case-conversion:
+		. Created "titleCaseLine" (C-x t) and "titleCaseRegion"
+		  (C-x C-t) commands, which were missing from the group of
+		  commands that change the case of letters and words.  Also
+		  changed default binding of "trimLine" command from "C-x C-t"
+		  to "C-x C-\".
+		. Changed "lowerCaseWord", "titleCaseWord", and "upperCaseWord"
+		  commands to perform conversion in a backward direction if n is
+		  negative and leaves point at ending position in that case.
+		. Changed "lowerCaseRegion", "titleCaseRegion", and
+		  "upperCaseRegion" commands to leave point at opposite end of
+		  region after conversion (for visual effect).
+	- Changed all commands that edit a block of lines (like "detabLine" and
+	  "trimLine") to operate the same way, including moving the point to the
+	  end of the block when completed, reporting the number of lines that
+	  were changed, and not putting the buffer into a changed state if no
+	  lines were modified.
+	- Changed "showBuffers" command to display all buffers except macros if
+	  n == -1 so that hidden buffers created by the user are included.
+	- Changed "nextBuf" and "prevBuf" commands to include hidden, non-macro
+	  buffers when switching if n == 0.
+	- Renamed "pipeBuf" command to "filterBuf", changed its binding from
+	  "C-x |" to "C-x v", and changed its prompt from "|" to "Filter
+	  command" to clarify that it runs a shell command, not a pipeline.
+	- Changed $KeyPending system constant to keyPending? function.
+	- Changed "selectBuf" command and all buffer and file commands that use
+	  "selectBuf" numeric prefix options to return one of three values in
+	  script mode: (1) - if n == -1, name of buffer that was popped if not
+	  deleted afterward; otherwise, nil; (2) - if n == 0, two-element array
+	  containing buffer name and Boolean value indicating whether the buffer
+	  was created (as was returned previously for "findFile" and "viewFile"
+	  commands); or (3) - four-element array containing same first two
+	  elements as for n == 0 plus ordinal number of window displaying the
+	  buffer, and Boolean value indicating whether the window was created.
+	- Removed buffer name and filename return values from "appendFile",
+	  "insertBuf", "insertFile", "truncBuf", and "writeFile" commands, which
+	  were not needed.
+	- Changed "pause" function to get the delay time from the value given as
+	  an argument instead of using the numeric prefix, and interpret the
+	  argument as seconds or centiseconds, depending on the n argument.
+	- Changed "setWrapCol" command to set the wrap column to the value given
+	  as an argument instead of using the numeric prefix, or optionally set
+	  it to the previous value, depending on the n argument.
+	- Changed text insertion and replacement:
+		. Changed "space", "insertSpace", and "newline" commands to
+		  insert space(s) or newline(s) without formatting or text
+		  replacement if n < 0.
+		. Changed "openLine" command to move point to first empty line
+		  inserted if n < 0.
+		. Changed "quoteChar" command to do character replacement
+		  instead of insertion if the "Over" or "Repl" buffer mode is
+		  enabled.
+		. Changed self-insert command to force insertion when n < 0.
+	- Created $ScreenCount system variable, which returns the number of
+	  existing screens.
+11. Made screen and window improvements:
+	- Changed "joinWind" command to join windows upward by default (like
+	  "deleteWind") and delete buffer in other window if n == -1.
+	- Changed "resizeWind" command to allow a negative argument and to grow
+	  or shrink window at top instead of bottom in that case.
+	- Renamed "redrawScreen" command (ESC l) to "reframeWind" and changed to
+	  center current line in window when n == 0 (the new default) instead of
+	  forcing a screen redraw.
+	- Renamed "newScreen" command to "selectScreen" and changed to either
+	  switch to a given screen, create a screen, or force a screen redraw,
+	  depending on the n argument.
+	- Created "selectWind" (C-x w) command, which switches to a given
+	  window, and changed binding of "resizeWind" command to "C-x z".
+	- Changed "nextScreen", "prevScreen", "nextWind", and "prevWind"
+	  commands to switch to next or previous screen or window n times,
+	  instead of using n as a screen or window number to switch to.
+	- Changed "deleteScreen" command to require the screen number as an
+	  argument in script mode, and also allow the current screen to be
+	  deleted.
+	- Created "bufWind" function, which returns ordinal number of first
+	  window on current screen displaying given buffer, or nil if none.
+	- Created "saveScreen" and "restoreScreen" functions and changed
+	  "restoreWind" and "restoreScreen" to return the number of the restored
+	  window or screen.
+12. Made macro changes:
+	- Changed "renameFile" (C-x R) macro to rename a file on disk by
+	  default, or rename the filename of a buffer instead if n argument.
+	- Created "deleteFile" macro (C-x D) which deletes a file on disk by
+	  default, optionally with "rm -rf" command, or deletes a buffer and its
+	  associated file from disk if n > 0.
+13. Changed window handling:
+	- Expanded use of numeric prefix to include n == -2 and n < -2 for most
+	  buffer and file commands so that a new (n >= 2) or existing (n <= -2)
+	  window can be selected as the target of the buffer, instead of always
+	  using an existing window (if available), as previously.  For example,
+	  "C-u 2 C-x C-f" will always display the file that is found in a new
+	  window.
+	- When displaying a pop-up window, added ability to shift the display
+	  left if needed to prevent line truncation; for example, when doing
+	  file pathname completions.
+	- Created "popFile" (C-h C-p) and "popBuf" (C-h p) commands, which
+	  display a file or buffer in a pop-up window and accept options (like
+	  left-shift long lines) for controlling how the window is displayed.
+	- Changed "splitWind" command to return the ordinal number of new window
+	  not containing point.
+14. Improved handling of modes and buffer attributes:
+	- Expanded "show" modes to include buffer modes.
+	- Eliminated "alterDefMode" command, $defModes system variable, and
+	  default buffer modes, which were not useful.
+	- Eliminated $BufFlagXXX and $ModeXXX system constants, and $bufFlags
+	  system variable.
+	- Renamed $bufModes, $globalModes, $showModes system variables to
+	  $BufModes, $GlobalModes, $ShowModes system constants and changed to
+	  return arrays of mode names instead of integer bit masks.
+	- Created bufAttr?, bufMode?, globalMode? and showMode?  functions,
+	  which check if any or all given buffer attribute or mode arguments
+	  (individual names or within an array) are set and return a Boolean
+	  result.
+	- Combined "hideBuf", "unhideBuf", and "unchangeBuf" commands into new
+	  "alterBufAttr" (C-x a) command, which provides the ability to clear,
+	  enable, or disable buffer attributes.
+	- Changed the "alterXxxMode" commands:
+		. Changed use of n argument so that all modes can be cleared,
+		  or cleared then set, in addition to the previous
+		  functionality.
+		. Changed processing to allow an array (of strings) as an
+		  argument in addition to a string argument.
+	- Removed "Esc8" global mode, which was never full implemented.
+	- Changed display system to show global modes on mode line at bottom of
+	  screen only.
+    Now all modes and buffer attributes are managed with keywords instead of bit
+    masks.
+15. Created "createBuf" hook, which is called whenever a permanent buffer is
+    created (for example, by the "selectBuf" or "findFile" commands) and can be
+    used to initialize buffer modes or attributes.
+16. Changed macro declaration syntax to allow a minimum and maximum argument
+    count to be specified (both of which are optional), including forms "macro
+    name" and "macro name()" for "zero or more arguments" and "macro name(min,)"
+    for "min or more arguments".
+17. Changed processing to save hidden buffers (except macros) in addition to
+    unhidden ones when multiple buffers are saved at once via "ASave" global
+    mode, "saveBuf" command, or "quickExit" command.
+18. Redesigned terminal-display subsystem:
+	- Changed code which manages changes to the display to operate more
+	  efficiently and minimize OS calls.
+	- Eliminated "NoUpd" global mode, which is no longer needed.
+	- Changed horizontal scrolling of the line containing point when "HScrl"
+	  global mode is disabled to be done the same way as scrolling of all
+	  lines when "HScrl" global mode is enabled, instead of the radical
+	  jump-scrolling as was done previously.
+	- Renamed $horzScrollCol variable to $HorzScrollCol and changed to be
+	  read-only.
+19. Changed default bindings of the following commands and macros to be more
+    consistent with and distinct from related commands and to make use of the
+    expanded binding table:
+	bfFormatItem		C-h 1	->	ESC .
+	bfFormatList		C-h ,	->	ESC L
+	chDir			C-c .	->	C-c d
+	cycleKillRing		C-x y	->	ESC y
+	deleteBuf		C-x k	->	C-x C-b
+	deleteMacro		C-x RTN	->	C-x @
+	fenceWord		C-c f	->	ESC {
+	insertLineI		ESC i	->	C-x i
+	kmDeleteKeyMacro	C-c C-d	->	C-x K
+	kmSaveKeyMacro		C-c C-s	->	ESC C-s
+	kmSelectKeyMacro	C-c k	->	ESC K
+	kmShowKeyMacros		C-h y	->	C-h K
+	kmXeqKeyMacro		C-c e	->	ESC e
+	let			C-x =		ESC =
+	pwd			C-h .	->	C-h d
+	readPipe		C-x @ ->	C-x ~
+	renameBuf		C-x b	->	C-x B
+	renameFile		C-x r	->	C-x R
+	scratchBuf		C-x s	->	C-x #
+	selectBuf		C-x C-b	->	C-x b
+	setBufFile		C-x f	->	C-x F
+	seti			C-x i	->	ESC i
+	showModes		C-h o	->	C-h M
+	showPoint		C-x .	->	C-h .
+	showScreens		C-h s	->	C-h S
+	unbindKey		C-x C-k	->	ESC C-k
+    and deleted duplicate bindings:
+	C-c {	copyFencedRegion
+	C-h {	killFencedRegion
+	C-x {	deleteFencedRegion
+20. Made several bug fixes:
+	- Fixed bug where a ++, --, or assignment operation was causing a "not
+	  an lvalue" error when the expression in question was being evaluated in
+	  a "false" state; for example, "false and x[1] += 3".
+	- Fixed a problem where an expression such as "$searchPat = 'ab[cd]:r'"
+	  was evaluating to "ab[cd]" instead of the original pattern.
+	- Fixed problem where an extra newline was being inserted when $lineText
+	  was set to a new value.
+	- Fixed bug where the search pattern was not being saved properly when
+	  the pattern was a null string.
+	- Fixed bug where the prompt for the "queryReplace" command could be
+	  shown as '"?' if a regular expression pattern matched several lines in
+	  the buffer.
+	- Changed "selectBuf" command to return an error if n < 0 (pop request)
+	  and the target buffer does not exist.
+	- Fixed bug in "wrapLine" command and when 'Wrap' buffer mode was
+	  enabled where a word at the end of a line that ended just prior, at,
+	  or just beyond the wrap column was being wrapped when it shouldn't be
+	  or was not being wrapped when it should.
+	- Fixed bug where a function key could not be used as a single key; for
+	  example, as $searchDelim.
+	- Fixed bug where reading a file that did not exist would sometimes not
+	  cause an error (but just create an empty buffer).
+	- Fixed bug where the mode line at the bottom of the screen was not
+	  being updated if a "deleteScreen" command caused the current screen
+	  number to change.
+	- Changed all places where a string is converted to an integer to ignore
+	  any trailing white space in the source string instead of considering
+	  the numeric literal invalid.
+	- Fixed bugs where a nil value in a script could be processed as a
+	  string under certain conditions, potentially causing a crash.
+	- Changed hook processing so that any value returned from the "preKey"
+	  hook will be ignored, and the current key will always be executed,
+	  whether or not it was changed by the hook.  This prevents a potential
+	  deadlock situation where no key entered by the user would be executed,
+	  including the "exit" (C-x C-c) command, if the hook returned true for
+	  every key entered.
+21. Linked binary with new ProLib 1.3.0 library, which provides the ability to
+    prepend text to a string-fab object, parse switches and values from the
+    command line, and create and manage arrays and hash tables.
+
+----------
+8.5.1	23 Feb 2017
+ 1. Fixed bug where specifying a string containing a printf formatting spec
+    (like "%s") as an argument to the "abort" or "exit" command or "notice"
+    function in a script would cause unpredictable results, including a crash.
+ 2. Changed search commands to display a message when a search is "taking
+    awhile" to complete (which can happen in very large buffers) so the user
+    knows the search is in progress.
+ 3. Fixed problem where the "queryRepl" command was not always terminating if
+    n > 0 and n substitutions were made because the number of matches was being
+    checked instead of the number of substitutions.
+ 4. Fixed problem where a window was not being redrawn when "HScrl" mode was
+    enabled, the display was shifted left (because the point was near the end of
+    a long line), and "HScrl" mode was subsequently disabled.
+
+----------
+8.5.0	2 Feb 2017
+ 1. Converted GeekLib library to new ProLib library which contains several
+    improvements, including Datum objects (which replace Value objects and now
+    support several data types) and records and routines for managing arrays.
+    Datum and Array objects are used extensively by MightEMacs.
+ 2. Enhanced supported data types:
+	- Added array data type.
+	- Changed nil and Boolean pseudo (string) types to real types.
+    The scripting language now supports nil, Boolean, integer, string, and array
+    data types.  Arrays may be nested, sliced, and "auto extended" by assigning
+    a value to an element beyond the end of the array.  Array syntax is
+    "[val,val,...]" where "val" is a value of any type, including array; for
+    example, "x = [false,5,['abc',nil]]".  A slice is created by using two
+    indices; for example, "y = x[0,2]" would set "y" to "[false,5]".
+    Additionally, an array may be "auto extended" by assigning a value to an
+    element beyond the end of the array; for example (continuing the previous
+    one), the sequence "y[3] = 'xyz'" would set "y" to "[false,5,nil,'xyz']".
+ 3. Added a "for" statement (loop block) to the scripting language for iterating
+    through elements of an array.  The new syntax is:
+	for <var> in <array-expr>
+		...
+	endloop
+ 4. Changed macro syntax and argument processing:
+	- Changed syntax for a macro definition to:
+		macro <name>(<n>) {usage: <str>, desc: <str>}
+	  which specifies that the (optional) argument count now be in
+	  parentheses instead of preceded by a comma as previously, and adds
+	  optional "usage" and "description" strings.
+	- Changed showBindings display to include any usage text for macros.
+	- Changed showKey command to display usage text on the message line in
+	  addition to the command or macro name.
+	- Replaced $ArgCount, $argIndex variables and "nextArg" function with
+	  new $ArgVector array, which holds the arguments (if any) of a running
+	  macro.
+	- Changed numeric variables ($1, $2, ...) to reference $ArgVector array
+	  elements.
+	- Changed "length" function to accept an array argument and return its
+	  size.
+    Note that the $ArgVector variable may not be assigned to; however, the array
+    it contains may be modified in any way, just like any other array.
+ 5. Implemented parallel assignment:
+	- Added support for assignment expressions such as "a,b[1],c = [1,2,3]",
+	  which will set multiple variables (or array elements) at once to the
+	  elements of an array.
+	- Removed support for comma expressions such as "(x = 3), y = nil" to
+	  avoid syntactical ambiguities.
+ 6. Added array recursion detection:
+	- Renamed $maxRecursion variable to $maxMacroDepth and created
+	  $maxArrayDepth variable.
+	- Changed certain array operations to either (a), return an error if
+	  $maxArrayDepth is exceeded during recursive evaluation; or (b) stop if
+	  endless recursion is detected and return "[...]" for the array.
+	- Changed "quote" function to force the latter behavior if n > 0.
+    These changes will prevent an endless loop if an array that contains itself
+    at any nesting level is evaluated.
+ 7. Added support for line continuation in scripts: changed script processor to
+    combine any line that ends with a backslash (\) with the following line(s)
+    before evaluating it.  This allows any line (or multiple lines) in a script
+    to be extended to the next line by adding a backslash to the end of it,
+    including a line containing a partial single (') or double (") quoted
+    string.
+ 8. Made several function changes:
+	- Removed delimiter argument from include? function and changed to
+	  require an array instead of a list.
+	- Renamed push, pop, shift, unshift functions to strPush, strPop,
+	  strShift, strUnshift and changed to not allow Boolean (or array)
+	  arguments.
+	- Created new push, pop, shift, and unshift functions which operate on
+	  an array.
+	- Changed "length" function to accept an array or string argument and
+	  return its size or length.
+	- Changed the concatenation operators (& and &=) and functions which
+	  concatenate a list of arguments (like "print"), to also accept Boolean
+	  values and arrays and process the latter (recursively) as if each
+	  element was specified as an argument.
+	- Changed "quote" function to accept any data type and convert it to a
+	  string form which can be resolved via the "eval" function back to its
+	  original value.
+	- Changed "join" and "toString" functions to accept arrays and use the n
+	  argument to control the conversion process.
+	- Replaced $KillText variable with "kill N" function, which returns the
+	  Nth kill.
+	- Replaced int? and string? functions with type?, which returns the type
+	  of its argument as a keyword ("nil", "bool", "int", "string", or
+	  "array").
+	- Changed "sprintf" function to accept an array at any position in the
+	  argument list after the format spec and process the array elements as
+	  if they were specified individually.
+	- Created "split" function which converts a string to an array.
+	- Created "array" function which creates an array with size and
+	  initializer options.
+	- Created "clone" function which creates an exact copy of an array.
+	- Replaced void? function with empty?, which returns true if its
+	  argument is nil, a null string, or an empty array.
+	- Changed "sprintf" function and '%' operator to allow a nil argument
+	  for the %s specification in the format string.
+    Note that for compatibility with array elements, which can be assigned to
+    but are not variables, the functionality of the strShift and strPop
+    functions has changed slightly: a null item at the beginning (for strPop) or
+    end (for strShift) of a delimited string in a variable or array element will
+    not be detected, and nil will be returned instead of a null string as
+    before.  The old behavior can be mimicked however, simply by "doubling up"
+    the delimiter at the end of the string.  For example, use "a:bb::" in place
+    of "a:bb:" to get a null string as the third argument for strShift instead
+    of nil.
+ 9. Changed "rand" function:
+	- Added "max N" required argument to function;
+	- Changed to return integers in range 1..N.
+	- replaced internal algorithm with a "xor-shift-64" type which uses
+	  64-bit unsigned integers.
+	- Changed $randNumSeed assignment so that (a), any value other than zero
+	  is used verbatim; and (b), a zero value causes a new seed to be
+	  obtained using the current time.
+10. Made command changes:
+	- Changed default key binding for "inserti" command to "C-c i" and
+	  replaced deleteTab command with deleteBackTab (S-TAB) and
+	  deleteForwTab (M-TAB), which simplifies the task of deleting tabs
+	  forward when using soft tabs.
+	- Changed "beep" command to a function.
+	- Changed nextBuf and prevBuf commands to return buffer name only if n
+	  == 0, and delete exited buffer after switching to new buffer if n < 0.
+	- Changed resizeWind to make all windows on screen the same size if
+	  n == 0.
+	- Changed deleteWind to force space to upper window if n < -1 (instead
+	  of n < 0) and added option to delete its buffer if n == -1 (for
+	  consistency with prevBuf and nextBuf commands).
+	- Created "lastBuf" command (bound to "C-x \"), which (a), switches to,
+	  in the current window, the last buffer that was exited from in any
+	  window; and (b), deletes the former buffer if n < 0.
+    The "lastBuf" command provides a means to easily toggle between two buffers
+    in a window, or view a file in the current window temporarily, then switch
+    back to the previous buffer, deleting the new buffer in the process.
+11. Changed "joinLines" command:
+	- Fixed bug where all lines from dot to the end of the buffer would be
+	  joined if n == 0 and the region contained only one line.
+	- Changed processing to do nothing (instead of returning an error) if
+	  n == 1 or the region line count is 1.
+12. Made system variable changes:
+	- Replaced $BufList and $WindList variables with "bufList" and
+	  "windList" functions (which return arrays instead of delimited
+	  strings) and added list options which can be selected via the n
+	  argument.
+	- Deleted $BufCount (which is synonymous with "length bufList()") and
+	  $BufOtpDelim (which is not needed).
+	- Replaced $BufLen and $BufSize variables with "bufSize" function which
+	  returns the buffer size in lines or bytes, depending on the n
+	  argument.
+	- Replaced $EditorName, $EditorVersion, $Language, and $OS variables
+	  with "sysInfo" function which returns a value selected by the n
+	  argument.
+	- Renamed $travJumpSize to $travJump (to be consistent with $horzJump
+	  and $vertJump) and changed default value from 14 to 12.
+	- Deleted $BufFlagPreprocd.
+	- Eliminated legacy "truncated file" concept and corresponding buffer
+	  flag ($BufFlagTruncated).
+13. Changed concatenation:
+	- A concatenation expression such as "nil & 5" where nil is the first
+	  value is no longer allowed.
+	- Any value may now be concatenated with a string, including Boolean and
+	  array values.
+	- Any value may be concatenated with an array; however, an array value
+	  will be "exploded" first.
+    These changes allow expressions such as "'Result: ' & myMac() & [': ',55]"
+    (string result) and "[1,2] & [3,4,5]" (array result).
+14. Changed auto-save feature:
+	- Changed key entry loop to save all changed buffers instead of just the
+	  current one when auto-save is triggered.
+	- Changed mode control system to not allow "ASave" mode to be activated
+	  if $autoSave is zero.
+15. Changed hook system to no longer allow a command to be bound to a hook
+    (which made no sense):
+	- Changed wrapWord command to a function.
+	- Created "wrapper" macro (in memacs.mm) which calls wrapWord, and set
+	  it to the "wrap" hook.
+16. Changed buffer completion to not display hidden buffers when TAB is entered
+    as the first character, but include them if '?' is entered.
+17. Made improvements to the C, MightEMacs, and Ruby toolbox libraries,
+    including the ability to search for class and module names in Ruby files
+    (via "C-c C-c") in addition to method names.
+18. Changed default key binding for xeqFile command from "M-/" to "C-x /" to be
+    consistent with other file commands and xeqBuf command (C-x x).
+19. Streamlined command and function code so that execution is always done in
+    one place and arguments are validated consistently.  These changes fixed
+    bugs where specifying an unexpected integer argument to certain commands or
+    functions caused a crash, including:
+	- First argument to "joinLines" and "sprintf" functions.
+	- First or second argument to "wrapLine" command.
+	- Any argument to "deleteBuf" command.
+20. Fixed issue where the "writeBuf" function would not always insert text in
+    the correct place if the target buffer was being displayed.
+21. Reorganized source header files: replaced the e*.h files with bind.h, cmd.h,
+    english.h, exec.h, file.h, lang.h, main.h, search.h, std.h, and var.h.
+
+----------
+8.4.0	23 Oct 2016
+ 1. Changed internal line delimiters from CR to NL:
+	- Changed all terminal input to allow either "return" (C-m) or "newline"
+	  (C-j) as a line delimiter if either one is specified as the delimiter,
+	  and to convert "return" to "newline" by default otherwise.
+	- Changed all buffer editing to create a line when a NL character is
+	  inserted instead of a CR character.
+	- Changed pattern matching to recognize NL as "end of line" instead of
+	  CR.
+ 2. Changed expression evaluation so that a null string ('' or "") will evaluate
+    to true instead of false when used in a Boolean context.  Now the only
+    expressions that are false are 0, false, and nil.  All other expressions,
+    including a null string, are true.
+ 3. Changed "replace" and "queryReplace" commands to interpret a "\0" literal in
+    the replacement pattern in Regexp mode as a "group 0" (the entire match)
+    reference instead of a "0" character.
+ 4. Changed "deleteBuf" command to:
+	- Ignore changes when n < 0 instead of n > 0.
+	- Delete all unchanged buffers if n == 0.
+	- Delete all buffers, no force, if n == 1.
+	- Delete all buffers, ignoring changes, if n > 1.
+    The user is prompted for confirmation in the last case.
+ 5. Changed "white space" delimiter in list processing from nil to a space
+    character:
+	- Changed push and unshift functions to convert a nil delimiter to a
+	  null string instead of a space when adding the delimiter and value to
+	  a variable.
+	- Changed pop and shift functions to process a nil delimiter the same
+	  way as a null ("") delimiter.
+	- Changed include?, pop, and shift functions to use a space character
+	  for white space instead of nil.
+ 6. Changed default $execPath to ":/usr/lib/memacs" (Debian) and
+    ":/usr/local/lib/memacs" (non-Debian) and changed installation process
+    accordingly.
+ 7. Removed "echo" option from "getKey" function and changed it to get a single
+    key and return it as an integer if n <= 0.
+ 8. Changed the "writeFile" and "appendFile" commands to update the buffer name
+    by default when a new filename is set, but to skip the update if n <= 0.
+ 9. Eliminated if/loop nesting limit in scripts.  Nesting depth is now
+    unlimited.
+10. Changed processing of "about" command and all "showXXX" commands so that if
+    the buffer that is created is not deleted after the command is executed (if
+    n >= 0), the buffer is made visible.
+11. Added case-insensitive search option to "grepFiles" (C-x C-g) macro.
+12. Fixed bug in "showMarks" command where a mark set on an empty line was
+    sometimes displaying random characters or incorrect data for the line's
+    contents.
+13. Previously, when the "$otpDelim" variable was not set and multiple buffers
+    were written, the input record delimiter from the current buffer was being
+    used as the output delimiter for all buffers instead of using each buffer's
+    input delimiter.  This has been fixed.
+14. Fixed bug where assignment to the $bufLineNum variable was returning an
+    error.
+15. Removed the "reverse" function, which had dubious value.
+
+----------
+8.3.1	18 Sep 2016
+ 1. Bug fixes:
+	- Fixed bug where it was not possible to specify an explicit RegExp
+	  pattern that ended with a colon due to a syntax issue related to
+	  consecutive colons.  For example, the pattern "abc:::r" was
+	  interpreted as the plain text pattern 'abc::r' instead of RegExp
+	  pattern /abc:/.  Changed method of interpreting patterns as follows:
+	  "If a pattern ends with a colon followed by one or more valid option
+	  letters, and the colon is not the first character of the pattern, then
+	  everything preceding the colon is the pattern.  In all other cases,
+	  the entire string is the pattern (with no options)."  Now for example,
+	  "abc:ri" would be interpreted as RegExp pattern /abc/i, "abc:r:p"
+	  would be interpreted as plain text pattern 'abc:r', and "abc::r" would
+	  be interpreted as RegExp pattern /abc:/.
+	- Fixed bug in "include?" function where it was returning false when the
+	  element being searched for was in the list but also occurred earlier
+	  in the list as a substring of a different element.
+	- Fixed bug in "sub" function where it would return an incorrect result
+	  in certain circumstances when called with a RegExp pattern and n > 1.
+	- Fixed the "renameFile" (C-x r) macro and "help" (ESC ?) command by
+	  changing all occurrences of the obsolete "fileExists?" function in
+	  memacs.mm to equivalent "stat?" calls.
+	- Fixed issues in the keyboard macro toolbox (keyMacro.mm) where saving
+	  a macro (C-c C-s) produced an error and displaying a list (C-c y) did
+	  nothing.
+ 2. Renamed $search and $replace system variables to $searchPat and $replacePat,
+    which better describe their purpose.
+ 3. Renamed $WorkDir system variable to $workDir and changed its usage so that
+    the current working directory can be changed by assigning a value to it.
+ 4. Replaced "Rd1st" global mode with -N switch.
+ 5. Changed default bindings for grepFiles macro from "M-s" to "C-x C-g",
+    cFindFunc, memacsFindMacro, and rubyFindMethod macros from "M-C-]" to
+    "C-c C-f", and newScreen command from "M-C-s" to "M-s", which puts the first
+    in the "file family" (most of which begin with "C-x") and makes the latter
+    ones easier to enter and/or remember.
+ 6. Added option to "renameFile" (C-x r) macro to rename file on disk only if
+    n <= 0.
+ 7. Changed fenceWord macro to accept any punctuation character as a fence (in
+    addition to (), [], {}, and <> pairs) and use it for both the left and right
+    fence characters.
+
+----------
+8.3.0	18 Jun 2016
+ 1. For Debian Linux: changed default value of $execPath global variable to
+    ":/etc/memacs.d:/etc" in memacs binary, and changed installation process to
+    install package files in /etc and /usr/bin instead of /usr/local.
+ 2. Made regular expression changes:
+	- Added support for "{m,n}" repetition operators, "\b" (word boundary),
+	  and "\B" (non-word boundary) metacharacters.
+	- Changed RE compilation to return an error if a repetition operator
+	  (such as + or *) is specified in an invalid location, instead of
+	  treating the operator as a literal character, as was done previously.
+ 3. Made mode changes:
+	- Replaced single-letter shortcuts for mode names with name completion.
+	  Partial mode names which are unambiguous (such as "rd" for "RdOnly")
+	  are also allowed.
+	- Created "showModes" command bound to "C-h o", and removed cryptic mode
+	  information from "showBuffers" display.
+ 4. Changed "insertLineI" command to use its numeric prefix to determine a
+    target line and insert a single line with indentation before that line
+    instead of inserting n lines before or after the current line, as was done
+    previously.
+
+----------
+8.2.1	22 Apr 2016
+ 1. Bug fixes:
+	- Fixed bug where all integer global variables were being converted to
+	  strings after the "showVariables" command was executed.
+	- Fixed bug where the "setBufFile" command was returning an error
+	  message when RETURN was entered at the filename prompt instead of
+	  clearing the filename.
+	- Fixed bug where all marks were cleared in a narrowed buffer when the
+	  "clearBuf" command was executed, instead of just the visible ones.
+ 2. Renamed the "fileExists?" function to "stat?" and changed to accept a second
+    argument containing letter(s) which mimic the shell's -x file tests.  The
+    function now returns true if any of the following test codes are true for
+    the given file: [d]ir, [e]xists, [f]ile, sym[L]ink, hard[l]ink, [r]ead,
+    [s]ize > 0, [w]rite, or [x]eq; otherwise, it returns false.
+ 3. Changed the "pathname" function to not resolve a symbolic link and return
+    the abolute pathname of the link itself if n <= 0.
+ 4. Added calls to the exit-buffer and enter-buffer hooks if the buffer changes
+    when switching screens.
+ 5. Added new macros to the memacs.mm startup file:
+	- "renameFile" (bound to 'C-x r'), which renames the file associated
+	  with the current buffer, both in the editor and the OS.
+	- "nextGrepBuf" (bound to 'C-c ]'), and "prevGrepBuf" (bound to
+	  'C-c ['), which switch to the next or previous buffer from the
+	  result of the most recent "grepFiles" invocation.
+ 6. Changed the user startup file .memacs to create a write hook which will
+    check if the file that is about to be written already exists and is a
+    symbolic or hard link.  If so, it will ask the user if the link should be
+    broken before writing, thereby preserving the original file.
+ 7. The Red Hat Linux binary has been replaced with an equivalent one built on
+    CentOS Linux, and a new Debian Linux binary is now included.
+
+----------
+8.2.0	11 Mar 2016
+ 1. Made search and replacement changes:
+	- Search and replacement patterns may now be any length.
+	- Options (formerly ":m") which are appended to a search pattern have
+	  been expanded and now apply to non-Regexp patterns as well.  New
+	  options are: "i" (ignore case), "e" (exact case), "r" (Regexp mode),
+	  and "p" (plain text mode).  Also changed pattern parsing so that a
+	  pattern such as "x:e" can be searched for literally by using a double
+	  colon, as in "x::e".  Pattern options override the global modes
+	  'regexp' and 'exact', so you may now perform any type of search (or
+	  search and replace) by appending option(s) to the pattern instead of
+	  adjusting the global modes first.  The two global modes are now used
+	  as defaults only.
+	- Escape characters \t (tab), \r (CR), \n (NL), and \f (FF) are now
+	  available for use in regular expression search and replacement
+	  patterns.
+	- Escape characters \d (digit), \l (letter), \s (space), and \w (word)
+	  are now available for use in regular expression character classes.
+	- Escape characters \A (beginning of string), \D (non-digit), \L
+	  (non-letter), \S (non-space), \W (non-word), \Z (end of string, but
+	  before a CR), and \z (end of string) are now available for use in
+	  regular expression search patterns.
+	- Fixed ^ and $ processing so that they will match adjacent to an
+	  imbedded CR character in a buffer line or string in addition to the
+	  beginning or end of it.
+	- Operators =~ and !~ may now be used in an expression to perform
+	  regular expression matching.  The second (string) argument is assumed
+	  to be a regular expression which may contain groups.
+	- Changed the "index" and "sub" functions to operate in Regexp mode
+	  and/or ignore case when ":r" and/or ":i" is appended to the pattern;
+	  otherwise, plain text, case-sensitive mode.  Also changed "sub" to do
+	  zero substitutions if n == 0, one substitution if n == 1 or is the
+	  default, and all substitutions if n > 1.
+	- Changed the "match" function to return groups from the last =~ or
+	  "index" match by default, and from the last buffer search if an n
+	  argument is given.
+	- Changed $Match variable to return the last pattern match, whether from
+	  a buffer search or a =~ match.
+	- Renamed $ModeRegExp variable to $ModeRegexp to be consistent with the
+	  global mode of the same name.
+	- Modified regular expression search and replacement in a buffer or
+	  string so that a match and replacement of an empty string without
+	  advancement of the scanning position will cause processing to stop
+	  (with an error message), and prevent an endless loop.
+ 2. Changed mark system so that it is more usable:
+	- Replaced numeric marks with printable-character marks between ' ' and
+	  '~' inclusive, and changed so that marks are tied to a buffer instead
+	  of a window.  As a result, the same marks will exist in every window
+	  that is displaying the same buffer.
+	- Mark ' ' (space) is now the default mark and is used to define
+	  regions.
+	- Renamed "clearMark" command to "deleteMark" and added option to delete
+	  all marks (except ' ') in the current buffer if an n argument is
+	  specified.
+	- Changed "setMark" and "swapMark" commands to use mark ' ' by default,
+	  '.' if n < 0, and prompt for a mark otherwise.
+	- Changed "gotoMark" to always prompt for a mark and changed its default
+	  binding to 'M-SPC'.
+	- Changed the "deleteMark", "gotoMark", and "swapMark" commands so that
+	  existing marks are included in the prompt when requesting a mark
+	  interactively.
+	- Created "showMarks" command for displaying all the marks in the
+	  current buffer in a pop-up window.
+	- Changed the "defined?" function to check whether a mark exists and
+	  (optionally) is also active, dependent on the n value.
+    Now marks can be any printable character, are easier to remember, are tied
+    to a buffer instead of a window, and can be displayed at any time.
+ 3. Made key binding syntax and related changes:
+	- Renamed "xPrefix", "cPrefix", and "hPrefix" commands to "prefix1",
+	  "prefix2", and "prefix3", respectively, and eliminated the "X-", "C-",
+	  and "H-" prefixes for these commands.
+	- Two-key sequences are now coded as two values separated by a space.
+	- Control characters may now be coded as 'C-x' in addition to the
+	  current '^x' form, although the new syntax is now preferred -- to be
+	  consistent with 'M-' and 'S-' prefixes.
+	- The escape, backspace, tab, and return keys may now be coded as 'ESC',
+	  'DEL', 'TAB', and 'RTN' (in addition to 'SPC' for the spacebar) and
+	  are now the preferred form for those characters.
+	- Lower-case letters are now favored over upper case; for example, "C-a"
+	  instead of "C-A".
+	- Added all prefix pseudo commands and special ones like "universalArg"
+	  to the "showBindings" display and the "bindKey" completion display,
+	  and changed the "defined?" function to return "pseudo command" for all
+	  of these commands.
+ 4. Added variable name completion, which is automatically enabled whenever a
+    variable name is requested at a prompt (such as entering "C-x =" to set a
+    variable) or by specifying the 'V' or 'v' type to the "prompt" system
+    function (see first bullet in item #8).
+ 5. Created "fenceWord", "popFileList", and "showVar" macros and added to
+    memacs.mm startup file (see memacs-macros.1 for details).  Also fixed issue
+    where language tools were not always loaded or unloaded appropriately in
+    certain situations when switching buffers.
+ 6. Made command changes:
+	- Created "dupLine" command, which duplicates a block of lines in the
+	  current buffer and places the cursor at the beginning of the
+	  duplicated text.
+	- Added option to "deleteWhite" command to delete non-word characters in
+	  addition to white space if n > 0.
+	- Changed "gotoLine" command to get the line number as its first
+	  argument and operate on a specified buffer if an n argument is given.
+	- Changed the "readFile" and "setBufFile" commands' default behavior to
+	  change the current buffer name to one derived from the filename.
+	- Changed "backWord", "forwWord", and "endWord" commands to return false
+	  if move goes out of buffer; otherwise, true.
+	- Changed "clearBuf" command to require a buffer name if n >= 0 and
+	  force-clear if n != 0 so that the current buffer can be force-cleared
+	  in a script via "-1 => clearBuf".
+ 7. Changed screen formatting such that a nearly complete mode line is displayed
+    when the column width is between 80 and 95 columns instead of an abbreviated
+    one as previously.
+ 8. Removed leading "!" character from directive names used in scripts and
+    changed syntax so that a left paren may immediately follow the name (with
+    the exception of the "macro" directive).  As a result, you may now for
+    example, use "if(a == 1)" or "while x > 0" instead of "!if a == 1" and
+    "!while x > 0" as before.
+ 9. Made system function changes:
+	- Swapped the third ("delimiter") and fourth ("type") arguments of the
+	  "prompt" function and changed it to process a fourth argument only if
+	  not a completion type.  Also changed prompt types to [^]no auto,
+	  [b]uf, [c]har, [f]ile, [s]tr, and [v|V]ar, where 'V' specifies all
+	  variables and 'v' specifies mutable-only variables.
+	- Changed "readBuf" function to use its n argument as a repeat count and
+	  return the last line read.
+	- Removed "pad" function, which can be done instead with the "%"
+	  formatting operator or the "sprintf" function.
+	- Changed "subLine" and "subString" functions so that the last argument
+	  ("len") is optional and defaults to an infinite value.
+	- Fixed bug in "subString" function where a negative offset that was
+	  equal to the string length (such as "subString('abc',-3,3)" returned a
+	  null string instead of a substring beginning at the first character.
+	- Changed "dirname" function to return "." instead of null when the
+	  pathname argument has no directory portion and an n argument is
+	  specified.
+	- Changed "whence" command to display information about the current line
+	  instead of the whole buffer if an n argument is specified.
+	- Changed "insert", "overwrite", "replaceText", and "writeBuf" functions
+	  to insert CR characters literally if n < 0.
+	- Created "void?" function which return true if its argument is nil or a
+	  null string.
+	- Created wordChar? system function, which returns true if a character
+	  is in $wordChars.
+	- Changed "push" and "unshift" functions to return the new variable
+	  value instead of the argument value.
+10. Replaced hook variables with new commands: "setHook" and "showHooks".  Also
+    created "chDir" hook, which is invoked at program startup and whenever the
+    current directory is changed.
+11. Aliases may now be created for system functions as well as for commands and
+    macros.
+12. Made system variable changes:
+	- Changed $BufSize variable to return the number of lines in the current
+	  buffer instead of bytes, and created $BufLen, which returns the former
+	  (bytes) value.
+	- Changed $lineChar variable to return a string instead of an integer.
+	- Replaced "bufWind" function with $WindList variable, which provides
+	  more information about current windows.
+13. Added -S switch which provides a means to execute a MightEMacs script
+    contained in a file as a shell script.  All command line arguments are
+    passed to the MightEMacs script.
+14. Removed length restriction from keyboard macros and fixed issue where a
+    keyboard macro would stop after one iteration if the $maxLoop variable was
+    set to zero, instead of executing n times.
+15. Removed "kecho" global mode and $ModeKeyEcho variable, and changed the
+    "prompt" and "getKey" functions to suppress key echoing if the n argument is
+    zero.
+16. A \s (space) escape character is now recognized in a double-quoted string,
+    and \b (backspace) has been removed.
+17. The return value from the "exitBuf" hook (or nil if it is not defined) is
+    now passed as an argument to the "enterBuf" hook, and both hooks are now
+    called on hidden buffers, which were bypassed previously.
+18. Changed handling of true, false, and nil in scripts:
+	- In most cases, nil is now translated to a null string when converted
+	  to a string, and Boolean values may not be converted and will generate
+	  an error.
+	- Moved the functionality of the "stringLit" function to "toString" and
+	  deleted the former function.
+	- Changed the "toString" function to (a), convert integer, string, and
+	  nil values by default (and generate an error if Boolean); (b), accept
+	  any type of value and convert it to human-readable form if n is not
+	  the default; and (c), put double quotes around the result if n > 0 and
+	  the original value was a string.
+	- Changed the "print" function to always output "true" and "false" for
+	  Boolean values and either a null string (default), or "nil" (if
+	  n <= 0) for nil.
+19. Fixed issue where windows other than the current window that were all
+    displaying the same buffer were not restored to their original state if the
+    buffer was narrowed and then widened.
+20. Fixed some other minor bugs.
+
+----------
+8.1.1	14 Nov 2015
+ 1. Fixed various bugs, including an issue where entering a right brace in the
+    first column of a line when C mode was enabled could cause random text to be
+    deleted before the cursor; and an issue where backspacing did not work
+    correctly if the cursor had previously moved past the right edge of the
+    terminal window.
+ 2. Changed the license for the project to GNU General Public License (GPLv3).
+
+----------
+8.1.0	25 Oct 2015
+ 1. Created "undelete" command, which restores the most recently deleted text
+    from a deleteXXX or truncBuf command, and bound it to M-U.
+ 2. Renamed $loopMax variable to $maxLoop and created $maxRecursion variable,
+    which sets the maximum recursion depth for any macro to prevent endless
+    recursion and an "out of memory" crash.
+ 3. Changed the bang (!) to a carat (^) in the -G and -D switches to avoid
+    conflicts with the shell's use of the bang character.
+ 4. Changed default architecture to 64 bit.
+ 5. Changed joinLines command to join lines with no space between them (instead
+    of a single space) when invoked in a script with a nil argument, and created
+    a corresponding macro (joinLines0) bound to X-^ so it can be used
+    interactively.
+ 6. Fixed some minor bugs.
+ 7. Simplified the installation procedure.
+
+----------
+8.0.0	29 Sep 2015
+ 1. First public release.

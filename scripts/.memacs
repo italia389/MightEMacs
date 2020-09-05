@@ -1,0 +1,74 @@
+# .memacs	Ver. 9.5.0
+#	MightEMacs user startup file.
+
+# Pop or open file whose pathname is in current buffer.
+command openBufPath(0) {description: 'Extract a pathname from current buffer and display the file in a pop-up window or open\
+ it.  User is prompted to enter one or two of the following options: "FindFile" -> open file with ~bfindFile~B command;\
+ "PopFile" -> display the file in a pop-up window; and "UseRegion" -> use region contents as pathname.  Either "FindFile" or\
+ "PopFile" must be specified.  If "UseRegion" not specified, pathname is extracted from buffer at point and is assumed to be\
+ bounded by white space and/or line breaks.'}
+
+	# Get options.
+	if empty?(options = prompt('Options (~u~bF~ZindFile, ~u~bP~ZopFile, Use~u~bR~Zegion)', 'TermAttr'))
+		return nil
+	elsif (optionsLC = lowerCaseStr(options)) !~ '^[fpr]+$'
+		return -1 => message 'Fail', 'Invalid options "', options, '"'
+	endif
+
+	findPop = nil
+	useRegion = false
+	loop
+		option = strShift(optionsLC, nil)
+		if option == 'f' || option == 'p'
+			if findPop != nil
+				return -1 => message 'Fail', '"FindFile" and "PopFile" cannot both be specified'
+			else
+				findPop = option
+			endif
+		else	# option == 'r'
+			useRegion = true
+		endif
+		if empty? optionsLC
+			break
+		endif
+	endloop
+	if nil? findPop
+		return -1 => message 'Fail', 'Either "FindFile" or "PopFile" must be specified'
+	endif
+
+	# Get pathname.
+	if useRegion
+		path = $RegionText
+	else
+		# Do sanity checks.
+		goBack = true
+		if $lineChar == ?\s || $lineChar == ?\t
+			endWhite
+			if $lineChar == ?\n
+				return message('Pathname not found')
+			endif
+			goBack = false
+		endif
+
+		# Find beginning and end of pathname.
+		1 => setMark ??
+		$searchPat = '[[:graph:]]+:re'
+		goBack and huntBack
+		setMark
+		huntForw
+		delRingEntry 'Search'
+		path = $RegionText
+		-1 => gotoMark ??
+	endif
+
+	# Open or pop file.
+	if !empty?(path = 1 => prompt(findPop == 'f' ? 'Find file' : 'Pop file', path, 'Type: File'))
+		if findPop == 'f'
+			findFile path
+		else
+			1 => popFile path, 'AltModeLine, Delete'
+		endif
+	endif
+endroutine
+
+bindKey 'C-x O', openBufPath

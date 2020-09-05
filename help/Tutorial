@@ -1,0 +1,2194 @@
+===============================================================================
+     W e l c o m e   t o   t h e   M i g h t E M a c s   T u t o r i a l
+===============================================================================
+
+This tutorial is designed to teach you the basics of using MightEMacs, a very
+powerful text editor.  MightEMacs has many commands -- too many to explain here.
+However, you will learn most of the essential ones and enough of its design
+concepts so that you can move around quickly in a file and become adept at
+editing text.
+
+The time required to complete the tutorial varies, depending upon how quickly
+you learn the commands and how much time is spent with experimentation.
+However, you can stop at any time and return to where you left off by simply
+starting the tutorial again.
+
+    * To  exit  the tutorial, press:  C-h t  
+    * To resume the tutorial, press:  C-h t  
+
+PLEASE NOTE:
+    The commands in the lessons will modify the text.  Make sure you are using a
+    copy of this file to practice on.  (The file path in the mode line at the
+    bottom of this screen should begin with your home directory.)
+
+It is important to remember that this tutorial is designed to teach by use,
+which means that you need to type the commands to learn them.  If you just read
+the text, you will forget the commands... guaranteed.  Take the time to type the
+commands and do the exercises so that you can commit the keys to memory and
+learn how to use the editor effectively.
+
+Now, make sure that your  <caps-lock>  key is not depressed and press
+the  <down-arrow>  key enough times to move the cursor so that "Lesson 0"
+completely fills the screen.
+
+
+--------------------------------------------------------------------------------
+Lesson 0:  WHAT YOU NEED TO KNOW FIRST
+
+    MightEMacs is a "modeless" editor.  There is no insert mode to enable before
+    you can begin typing text.  Text is automatically inserted at the cursor
+    location as you type.  To enter commands, you use control keys in
+    combination with other keys.
+
+    The following syntax will be used for a control key:  C-x  which means:
+
+        "hold down the <control> key and press the  x  key".
+
+    Sometimes two keys must be entered for a command; for example, "control + h"
+    followed by the letter "k".  In this case, both keys are shown with a space
+    in between:  C-h k
+
+    You get the idea.  MightEMacs uses one or two keystrokes for all commands
+    (excluding any numeric prefix entered first, which is explained later).
+
+    Also, a few keys have their own mnemonics:
+        escape key:     ESC
+           tab key:     TAB
+        delete key:     DEL
+        return key:     RTN
+          spacebar:     SPC
+    For example:
+        ESC C-a     Press <esc> key, let go, then press  <control> + a  key.
+
+    The cursor location is referred to as the "point" in MightEMacs terminology.
+    The two terms are used interchangeably in the lessons; however, "point" is
+    preferred.
+
+    Lastly, a file's contents are read into a "buffer" and a buffer is displayed
+    in a "window".  Multiple buffers may exist (and multiple windows); however,
+    a given window always displays exactly one buffer.  Only one buffer
+    (containing this tutorial) and one window will be used in this tutorial.
+
+    That's the basics.  Now let's get started.  Press the  <down-arrow>  key
+    again so that you can see all of "Lesson 1.1" on the screen.
+
+
+--------------------------------------------------------------------------------
+Lesson 1.1:  MOVING THE CURSOR
+
+    To move the cursor, press the control keys as shown in the diagram.
+             ^
+            C-p            HINT:  C-p is [p]revious line, C-n is [n]ext line.
+      < C-b     C-f >
+            C-n                   C-b is [b]ackward char, C-f is [f]orward char.
+             v
+
+ 1. Move the cursor around the screen with the four control keys until you get
+    comfortable using them.
+ 2. Press the up  C-p  and down  C-n  keys several times in a row.  Notice that
+    the point (cursor) moves to the same column position on each line if
+    possible, even when passing through blank lines.
+
+NOTES:
+    The arrow keys will also work.  However, it is usually faster to use the
+    control keys above so that you can keep your fingers in the "home" position
+    on the keyboard.  It is just a matter of getting used to it.
+
+    If you are ever unsure about something you typed, press  C-g  to abort the
+    command.  Then retype the command you intended.
+
+ 3. Using the down key, move to Lesson 1.2.
+
+
+--------------------------------------------------------------------------------
+Lesson 1.2:  MORE CURSOR MOVEMENT
+
+    Besides moving the cursor (point) up, down, left, and right with the control
+    keys we just learned, you can move it to other useful places on a line by
+    pressing the following keys:
+
+        C-a         Jump to beginning of line.  ("a" is beginning of alphabet.)
+        C-e         Jump to [e]nd of line.
+        C-t         Jump across "[t]raverse" line quickly in both directions.
+        ESC C-a     Move to beginning of text.
+
+ 1. Move the point to a non-blank line on this page.
+ 2. Move the point around on the line using the keys above until you get
+    comfortable using them.
+ 3. Press  C-t  repeatedly and observe what happens.  The first time it is
+    pressed, it always moves the point toward the most distant end of the line,
+    with a slight preference toward the right rather than the left.
+
+NOTE:
+    The  ESC  key can entered by pressing the <esc> key at the top left corner
+    of your keyboard, or by pressing the  C-[  key:  <control> + [
+    The latter key is usually faster because your fingers stay in the "home"
+    position.
+
+ 4. Move the point to a non-blank line and press  C-t  a couple times followed
+    by  C-[ C-a.  Repeat until you get comfortable using  C-[.
+
+    You can also move the point forward and backward by pages with these keys:
+
+        C-v         Scroll forward one page.  ("v" points downward.)
+        C-z         Scroll backward one page.
+
+ 5. Press  C-v  twice, then press  C-z  twice.  Notice that the pages overlap
+    each other by two lines.
+ 6. When you are ready, go to Lesson 1.3 (press  C-v).
+
+
+--------------------------------------------------------------------------------
+Lesson 1.3:  WORD MOVEMENT
+
+    The point can be moved forward and backward by words with the following
+    commands:
+
+        ESC f       Move [f]orward to the beginning of the next word.
+        ESC b       Move [b]ackward to the beginning of the previous word.
+        ESC C-e     Move to the [e]nd of the current word.
+NOTE:
+    Most word commands begin with the  ESC  key.
+
+ 1. Move the point to a non-blank line on this page.
+ 2. Press  ESC f  several times in succession and observe how the point moves.
+    Then press  ESC b  once.  Notice that the point moves to the beginning of
+    the word just to its left.
+ 3. Move the point to the middle of a word, then press  ESC b.  Notice that the
+    point moves to the beginning of the word.  It always moves to the beginning
+    of the current word before moving backward to the beginning of the previous
+    one.
+ 4. Press  C-t  until the point is near the end of a line.  Then press  ESC C-e
+    several times.  Notice that the point moves across lines.  This is true for
+    all the word movement commands.
+ 5. Continue to move the point around on different lines using the three word
+    movement keys until you get comfortable using them.
+ 6. When you are ready, go to Lesson 1.4 (press  C-v).
+
+
+--------------------------------------------------------------------------------
+Lesson 1.4:  EXITING MIGHTEMACS
+
+*** NOTE: Before performing any of the steps below, read this entire lesson. ***
+
+ 1. Type:  ESC e  (or if you prefer:  C-x C-c  which are the classic exit keys).
+    This exits the editor, DISCARDING any changes you have made.  If you have
+    unsaved changes, you will be asked for confirmation first.  Just type "y" at
+    the prompt.
+ 2. Get back here by starting the tutorial again:
+        - type "mm" in the shell to start the editor.
+        - press  C-h t  to open the tutorial.
+        - then press  C-v  repeatedly until you get back here -- Lesson 1.4.
+ 3. If you have these steps memorized and are ready, execute steps 1 and 2 to
+    exit and return to this spot.
+
+NOTE:
+    Remember that  ESC e  discards any changes you made.  In a few lessons you
+    will learn how to save changes to a file, and exit and save changes in one
+    step.
+
+ 4. Move the point down to Lesson 1.5.
+
+
+--------------------------------------------------------------------------------
+Lesson 1.5:  TEXT EDITING - CHARACTER DELETION
+
+      * Press  C-d  to delete the character at point (under the cursor).
+      * Press  DEL  to delete the character before point (left of cursor).
+
+ 1. Move the point to the line below marked --->.
+ 2. To fix the typos, do both of the following:
+      - Move the point until it is on top of a character to be deleted and press
+        the  C-d  key to delete the unwanted character.
+      - Move the point until it is immediately to the right of a character to be
+        deleted and press the  DEL  key to delete the unwanted character.
+
+ 3. Repeat step 2 until the sentence is correct.
+
+---> Evvery goood boyy ddoes fiine.
+
+ 4. Once the line is fixed, move on to Lesson 1.6.
+
+
+--------------------------------------------------------------------------------
+Lesson 1.6:  TEXT EDITING - INSERTION
+
+      * Move point and type characters to insert text.
+
+    Inserting text with MightEMacs is very natural and straightforward.  You
+    just move the point to the desired location and begin typing.  Note that
+    text is always inserted at the point location.
+
+ 1. Move the point to the first line below marked --->.
+ 2. Make the first line the same as the second.  To do this, move the point to
+    the place where the text is to be inserted with the  C-f  and  C-b  keys.
+ 3  Enter the text that is missing.
+
+---> Some  is misng this .
+    Some text is missing from this line.
+---> There is also some text missing from the end of
+    There is also some text missing from the end of this line as well.
+
+ 4. Move to the next line marked --->.
+ 5. Now move the point to the end of the line (remember the key?) and enter the
+    missing text.
+
+NOTE:
+    To find out what a particular key does, press  C-h ?  followed by the key(s)
+    in question.  A description of the command will be displayed in a "pop-up
+    window".  You can then press  q  or  ESC  to dismiss the window and return
+    to your editing session.
+
+ 6. When you are comfortable inserting text, go to lesson 1.7.
+
+
+--------------------------------------------------------------------------------
+Lesson 1.7:  EDITING A FILE
+
+      * Press  ESC z  to save a file and exit.
+
+*** NOTE: Before performing any of the steps below, read this entire lesson. ***
+
+ 1. Exit this tutorial as you did in lesson 1.4:  ESC e
+    -OR- create another terminal window and do the following steps there.
+ 2. At the shell prompt type this command:
+
+      $ mm tutor
+
+    'mm' is the command to start the MightEMacs editor; 'tutor' is the name of the
+    file you wish to edit.  Use a file that does not exist or may be changed.
+
+NOTE:
+   You may also type 'memacs' instead of 'mm' if you prefer.
+
+ 3. Insert and delete text as you learned in the previous lessons.
+ 4. Save the changed file and exit MightEMacs with:  ESC z
+    Notice that a message is displayed indicating that the file was saved as you
+    return to shell.
+ 5. If you exited MightEMacs in step 1, restart the tutorial and move down to
+    the following summary.
+ 6. After reading the above steps and understanding them, do this lesson.
+
+
+--------------------------------------------------------------------------------
+Lesson 1:  SUMMARY
+
+
+ 1. To start MightEMacs from the shell, type:
+
+        $ mm <filename>
+            -OR-
+        $ memacs <filename>
+
+ 2. The point is moved horizontally and vertically by using either the arrow
+    keys or the following keys:
+
+	C-b (left)	C-f (right)	C-p (up)	C-n (down)
+
+ 3. You can jump to different places on a line with the following keys:
+
+	C-a  (beginning)		C-t	 (traverse line)
+	C-e  (end)			ESC C-a  (beginning of text)
+
+ 4. The <esc> key and  C-[  key can both be used for  ESC.
+
+ 5. You can move by words with the following keys:
+
+	ESC f (forward)     ESC b (backward)    ESC C-e (end)
+
+ 6. To scroll  forward   one page, type:  C-v
+    To scroll  backward  one page, type:  C-z
+
+ 7. To delete the character    at    point, type:  C-d
+    To delete the character  before  point, type:  DEL
+
+ 8. To insert or append text, simply move the point to the desired location and
+    begin typing.
+
+ 9. To exit MightEMacs, type:
+
+        ESC e   to discard changes.
+                    -OR-
+        ESC z   to save changes.
+
+NOTE:
+    Pressing  C-g  will cancel any unwanted or partially-completed command.
+
+Now continue with Lesson 2.
+
+
+--------------------------------------------------------------------------------
+Lesson 2.1:  NUMERIC PREFIX
+
+      * Type  C-u  to generate a positive numeric prefix.
+      * Type  C--  to generate a negative numeric prefix.
+
+    Much of the power of MightEMacs comes from the use of a numeric prefix with
+    a command.  A numeric prefix (or numeric argument) is a positive or negative
+    number you generate before typing the keys for a particular command.  The
+    numeric prefix then affects the operation of that command in some way.
+
+    There are two keys for this:  C-u  and  C-_
+
+IMPORTANT NOTE:
+    On most systems, C-_  (control + underscore) can be entered with or without
+    the <shift> key.  In other words, you can press <control> + dash for  C-_
+    which is easier to type.  Given this, we will use the mnemonic:  C--
+    (control + -) for  C-_ (the real ASCII control character) in this tutorial
+    from this point forward.
+
+    When you press  C-u,  "Arg: 2" is displayed on the message line at the
+    bottom of the screen.  This is the initial numeric argument.  If you press
+    C-u  again, it changes to "Arg: 0".  If you press it a third time, it
+    changes to "Arg: 3", then continues in ascending order from that point
+    ("Arg: 4, "Arg: 5, etc.).  The generated sequence is 2, 0, 3, 4, ...
+    You may also enter a number by hand at any time after pressing  C-u  by
+    pressing the numeric keys.
+
+    To generate a negative number, you type  C--.  The initial argument is
+    "Arg: -1".  If you press  C--  again, it changes to "Arg: -2" and so on.
+    The generated sequence is -1, -2, -3, ...
+
+    You can also use both keys together.  Each time you press  C-u, the number
+    is increased by one.  Each time you press  C--, the number is decreased by
+    one.
+
+    Let's try this now with some navigation keys.
+
+ 1. Move the point to the beginning of a non-blank line on this page.
+ 2. Type the following keys:  C-u C-f
+ 3. Notice that the point moved two characters forward.  Now type:  C-u 5 C-f
+    What happened?
+ 4. Try:  C-u 3 ESC f.  Notice that the point moves three words forward.  Now
+    type  C-u 5 ESC b  to move backward five words.
+
+NOTE:
+    If it often faster to type  C-t  a couple times followed by  ESC f,  ESC C-e
+    or  ESC b  to position the point at the beginning or end of a word that is
+    several words distant.  Note however that  C-t  only moves the point on the
+    line the cursor is on -- it will not move the point across lines.
+
+ 5. Try the suggestion above.  Move to a non-blank line, pick a target position
+    before you start (the beginning or end of a word), then figure out how to
+    get there by pressing  C-t  one or more times, followed by one or two word
+    movement commands.
+ 6. Type:  C-- C-a.  Notice that the point moved to the beginning of the previous
+    line.
+ 7. Type:  C-u C-e.  It now moves to the end of the next line.
+
+    Note that for line movement (and line selection, discussed later), line 1 is
+    the current line, line 2 is the next line, and line -1 is the previous line.
+
+ 8. Experiment with the numeric prefix keys in combination with  C-a, C-e, and
+    ESC C-a and see how the point is moved around.
+ 9. When you are comfortable with using the numeric prefix keys in combination
+    with all the navigation keys mentioned, proceed to the next lesson.
+
+
+--------------------------------------------------------------------------------
+Lesson 2.2:  INSERTING RUNS OF CHARACTERS
+
+    A numeric prefix can be used with regular characters to generate runs of
+    those characters.  For example, you can easily generate a line of dashes or
+    underscores.
+
+ 1. Move the point to the line below marked --->.
+ 2. Press  C-e  to move to the end of the line.
+ 3. Now type:  C-u 40 =  and observe what happens.
+
+--->
+
+    There is one nuance about using a numeric prefix to generate runs of
+    characters.  What if the character is a digit?  If you type  C-u followed by
+    a digit, it will be taken as the numeric prefix you are entering, not a
+    character to be inserted.  To solve this dilemma, the following rule is
+    used:
+
+     "You can only enter digits directly ONCE during entry of a numeric prefix."
+
+    In other words, if you say, press  C-u, then enter a 3, press  C-u again
+    (which changes 3 to 4), and enter 5, the last digit (5) you typed will be
+    inserted four times.  This is because the second  C-u  key "terminated"
+    further manual entry of the number.
+
+    Fortunately, inserting runs of digits is rarely needed, so remembering this
+    technique is not of vital importance.  It is only mentioned here for
+    completeness.
+
+ 4. We're now ready to learn some editing commands and also use them in
+    combination with a numeric prefix to see how to quickly manipulate text.  Go
+    to Lesson 2.3.
+
+
+--------------------------------------------------------------------------------
+Lesson 2.3:  DELETION COMMANDS
+
+      * Type  C-\    to delete a word.
+      * Type  C-l    to delete a line.
+      * Type  ESC \  to delete white space.
+
+ 1. Move the point to the first line below marked --->.
+ 2. Move the point to the beginning of a word that needs to be removed.
+ 3. Type  C-\  to delete the word.
+
+---> There are a some words pizza that don't belong paper  in this sentence.
+---> This is the first line to be deleted.  Nuke me.
+---> Keep this Jack line  Jill, but but delete the word words that don't spoon belong.
+---> Delete this line   	  here...
+---> and go ahead and delete this one, too!
+
+ 4. Repeat steps 2 and 3 until the sentence is correct.  Notice that the  C-\
+    key deletes the word plus any white space following the word.
+ 5. Move the point to the second line above marked --->.
+ 6. Press  C-l  to delete the line.  The point will now be at the beginning of
+    the next line.
+ 7. Delete word "Jack" on the current line, then press  ESC C-e  to move to the
+    end of the following word.  Now press  C-\.  Notice that the two spaces
+    preceding "Jill" were deleted along with the word.
+ 8. Fix the rest of the current line with  C-\  (delete the unwanted words).
+ 9. Move to the next line, then move the point to the middle of the white space
+    between the words "line" and "here".  Note that the white space contains
+    spaces and a hard tab.
+10. Press  ESC \  to delete the white space.  Notice that all the white space
+    characters were deleted, both before and after the point.
+11. Now delete the line.
+
+NOTE:
+    The point may be anywhere on a line when  C-l  is pressed to delete that
+    line.
+
+12. Press  C-t  a couple times to move to the middle of the current line.
+13. Delete the line.
+14. Proceed to the next lesson.
+
+
+--------------------------------------------------------------------------------
+Lesson 2.4:  UNDELETE COMMAND
+
+      * Type  ESC u  to undelete the last text object that was deleted.
+
+    Every time a command is entered that deletes text (other than single
+    characters or a whole buffer), the deleted text is save on the "delete
+    ring" (discussed later).  Deleted text can be re-inserted where it was
+    deleted by immediately typing:  ESC u
+
+    Note that text is always undeleted (inserted) at the current point location,
+    which is not necessarily the place where the text was deleted.
+
+ 1. Move the point to the line below marked --->.
+ 2. Move the point to the beginning of the word "second".
+ 3. Type  C-\  to delete the word.
+ 4. Type  ESC u  to undelete (restore) the deleted text.
+ 5. The point is now on the comma preceding the word "third".  Press  C-\.
+    Notice that the comma, space, and the word "third" were deleted.  Press
+    C-[ u  to restore the deleted text.
+
+NOTE:
+    The  C-\  key deletes from the point position through any non-word
+    characters, then the word, then any white space that follows it.
+
+ 6. Move the point forward one character (to the space immediately preceding the
+    word "fourth") and press C-\.  What was deleted?  Now undelete the text.
+ 7. Move to the letter "n" of the word "and".  Press  C-u C-u C-\.  Notice that
+    just "nd" was deleted.  A numeric prefix of zero prevents trailing white
+    space from being deleted.  Undelete the text.
+
+---> First, second, third, fourth and fifth.
+
+ 8. Proceed to the next lesson.
+
+
+--------------------------------------------------------------------------------
+Lesson 2.5:  MORE UNDELETE COMMANDS
+
+      * Type  ESC U  to undelete prior text objects that were deleted.
+      * Type  C-x C-y  to revert an undelete operation.
+      * Type  C-h d  to display the delete ring.
+
+    As mentioned in the previous lesson, the  ESC u  key (lower case "u")
+    undeletes the most recent "chunk of text" that was deleted -- a word, line,
+    part of a line, or region of text (to be discussed later).  If you want to
+    go back further in the deletion history, you simply press  ESC U  (upper
+    case "U") one or more times after you press  ESC u.
+
+    When  ESC U  is typed, the text that was just undeleted by the  ESC u  is
+    REPLACED by the next older deleted text.  This process is repeated each time
+    you type ESC U.
+
+    Let's try this out.
+
+ 1. Move the point to the first line below marked --->.
+ 2. Press  C-l  to delete the line.  The point will now be at the beginning of
+    the next line.
+ 3. Move the point down one line to the last line in the group.
+ 4. Press  C-l  to delete the last line also.
+ 5. Oops!  Didn't mean to do that... press  ESC u  to undelete the line.
+ 6. Wait!  Really wanted the line before that... press  ESC U  to undelete the
+    prior line that was deleted.  Observe that the first line that was deleted
+    has been restored to this location.
+
+---> This is the first line to be deleted (and last to be restored).
+---> Keep this one!
+---> Delete this line, too.
+
+NOTES:
+    The first  ESC U  key that is typed must be entered AFTER an  ESC u  key;
+    otherwise, it does nothing.
+
+    Additional  ESC U  keys must be in succession.  Once another key is typed,
+    ESC U  has no effect.
+
+    Undeleted text is ALWAYS inserted at point, not automatically at the place
+    where it was originally deleted.  If you want to put it there, you must move
+    the point to that spot first.
+
+ 7. We've changed our minds (again)... we don't want to restore anything.  Press
+    C-x C-y  to "revert" the undelete; that is, remove the text that was
+    restored.
+
+NOTES:
+    An  ESC u  or  ESC U  command can be cancelled by pressing  C-x C-y  which
+    removes the undeleted text.
+
+    The  C-x C-y  command must immediately follow an  ESC u  or  ESC U  command
+    (or a  C-y  or  ESC C-y  command, discussed later); otherwise, it does
+    nothing.
+
+ 8. It's easy to lose track of what's been deleted as you are editing.  Not a
+    problem.  You can display the delete ring at any time to see what's been
+    deleted and what text object is at the "top" (entry 0).  Press  C-h d  now
+    to display the ring in a pop-up window.  Then press  q  or  ESC  to dismiss
+    the window and return here.
+ 9. Proceed to the next lesson.
+
+
+--------------------------------------------------------------------------------
+Lesson 2.6:  MORE SCROLLING OPTIONS
+
+      * Type  C-- C-v  to scroll forward  1/2 page.
+      * Type  C-- C-z  to scroll backward 1/2 page.
+
+    As we learned in a previous lesson,  C-v  and  C-z  scroll forward and
+    backward by pages.  If you supply a negative numeric prefix to either
+    command, they scroll by half a page instead.
+
+ 1. Press  C-- C-v  twice, then press  C-- C-z  twice.  Notice that the
+    scrolling is in half pages instead of whole ones, with a two-line overlap.
+
+    You can think of the negative numeric prefix used here as a "restricted"
+    version of the commands.  This is a concept used with various MightEMacs
+    commands.  Although the primary purpose of the numeric prefix is to cause a
+    command to be repeated and/or supply a direction, it can also be used in a
+    few other ways, and this is one of them.
+
+ 2. Scroll down to the next lesson in half pages.
+
+--------------------------------------------------------------------------------
+Lesson 2.7:  DELETE-TO-LINE-BREAK COMMAND
+
+      * Type  C-k          to delete to the end of a line.
+      * Type  C-u C-u C-k  to delete to the beginning of a line.
+
+ 1. Move the point to the first line below marked --->.
+ 2. Move the point to the end of the first occurrence of the word "up" (by
+    pressing  C-t  a couple times followed by  ESC C-e  once or twice).
+ 3. Press  C-k  to delete to the end of the line.
+
+---> This line is This line is messed up is messed up.
+---> This line This line is also messed up messed up.
+
+ 4. Move the point backward to the beginning of the word "This".
+ 5. Press  C-u C-u C-k  to delete to the beginning of the line.
+
+NOTE:
+    The  C-k  key deletes text from the point to the beginning of the line when
+    given a numeric prefix of zero.  As you may recall, pressing  C-u  twice
+    generates a zero.
+
+ 6. Move the point down one line and fix that one in the same manner; however,
+    delete the beginning portion first, then the ending portion.
+ 7. Move on to Lesson 2.8 for more uses of this command.
+
+
+--------------------------------------------------------------------------------
+Lesson 2.8:  MORE WAYS TO USE DELETE-TO-LINE-BREAK COMMAND
+
+      * Type  C-u n C-k  to delete forward  to nth line break.
+      * Type  C-- n C-k  to delete backward to nth line break.
+
+    The  C-k  key deletes text from the point forward or backward up to but not
+    including a line break.  The number of lines to include in the deletion is
+    determined by the numeric prefix.  The default value is 1, which means
+    "delete forward to end of current line".  A value of 2 would delete from the
+    point to the end of the next line.  A value of -1 would delete from the
+    point to the beginning of the previous line.  Positive values of n delete
+    forward and negative values delete backward.  Let's try it.
+
+ 1. Move the point to the third line below marked --->.
+ 2. Move the point to the end of the word "MIDDLE".
+ 3. Press  C-u C-k  to delete to the end of the next line.
+ 4. Press  C-u C-u ESC u  to restore (undelete) the text just deleted without
+    moving the point.  Note that the numeric prefix used was zero for "hold
+    point".
+
+---> A bird in the hand is worth hundreds in the bush.
+---> Now is the time for all good men to come to the aid of their country.
+---> Here is a word in the MIDDLE of this group of lines.
+---> The rain in Spain falls mainly on the Plain.
+---> Experience enables you to recognise a mistake when you make it again.
+
+ 5. Move the point backward to the beginning of the word "MIDDLE" using the
+    "back word" command.
+ 6. Press  C-- C-k  to delete to the beginning of the previous line.
+ 7. Press  ESC u  to restore the text just deleted.  Observe that, unlike in
+    step 4,  the point "followed the restored text", which is the usual
+    behavior.
+ 8. Experiment with  C-k  and  ESC u  and  C-u C-u ESC u  to get comfortable
+    with deleting and restoring text.  Try all numeric prefixes for  C-k  in the
+    range -2 to +2.
+
+NOTE:
+    Recall that you can move the point before pressing  ESC u  to undelete text.
+    You can also undelete the same text more than once.  It will always be
+    inserted at the point location, regardless of where it was originally
+    deleted.
+
+
+--------------------------------------------------------------------------------
+Lesson 2:  SUMMARY
+
+
+ 1. To generate a numeric prefix for a command, press
+
+        C-u     for positive numbers in sequence 2, 0, 3, 4, ...
+            -OR-
+        C--     for negative numbers in sequunce -1, -2, -3, ...
+
+    You may also use both keys.  Press  C-u  to increase the number by 1 and
+    press  C--  to decrease the number by 1.
+
+ 2. You can insert runs of characters by generating a numeric prefix for the
+    length, then pressing the character once (like dash or underscore).
+
+ 3. To delete   a line,     type:  C-l
+    To delete   a word,     type:  C-\
+    To delete  white space, type:  ESC \
+
+ 4. To undelete the most recent "chunk of text" that was deleted, press:
+
+        ESC u
+
+    To undelete older text objects, follow with:
+
+        ESC U  (one or more times)
+
+    To cancel the undelete sequence entirely, press:
+
+        C-x C-y
+
+ 5. To scroll forward  1/2 page, type:  C-- C-v
+    To scroll backward 1/2 page, type:  C-- C-z
+
+ 6. To delete to the     end     of the line, type:  C-k
+    To delete to the  beginning  of the line, type:  C-u C-u C-k
+
+ 7. To delete from point   forward  to nth line break, type:  C-u n C-k
+    To delete from point  backward  to nth line break, type:  C-- n C-k
+
+Continue with Lesson 3.
+
+
+--------------------------------------------------------------------------------
+Lesson 3.1:  DUPLICATING LINES
+
+      * Press  ESC d  to duplicate a line.
+
+    MightEMacs has many commands that operate on a line or multiple lines (a
+    "line block").  We will discuss some of them in this lesson.
+
+    You can duplicate a line or a block of lines by pressing  ESC d.  The point
+    will be moved to the beginning of the duplicated line(s) after the
+    operation.
+
+ 1. Move the point to the first line below marked --->.
+ 2. Move to the end of the line.
+ 3. Press  C-u ESC d  to duplicate the current line and the next line (two
+    lines).  Note that the point can be anywhere on the first line.
+ 4. The point will now be on the first of the two duplicated lines.  Delete the
+    current line and the next line (remember the keys?).
+
+---> Roses are red,
+---> Violets are blue,
+---> Flowers smell nice,
+---> but this poem stinks.
+
+ 5. Move the point to the last line above marked --->.
+ 6. Press  C-- ESC d  to duplicate the previous line and the current line.
+    Notice how n is used as a "line selector".
+ 7. Delete the two duplicated lines again (press  C-u C-l).
+
+NOTE:
+    If you press  ESC d  without a numeric prefix, it duplicates the current
+    line only.
+
+ 8. Move on to the next lesson.
+
+--------------------------------------------------------------------------------
+Lesson 3.2:  OPENING LINES
+
+      * Press  C-x o    to open a line above current line.
+      * Press  C-e C-j  to open a line below current line.
+
+    It is often desirable to open a new line above the current one, regardless
+    of where the point is on the line.  You can do this by typing  C-x o.
+    A new line will be inserted ("opened"), any indentation from the line just
+    prior to the newly opened line will be copied to it, and the point will be
+    moved to the end of the indentation.
+
+ 1. Move the point to the first line below marked --->.
+ 2. Now move down two lines to the one that contains the word "third".
+ 3. Press  C-x o  to open a line above it.  Notice that the indentation from the
+    line above ("second") was duplicated and the point is positioned after the
+    indentation.
+
+---> This is the first line.
+     This is the second line with indentation.
+---> This is the third line.
+---> And this is the fourth.
+
+ 4. Press  C-l  to delete the line that was created.
+ 5. Move the point to the fourth line above marked --->.
+ 6. Now we wish to open a line two lines above, at the same spot as was done in
+    step 3.  We can do this by using n as a line selector to select the "target"
+    line (know how?).  The new line will be opened above the target line.
+ 7. Here's how: press  C-- C-x o  and observe that a line was opened at the same
+    location.  A numeric prefix of -1 selected the line above as the target,
+    then a line was opened above that.
+ 8. Delete the line just opened.
+
+NOTE:
+    You can also specify a positive numeric prefix (n > 1) to open a line below
+    the current line.  However, it is a bit faster to use the  C-j  command
+    instead, which is explained next.
+
+ 9. Move the point up one line (to "second").
+10. Press  C-e C-j.  Notice that this two-key sequence opens a line below the
+    current line with the same indentation.
+
+    The  C-j  command inserts a newline into the text, just like the  RTN  key;
+    however, it also duplicates any indentation from the current line.  So by
+    simply moving the point to the end of the line first (with  C-e), we can
+    "open" a line below the current line in the same manner as  C-x o  does.
+11. Experiment with  C-x o  and the  C-e C-j  sequence a bit more on the
+    practice lines to get a good understanding of how lines are opened.  When
+    ready, proceed to the next lesson.
+
+
+--------------------------------------------------------------------------------
+Lesson 3.3:  MORE OPENING LINES AND DELETING BLANK LINES
+
+      * Press  C-o      to open a line at point.
+      * Press  C-x C-o  to delete blank lines around point.
+
+    Another way to open a line is by pressing  C-o.  This command inserts a
+    newline at point without moving point (usually), which is useful when you
+    want to split a line or create some space below the point location.
+
+ 1. Move the point to the first line below marked --->.
+ 2. Move the point just past the question mark.
+ 3. Press  C-o  to move the rest of the line to the line below.  Notice that the
+    point did not move.
+
+---> What time is it?  This is a timely question, indeed.
+---> Need some space here, me thinks...
+---> right above this line.
+
+ 4. Press  C-d  to "undo" the change (delete the newline).
+ 5. Now press  C-- 3 C-o.  What happened?  When you use a negative value of n
+    with  C-o, abs(n) lines are inserted and the point is moved to the beginning
+    of the first opened line, if possible.
+ 6. Let's get rid of the empty lines.  Press  C-x C-o.  Notice that the blank
+    lines are deleted.
+ 7. Now let's open some lines in a slightly different way.  Move the point to
+    the beginning of the last line above marked --->.
+ 8. Press  C-u C-o  to "push" the current line down two lines.
+ 9. Move up one line and press  C-x C-o  again.  Notice that the two empty lines
+    below the current (non-empty) line were deleted.  The  C-x C-o command
+    deletes empty lines immediately below the current line if the current line
+    is not blank.  It will also delete empty lines immediately above the current
+    line if given a negative numeric prefix.
+10. Repeat step 8, move down to the last line, move to the end of the line, then
+    press  C-- C-x C-o  to observe this behavior.
+
+NOTE:
+    The point can be anywhere on a non-empty line when  C-x C-o  is pressed to
+    delete blank lines above or below it.
+
+11. Go to the next lesson.
+
+
+--------------------------------------------------------------------------------
+Lesson 3.4:  JOINING AND WRAPPING LINES
+
+      * Press  ESC w    to set the wrap column.
+      * Press  ESC C-j  to join lines with one space in between.
+      * Press  C-x C-j  to join lines with no  space in between.
+      * Press  ESC RTN  to wrap lines.
+
+    Two very useful features of MightEMacs are its ability to join lines
+    together with or without intervening space, and its ability to fill and wrap
+    lines between left and right margins.  The left "margin" is the indentation
+    (white space), if any, of the first line selected.  The right margin is the
+    "wrap column", which is held in a system variable called $wrapCol.  As a
+    convenience, this variable can be set with the  ESC w  command.
+
+    Let's try this out and see how it's done.
+
+ 1. Move the point to the last line below marked --->.
+ 2. Move up one line to "margins".
+ 3. Press  ESC C-j  to join the current line with the line above it.  Notice
+    that there is just one space in between and the point is at the place where
+    the lines were joined.
+ 4. Press  C-p  to move up one line.
+ 5. Press  C-u ESC C-j  to join two lines together going forward -- the current
+    line and the next line.  Notice the position of point.
+ 6. Now move the point forward a few characters to the middle of the word
+    "ability".
+ 7. Press  RTN  to split the word, then press  C-e  to move to the end of the
+    line.
+
+---> This is the first line.
+    Two useful features of MightEMacs is
+        its ability to join
+  lines together with or without intervening space, and its
+ability to fill and wrap lines between left and right
+            margins.
+---> This is the last line.
+
+ 8. Let's fix that.  Press  C-x C-j  to join the current line with the line
+    above it with no intervening space.  Notice that the point can be anywhere
+    on the line before the keys are typed.
+ 9. Now let's do some line wrapping.  First we need to set the wrap column.
+    Press ESC w  and enter 50 at the prompt.
+10. We will now wrap the current line with the two lines above it.  Notice that
+    the three lines have different amounts of indentation.  Press  C-- C-- ESC
+    RTN  to wrap the lines, which executes the command with a numeric prefix of
+    -2.  The text now fits nicely between column 4 (end of indentation) and
+    column 50 (the wrap column).
+
+NOTES:
+    We used n as a line selector for the last command, just like we did for some
+    other line commands in previous lessons.
+
+    The lines had different amounts of indentation, but it didn't matter.  The
+    indentation from the first line of the block is used to indent all of the
+    lines.
+
+11. Continue experimenting in the practice area until you feel comfortable
+    joining and wrapping lines with these three commands.  You may proceed to
+    the next lesson when you are ready.
+
+--------------------------------------------------------------------------------
+Lesson 3.5:  LINE NUMBERS
+
+      * Press  C-h .    to display current line number.
+      * Press  ESC g    to go to a particular line by number.
+
+    You can press  C-h .  at any time to display information about the point
+    location on the message line, which includes the line number in the buffer.
+    You can also press ESC g  to go to a particular line.
+
+ 1. Move the point to the line below marked --->.
+ 2. Press  C-h .  and observe that various information about the point location
+    is displayed on the message line.  The last item shown is the integer value
+    of the ASCII character at point in hexadecimal.
+ 3. Move the point to the end of the line, press  C-h .  again, and enter the
+    line number shown on the message line.
+
+---> Enter line number: 
+
+ 4. Press  C-u 9 C-p  to move point up 9 lines.
+ 5. Now let's go back to the line we were just on.  Press  ESC g  and enter the
+    line number you typed in step 3 at the prompt.
+
+NOTE:
+    You can also go to a line number when you start MightEMacs by using the "+"
+    switch on the command line following the filename.  For example, the
+    following shell command will open file "myprog.c" at line 234:
+
+        $ mm myprog.c +234
+
+
+--------------------------------------------------------------------------------
+Lesson 3:  SUMMARY
+
+
+ 1. To duplicate the current line, press
+
+        ESC d
+
+    To duplicate multiple (n) lines, press
+
+        C-u n ESC d     to select and duplicate lines forward
+            -OR-
+        C-- n ESC d     to select and duplicate lines backward
+
+ 2. To open a line above the current line, press:  C-x o
+    To open a line below the current line, press:  C-e C-j
+
+ 3. To open a line at point, press:  C-o
+
+    To open  n  lines at point and move to the first blank line opened,
+    press:  C-- n C-o
+
+ 4. To delete blank lines around point, press:  C-x C-o
+
+ 5. To set the wrap column, press:  ESC w
+
+ 6. To join lines with one space in between:
+
+        - to join the current line with the line above, press:  ESC C-j
+        - to join n lines above, press:  C-- n ESC C-j
+        - to join n lines below, press:  C-u n ESC C-j
+
+    To join the current line with the line above with no space in between,
+    press:  C-x C-j
+
+ 7. To wrap the current line, press:  ESC RTN
+    To wrap n lines above, press:     C-- n ESC RTN
+    To wrap n lines below, press:     C-u n ESC RTN
+
+ 8. To display the current line number and other information about the point
+    location, press:  C-h .
+
+ 9. To go to a particular line number in the buffer, press:
+
+        ESC g
+
+    and enter the line number at the prompt.
+
+Continue with Lesson 4.
+
+
+--------------------------------------------------------------------------------
+Lesson 4.1:  REGIONS
+
+      * Press  C-SPC  to set the endpoint of a region.
+      * Press  C-w    to delete all text in the region.
+
+    Thus far, we have learned commands that operate on characters, words, lines,
+    and partial lines.  There is another type of text object that is used
+    frequently: a "region".  A region is basically a sequence of zero or more
+    characters in the buffer.  It exists at all times and is defined as all text
+    between the point and the "dot mark".  Marks (discussed later) are visible
+    characters which are used to mark point positions in a buffer.  The dot mark
+    '.' is special in that it always exists (cannot be deleted), and is used to
+    delineate a region.  It is set with the  C-SPC command, which saves the
+    current point location in the mark.
+
+    Note that the dot mark and the point may be at the same spot, which would
+    define an empty region (which is valid, but not particularly useful).
+
+    Regions are used to operate on text that is not easily selected by words,
+    lines, or partial lines.  They are also used to mark large line blocks where
+    the number of lines is not easy to determine visually.  The region can then
+    be used with a line command to operate on all lines in the region.  This is
+    done by executing the command with a numeric prefix of zero.
+
+    Let's use a region with a couple commands and see how this works.
+
+ 1. Move the point to the beginning of the word "with" on the first line below
+    marked --->.
+ 2. Press  C-SPC  to set the dot mark at this location.  Notice that you get
+    feedback on the message line.
+
+NOTE:
+    The  C-SPC  command sets mark '.' by default.  If you give it a numeric
+    prefix, it will prompt you for the mark to set (which is how you set your
+    own marks).
+
+ 3. Move the point to the beginning of the word "see" on the last line below
+    marked --->.
+
+---> Regions are used with numerous commands and are very useful.
+     A typical use is to put text on the kill ring so that it
+     can be "yanked" later at a different place in the buffer.
+---> You will see how this is done in the next lesson.
+
+ 4. We will now delete all lines in the region.  Press:  C-u C-u C-l
+    All four lines have been removed.  The  C-l  command was executed with a
+    numeric prefix of zero, which instructed it to delete all lines in the
+    region.
+
+NOTE:
+    It does not matter if the region "covers" only a portion of the first line
+    and a portion of the last line.  The region endpoints can be anywhere on
+    the beginning and ending lines to include them.
+
+ 5. Undelete the lines.  (Press:  ESC u)
+ 6. Now move the point to the beginning of the word "in" on the last line.
+ 7. Set the mark.
+ 8. Move the point to the beginning of the word "with" on the first line.
+ 9. We will now delete the text in the region (not the lines).  Press:  C-w
+    The text in the region has been removed.  The  C-w  command deletes all text
+    in the current region.
+
+    Notice that when we executed the  C-l  command in step 4, the mark was at
+    the beginning of the region and the point was at the end.  This time the
+    point was at the beginning of the region and the mark was at the end.  It
+    works either way.
+10. Undelete the text again and go to the next lesson.
+
+
+--------------------------------------------------------------------------------
+Lesson 4.2:  KILL RING
+
+      * Press  C-h C-l  to kill a line.
+      * Press  C-h C-\  to kill a word.
+      * Press  C-y      to yank text from the kill ring and insert it at point.
+
+    MightEMacs has several commands for cutting, copying, and pasting text, as
+    is done in GUI applications.  The terminology for the first and last
+    operations is a bit different, however.  In MightEMacs, cutting is called
+    "killing" and pasting is called "yanking".  (These are legacy terms that
+    were used in the original emacs editor, and are still used today.)  Each
+    time text is killed or copied, it is placed on the "kill ring", which is a
+    circular ring of text objects.  Text objects on the ring can be yanked back
+    into the buffer at any location.  You can also access older entries easily.
+    Let's try it.
+
+ 1. Move the point to the first line below marked --->.
+ 2. Press  C-h C-l  to kill the line.
+
+NOTE:
+    Recall that  C-l  by itself DELETES a line.  If you precede it with  C-h
+    (for "homicide"), it KILLS a line instead.  This works for all the other
+    commands that delete text objects as well.  For example,  C-h C-\  kills
+    a word and  C-h C-k  kills all text from point to the end of the line.
+    Similarily, you can precede the delete command with  C-c  (for "copy")
+    instead of  C-h to COPY the text object; for example,  C-c C-l  copies the
+    current line to the kill ring.
+
+ 3. You are now on the "cow" line.  Move the point to the beginning of the next
+    line.
+ 4. Press  C-y  to "yank" the text that was just killed (in step 2).  The text
+    is inserted at point.
+ 5. Move down to the last line (that contains the word "dish").
+ 6. Kill the line and re-insert it (yank it) at the beginning of the first line.
+
+    This is how you move whole lines around in the text.  Next, we'll rearrange
+    some words.
+
+---> Hey Diddle Diddle, the cat and the fiddle,
+---> the cow jumped over the moon.
+---> The little dog laughed, to see such sport,
+---> and the dish ran away with the spoon.
+
+ 7. We're back on the "cow" line.  Move the point to beginning of the first word
+    ("the").
+ 8. Press  C-u C-h C-\  to kill two words.
+ 9. Move up one line and forward one word to the beginning of the word "the".
+10. Press  C-y  to yank the words into the text.
+11. Now press  C-u C-h C-\  again to kill the next two words.
+12. Move back to the line below and yank the words before the word "jumped".
+13. Continue to experiment with  C-h C-l  and  C-h C-\  to kill lines and words
+    and  C-y  to re-insert the text at various places until you get comfortable
+    using these commands.
+14. Proceed to the next lesson when ready.
+
+--------------------------------------------------------------------------------
+Lesson 4.3:  MORE WAYS TO KILL TEXT
+
+      * Press  C-h C-w  to kill the region.
+      * Press  C-h C-k  to kill a partial line.
+
+    Just like killing lines and words as demonstrated in the previous lesson,
+    you can kill the region and portions of a line by using the  C-w  and  C-k
+    keys as the "text objects".
+
+ 1. Move the point to the first line below marked --->.
+ 2. Move down two lines, then move to the end of the word "hand" on the line.
+ 3. Move forward one character to the beginning of "in".
+ 4. We will now kill all text from point to the beginning of the line.  Press
+    C-u C-u C-h C-k.  (Recall that  C-u C-u C-k  DELETES all text from point to
+    the beginning of the line.)
+ 5. Move the point to the beginning of the word "is" on the first line.
+ 6. Press  C-y  to insert the text at point.
+ 7. Move the point to the end of the word "bush." past the period.
+ 8. Press  C-h C-k  to kill to the end of the line.
+ 9. Press  C-n  to move down one line.  You should now be at the end of that
+    line.
+10. Press  C-u C-u C-y.  Notice that the text was inserted but the point did not
+    move.  This was accomplished by using a numeric prefix of zero with the yank
+    command.
+
+---> is worth hundreds in the bush. to come to the aid of their country.
+---> The rain ---> Now is the time for all good men
+A bird in the hand in Spain falls mainly on the Plain.
+---> Experience enables you to recognise a mistake when you make it again.
+
+11. Move to the beginning of the current line and set the mark.
+12. Now execute the "end of word" command twice, which moves the point to the
+    end of the word "rain".
+13. Move forward one character to the beginning of "--->".
+14. We're ready to kill the region.  Press  C-h C-w
+15. And now for the final fix.  Move down one line and yank the text.
+16. Do some more experimentation with  C-h C-w  and  C-h C-k  to get a good feel
+    for how they kill text.  Remember that the C-y  command always yanks the
+    last text that was killed (or copied).  In the next lesson we will see how
+    to yank older text.
+17. Proceed to the next lesson when ready.
+
+
+--------------------------------------------------------------------------------
+Lesson 4.4:  DISPLAYING THE KILL RING AND YANKING OLDER ENTRIES
+
+      * Press  C-h k      to display the kill ring in a pop-up window.
+      * Press  C-- n C-y  to yank the -nth entry from the kill ring.
+
+    The kill ring can be displayed at any time by pressing  C-h k.  (Recall that
+    help and informational commands always begin with the  C-h  prefix.)  The
+    ring is displayed in a pop-up window (discussed in detail later).  For now,
+    just remember that you press  q  or  ESC  to dismiss a pop-up window.  You
+    can also press  ?  to get command help.
+
+ 1. Press  C-h k  to display the kill ring.  Notice that the most recent text
+    that was killed or copied is entry 0.  The kill or copy just before that is
+    entry -1, then -2, and so on.
+ 2. Move the point to the line below marked ---> then to the beginning of the
+    word "blue".
+ 3. Press  C-- C-c C-\  to copy the previous word to the kill ring.  Notice that
+    the point did not move.
+ 4. Display the kill ring and verify that "green " is displayed as entry 0.
+ 5. Move forward two words.
+ 6. Copy the word "yellow " to the kill ring (by pressing  C-c C-\), then
+    display the kill ring again to verify it.  Notice that "green " is now entry
+    -1.
+
+---> Red green blue white yellow black.
+
+ 7. Move forward one word.  Now let's insert "green ".  Press  C-- C-y.  Entry
+    -1 from the kill ring was inserted.
+ 8. Now press  C-u C-y.  What happened?  When  C-y  is given a positive numeric
+    prefix, it is used as a repeat count.  Two copies of the topmost kill entry
+    ("yellow ") were inserted at point.
+ 9. Do some more experimentation on your own, then go to the next lesson when
+    ready.
+
+
+--------------------------------------------------------------------------------
+Lesson 4.5:  COPYING TEXT
+
+      * Press  C-c C-w  to copy the region.
+      * Press  C-c C-l  to copy a line.
+      * Press  C-c C-\  to copy a word.
+      * Press  C-c C-k  to copy a partial line.
+
+    As was shown in the previous lesson, you can copy text to the kill ring in
+    addition to killing it.  This can be done with all four of the "kill a text
+    object" commands by simply replacing the  C-h  prefix with  C-c.  For
+    example, you would press  C-c C-l  to copy a line instead of  C-h C-l  to
+    kill it.  Let's try it.
+
+ 1. Move the point to the first line below marked --->.
+ 2. Press  C-c C-l  to copy the line to the kill ring.  (The point can be
+    anywhere on the line.)
+ 3. Move to the beginning of the third line, before the "--->".
+ 4. Press  C-y  to yank the copy of the first line from the kill ring.
+ 5. Move back four words, then forward one character so that the point is
+    between words "a" and "line" on line 3.
+ 6. Press  C-u 3 C-c C-\  to copy the next three words to the kill ring (which
+    includes the initial space character).
+ 7. Move to the end of the next line, move back one character, and yank the
+    text.
+
+---> This is a line of text.
+---> this is another line.
+---> and this is yet another.
+
+ 8. Move to the beginning of the previous line and set the mark.
+ 9. Move forward one word (to the beginning of the word "This").
+10. Press  C-c C-w  to copy the region.
+11. Move up one line and press  C-c C-k  to copy from point to the end of that
+    line.
+12. Now open a line above the current line and press  C-- C-y C-y  to yank the
+    "--->" entry followed by the text copied in step 11.
+
+    As you can see in this lesson and the previous lessons in this section, you
+    can do pretty much any type of text editing using a combination of delete, kill,
+    and/or copy commands and yank.  You just need to remember the four "text
+    objects" keys:
+            C-\     word
+            C-k     partial line
+            C-l     line
+            C-w     region
+
+    And remember these rules:
+         1. Use the key alone to DELETE.
+         2. Prefix the key with  C-h  to KILL.
+         3. Prefix the key with  C-c  to COPY.
+    and, with the exception of a region, use the correct numeric prefix if
+    needed to select the text you want.  -n selects objects backward and +n
+    selects objects forward.
+
+
+--------------------------------------------------------------------------------
+Lesson 4:  SUMMARY
+
+ 1. To set a region:
+        - move the point to one end of the region and press:  C-SPC
+        - move the point to the other end of the region.
+
+ 2. To delete all text (characters) in the region, press:  C-w
+
+ 3. To kill text objects:
+        - press  C-h C-\          to kill a WORD
+        - press  C-h C-k          to kill to END OF LINE
+        - press  C-u C-u C-h C-k  to kill to BEGINNING OF LINE
+        - press  C-h C-l          to kill a LINE
+        - press  C-h C-w          to kill the REGION
+
+ 4. To copy text objects:
+        - press  C-c C-\          to copy a WORD
+        - press  C-c C-k          to copy to END OF LINE
+        - press  C-u C-u C-c C-k  to copy to BEGINNING OF LINE
+        - press  C-c C-l          to copy a LINE
+        - press  C-c C-w          to copy the REGION
+
+ 5. To yank the     top     entry from the kill ring, press:  C-y
+    To yank an older (-nth) entry from the kill ring, press:  C-- n C-y
+
+ 6. To display the kill ring in a pop-up window, press:  C-h k
+
+
+Continue with Lesson 5.
+
+
+--------------------------------------------------------------------------------
+Lesson 5.1:  MARKS
+
+      * Press  C-SPC      to set the dot mark.
+      * Press  C-u C-SPC  to set a custom mark.
+      * Press  ESC SPC    to go to a mark.
+      * Press  C-x C-x    to swap point with a mark.
+      * Press  C-h SPC    to display all marks in a pop-up window.
+
+    As mentioned previously, marks are visible characters of your choosing which
+    are used to mark point positions in a buffer.  They are essentially
+    "bookmarks" and you can set as many as you want, wherever you want.  Their
+    primary purpose is to mark places in the buffer that you wish to return to
+    later.  However, mark '.' (the "dot" mark) is also used to define an
+    endpoint of a region, which we've already learned.
+
+    A mark is set with the  C-SPC command, which saves the current point
+    location in the chosen mark.  When executed without a numeric prefix, the
+    command sets the dot mark.  When executed with a numeric prefix, it prompts
+    for the mark to set.  You enter a single visible character (a letter, digit,
+    or punctuation character) at the prompt, without pressing  RTN.
+
+    Once a mark is set, you can return to it later by either jumping directly to
+    it ("goto mark"), or by exchanging the point position with the mark position
+    ("swap mark").  The latter method is used when you want to go to a mark
+    temporarily, then return to where you were.  (You would do a swap mark to go
+    there, then swap mark again to return.)
+
+    Let's try this out.
+
+ 1. Move the point to the beginning of the word "bird" in first line below
+    marked --->.
+ 2. Press  C-u C-SPC  and press  b  at the prompt to set mark 'b'.
+ 3. Move the point to the beginning of the word "Spain" in line 3.
+ 4. Set mark 'S' (marks are case-sensitive).
+ 5. Move to the beginning of the word "enables" in the next line.
+
+---> A bird in the hand is worth hundreds in the bush.
+---> Now is the time for all good men to come to the aid of their country.
+---> The rain in Spain falls mainly on the Plain.
+---> Experience enables you to recognise a mistake when you make it again.
+
+ 6. Let's display the marks.  Press  C-h SPC  to display all marks in a pop-up
+    window.  Observe that the first column shows the mark characters.
+ 7. We will now swap our position with mark 'b' (at the word "bird").  Press
+    C-x C-x  and enter  b  at the prompt.  The point is now at "bird".
+
+NOTE:
+   When you are prompted to choose an existing mark, all marks are shown in the
+   prompt so you can see which ones have been set.
+
+ 8. Repeat step 7.  We're now back at "enables".
+ 9. Move the point to the end of the line.
+10. Now let's jump to "Spain".  Press  ESC SPC  and enter  S  at the prompt.
+11. Move the point to some other places, set some marks, and practice using the
+    swap and goto mark commands.
+12. Proceed to the next lesson when you're ready.
+
+
+--------------------------------------------------------------------------------
+Lesson 5.2:  CONSTANTS AND VARIABLES
+
+      * Press  ESC =  to set a variable.
+      * Press  C-h v  and enter an apropos pattern to display variable(s).
+
+    The editor uses system constants and variables to provide information about
+    the editing session and to maintain various settings; for example, the
+    length of the current line ($LineLen) and the column at which text is
+    wrapped ($wrapCol).  All system constants and variables begin with a dollar
+    sign.  If the first letter of the name is capitalized, it is a constant
+    (immutable); otherwise, it is a variable.  Constants and variables can be
+    viewed and variables can be changed at any time.
+
+
+ 1. Let's change the wrap column.  Press  ESC =  to set a variable.  You will be
+    prompted with "Assign variable: ".  Enter "$wrap" and press  TAB to
+    "complete" the variable name.  Notice that the full variable name "$wrapCol"
+    is displayed briefly.
+
+NOTES:
+    You can press  TAB  at any time when entering a variable name to see what
+    names match the character(s) you have entered so far.  If more than one name
+    matches, the names will be shown in a pop-up window; otherwise, the full
+    variable name will be displayed briefly and input will be completed.
+
+    You can press  TAB  to do completion on other types of names as well,
+    including mode names and buffer names.
+
+ 2. You are now being prompted to enter a new value for the $wrapCol variable,
+    with the old value shown.  Enter  75  and press  RTN.
+ 3. The variable has now been changed.  Let's verify that.  Press  C-h v  to
+    display variables.  At the apropos prompt, enter "wrap" and press  RTN.
+    Notice that $wrapCol is now 75.
+
+NOTE:
+    The wrap column can also be changed with the  ESC w  command.
+
+
+--------------------------------------------------------------------------------
+Lesson 5.3:  TABS AND INDENTATION
+
+        * Press  C-u 0 TAB  to set  hard  tabs.
+        * Press  C-- n TAB  to set  soft  tabs with tab size n.
+
+    MightEMacs supports both hard and soft tabs.  When hard tabs are in effect,
+    tab characters (octal 011) are inserted directly into the text.  When soft
+    tabs are in effect, runs of spaces are inserted instead.
+
+    The type of tab is controlled by the $softTabSize system variable.  When its
+    value is zero, hard tabs are in effect; when its value is greater than zero,
+    soft tabs are in effect and its value is used as the tab size (number of
+    spaces).  Additionally, when hard tabs are in effect ($softTabSize is zero),
+    the $hardTabSize system variable controls the size of the tab character,
+    which defaults to 8.
+
+    The tab key on the keyboard can be used both to insert tabs into the text,
+    and to set the $softTabSize variable.  When soft tabs are in effect, it
+    inserts runs of spaces; when hard tabs are in effect, it inserts a tab
+    character.  In both cases, if the numeric prefix is greater than zero, it is
+    used as a repeat count.
+
+    To set the soft tab size, you generate a numeric prefix of zero or a
+    negative number and press the tab key.  When this is done, the soft tab size
+    will be set to abs(n) and no other action will be taken.  Hence, you can
+    enable soft tabs by pressing  C-- n TAB  (where n is the tab size), and you
+    can enable hard tabs by pressing  C-u 0 TAB.
+
+ 1. Let's check the current tab sizes.  Press  C-h v  and enter "tab" at the
+    prompt to display all variables that contain that string in their name.  The
+    two tab variables we just discussed will be shown in a pop-up window.
+ 2. Press  C-- 4 TAB  to set the soft tab size to 4.  Then repeat step 1 to
+    verify it.
+ 3. Move the point to the beginning of the word "Pizza" in the line below
+    following --->.
+ 4. Press  TAB  and notice that the line was shifted right to the next tab stop.
+ 5. Press  TAB  again followed by DEL.  Observe that the line was shifted
+    farther right, then shifted left back to its orignal position.  The  DEL  key
+    removed all four space characters.
+ 6. Now let's open a line below the current line (remember the two keys?).  Press
+    C-e C-j.  The indentation from the "Pizza" line was copied to the new line.
+ 7. Press the spacebar twice, then press  DEL.  Notice that the point was moved
+    back to a tab stop again.
+ 8. Press  C-l  to delete the blank line, then move the point one character
+    forward.
+ 9. Now press  TAB  again.  What happened?  The first non-whitespace character
+    on the line was aligned at the next tab stop.  This is how the tab key works
+    when soft tabs are in effect.
+10. Press  C-b  and observe that the point moves backward one position, over the
+    space character to its left.  All white space preceding the first word on
+    the line consists of space characters.
+
+--->
+    Pizza is delicious.
+    Sauerkraut is not.
+--->
+
+11. Now let's try hard tabs.  First we'll delete the indentation from both
+    lines.  Press  ESC \, move up one line and press ESC \  again.
+12. We need to enable hard tabs.  Press  C-u C-u TAB.
+13. Press  TAB  now and observe that the line was shifted right 8 columns.
+14. Press  C-b  to move backward one character.  What happened?  The point
+    jumped over the hard tab character.  Note that this is different than what
+    happened in step 10.  The point moved over the hard tab character.
+15. Press  ESC C-e  to move to the end of the word "Pizza", then press  TAB.
+    Notice that the point is now aligned at the next tab stop, not the word
+    "is".  This is how the tab key works when hard tabs are in effect.
+
+
+--------------------------------------------------------------------------------
+Lesson 5.4:  INDENTING AND OUTDENTING A REGION
+
+      * Press  ESC )  to  indent   all lines in region.
+      * Press  ESC (  to  outdent  all lines in region.
+
+    There are two methods for changing the indentation of a group of lines.  We
+    will learn the first method here and the second method in the next lesson.
+
+ 1. Verify that hard tabs are in effect by displaying the "tab" variables.  If
+    not, enable hard tabs as you learned in the previous lesson.
+ 2. Move the point to the "if" line below following --->.
+ 3. Set the mark (anywhere on the line).
+ 4. Move down three lines.  We now have four lines in the region.
+ 5. Press  ESC )  to indent the line block one level.  Notice that the point is
+    now at the beginning of the line just past the line block that was indented
+    (and outside the original region).
+
+--->
+	if(len == 0)
+		len = strlen(str);
+	else if(len < 0)
+		len = 0;
+--->
+
+ 6. Move up one line and press  C-x C-x .
+    The point is now back to where we set the mark in step 3.
+ 7. Press  C-u ESC (  to outdent the line block two levels.
+ 8. Move up one line and repeat step 5.
+
+NOTES:
+    The  ESC )  and  ESC (  commands indent or outdent all lines in the current
+    region by n levels (default 1).
+
+    You can press  C-x C-x .  to see where the region is before executing the
+    command if you are unsure.
+
+ 9. Continue to experiment setting the region is various places and changing the
+    indentation with different values of n until you feel comfortable using
+    these two indentation commands.
+
+
+--------------------------------------------------------------------------------
+Lesson 5.5:  INDENTING AND OUTDENTING A LINE BLOCK
+
+      * Press  C-c )  to  indent   a line block.
+      * Press  C-c (  to  outdent  a line block.
+
+    The second method for changing the indentation of a group of lines is to use
+    n as a line selector, just like for other line commands.  The two commands
+    used for this will prompt for the number of indentation levels.
+
+ 1. Move the point to the "if" line below following --->.
+ 2. Press  C-u 4 C-c )  to select four lines to indent.
+ 3. You are now being prompted to enter the number of tab stops with a default
+    of 1.  Press  RTN  to select it.  Notice that the point was moved to the
+    beginning of the first line following the line block that was indented, just
+    like in the last lesson.
+ 4. Move up one line and press  C-- 3 C-c (  to select the same four lines
+    backward to outdent.  You will get the same prompt as in step 4.  Press
+    RTN.
+
+--->
+	if(len == 0)
+		len = strlen(str);
+	else if(len < 0)
+		len = 0;
+--->
+
+NOTE:
+    The  C-c )  and  C-c (  commands indent or outdent all lines in the line
+    block selected by n.  If n is not specified, it defaults to 1 (the current
+    line only).  The point can be anywhere on the starting line.
+
+ 5. Continue to experiment selecting lines with n and changing the indentation
+    to different levels until you feel comfortable using these two alternate
+    indentation commands.
+
+
+--------------------------------------------------------------------------------
+Lesson 5.6:  CHANGING CASE OF TEXT
+
+      * Press  ESC C-l  to change a  word  to  lower  case.
+      * Press  ESC C-u  to change a  word  to  upper  case.
+      * Press  ESC C-t  to change a  word  to  title  case.
+
+      * Press  C-x C-l    to change a  line  to  lower  case.
+      * Press  C-x C-u    to change a  line  to  upper  case.
+      * Press  C-x C-t    to change a  line  to  title  case.
+
+      * Press  C-x l  to change text in the region to  lower  case.
+      * Press  C-x u  to change text in the region to  upper  case.
+      * Press  C-x t  to change text in the region to  title  case.
+
+ 1. Move the point to the beginning of the word "bird" in the first line below
+    marked --->.
+ 2. Press  ESC C-u  to convert the word to upper case.
+ 3. Move forward to the space after "the".  Press  ESC C-t  to convert the next
+    word to title case.
+ 4. Move to the beginning of the line.  Press  C-u ESC C-l  to convert the first
+    two words to lower case.
+ 5. Move to the end of the line.  Press  C-- ESC C-t  to convert the last word
+    to title case.
+
+NOTE:
+    Any non-word characters between the point and the target word(s) are ignored
+    (skipped over) when changing the case.
+
+---> A bird in the hand is worth hundreds in the bush.
+---> Now is the time for all good men to come to the aid of their country.
+---> THE RAIN IN SPAIN FALLS MAINLY ON THE PLAIN.
+---> Experience enables you to recognise a mistake when you make it again.
+
+ 6. Let's change the next line to upper case.  Move down one line and press
+    C-x C-u.
+ 7. We're now on the third line.  Press  C-u C-x C-l  to change it and the next
+    line to lower case.
+ 8. Now move up two lines to the third line and change the first word to title
+    case.
+ 9. Move down one line to the middle of the word "Experience".  Press  C-x C-t  to
+    change the whole line to title case.  Notice that it doesn't matter where
+    the point is on the line.
+10. Move up one line and change the line to lower case.
+11. Move up one line again to the middle of the word "Experience" and set the
+    mark.  Now move forward to the middle of the word "mistake".
+12. Press  C-x t  to change the text in the region to title case.  Notice that
+    the first letter in the region was capitalized even though it is in the
+    middle of a word.
+13. Continue to experiment with these commands until you get comfortable using
+    them.
+
+
+--------------------------------------------------------------------------------
+Lesson 5  SUMMARY
+
+ 1. To set the mark, press:             C-SPC
+    To set a custom mark, press:        C-u C-SPC
+    To go to a mark, press:             ESC SPC
+    To swap point with a mark, press:   C-x C-x
+    To display all marks in a pop-up window, press:  C-h SPC
+
+ 2. To set a system variable, press:    ESC =
+    and enter the name of the variable and its new value.
+
+ 3. To display variable(s), press:      C-h v
+    and enter an apropos pattern.
+
+ 4. To set  hard  tabs, press:                  C-u 0 TAB
+    To set  soft  tabs with tab size n, press:  C-- n TAB
+
+ 5. To  indent   all lines in region, press:  ESC )
+    To  outdent  all lines in region, press:  ESC (
+
+ 6. To  indent   a line block, press:  C-c )
+    To  outdent  a line block, press:  C-c (
+
+ 7. To change a  word  to  lower  case, press:  ESC C-l
+    To change a  word  to  upper  case, press:  ESC C-u
+    To change a  word  to  title  case, press:  ESC C-t
+
+    To change a  line  to  lower  case, press:  C-x C-l
+    To change a  line  to  upper  case, press:  C-x C-u
+    To change a  line  to  title  case, press:  C-x C-t
+
+    To change text in the region to  lower  case, press:  C-x l
+    To change text in the region to  upper  case, press:  C-x u
+    To change text in the region to  title  case, press:  C-x t
+
+
+--------------------------------------------------------------------------------
+Lesson 6.1:  MODES
+
+      * Press  ESC m  to change a mode.
+      * Press  C-h m  to display all modes.
+
+    Modes are used in MightEMacs to control certain aspects of the editor, like
+    the behavior of certain commands, how files are saved, and what is displayed
+    on the line at the bottom of the screen (the "mode line").  Modes are
+    identified by a short keyword; for example, "ASave" or "Over".  There are
+    two types of modes: global and buffer.  Buffer modes are associated with a
+    specific buffer and affect only that buffer.  Global modes are global in
+    scope and affect all buffers.
+
+    You can see which modes are enabled by looking at the mode line.  Active
+    global modes are displayed at the left end of the mode line in parentheses
+    ( ).  Active buffer modes are displayed immediately to the right of those
+    (if any) in brackets [ ].
+
+    We will discuss some commonly-used modes in this lesson.  For a complete
+    description, see the "Modes" topic in the Help System (which is discussed
+    later).
+
+    Commonly-used global modes are:
+
+        ASave       Auto-save changed buffers to disk periodically.
+        Exact       Searches are case-sensitive by default.
+        Regexp      Search patterns are regular expressions by default.
+
+    Commonly-used buffer modes are:
+
+        Bak         Create backup file when saving a buffer to disk.
+        Col         Display column number of point in mode line.
+        Line        Display line number of point in mode line.
+        Over        Overwrite columns when typing.
+        Repl        Replace characters when typing.
+
+    The difference between the "Over" and "Repl" buffer modes is how hard tabs
+    are handled.  When "Over" mode is enabled, a hard tab is not overwritten
+    until the point is at a tab stop.  When "Repl" mode is enabled, a hard tab
+    is overwritten the moment it is encountered in a line.
+
+    Modes are enabled and disabled with the  ESC m  command, which prompts for a
+    mode name.  The action taken is dependent on the numeric prefix.  The
+    default action is to toggle the mode that is entered, which is usually
+    sufficient.  However, you can specify a numeric prefix as follows:
+
+        n < 0       Disable mode.
+        n == 0      Toggle mode (default).
+        n == 1      Set mode.
+        n > 1       Clear all modes of same type and set one given.
+
+    Let's try changing some modes.
+
+ 1. Look at the left end of the mode line at the bottom of the screen and take
+    note of which global modes are shown in parentheses.  It will typically look
+    like this:  (Exact)  which means searches (discussed later) are case-
+    sensitive by default.
+ 2. Let's toggle "ASave" global mode.  Press  ESC m
+ 3. You will now get a "Toggle mode: " prompt at the bottom of the screen.
+    Enter "as" and press  TAB, which will complete the mode name and execute the
+    command.  "ASave" will now be displayed (or not displayed) on the mode line,
+    depending on whether it was displayed (enabled) before.
+    
+NOTE:
+    Mode names are not case sensitive.
+
+ 4. Now let's set the "Col" buffer mode.  Press  C-u 1 ESC m  and enter "col" +
+    RTN at the prompt.
+ 5. You will now be prompted for a buffer name.  Enter "Mi" and press  TAB  to
+    complete the name of the current buffer.
+
+NOTES:
+    When you specify a numeric argument with  ESC m  and the mode you enter is a
+    buffer mode, you will be prompted for the name of the buffer to operate on.
+
+    Buffer names are case sensitive.
+
+ 6. The buffer mode is now enabled.  You should see "C:nn" in the mode line,
+    where nn is the column number of point.
+ 7. Move the point backward and forward on the current line and notice how the
+    column number changes.
+ 8. You may have noticed that "Col" is not shown in the mode line in brackets
+    even though the mode is enabled.  This is because the "Col" buffer mode is
+    hidden.  To verify this, press  C-h m  to display all modes in a pop-up
+    window.  Mode attributes are shown in the first column.  A '+' means the
+    mode is enabled and a '?' means the mode is hidden.
+ 9. Repeat steps 4 and 5 using "Line" mode instead of "Col" mode.
+10. Toggle "Col" mode and "Line" mode to disable them.
+
+
+--------------------------------------------------------------------------------
+Lesson 6.2:  SEARCHING FOR PATTERNS
+
+      * Press  C-s    to search for a pattern  forward.
+      * Press  C-r    to search for a pattern  backward.
+      * Press  C-]    to repeat previous search  forward.
+      * Press  C-^    to repeat previous search  backward.
+
+    MightEMacs has the ability to search for plain text or regular expression
+    (RE) patterns both forward and backward, optionally ignoring case.  Searches
+    always begin at point and continue until either the pattern is found or a
+    buffer boundary is reached.
+
+    The type of pattern matching is controlled by option characters appended to
+    the pattern string (explained below), and by two global modes: "Exact" and
+    "Regexp".  When enabled, the former mode specifies case-sensitive pattern
+    matching by default and the latter specifies RE matching by default.  Either
+    or both can be enabled or disabled at any time.
+
+    A colon and one or more lowercase letters may be appended to any pattern to
+    specify options, as follows:
+
+      e     Exact pattern matching.  Case of letters is significant.
+      i     Ignore case.  Case of letters is not significant.
+      p     Plain text matching.  The pattern is matched literally.
+      r     Regexp matching.  The pattern is matched as a regular expression.
+      m     Multi-line mode.  When performing RE matching, the  .  metacharacter
+            and a negative character class  [^...]  will match a newline, which
+            they do not by default (but only if, in the latter case, the
+            character class does not contain a newline).
+
+    For example, the pattern "abc:pi" would specify a plain text search for
+    string "abc", ignoring case.  Pattern options always override the
+    corresponding global modes.
+
+    Let's do some searches and see how this works.
+
+ 1. We need to ensure that "Exact" global mode is enabled and "Regexp" global
+    mode is disabled.  Examine the global modes on the mode line and verify that
+    "Exact" is shown and "Regexp" is not.  If this is not the case, make the
+    necessary change(s) as you learned in the previous lesson.
+ 2. Move the point to the beginning of the word "bird" in the first line below
+    marked --->.
+ 3. Let's search forward for the word "good".  Press  C-s  to do a forward
+    search.  You will get a search prompt.  Enter "good" and press  ESC  to
+    terminate the pattern.
+
+NOTE:
+    Search patterns are terminated by pressing  ESC  instead of  RTN  so that a
+    newline can be entered as part of the pattern.  The termination key can be
+    changed however, by setting the $searchDelim system variable to  RTN  or a
+    different key.
+
+ 4. Notice that the point was moved to the end of the word "good" on the second
+    line.  Now let's search for a newline followed by three dashes.  Press  C-s
+    again and enter  RTN - - - ESC  at the pattern prompt.  We're now at the ">"
+    character at the beginning of the third line.  This is a simple way to
+    search for text at the beginning of a line -- just enter  RTN  as the first
+    character of the pattern.
+ 5. Move the point to the end of the line and press  C-r  to search backward.
+    Enter "ON" and press  ESC  to search for the word.  Recall that the "Exact"
+    global mode is enabled so searches are case-sensitive by default.
+
+---> A bird in the hand is worth hundreds in the bush.
+---> Now is the time for all good men to come to the aid of their country.
+---> THE RAIN IN SPAIN FALLS MAINLY ON THE PLAIN.
+---> Experience enables you to recognise a mistake when you make it again.
+
+ 6. Now we'll override the "Exact" mode.  Enter  C-r  again, then enter "the:i"
+    followed by  ESC.  The ":i" at the end of the pattern specifies that case be
+    ignored.  The point should now be at the beginning of the line (at the
+    beginning of the word "THE").
+ 7. Let's "hunt" backward for the next occurrence of our pattern.  Press  C-^
+    to do this (control + shift + carat).  Notice that we're now at the
+    beginning of the word "their" on the previous line.  Press  C-^  a couple
+    more times until the point moves to the first line.
+ 8. Now let's hunt forward.  Press  C-s  and enter " a" (SPC + a) for the
+    pattern.  We're now at the word "all".  To find the next occurrence forward,
+    press  C-]
+ 9. Press  C-]  one more time to get to "a" on the fourth line, then press  C-^
+    a couple times to move backward again.
+
+NOTE:
+    Once a pattern is set with  C-s  or  C-r, you can press  C-]  or  C-^  in
+    any combination to move forward or backward through the buffer to find the
+    next occurrence.
+
+10. As a final example, move the point to the beginning of the word "NOTE" below
+    this step.  Then press  C-s  and enter  "xyzzy" as the pattern (which
+    doesn't exist).  You will see "Not found" on the message line and the point
+    will not move.
+
+NOTE:
+    You can also use regular expression patterns when searching; however, RE
+    patterns are beyond the scope of this tutorial.  If you already know RE
+    syntax and would like to experiment with it, you can do the following:
+        1. Press  C-s  or  C-r  to begin a search.
+        2. Enter the RE pattern followed by ":r" with no space to indicate that
+           the pattern is a regular expression.  Then press  ESC to do the
+           search.  For example, the pattern "^\s+:r" (without the quotes) would
+           match white space at the beginning of a line.
+        3. Note that the editor supports most of the commonly-used RE
+           metacharacters used by the "egrep" shell command.  The most notable
+           exception is the OR bar (|), which is not supported.  (See the
+           "Search Pattern Syntax" topic in the Advanced Help System for
+           details.)
+
+
+--------------------------------------------------------------------------------^
+Lesson 6.3:  SEARCH RING
+
+      * Press  C-p    when prompted for a pattern to access older entries.
+      * Press  C-n    when prompted for a pattern to access newer entries.
+      * Press  C-h s  to display the search ring in a pop-up window.
+
+    All search patterns are kept on the "search ring", which is circular list
+    structure just like the kill ring.  Whenever you press  C-s  or  C-r  and
+    are prompted to enter a search pattern, you can press  C-p  one or more
+    times to display recent patterns that were entered, beginning with the most
+    recent one.  You can also press  C-n  to move forward again (to newer
+    entries).  Each time you press  C-p  or  C-n, the search ring is cycled so
+    that the pattern being displayed is at the "top" of the ring.
+
+    You can also display the search ring at any time by pressing  C-h s.
+
+ 1. Move the point to the end of this instruction line... HERE.
+ 2. Press  C-s  to get the search prompt.  Then press  C-p  repeatedly until you
+    see "<NL>---".
+ 3. Now press   ESC  to terminate the pattern and do the search.  The point
+    should now be on the ">" character at the beginning of the first line below
+    marked --->.
+ 4. Press  C-s  again, but this time press  C-n  repeatedly until you see "ON",
+    then press  ESC.  The point should move forward to the third line.
+ 5. You can also modify a prior pattern.  Press  C-r  and  C-n  repeatedly until
+    you see "the:i", then press  DEL  twice to remove the ":i" from the end of
+    the pattern.  Now press  ESC  to search for the word "the" backward.  You
+    will end up at the beginning of the word "their" on the previous line.
+ 6. Let's see what the search ring looks like at this point.  Press  C-h s  to
+    display it in a pop-up window.  Press  q  or  ESC  to dismiss the window
+    when you're done.
+
+---> A bird in the hand is worth hundreds in the bush.
+---> Now is the time for all good men to come to the aid of their country.
+---> THE RAIN IN SPAIN FALLS MAINLY ON THE PLAIN.
+---> Experience enables you to recognise a mistake when you make it again.
+
+ 7. Continue experimenting with the four search commands, entering patterns, and
+    cycling them forward and backward at the search prompt until you are
+    comfortable using the commands.
+
+ 8. Proceed to the next lesson when ready.
+
+
+--------------------------------------------------------------------------------
+Lesson 6.4:  SEARCH AND REPLACE
+
+      * Press  ESC q  to do a query replace operation.
+
+    In addition to searching for patterns, you can replace the text that matches
+    a pattern with other text.  This can be done with or without prompting.
+    Let's try it.
+
+ 1. Move the point to the beginning of the first line below marked --->.
+ 2. Press  ESC q  to execute the query replace command.  You will be prompted to
+    enter a pattern to search for.  Enter "mispel" and press  ESC  to terminate
+    the pattern.
+ 3. You will now be prompted to enter replacement text.  Enter "misspel" and press
+    ESC.
+ 4. MightEMacs will now search through the buffer for the pattern, beginning at
+    point.  When the pattern is found (on the second line), it will pause,
+    display a prompt showing the replacement it is about to make, and ask for
+    confirmation.  You can press  n  to skip this occurrence or press  y  or
+    SPC  to do the replacement.  Notice that the cursor is displayed in the
+    buffer where the replacement is about to occur.  Press  SPC  at the prompt
+    to make the change.
+ 5. The point should now be on the third line at a "confirmation" prompt again.
+    Notice that the word was corrected on the second line.  This time press  y
+    to do the replacement.
+
+---> The queryReplace command can be used to fixx
+---> the mispelled words in these sentences that
+---> are mispelled in addition to fixxing other mistakes
+---> and typing errors which are needing a fixx.
+
+ 6. You should now see "Scan completed.  Press q to quit or . to go back.".
+    This means that no more occurrences were found.  You may now terminate the
+    command and either stay at the current position (where the last substitution
+    occurred) by pressing  q  or return to the starting point.  Let's do the
+    latter.  Press  .  to go back to where we started.
+ 7. The message "[2 substitutions]" is now displayed on the message line.  The
+    command completed successfully and two substitutions were made.  The point
+    was also moved back to the beginning of the first line (where we started).
+ 8. Now let's make another correction.  Press  ESC q  again and enter "fixx" +
+    ESC at the pattern prompt.  At the "with" prompt, enter "fix" + ESC.
+ 9. You should now be prompted to correct the word "fixx" on the first line.
+    Press  SPC  to change it.
+10. We're now being prompted to fix the third line.  This time press  ?  to get
+    help.  As you can see, there are many responses you can give at a
+    replacement prompt (the ones that are underlined).  Let's undo the last
+    change we made.  Press  u
+11. Notice that we are being re-prompted to make the first replacement again.
+    Press  n  to skip it.
+12. We're back at line 3.  Press  SPC  to make the change.
+13. We're now on line 4, but there's a problem.  We are no longer sure if making
+    these changes is the right thing to do.  Let's bail out.  Press  .  to stop
+    and return to the starting point.
+
+    As you can see, the  ESC q  command is very useful for making mass changes
+    in a buffer.  Proceed to the next lesson to learn about its other features.
+
+
+--------------------------------------------------------------------------------
+Lesson 6.5:  MORE SEARCH AND REPLACE
+
+      * Press  ESC r  to do a replace operation without prompting.
+      * Press  C-h r  to display the replace ring in a pop-up window.
+
+    Recall from the SEARCH RING lesson that you can access previous patterns
+    when doing searches.  That applies to query replace as well, including
+    replacement patterns.
+
+ 1. We have regained the confidence we lost in the previous lesson and are ready
+    to have another go at it.  :-)  Move the point to the beginning of the first
+    line below marked --->.
+ 2. Press  ESC q  to execute the query replace command again.  At the prompt,
+    press  C-p  to retrieve "fixx", then press  ESC  to accept it.
+ 3. Now we're at the "with" prompt.  Press  C-p  to retrieve the most recent
+    replacement pattern.  "fix" should be displayed.  Press  ESC  to accept it.
+ 4. We're now being prompted to make a replacement on the first line.  Press  n
+    to skip it.
+ 5. Now we're on line 4.  Oops.  We realize that we should have made the first
+    change after all.  Let's start over.  Press  r  to go back to the starting
+    point and begin the search again.
+ 6. We're back on line 1.  Press  SPC  to make the change.
+ 7. Now we're on line 4 again.  Press  SPC  to change that one also.
+ 8. We're finished -- "Scan completed..." is displayed.  Hallelujah!  This time
+    press  q  to quit.  Notice that the point is left where the last replacement
+    was made and message "[2 substitutions, mark ` set to previous position]" is
+    displayed.
+
+---> The queryReplace command JUNK can be used to fixx
+---> the misspelled words JUNK in these sentences that
+---> are misspelled in addition to fixing other mistakes
+---> and typing errors which are JUNK needing a fixx.
+
+ 9. Let's make one final correction.  We didn't return to the starting point
+    when we ended the last command; however, we can still get back to that spot
+    by moving the point to mark ` (backtick).  Let's do that.  Go to mark  `
+    (press  ESC SPC `).
+10. We will now use the "do the rest" option.  Notice that there are three
+    occurrences of a capitalized word in the practice text that don't belong
+    there.  Execute the query replace command again and enter that word plus a
+    space as the pattern.
+11. At the "with" prompt, just press  ESC  to enter a null string.
+12. We're now at the first word on line 1.  Press  SPC  to remove it.
+13. We've now moved to line 2.  Let's fix the rest without any further
+    prompting.  Press  !  to make all other changes from the current position to
+    the end of the buffer.
+
+    This is an example of how to use  ESC q  to remove multiple occurrences of a
+    string from the text (or replace it with another string).
+
+NOTES:
+    Be aware that the  !  option replaces all remaining matches from the current
+    position to the END OF THE BUFFER without any further prompting.  Don't use
+    this option unless you are certain that you want this to happen (the changes
+    cannot be automatically undone).
+
+    Another way to do a search and replace without prompting is to use the
+    ESC r  command.  This command works just like the  !  option of the  ESC q
+    command; that is, it replaces all occurrences of the pattern from the point
+    to the end of the buffer.
+
+    You can also use the  ESC r  command with a numeric argument to specify a
+    fixed number of replacements.  For example, if you know you want to make
+    three replacements only, enter  C-u 3 ESC r  followed by the pattern and
+    replacement text at the prompts.
+
+    Lastly, replacement patterns are kept on a ring, just like search patterns.
+    You can press  C-h r  to view it.
+
+
+--------------------------------------------------------------------------------
+Lesson 6  SUMMARY
+
+
+ 1. To change a mode, press:      ESC m
+    To display all modes, press:  C-h m
+
+ 2. To search for a pattern    forward,  press:  C-s
+    To search for a pattern    backward, press:  C-r
+    To repeat previous search  forward,  press:  C-]
+    To repeat previous search  backward, press:  C-^
+
+ 3. To access  older  search or replacement entries at a prompt, press:  C-p
+    To access  newer  search or replacement entries at a prompt, press:  C-n
+
+ 4. To do a search and replace operation  with     prompting, press:  ESC q
+    To do a search and replace operation  without  prompting, press:  ESC r
+
+ 5. To display the replace ring in a pop-up window, press:  C-h r
+
+
+--------------------------------------------------------------------------------
+Lesson 7.1:  POP-UP WINDOWS
+
+      * Press  q  -OR-  ESC  to dismiss a pop-up window.
+
+    Pop-up windows are used extensively in MightEMacs for many purposes,
+    including the display of help and state information.  A pop-up window
+    overlays the entire screen, but only exists for a short time to display
+    information.  When it is being displayed, the cursor will always be at a
+    prompt at the bottom of the screen and will remain there until the window is
+    dismissed.  Pop-up windows operate the same way as the "less" Unix command
+    (file viewer) and support a subset of its commands.
+
+    When you are viewing a pop-up window in MightEMacs, you can press  ?  to see
+    the commands that are available, which are all single keystrokes.  You can
+    press  q  or ESC  at any time to dismiss the pop-up window and return to the
+    edit window.  If you press a key other than a paging command, it is
+    "remembered" and used as the first keystroke of the next command after the
+    pop-up window is dismissed.
+
+ 1. Let's view some commands in a pop-up window and scroll the display.  Read
+    the next step in its entirety before pressing any keys.
+ 2. Press  C-h c  to display commands.  At the "Apropos" prompt, enter "show" +
+    RTN.  You will see several commands in a pop-up window.  Press  ?  to
+    display help on the message line.  All the commands that can be used for
+    scrolling, etc.  will be underlined.  Try some of the commands, such as  SPC
+    to go forward,  b  to go back, and  G  to jump to the bottom.  When you are
+    done experimenting, press  q  to dismiss the window and return here.
+ 3. Now we will use a different method to dismiss the window.  Move the point to
+    the beginning of this line.
+ 4. Read the next step in its entirety before pressing any keys.
+ 5. Press  C-h k  to display the kill ring in a pop-up window.  Then press  C-e
+    DO NOT press  q  or  ESC  to dismiss the window.
+ 6. Where is the point now?  Notice that the  C-e  you pressed dismissed the
+    pop-up window AND was executed as a command (moved the point to the end of
+    the line).
+
+
+--------------------------------------------------------------------------------
+Lesson 7.2:  WINDOW REFRAMING
+
+      * Press  C-x .    to reframe the current window.
+      * Press  C-x C-n  to move window frame  down  n lines.
+      * Press  C-x C-p  to move window frame   up   n lines.
+
+    It is often desirable to move the lines being displayed in a window up or
+    down without moving the point.  This is called "reframing".  For example, if
+    you are entering lines of text and the point is getting close to the bottom
+    of the screen, you may want to shift the display upward to make more room
+    below.
+
+    Let's see how to do this.
+
+ 1. Move the point to this line.
+ 2. We will now make the line above the second line in the window.
+
+NOTE:
+    We are only using one window in this tutorial (except for the last lesson),
+    which consists of all lines on the screen.
+
+ 3. Press  C-u C-x .  to reframe the window with n == 2.  Notice that the first
+    instruction line is now the second line from the top of the screen and the
+    point is still at the same place on that line.  The point did not move in
+    the buffer, just the window "frame" that is displaying the buffer.  The
+    frame moved down so we now see more lines below (and fewer lines above).
+ 4. Now let's center the line containing point.  Move the point to this line and
+    press  C-x .
+ 5. Notice that the previous instruction is now centered vertically on the
+    screen.  This is the default behavior of the  C-x .  command.
+ 6. You can also reframe relative to the bottom of the screen by using a
+    negative numeric prefix.  Move the point to the next step and press  C-- 3
+    C-x .
+ 7. This line is now third from the bottom of the screen.  Scroll down 1/2 page
+    now so you can see the rest of this lesson.
+ 8. In addition to reframing using a line number, you can reframe by shifting
+    the display a certain number of lines up or down.  Move the point to the
+    next step and press  C-u 5 C-x C-n
+ 9. The window frame moved down 5 lines (and this line moved up 5 lines as a
+    result).  C-x C-n  moves the frame down and  C-x C-p  moves the frame up.
+    Both commands move the frame one line by default.
+10. Do some more experimentation with  C-x .  and  C-x C-n  and  C-x C-p  to
+    familiarize yourself with them and remember the keys.  They are very handy
+    commands and used often to keep text in view as you edit.
+
+
+--------------------------------------------------------------------------------
+Lesson 7.3:  GETTING HELP
+
+      * Press  ESC ?  to enter the Help System.
+      * Press  ESC a  to do an apropos on a command or variable.
+      * Press  C-h c  to do an apropos on a command.
+      * Press  C-h v  to do an apropos on a variable.
+      * Press  C-h ?  to display help for particular key(s).
+
+    MightEMacs has a comprehensive built-in Help System.  To access it, press
+    ESC ?  and read the instructions on the first page to find out how it works.
+
+    You can also get help on commands and variables (as well as macros and
+    functions, which are discussed in Advanced Help) by pressing  ESC a  and
+    entering part of a name, like "file" or "buf".  All matching items will be
+    displayed in a pop-up window.
+
+    To limit the apropos search to just commands,  press:  C-h c
+    To limit the apropos search to just variables, press:  C-h v
+
+    Lastly, to find out what a particular key does, press  C-h ?  followed by
+    the key(s) in question.  A description of the command will be displayed in a
+    pop-up window.
+
+
+--------------------------------------------------------------------------------
+Lesson 7.4:  CREATING A STARTUP SCRIPT
+
+    MightEMacs can be extensively customized.  You can for example, write your
+    own commands called "macros" in MScript (the scripting language), bind them
+    to keys, and execute them in your editing session just like the built-in
+    commands.  You can also do simpler things like change the default settings
+    at startup.  To do this, you have to create a ".memacs" file in your home
+    directory.
+
+    Let's create a startup file that does three things.  We will make them all
+    comments in this example, but feel free to uncomment them (by removing the
+    #  character at the beginning of the line) or modify them if you like.  The
+    three customizations are:
+
+        - enable "ASave" mode.
+        - change the search delimiter to the return key.
+        - bind the "help" command to  ESC h  (in addition to  ESC ?).
+
+ 1. Reframe the window so that this line is the first line on the screen.
+    Move the point to the first line of this step and press  C-u 1 C-x .
+ 2. Open your startup file in a new window (so that you can still see these
+    steps).  Press  C-u 3 C-x C-f  and enter "~/.memacs" at the prompt.  This
+    will create an empty buffer for the file in a new window below and switch to
+    that window.
+
+NOTES:
+    You will now see two windows and be in the lower one (with the tutorial in
+    the upper one).  To scroll the upper window down, press  C-h C-v
+    To scroll it up, press  C-h C-z
+
+    If you chose to install the sample user startup file when you installed
+    MightEMacs, the file will already exist and contain data.
+
+ 3. Move to the end of the buffer if it's not empty (press  ESC >  ).
+ 4. Enter the following lines:
+
+        # 1 => chgMode nil, 'ASave'
+        # $searchDelim = 'RTN'
+        # bindKey 'ESC h', help
+
+NOTE:
+    The "=>" operator is used to supply a numeric prefix to a command.
+
+ 5. Save the file by pressing  C-x C-s
+ 6. Delete the current window by pressing  C-x 0
+
+    Any uncommented lines will go into effect the next time you start
+    MightEMacs.  You can add all your preferred settings to this ".memacs" file.
+
+    For more information about the MScript language, see the "Writing Scripts"
+    topic in Advanced Help.  For more information about the windows, see the
+    "Windows" topic in Advanced Help.
+
+
+--------------------------------------------------------------------------------
+Lesson 7 SUMMARY
+
+ 1. To dismiss a pop-up window, press:  q  -OR-  ESC
+
+ 2. To reframe the current window, press:        C-x .
+    To move window frame  down  n lines, press:  C-x C-n
+    To move window frame   up   n lines, press:  C-x C-p
+
+ 3. To enter the Help System, press:                   ESC ?
+    To do an apropos on a command or variable, press:  ESC a
+    To do an apropos on a command, press:              C-h c
+    To do an apropos on a variable, press:             C-h v
+    To display help for particular key(s), press:      C-h ?
+
+
+--------------------------------------------------------------------------------
+
+    This concludes the MightEMacs Tutorial.  It was intended to give a
+    reasonably good overview of the editor, and provide enough information about
+    concepts and common commands to allow you to begin editing files with at
+    least a basic level of confidence.  It is far from complete.  MightEMacs has
+    many more commands and features.  Read through the topics in the Help System
+    next (via ESC ?).
+
+    To learn how to write and use scripts, read the topics in Advanced Help.
+
+
+(c) Copyright 2020 Richard W. Marinelli
+Email: italian389@yahoo.com
+Reddit: http://reddit.com/r/memacs
+Ver. 1.1.0

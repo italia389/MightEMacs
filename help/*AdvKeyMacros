@@ -1,0 +1,111 @@
+~bKey Macros~B
+
+You may find during an editing session that you need to perform the same series
+of commands on multiple lines or portions of text.  MightEMacs has the ability
+to save (or record) keystrokes in memory (a "key macro" or just "macro") and
+then play them back as many times as you like, as if you had entered them by
+hand.  Each macro you create is given a name when you complete it and saved on
+the "Macro" ring.
+
+The general method of recording and playing back a macro is as follows:
+
+     1. Position the point at the beginning of the first text object (typically,
+        the beginning of a line).
+     2. Start recording by entering ~#uC-x (~U (beginMacro).  "REC" will appear on
+        the mode line of the current window (in color if available).
+     3. Enter commands to change the first text object to the desired form and
+        position the point at the beginning of the next object when done.
+     4. Stop recording by entering ~#uC-x )~U (endMacro).  "REC" will disappear from
+        the mode line.
+     5. You will be prompted to give the macro a name.  Enter a short name and
+        ~ureturn~U (or just press ~ureturn~U to discard the macro).
+     6. Play back the macro you just recorded for each of the remaining text
+        objects by entering a positive numeric prefix followed by ~#uC-x e~U
+        (xeqMacro).
+
+For example, say you have the following lines of text and wish to convert them
+to an initializer for an array variable for a C program you're working on:
+
+    blue, 32, The sky
+    green, 7, Grass blades
+    red, 1, Hot chile peppers
+    yellow, 15, Ripe bananas
+
+One way to do this is to position the point at the beginning of the first line
+(at the "b" of "blue"), then use the following series of keys:
+
+    ~#uC-x ( { C-u C-s , ESC C-f " C-e " } , C-f C-x )~U
+
+Lastly, enter "example" for the name when prompted.
+
+This sequence does the following: begins a macro, inserts a left brace, searches
+for the second comma, moves forward one character, inserts a double quote
+character, moves to the end of line, inserts a double quote, a right brace, and
+a comma, moves forward one character (to the beginning of the next line), and
+ends recording.  Now it can be played back three times by isuing ~#uC-u 3 C-x e~U,
+which produces the following result:
+
+    {blue, 32, "The sky"},
+    {green, 7, "Grass blades"},
+    {red, 1, "Hot chile peppers"},
+    {yellow, 15, "Ripe bananas"},
+
+This can definitely save you a lot of typing, especially when you have many
+similar text objects to edit.
+
+Note that when you press ~#uC-x e~U to execute a macro, it executes the macro on the
+top of the macro ring by default.  If you use a negative numeric prefix for the
+command, it first prompts you for a macro name (which can be completed with the
+~utab~U key), then executes that macro abs(n) times.  This allows you to quickly
+execute a macro by name other than the most recent one executed.  Additionally,
+you can press ~#uC-h M~U (showMacroRing) to see all macros that exist.
+
+You can also use the "seti" (~#uESC i~U) and "inserti" (~#uC-c i~U) commands in
+combination with a macro to insert a series of numbers (ascending or descending)
+into the current buffer, optionally with associated text.  For example, let's
+say you wanted to insert line numbers before ten consecutive lines in form
+"NN. ", where NN is the line number.  You could accomplish this as follows:
+
+     1. Set the beginning line number, format string, and increment with the
+        ~#uESC i~U command.
+     2. Move the point to the beginning of the first line.
+     3. Create a macro that inserts the line number via the ~#uC-c i~U command and
+        moves the point to the beginning of the next line.
+     4. Run the macro nine more times.
+
+The "seti" command initializes the editor's internal "i" variable, a format
+string, and an increment.  These three values are subsequently used by the
+"inserti" command to insert an integer converted to string form into the text.
+The format string must contain exactly one %d, %o, %u, %x, or %X specification.
+Each time the "inserti" command is called, it does the following abs(n) times:
+
+     1. Evaluates the expression "fmt % i" (where ~ufmt~U is the format string and ~ui~U
+        is the i variable).
+     2. Inserts the result of the expression at point.
+     3. Adds the increment to i.
+     4. If the command was called with a negative numeric prefix, moves the
+        point back to its original location.
+
+Given this, we could do the following to number ten consecutive lines:
+
+     1. Type ~#uESC i~U and enter "1", "%2u. ", and "1" when prompted.
+     2. Move the point to the beginning of the first line.
+     3. Create a macro (and give it a name): ~#uC-x ( C-c i 2 C-a C-x )~U.
+     4. Run it nine more times: ~#uC-u 9 C-x e~U.
+
+The numbers will be inserted before each line with space padding so that they
+are vertically aligned.
+
+Note that you can also run the "inserti" command by itself with a repeat count
+if you don't need to move the point after each iteration.  For example, try
+this:
+
+     1. Type ~#uESC i~U and enter "1", "....+....%d", and "1" when prompted.
+     2. Move the point to the beginning of an empty line.
+     3. Run "inserti" nine times: ~#uC-u 9 C-c i~U.
+
+You now have a "line length" ruler in your buffer.
+
+One final note: you can display the "i" variable parameters at any time by
+invoking "seti" with a negative numeric prefix; for example, ~#uC-- ESC i~U.  The
+current values will be displayed on the message line.

@@ -1,0 +1,159 @@
+~bSearch Pattern Syntax~B
+
+As discussed previously, there is a group of commands for searching for a
+pattern in a buffer and optionally, replacing one or more occurrences of the
+matching text with a string or another pattern.  MightEMacs supports searching
+using regular expressions (REs) or plain text patterns.  Additionally, either
+type of search can be case-sensitive or case-insensitive, and searching can be
+done either forward or backward.  The type of pattern matching is controlled by
+option characters appended to the pattern string, and by two global modes:
+"Exact" and "Regexp".  When enabled, the former mode specifies case-sensitive
+pattern matching by default and the latter specifies RE matching by default.
+Either or both can be enabled or disabled at any time.
+
+MightEMacs uses the XRE library in "enhanced" mode for regular expression
+matching.  See the xre_format(7) man page for details.  The XRE library supports
+an extensive set of features; however, only a summary of the RE pattern syntax
+is described here.
+
+Note that in the descriptions below an "atom" is defined as a literal character,
+an escaped character, a literal sequence (like ~b~u\t~Z), the ~b~u.~Z metacharacter, a
+character class, a shortcut (like ~b~u\d~Z), a back reference (like ~b~u\2~Z), or a group.
+Also, "greedy" matching means "as many as possible" and "ungreedy" matching
+means "as few as possible".
+
+~bBasic Elements~B
+
+    ~b.~B       Match any character except ~unewline~U.
+    ~b*~B       Match zero or more occurrences of the previous atom in "greedy"
+            mode.
+    ~b+~B       Match one or more occurrences of the previous atom in "greedy" mode.
+    ~b?~B       Match zero or one occurrence of the previous atom, or change an
+            iteration operator to "ungreedy".
+    ~b{m,n}~B   Match a minimum of ~bm~B and a maximum of ~bn~B occurrences of the previous
+            atom, where ~bm~B and ~bn~B are unsigned integers.  ~bm~B is required; however,
+            ~bn~B or ~b,~B may be omitted.  In the ~b{m,}~B form, ~bn~B defaults to an infinite
+            value.  In the ~b{m}~B form, exactly ~bm~B occurrences must match.
+    ~b[~B       Begin a character class definition.
+    ~b]~B       End a character class definition.
+    ~b(~B       Mark the beginning of a group.
+    ~b)~B       Mark the end a group.
+    ~b|~B       Match the RE which precedes or follows ("or").
+
+The ~b?~B metacharacter is used for "zero or one of the previous item" or as a
+modifier following itself, ~b*~B, ~b+~B, or ~b{m,n}~B meaning "as few as possible".
+
+Character classes ~b[]~B may contain range(s) or be negated with a leading ~b^~B
+metacharacter; for example, "[a-zA-Z0-9_]" or "[^0-9]".
+
+~bAssertions~B
+
+    ~b^~B       Match beginning of line, including the position following a ~unewline~U
+            character.
+    ~b$~B       Match end of line, including the position preceding a ~unewline~U
+            character
+    ~b\<~B      Match the beginning of a word.
+    ~b\>~B      Match the end of a word.
+    ~b\b~B      Match a word boundary.
+    ~b\B~B      Match a non-word boundary.
+
+A word is defined as a sequence of word characters which is neither preceded nor
+followed by word characters.  A word character is an alphanumeric character (as
+defined in the ctype(3) man page) or an underscore.
+
+~bLiteral Sequences~B
+
+    ~b\e~B      Escape character.
+    ~b\f~B      Form feed.
+    ~b\n~B      Newline.
+    ~b\r~B      Carriage return.
+    ~b\t~B      Tab character.
+    ~b\xx...~B or ~b\x{x...}~B
+            An arbitrary eight-bit value.  The x... sequence represents one or
+            two hexadecimal digits.
+
+Literal sequences can be used both inside and outside a character class.
+
+~bNamed Character Classes~B
+
+Within a ~b[]~B bracket expression, the name of a character class enclosed in ~b[:~B
+and ~b:]~B stands for the list of all characters belonging to that class.  Standard
+character class names are:
+
+    alnum     cntrl     lower     space
+    alpha     digit     print     upper
+    blank     graph     punct     xdigit
+
+These stand for the character classes defined in the ctype(3) man page.  For
+example, "[[:digit:].]" would match a digit or a period.
+
+~bShortcuts~B
+
+The following shortcuts can be used to replace more complicated character
+classes.  Additionally, the lower case versions may be used inside a character
+class; for example, "[\a\d]" would match any letter or digit.
+
+    ~b\a~B      Match an alphabetic character (equivalent to "[[:alpha:]]").
+    ~b\A~B      Match a non-alphabetic character (equivalent to "[^[:alpha:]]").
+    ~b\d~B      Match a digit character (equivalent to "[[:digit:]]").
+    ~b\D~B      Match a non-digit character (equivalent to "[^[:digit:]]").
+    ~b\h~B      Match a horizontal space character (space or tab) (equivalent to
+            "[[:blank:]]").
+    ~b\H~B      Match a non-horizontal space character (space or tab) (equivalent to
+            "[^[:blank:]]").
+    ~b\l~B      Match a lower-case letter (equivalent to "[[:lower:]]").
+    ~b\L~B      Match a non-lower-case letter (equivalent to "[^[:lower:]]").
+    ~b\N~B      Match a non-newline character (equivalent to "[^\n]").
+    ~b\s~B      Match a space character (equivalent to "[[:space:]]").
+    ~b\S~B      Match a non-space character (equivalent to "[^[:space:]]").
+    ~b\u~B      Match an upper-case letter (equivalent to "[[:upper:]]").
+    ~b\U~B      Match a non-upper-case letter (equivalent to "[^[:upper:]]").
+    ~b\w~B      Match a word character (equivalent to "[[:alnum:]_]").
+    ~b\W~B      Match a non-word character (equivalent to "[^[:alnum:]_]").
+
+~bBack References~B
+
+A back reference is a backslash ~b~u\~Z followed by a digit from 1 through 9, such as
+"\2".  A back reference matches the same sequence of characters matched by the
+nth group (numbering groups by the positions of their opening parentheses, left
+to right), so that, for example, "([bc])\1" matches "bb" or "cc" but not "bc".
+
+~bGeneral~B
+
+Plain parentheses ~b(~B and ~b)~B are used for grouping and escaped versions ~b\(~B and ~b\)~B
+are used to search for the literal characters.  Grouped match strings may be
+included in a replacement pattern by specifying ~b\n~B, where n is a digit in the
+range 1-9 and refers to the nth group.  Groups are numbered in sequence by the
+opening parenthesis in the search pattern, beginning at 1.  The entire matched
+string is represented by ~b\0~B.
+
+Lastly, a colon and one or more lowercase letters may be appended to any pattern
+to specify options, as follows:
+
+    ~be~B       Exact pattern matching.  Case of letters is significant.
+    ~bf~B       Fuzzy matching.  Approximate matching is performed.
+    ~bi~B       Ignore case.  Case of letters is not significant.
+    ~bp~B       Plain text matching.  The pattern is matched literally.
+    ~br~B       Regexp matching.  The pattern is matched as a regular expression.
+    ~bm~B       Multi-line mode.  When performing RE matching, the ~b.~B metacharacter
+            and a negative character class ~b[^...]~B will match a ~unewline~U, which
+            they do not by default (but only if, in the latter case, the
+            character class does not contain a ~unewline~U).
+
+Pattern options always override the corresponding global modes.  For example,
+the pattern "abc.:ri" would be processed as a regular expression and case would
+be ignored, whether or not the ~uExact~U or ~uRegexp~U global modes were enabled.
+Whereas "abc.:e" would cause case to be significant, but would be processed as a
+regular expression if ~uRegexp~U mode was enabled, and as plain text if not.  Also,
+to allow a pattern option string to be part of a pattern and avoid ambiguity
+when a pattern is interpreted, the following rule is used:
+
+    "If a pattern ends with a colon followed by one or more valid option
+    letters, and the colon is not the first character of the pattern, then
+    everything preceding the colon is the pattern.  In all other cases, the
+    entire string is the pattern (with no options)."
+
+So for example, the pattern "abc:ri" would be interpreted as RE pattern /abc/i,
+"abc:r:p" would be interpreted as plain text pattern 'abc:r', "abc::r" would be
+interpreted as RE pattern /abc:/, and "abc:rx" would be interpreted as plain
+text pattern 'abc:rx' (because it contains invalid option letter ~bx~B).

@@ -1,0 +1,78 @@
+~bMScript Introduction~B
+
+In addition to editing files, one of MightEMacs primary features is
+extensibility through the use of a powerful scripting language called MScript.
+For example, you can write your own commands and functions, which provide a
+means of extending the editor's features and capabilities to suit your needs.
+MScript uses a C-like syntax for expressions and statements, which can be
+continued to subsequent lines.  Statements are used for looping, conditional
+execution, defining routines, and other purposes.  A command that is defined in
+a script operates identically to a built-in command; that is, it accepts a
+numeric prefix, can be bound to a key (and invoked interactively), can be called
+from a script with arguments, and returns a value.
+
+Scripts are written in buffers or files and then executed with the "xeqBuf"
+(~#uC-x x~U) or "xeqFile" (~#uC-x /~U) command.  MScript files may also be executed from
+the command line when starting the editor or from another script (for example,
+from the "memacs.ms" site startup file or the "~/.memacs" user startup file).
+
+You can try this out for yourself in the editor.  Create a scratch buffer and
+enter the following lines:
+
+    # Example script that defines a function which accepts two arguments.
+    function example(2)
+        print "Base name of file '#{$1}' is '#{-1 => basename $1}'"
+        $2
+    endroutine
+
+Execute the buffer by entering ~#uC-x x~U and typing the name of the scratch buffer
+at the prompt.  Function "example" is now defined.  (You can verify this via the
+"showFunctions" (~#uC-h f~U) command.  You should see "example" in the "user" section
+of the list with no key binding or description.)
+
+Now let's execute the function and capture it's return value in a global
+variable.  Type ~#uESC C-x~U (eval) to execute a command line.  At the prompt, enter:
+
+    $result = example '/dir1/myfile.txt', 77
+
+and press ~ureturn~U, which will run the function.  You should see:
+
+    Base name of file '/dir1/myfile.txt' is 'myfile'
+
+on the message line.  Now check the global variable.  Enter ~#uC-h v res~U, press
+~ureturn~U, and observe that variable $result has a value of 77.
+
+This was admittedly a contrived example of writing a script and a user routine,
+but does illustrate the basics of how it's done.  For something more practical,
+consider the following.  Say you are testing a script and want to clear all
+hooks at the beginning of it so that they will not be invoked when your script
+is run.  This script snippet accomplishes that by getting a list of all hook
+names into a buffer, positioning the point in the buffer and looping through the
+lines, clearing each hook by extracting its name from the line and building a
+"clearHook" statement that is executed with the "eval" command.  Lastly, it
+deletes the temporary buffer:
+
+    # Clear all hooks.  Process lines which begin
+    # with a lower-case letter.
+    bufname = (0 => showHooks)[0]
+    until nil?(line = bgets bufname)
+        if line =~~ '^[a-z]'
+            eval "clearHook '", strShift(line, ' '), "'"
+        endif
+    endloop
+    delBuf bufname
+
+As you can see, useful work can be done with just a few lines of code.  Note
+that this script snippet uses the "showHooks" command to get all the hooks
+names.  This was the only way to obtain them prior to version 9.0 of the editor.
+Now the "getInfo" function is available.  It provides various types of system
+and session information, including hook names.  Here is the same script snippet
+rewritten to use "getInfo":
+
+    # Clear all hooks.  getInfo returns hooks as an array in
+    # form: [[hook-name, func-name], ...].
+    for hookInfo in getInfo('Hooks')
+        eval "clearHook '", hookInfo[0], "'"
+    endloop
+
+This version is definitely more succinct and straightforward.

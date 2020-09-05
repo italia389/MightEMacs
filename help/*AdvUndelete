@@ -1,0 +1,32 @@
+~bUndeleting Text~B
+
+As you may recall, deleted text is saved on the "delete ring" (with the
+exception of single characters or a whole buffer).  The delete ring works just
+like the kill ring and can be used in the same manner.
+
+The commands for undeleting text and managing the delete ring are:
+
+    undelete            ~#uESC u~U
+    undeleteCycle       ~#uESC U~U
+    revertYank          ~#uC-x C-y~U
+    cycleDelRing        ~#uC-c d~U
+    delDelEntry         ~#uC-x d~U
+    showDelRing         ~#uC-h d~U
+
+The "undelete" (~#uESC u~U) command is equivalent to the "yank" (~uC-y~U) command and the
+"undeleteCycle" (~#uESC U~U) command is equivalent to the "yankCycle" (~#uESC C-y~U)
+command.  The only difference is that text is retrieved from the delete ring
+instead of the kill ring.
+
+So if you delete some text by mistake, like a line or word, you can immediately
+restore it by pressing ~#uESC u~U.  The inserted text is also marked as a region.  If
+you want the deleted text before that, immediately press ~#uESC U~U one or more
+times to replace the restored text with the next older entry from the delete
+ring.  You also can cancel the whole undelete process by pressing ~#uC-x C-y~U
+(revertYank), which will remove the undeleted text from the buffer, just like is
+done when the keys are entered after a yank command.
+
+The maximum size of the delete ring is initially 30 entries, and is controlled
+with the "ringSize" (~#uESC R~U) command.  To change the size, execute the command
+with a numeric prefix, enter "delete" for the ring name, and enter a new integer
+value.  To set it to an unlimited size, enter zero for the size.

@@ -1,0 +1,113 @@
+~bStatements~B
+
+Several types of statements are available for use in scripts, including ones for
+looping and conditional execution.  All "statement keywords" must be the first
+word on a line (optionally preceded by white space), and must have either white
+space or a left paren between their names and their argument(s), if any.  The
+two exceptions are ~bcommand~B and ~bfunction~B, which must be followed by white space.
+
+Following is a list of all statements and their usage.  Keywords and literal
+characters are shown in ~bbold~B and parameters are ~uunderlined~U:
+
+    {~bcommand~B | ~bfunction~B} ~uname~U[~b(~B [~umin-arg-count~U [~b,~B [~umax-arg-count~U]]] ~b)~B]
+     [~b{~B [~barguments:~B ~ustring~U] [~b,~B] [~bdescription:~B ~ustring~U] ~b}~B]
+        Begin a command or function definition.  If ~bfunction~B is specified, the
+        routine may not be bound to a key or run interactively, and will not be
+        listed in the "showFunctions" display by default unless it includes
+        either the ~barguments~B or ~bdescription~B parameter, or is bound to a hook.
+        If ~bcommand~B is specified, the routine may be bound to a key or run
+        interactively, but may not be bound to a hook.
+
+        If the ~umin-arg-count~U or ~umax-arg-count~U expression is specified, it must
+        evaluate to a non-negative integer and the routine must be called with
+        no fewer than ~umin-arg-count~U and no more than ~umax-arg-count~U arguments or
+        an error will occur.  If only ~umin-arg-count~U is specified, the routine
+        must be called with exactly ~umin-arg-count~U arguments.  If ~umin-arg-count~U
+        is specified followed by a comma, the routine may be called with
+        ~umin-arg-count~U arguments or more.  Lastly, if neither argument count is
+        specified, the routine may be called with any number of arguments
+        (including none).
+
+        If the ~barguments~B or ~bdescription~B parameter is specified, the expression
+        must evaluate to a non-null string.  Neither, one, or both may be
+        specified, in any order, enclosed in braces ~b{ }~B.  The ~barguments~B value is
+        the argument syntax and the ~bdescription~B value describes the routine's
+        purpose; for example:
+
+            command fenceWord(1) {arguments: 'char', description: 'Wrap a pair\
+             of fences around [-]n word(s)'}
+
+        The ~barguments~B and ~bdescription~B text values are shown with the command or
+        function name in the help text produced by the "apropos" (~#uESC a~U),
+        "showCommands" (~#uC-h c~U), and "showFunctions" (~#uC-h f~U) commands.
+
+    ~bendroutine~B
+    	End the definition of the most recent command or function being defined,
+    	which is determined by locating the most recent unpaired ~bcommand~B or
+    	~bfunction~B keyword.
+
+    ~bif~B ~uand-or-expr~U
+        Begin an "if" statement.  Execution continues if ~uand-or-expr~U evaluates
+        to true.
+
+    ~belsif~B ~uand-or-expr~U
+        Specify an "else if" statement for the most recent unpaired ~bif~B keyword.
+        The condition is true if ~uand-or-expr~U evaluates to true and the paired ~bif~B
+        and any prior ~belsif~B clauses that follow the ~bif~B were false.  Zero or more
+        consecutive ~belsif~B keywords may follow an ~bif~B.
+
+    ~belse~B
+        Specify an "else" statement, which is true if the paired ~bif~B and any
+        ~belsif~B clauses that follow the ~bif~B were false.  Zero or one ~belse~B keywords
+        may follow an ~bif~B.
+
+    ~bendif~B
+        End an "if" statement, which is determined by locating the most recent
+        unpaired ~bif~B keyword.
+
+    ~bfor~B ~uvar~U ~bin~B ~uarray-expr~U
+        Begin a "for" statement.  ~uarray-expr~U is evaluated.  Then for each
+        element in the array (which may be empty), the value is assigned to
+        variable ~uvar~U and the block of statements following the keyword to
+        its paired ~bendloop~B is executed.  If the array is empty, the block is
+        not executed and ~uvar~U is set to ~bnil~B.
+
+    ~bwhile~B ~uand-or-expr~U
+        Begin a "while" statement.  The block of statements following the
+        keyword to its paired ~bendloop~B is executed while its condition is
+        true (zero or more times).
+
+    ~buntil~B ~uand-or-expr~U
+        Begin an "until" statement.  The block of statements following the
+        keyword to its paired ~bendloop~B is executed until its condition is
+        true (zero or more times).
+
+    ~bloop~B
+        Begin a "loop" statement.  The block of statements following the keyword
+        to its paired ~bendloop~B is executed an indefinite number of times (one or
+        more).  The block must contain at least one ~bbreak~B or ~breturn~B statement to
+        prevent an endless do loop.
+
+    ~bendloop~B
+        End a "for", "while", "until", or "loop" statement, which is determined
+        by locating the most recent unpaired ~bfor~B, ~bwhile~B, ~buntil~B, or ~bloop~B keyword.
+
+    ~bnext~B
+        Transfer control to the end of the enclosing loop block and begin the
+        next iteration, which causes immediate evaluation of the loop condition
+        if the block is a ~bwhile~B or ~buntil~B statement, and processing of the next
+        array element if the block is a ~bfor~B statement.
+
+    ~bbreak~B [~uint-expr~U]
+        Break out of one (the default) or more enclosing loop blocks, determined
+        by ~uint-expr~U if specified, which must evaluate to an integer greater than
+        zero.  Control is transferred to the end of the last block that is
+        exited.
+
+    ~breturn~B [~uand-or-expr~U]
+        Exit a command, function, or executing buffer and return to the caller.
+        The return value is ~uand-or-expr~U if specified; otherwise, ~bnil~B.
+
+    ~bforce~B ~uand-or-expr~U
+        Force the successful evaluation of ~uand-or-expr~U; that is, ignore any
+        error which may occur.

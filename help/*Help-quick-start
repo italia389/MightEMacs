@@ -1,0 +1,45 @@
+<home>    <exit>
+
+
+~bQuick Start~B
+
+To edit a file, enter the filename as an argument when you start MightEMacs:
+
+    $ mm foobar
+
+Alternatively, you can open a file to edit from within MightEMacs.  Type ~uC-x~U ~uC-f~U
+(findFile), enter the filename at the prompt, and press ~ureturn~U.
+
+Basic editing keys are:
+
+    ~uC-f~U or ~uright-arrow~U      Move cursor right.
+    ~uC-b~U or ~uleft-arrow~U       Move cursor left.
+    ~uC-p~U or ~uup-arrow~U         Move cursor up.
+    ~uC-n~U or ~udown-arrow~U       Move cursor down.
+    ~uC-a~U                     Move to beginning of line.
+    ~uC-e~U                     Move to end of line.
+    ~uC-t~U                     Jump quickly left or right across line.
+
+    ~uC-v~U                     Scroll down one page.
+    ~uC-z~U                     Scroll up one page.
+    ~#uESC <~U                   Move to beginning of buffer.
+    ~#uESC >~U                   Move to end of buffer.
+
+    ~uC-s~U                     Search forward (enter seach string and press ~uESC~U).
+    ~uC-r~U                     Search backward (enter seach string and press ~uESC~U).
+    ~uC-]~U                     Repeat last search forward.
+    ~uC-^~U                     Repeat last search backward.
+
+    ~uC-k~U                     Delete from cursor to end of line.
+    ~uC-l~U                     Delete current line.
+
+To perform an ~bapropos~B search on a command, function, or variable name, press
+~#uESC a~U and enter part of a name; for example, "buf" or "file".
+
+To exit MightEMacs:
+
+    ~#uESC z~U                   Save changes and exit.
+    ~#uESC e~U or ~#uC-x C-c~U        Exit without saving changes.
+
+
+<home>    <exit>

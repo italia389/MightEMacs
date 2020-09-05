@@ -1,0 +1,47 @@
+~bKill Ring~B
+
+As you may recall, a text object is saved in the kill ring whenever it is copied
+or killed.  The "yank" (~uC-y~U) command is used to insert text from the kill ring
+into the current buffer at point.  The yanked text is also marked as a region.
+
+There are five other related commands that you can use to manage the kill ring:
+
+    yankCycle           ~#uESC C-y~U
+    revertYank          ~#uC-x C-y~U
+    cycleKillRing       ~#uC-c k~U
+    delKillEntry        ~#uC-x k~U
+    showKillRing        ~#uC-h k~U
+
+To yank the most recent kill, press ~uC-y~U.  If you want a kill before that,
+immediately press ~#uESC C-y~U (yankCycle) one or more times.  Each time you execute
+the "yankCycle" command, the last inserted kill text is replaced with the
+previous one.  It also cycles the kill ring so that the last kill inserted stays
+at the "top".  You can also cancel the whole operation by pressing ~#uC-x C-y~U
+(revertYank) right after the "yank" command or after any of the "yankCycle"
+commands.  If ~#uC-x C-y~U is entered, the inserted text will be removed and you
+will be back to where you started.
+
+The "cycleKillRing" command allows you to cycle the kill ring manually before
+yanking.  This is handy when you have two or more kills and want to insert each
+one in a different place.  Move to the first location and insert the last kill
+first (~uC-y~U), move to the next location, cycle the kill ring (~#uC-c k~U), then insert
+the next one (~uC-y~U).
+
+Another way to do this is to use a negative numeric prefix with "yank" to access
+older kills directly.  In the last example, you could skip the "cycleKillRing"
+command and insert the next to last kill via ~#uC-- C-y~U.
+
+To see the kill ring at any time (in a pop-up window), enter ~#uC-h k~U.  The most
+recent kill is number 0, followed by -1, -2, etc.
+
+If you want to delete one or more kills from the kill ring, use "delKillEntry"
+(~#uC-x k~U).  This command deletes the most recent n entries (default 1), a specific
+entry if n is negative, or all entries if n is zero.
+
+Lastly, the maximum size of the kill ring (which defaults to 50 entries) is
+controlled with the "ringSize" (~#uESC R~U) command.  To change the size, execute
+the command with a numeric prefix, enter "kill" for the ring name, and a enter a
+new integer value.  To set it to an unlimited size, enter zero for the size.
+Note that you cannot set the size to a value (other than zero) that is less than
+the current number of entries in the kill ring.  You must delete one or more
+entries first.

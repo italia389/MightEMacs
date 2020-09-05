@@ -1,40 +1,45 @@
-You are looking at the ReadMe file for MightEMacs, an Emacs-style text editor which runs on Unix and Linux platforms.  See file
-*Install.txt* for build and installation instructions.  A C99 C compiler is required if you are not installing on a Linux or
-macOS platform, or do not want to use the included binaries.
+You are looking at the ReadMe file for MightEMacs, an Emacs-style text editor which runs on
+macOS, Linux, and Unix platforms.  See file *Install.txt* for build and installation
+instructions.  A C99 C compiler is required if you are not installing on a macOS or Linux
+platform, or do not want to use the included binaries.
 
 History and Project Goals
 -------------------------
-MightEMacs is designed to be a fast and full-featured text editor.  Goals of the project are to create an Emacs-style text
-editor that will do the following:
+MightEMacs is designed to be a fast and full-featured text editor.  Goals of the project are to
+create a lightweight Emacs-style text editor that will do the following:
 
  1. Provide the ability to edit code quickly and easily with few keystrokes.
  2. Use key bindings that are well designed and intuitive.
  3. Be as easy as possible to learn.
- 4. Be robust and powerful enough to perform sophisticated editing and automation tasks, provide a high level of extensibility,
-    and yet not be overly complex.
+ 4. Be robust and powerful enough to perform sophisticated editing and automation tasks, provide
+    a high level of extensibility, and yet not be overly complex.
 
-MightEMacs is focused on editing files well and being easily extensible, but also being an editor that is not daunting -- one
-that can be learned fairly quickly by the average programmer.  The tradeoff is that it lacks some features (and complexity) of
-other editors.  It uses a Text User Interface and is run from a terminal window.  It is not an IDE and doesn't try to be.  It is
-however, very fast, robust, and provides most of the things you would expect from an Emacs editor, like the ability to create
-multiple buffers, windows, and screens, built-in and user-defined modes of different types, a kill ring, search ring, keyboard
-macros, sophisticated navigation, searching, and editing commands, multiple working directories, language-specific
+MightEMacs is focused on editing files well and being easily extensible, but also being an
+editor that is not daunting -- one that can be learned fairly quickly by the average programmer.
+The tradeoff is that it lacks some features (and complexity) of other editors.  It uses a Text
+User Interface and is run from a terminal window.  It is not an IDE and doesn't try to be.  It
+is however, very fast, robust, and provides most of the things you would expect from an Emacs
+editor, like the ability to create multiple buffers, windows, and screens, built-in and
+user-defined modes of different types, a kill ring, search ring, key macro ring, sophisticated
+navigation, searching, and editing commands, multiple working directories, language-specific
 auto-formatting, fence matching, extensibility, a built-in help system, and more.
 
-It also supports a C-like scripting language called MScript that is very powerful and fairly easy to learn (assuming you already
-have programming experience).  The distribution package includes several scripts as well that perform various tasks, such as
-finding a file that contains a particular function or method definition and opening it at that location, naming and storing
-keyboard macros in a file, wrapping a pair of fence characters or quotes around one or more words in the text, or grepping for
-files and performing a global search and replace on them.
+It also supports a C-like scripting language called MScript that is very powerful and easy to
+learn (assuming you already have programming experience).  The distribution package includes
+several scripts as well that perform various tasks, such as finding a file that contains a
+particular function or method definition and opening it at that location, rewrapping text in a
+comment block, wrapping a pair of fence characters or quotes around one or more words in the
+text, or grep'ing for files and performing a global search and replace on them.
 
 See the `memacs(1)` man page and on-line help (via `ESC ?`) for further information.
 
 Examples
 --------
-Following are some examples of MightEMacs' features and how it can be used to edit code.  The cursor (point) is shown as (^)
-and keys that are typed are shown in <b>bold</b>.  Control keys are shown as `C-X`, where `X` is usually a letter.  Note
-that the `C-_` (control + underscore) key, which is used often, can be entered without holding down the shift key (control +
-dash), which makes it much easier to type.  Hence, it is shown as  `C--` in the examples.
+Following are some examples of MightEMacs' features and how it can be used to edit code.  The
+cursor (point) is shown as (^) and keys that are typed are shown in <b>bold</b>.  Control keys
+are shown as `C-X`, where `X` is usually a letter.  Note that the `C-_` (control + underscore)
+key, which is used often, can usually be entered without holding down the shift key (control +
+dash), which makes it easier to type.  Hence, it is shown as `C--` in the examples.
 
 1. Duplicate a block of lines in JavaScript:
 
@@ -178,30 +183,30 @@ dash), which makes it much easier to type.  Hence, it is shown as  `C--` in the 
 
     <pre>
     if(flags & OpEval)(^)
-        mset(mkp,NULL);
+        mset(mkp, NULL);
     else if(n >= 0)
-        mset(mkp,wkbuf);
+        mset(mkp, wkbuf);
     else
-        // mset(a,b) where a is a char buffer.
-        mset(NULL,wkbuf);
+        // mset(a, b) where a is a char buffer.
+        mset(NULL, wkbuf);
     </pre>
 
     <pre>
     <b>ESC q</b> (query replace...)
-    <b>(mset\()([^,]+),([^)]+):r ESC</b> ("from" regular expression...)
-    <b>\1\3,\2 ESC</b> ("to" replacement pattern)
+    <b>(mset\()([^,]+), ?([^)]+):r ESC</b> ("from" regular expression...)
+    <b>\1\3, \2 ESC</b> ("to" replacement pattern)
     <b>SPC SPC n SPC q</b> (replace first two occurrences, skip third, do last)
     </pre>
     Yields (reversed <b>mset()</b> arguments):
 
     <pre>
     if(flags & OpEval)
-        mset(NULL,mkp);
+        mset(NULL, mkp);
     else if(n >= 0)
-        mset(wkbuf,mkp);
+        mset(wkbuf, mkp);
     else
-        // mset(a,b) where a is a char buffer.
-        mset(wkbuf,NULL(^));
+        // mset(a, b) where a is a char buffer.
+        mset(wkbuf, NULL(^));
     </pre>
 
 7. Rewrap comment block in Java:
@@ -343,12 +348,12 @@ dash), which makes it much easier to type.  Hence, it is shown as  `C--` in the 
 
     <pre>
     if(flags & OpEval)
-        markSet(NULL,mkp);
+        markSet(NULL, mkp);
     else if(n >= 0)
-        markSet(wkbuf,mkp);
+        markSet(wkbuf, mkp);
     else
-        // markSet(a,b) where a is a char buffer.
-        markSet((^)wkbuf,NULL);
+        // markSet(a, b) where a is a char buffer.
+        markSet((^)wkbuf, NULL);
     </pre>
 
 11. Move text and change case of letters in PHP:
@@ -365,7 +370,7 @@ dash), which makes it much easier to type.  Hence, it is shown as  `C--` in the 
 
     <pre>
     <b>C-- C-- C-a</b> (move up two lines to beginning of line)
-    <b>ESC f</b> (move forward one word)
+    <b>C-u ESC f</b> (move forward two words)
     <b>C-u 3 ESC C-t</b> (change next three words to title case)
     <b>C-p C-b</b> (move up one line and backward one character: "{")
     <b>C-h '</b> (kill fenced region: "{" through "}")
@@ -408,41 +413,44 @@ dash), which makes it much easier to type.  Hence, it is shown as  `C--` in the 
     <b>C-- 4 TAB</b> (set tabbing style to four spaces)
     <b>C-u ESC )</b> (indent all lines in region two tab stops)
     <b>C-u 5 C-x C-e 4</b> (change 4-space tabs to hard tabs in next five lines)
-    <b>C-x ( ... C-x ) C-u 10 C-x e</b> (record keystrokes, then play back 10 times)
+    <b>C-x ( ... C-x ) work RTN</b> (record keystrokes, save as "work" macro...)
+    <b>C-u 10 C-x e</b> (then play back 10 times)
     <b>C-x | sort RTN</b> (pipe buffer through "sort" command and replace with result)
     <b>C-x ` date RTN</b> (execute "date" command and insert its output at point)
-    <b>ESC t y</b> (truncate buffer -- delete all text from point to end of buffer)
+    <b>ESC t y</b> (truncate buffer forward -- delete all text from point to end of buffer)
     <b>ESC u</b> (undelete -- restore most recently-deleted text)
     </pre>
 
 
 Distribution
 ------------
-The current distribution of MightEMacs may be obtained at `https://github.com/italia389/MightEMacs.git`.
+The current distribution of MightEMacs may be obtained at
+`https://github.com/italia389/MightEMacs.git`.
 
 Contact and Feedback
 --------------------
-User feedback is welcomed and encouraged.  If you have the time and interest, please contact Rick Marinelli
-<italian389@yahoo.com> with your questions, comments, bug reports, likes, dislikes, or whatever you feel is worth mentioning.
-Questions and feature requests are welcomed as well.  You may also post questions or comments on the MightEMacs discussion forum
-on Reddit at `http://reddit.com/r/memacs`.
+User feedback is welcomed and encouraged.  If you have the time and interest, please contact
+Rick Marinelli <italian389@yahoo.com> with your questions, comments, bug reports, likes,
+dislikes, or whatever you feel is worth mentioning.  Questions and feature requests are welcomed
+as well.  You may also post questions or comments on the MightEMacs discussion forum on Reddit
+at `http://reddit.com/r/memacs`.
 
 Notes
 -----
-This distribution of MightEMacs is version 9.4.0.  Installer packages containing 64-bit binaries are included for Linux
-platforms and macOS ver. 10.10 and later.  The sources can be compiled as well if desired; however, the build process has not
-been tested on other Unix platforms and there may be some (hopefully minor) issues which will need to be resolved.  If you are
-compiling the sources and encounter any problems, please contact the author with the details.
+This distribution of MightEMacs is version 9.5.0.  Installer packages containing 64-bit binaries
+are included for Linux platforms and macOS ver. 10.10 and later.  The sources can be compiled as
+well if desired; however, the build process has not been tested on other Unix platforms and
+there may be some (hopefully minor) issues which will need to be resolved.  If you are compiling
+the sources and encounter any problems, please contact the author with the details.
 
-Note that a portion of a library (ProLib) is included which contains routines that are used by the editor.  The most important
-ones are in datum.c.  These functions manage "Datum" objects, which are objects that contain data of various types, including
-strings that can be of any length and built on the fly.  It also includes array.c and hash.c, which contain routines for
-managing arrays and hash tables, and getswitch.c, which contains a function for parsing and validating command line switches.
-Prolib contains these and other functions that can be used in any C program.  The library is independent of MightEMacs, but
-included with it for convenience.
+Note that the editor uses both the [CXL](https://github.com/italia389/CXL.git) and
+[XRE](https://github.com/italia389/XRE.git) libraries, so those libraries must be built first
+and linked with MightEMacs if you are building the editor from the source code.  Instructions
+for doing this are in file *CustomInstall.txt*.
 
 Credits
 -------
-MightEMacs (c) Copyright 2019 Richard W. Marinelli was written by Rick Marinelli <italian389@yahoo.com>.
+MightEMacs (c) Copyright 2020 Richard W. Marinelli was written by Rick Marinelli
+<italian389@yahoo.com>.
 
 See License.txt for the MightEMacs license.

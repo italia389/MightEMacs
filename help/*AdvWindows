@@ -1,0 +1,58 @@
+~bWindows~B
+
+When working with multiple buffers (or files), it is often useful to split the
+screen into two or more windows and display the buffers in separate windows.
+This is accomplished with the "splitWind" (~#uC-x 2~U) command, which splits the
+current window into two windows of equal size by default.  The sizes can be
+different however, by using a numeric prefix.
+
+Initially, the current buffer is attached to both windows, which can be useful
+for displaying different portions of it.  To display a different buffer in one
+of the windows, simply switch to it with the "nextBuf", "prevBuf", or
+"selectBuf" command.  The entire process may then be repeated to create
+additional windows.
+
+The next obvious question is, "How do we adjust the sizes of each window?"
+There are three commands for this:
+
+    resizeWind      ~#uC-x z~U
+    growWind        ~#uC-x +~U
+    shrinkWind      ~#uC-x -~U
+
+These commands set, increase, or decrease the current window size by the number
+of rows specified with the numeric prefix.
+
+To switch to another window, use:
+
+    selectWind      ~#uC-x w~U       Switch to a window by number (topmost is 1).
+    nextWind        ~#uC-x n~U       Switch to next window (below), wrapping around
+                                to top if necessary.
+    prevWind        ~#uC-x p~U       Switch to previous window (above), wrapping
+                                around to bottom if necessary.
+
+You can also scroll an adjoining window without switching to it via:
+
+    forwPageNext    ~#uESC C-v~U     Scroll next window forward n pages.
+    backPageNext    ~#uESC C-z~U     Scroll next window backward n pages.
+    forwPagePrev    ~#uC-h C-v~U     Scroll previous window forward n pages.
+    backPagePrev    ~#uC-h C-z~U     Scroll previous window backward n pages.
+
+There are commands for deleting windows as well:
+
+    delWind         ~#uC-x 0~U      Delete the current window.
+    joinWind        ~#uC-x j~U      Join the current window with the window above it.
+    onlyWind        ~#uC-x 1~U      Delete all windows except the current one.
+
+Lastly, there are three commands for reframing a window; that is, scrolling the
+lines in a window up or down without changing the point position:
+
+    moveWindDown    ~#uC-x C-n~U    Move the window frame down n rows.
+    moveWindUp      ~#uC-x C-p~U    Move the window frame up n rows.
+    reframeWind     ~#uC-x .~U      Reframe the window so that the line containing
+                               point is at the [-]nth row, or vertically
+                               centered if n is zero (the default).
+
+All the window commands can be more finely controlled with a numeric prefix.
+For example, scrolling can be done in half pages by using a negative numeric
+prefix.  See the "showKey" (~#uC-h ?~U) or "showCommands" (~#uC-h c~U) help descriptions
+for details.

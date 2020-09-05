@@ -1,0 +1,32 @@
+~bMScript Shell Scripts~B
+
+An MScript script may be invoked in a number of different ways, including from
+the shell command line using a "@filename" argument (see memacs(1) for details).
+You can take this concept one step further by executing a script file directly
+from the shell; that is, instead of typing:
+
+    $ memacs ... @myscript ...
+
+you can just type:
+
+    $ myscript ...
+
+at the shell command prompt.  This is accomplished by specifying the pathname to
+the "memacs" binary with the ~b-S~B switch in the first line of the file as a shell
+comment (a "shebang" line); for example:
+
+    #!/usr/local/bin/memacs -S
+    # Example script that can be executed from the shell.
+    readFile $1
+    markBuf
+    0 => trimLine
+    beginBuf
+
+This script will open the file specified as an argument, read it into the
+current buffer, trim white space from all lines, then move the point back to the
+beginning of the buffer.  When the script ends, control is passed back to the
+user.
+
+Note that any arguments specified on the command line are available to the
+script as $1, $2, ..., etc.  And when the script starts, the current buffer is
+"untitled".

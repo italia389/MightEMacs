@@ -1,0 +1,187 @@
+~bMScript Rules and Guidelines~B
+
+When coding in MScript, take note of the following:
+
+  * A script consists of zero or more lines.  Blank lines and lines that begin
+    with ~u#~U as the first non-whitespace character (a comment) are ignored.
+    Comments beginning with ~u#~U may also occur at the end of a line.
+    Additionally, an embedded comment which begins with ~u/#~U and ends with ~u#/~U on
+    the same line is allowed.  All remaining lines or portions of lines are
+    interpreted as statements.
+
+  * Any line except a line containing a ~u#~U comment may be continued to the next
+    line by placing a backslash (~u\~U) at the end of it.  The line and the
+    following line will be interpreted as if they were joined and the backslash
+    was removed.  Backslashes may be appended to multiple consecutive lines as
+    well, to join more than two lines.  The entire block of lines will be
+    interpreted as a single statement.
+
+  * A statement consists of an optional statement keyword followed by an
+    optional ~uand-or-expr~U, which is a series of one or more expressions separated
+    by ~uand~U or ~uor~U.
+
+  * There are two types of variables: global and local.  Global variables begin
+    with a dollar sign (~u$~U), have global scope, and are permanent.  Local
+    variables do not have a leading dollar sign, are accessible only within the
+    script or routine in which they are created (assigned to), and are deleted
+    when the script or routine exits.  Predefined global variables whose names
+    begin with a capital letter (for example, $LineLen) are read-only and thus,
+    cannot be assigned to.
+
+  * Multiple variables may be assigned to elements of an array by separating the
+    variable names with a comma on the left side of the assignment operator; for
+    example:
+
+        arr = []
+        a, b, arr[0] = [1, false, 'xyz']
+
+    If there are more elements than variables, the extra elements will be
+    ignored.  If there are more variables than elements, the extra variables
+    will be set to ~unil~U.
+
+  * A command, function, or alias may be called with zero or more argument(s)
+    separated by commas, and may also be called with an n argument.  An n
+    argument is passed via the binary operator ~u=>~U using the syntax:
+
+        int-expr ~u=>~U name
+
+    where ~uint-expr~U is the n argument and ~uname~U is the command, function, or alias
+    name.  The ~u=>~U operator has high precedence in an expression.  (See the
+    ~bExpressions~B section for a description of all expressions, operators, and
+    their precedences.)
+
+  * A buffer containing a script may be executed just like a command by using
+    the "xeqBuf" command.  The command essentially acts as a "command proxy" and
+    is called with an optional n argument and a comma-separated list of
+    arguments, the first of which must evaluate to the name of the buffer to
+    execute.  The n argument (if any) and all arguments after the first are
+    passed to the script.
+
+  * A command, function, or alias that is called with argument(s) may be coded
+    with or without parentheses around the argument list; that is, in either of
+    the following forms:
+
+        name(arg1, arg2, ...)
+        name arg1, arg2, ...
+
+    However, be aware that the second form is prone to ambiguity and may induce
+    a syntax error.  If parentheses are used, there must not be any white space
+    between the function name and the left ~u(~U parenthesis; otherwise, it will
+    be interpreted as an unparenthesized function call (the second form) with
+    the first argument in parentheses.  The first form is also used to specify
+    zero arguments, as in ~uname~U().  The parentheses may be required in this case
+    to prevent tokens that follow ~uname~U from being interpreted as its arguments.
+
+  * The n argument is accessed from a routine or executing buffer via the $0
+    variable.  Other arguments are accessed via the $1, $2, ... variables or the
+    $ARGV array.  All $~un~U variables may be assigned to, although $0 must be an
+    integer value.  The $ARGV variable may not be assigned to; however, its
+    (array) contents may be modified just like any other array.  Note that the
+    $1, $2, ... variables are just shortcuts for $ARGV[0], $ARGV[1], ... and
+    will change if the $ARGV array is changed.
+
+  * When writing a routine, an important aspect to consider is whether it will
+    be called interactively, as a function with arguments, or both.  If both
+    calling modes are desired, then the routine should be coded as a "command"
+    and can use the "interactive?" system function to determine its calling
+    mode.  If the function returns true, the user command is being called
+    directly by the user (for example, via a key binding) and $ARGV will be
+    empty.  In this case, the command routine will have to query the user via
+    the "prompt" function to obtain its argument(s), if any.
+
+    If the "interactive?" function returns false instead, the user command is
+    being called in script mode, possibly with arguments.  In this case, all
+    arguments are available in the $ARGV array.  Recall in the ~bStatements~B
+    section that a user routine can be declared to accept (and require) a fixed,
+    minimum, and/or maximum number of arguments by using one of the following
+    forms (e.g., for a "command"):
+
+        command ~uname~U(~uf~U)
+        command ~uname~U(~um~U, [~un~U])
+
+    where ~uf~U is a fixed argument count, ~um~U is a minimum argument count, and ~un~U is
+    an optional maximum argument count.  It can also be declared to accept a
+    variable number of arguments (including zero) by simply omitting the
+    parenthesized portion that follows the command or function name:
+
+        command ~uname~U
+
+    Another aspect to consider is whether the routine will be bound to a key
+    (and run interactively).  If so, it must be defined as a "command" because a
+    "function" cannot be bound to a key.
+
+    A final aspect to consider for a function is whether it should be known to
+    the user; that is, whether it is a general purpose routine intended to be
+    called by other routines.  If not, it should be defined without help text so
+    that it is kept mostly hidden and does not clutter the help displays.  By
+    default, user functions are displayed in the "showFunctions" (~#uC-h f~U) listing
+    only if help text is defined in the function header.
+
+  * All scripts and user routines are invoked as "functions" and return a value,
+    which is one of the following, in order of precedence:
+
+         1. The argument of a ~ureturn~U statement (~unil~U if not specified).
+         2. The result of the last expression statement evaluated.
+         3. ~unil~U (by default).
+
+    The return value may be of any type, including array.  In general, the
+    editor will execute commands, functions, and scripts without regard for the
+    return values, except as follows.  If a Boolean value is returned that
+    evaluates to ~ufalse~U, then:
+
+          * If the ~ufalse~U return is from a system or user command being executed
+            interactively via a macro, the macro will be stopped and "False
+            return" will be displayed on the message line.
+          * If the ~ufalse~U return is from a function bound to a hook that is being
+            executed, an error message will be displayed and the hook will be
+            disabled.
+
+    Note that you can code an "abort" command with optional arguments in a
+    script, command, or function to abort it if needed and return control back
+    to the user.  If arguments are specified, they will be concatenated and
+    displayed on the message line as a return message (explained below).  You
+    can also exit the editor with the "exit" or "quickExit" command.  If the
+    "exit" command is coded with arguments, they will be concatenated and
+    displayed after returning to the shell.  Additionally, a shell return code
+    of 1 may be specified by using a negative numeric prefix with the "exit"
+    command.  (See the "showKey" (~#uC-h ?~U) or "showCommands" (~#uC-h c~U) help displays
+    for details.)
+
+  * Return messages (which are different from return ~bvalues~B) are generated by
+    certain commands and by using the "message" function in a script or routine.
+    These messages may or may not be saved.  Return messages are intended for
+    interactive use; that is, to be seen by the user on the message line during
+    editing.
+
+    Generally, the "RtnMsg" global mode must be enabled in order for return
+    messages to be saved, which is always the case during normal editing.
+    However, when a script begins executing, the mode is disabled to avoid
+    extraneous messages from being displayed on the message line during
+    execution.  It can be re-enabled in a script, if desired, at any time.
+
+    When a script is executing, the most recent return message that was saved is
+    available in the $ReturnMsg variable.  Messages have low and high priority,
+    the latter of which will replace the former.  A message from a command (like
+    "setMark" or "copyLine") has low priority and will not replace an existing
+    message.  The "message" function operates the same way by default; however,
+    it can set a message to high priority if called with the "High" option.  It
+    can also force message replacement if called with the "Force" option.
+    Additionally, the "RtnMsg" global mode has no effect on the "message"
+    function; that is, the function always operates as if the mode is enabled.
+    When control is eventually returned to the user, the final saved message (if
+    any) is displayed on the message line.
+
+    Note that if a script writes a message directly to the message line (via the
+    "print" or "printf" function), it will be overwritten by any return message
+    and thus may not be seen, depending on script execution time.  The "pause"
+    function can be used in this case as a workaround.
+
+  * The "printf" and "sprintf" functions and the ~u%~U format operator support most
+    of the conversion specifications described in the printf(3) man page, except
+    the ones associated with floating point numbers.
+
+Note that all system and user commands return ~unil~U by default.  Some commands
+however, have different return values.  See the "showCommands" (~#uC-h c~U),
+"showFunctions" (~#uC-h f~U), and "showVariables" (~#uC-h v~U) listings for descriptions
+of all the commands, functions, and variables that are available for use in
+MScript and what values they return.
