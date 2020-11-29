@@ -886,7 +886,7 @@ int iorText(const char *src, int n, ushort style, Buffer *pBuf) {
 
 			// Target buffer is not being displayed in any window... switch to it in current window.
 			pOldBuf = sess.pCurBuf;
-			if(bswitch(pBuf, SWB_NoHooks) != Success)
+			if(bswitch(pBuf, SWB_NoBufHooks) != Success)
 				return sess.rtn.status;
 			}
 		else {
@@ -906,13 +906,13 @@ Found:
 			// If screen is different, switch to it.
 			if(pScrn != sess.pCurScrn) {
 				pOldScrn = sess.pCurScrn;
-				if(sswitch(pScrn, SWB_NoHooks) != Success)
+				if(sswitch(pScrn, SWB_NoBufHooks) != Success)
 					return sess.rtn.status;
 				}
 
 			// If window is different, switch to it.
 			if(pWind != sess.pCurWind) {
-				(void) wswitch(pWind, SWB_NoHooks);		// Can't fail.
+				(void) wswitch(pWind, SWB_NoBufHooks);		// Can't fail.
 				supd_windFlags(NULL, WFMode);
 				}
 			}
@@ -923,16 +923,16 @@ Found:
 
 		// Restore old screen, window, and/or buffer, if needed.
 		if(pOldBuf != NULL)
-			(void) bswitch(pOldBuf, SWB_NoHooks);
+			(void) bswitch(pOldBuf, SWB_NoBufHooks);
 		else if(pOldScrn != NULL) {
-			if(sswitch(pOldScrn, SWB_NoHooks) != Success)
+			if(sswitch(pOldScrn, SWB_NoBufHooks) != Success)
 				return sess.rtn.status;
 			if(pOldWind != sess.pCurWind)
 				goto RestoreWind;
 			}
 		else if(pOldWind != NULL) {
 RestoreWind:
-			(void) wswitch(pOldWind, SWB_NoHooks);		// Can't fail.
+			(void) wswitch(pOldWind, SWB_NoBufHooks);		// Can't fail.
 			supd_windFlags(NULL, WFMode);
 			}
 		}

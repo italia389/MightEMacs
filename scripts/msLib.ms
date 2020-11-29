@@ -3,14 +3,14 @@
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# msLib.ms		Ver. 9.5.0
+# msLib.ms		Ver. 9.5.1
 #	MightEMacs library for MightEMacs script editing.
 
-# Array of parameters used for finding user commands and Functions in script files.
+# Array of parameters used for finding user commands and functions in script files.
 searchParams = [\
 	/# Function search parameters #/\
 ['Command or function',						/# User prompt #/\
- '^\h*(?:command|function) +%NAME%\<:re',			/# User routine RE #/\
+ '^\h*(?:command|function) +%NAME%\>:re',			/# User routine RE #/\
  '*.ms'],							/# Glob pattern(s) #/\
 	/# Class search parameters #/\
 nil,\
@@ -36,8 +36,8 @@ command msWrapIfElse(0) {description: 'Wrap ~#uif 0~U and ~uelse~U around [-]n l
 endroutine
 
 # Find user command or function definition, given name, in a file or current buffer.
-command msFindRoutine(0) {description: "Prompt for a directory to search and the name of a user command or function and find its\
- definition.  If directory is blank, current buffer is searched (only); otherwise, all files in directory matching\
+command msFindRoutine(0) {description: "Prompt for a directory to search and the name of a user command or function and find\
+ its definition.  If directory is blank, current buffer is searched (only); otherwise, all files in directory matching\
  \"#{searchParams[0][2]}\" template are searched, and first file found containing definition is rendered according to n\
  argument (with ~bselectBuf~B options)."}
 	$0 => langFindObj true
@@ -75,9 +75,9 @@ endroutine
 
 # Go to matching block end point if current line begins with a block keyword.  Set mark '.' to current position, mark 'T' to
 # top line of the block, mark 'E' to "else" line (if any), and mark 'B' to the bottom line.  If $0 == 0, be silent about errors.
-command msGotoBlockEnd(0) {description: "Go to block keyword paired with one in current line and set marks '.' (previous position),\
- 'T' (top line), 'E' (\"else\" line, if any), and 'B' (bottom line).  If n == 0, be silent about errors.  Returns: true if\
- successful; otherwise, false."}
+command msGotoBlockEnd(0) {description: "Go to block keyword paired with one in current line and set marks '.' (previous\
+ position), 'T' (top line), 'E' (\"else\" line, if any), and 'B' (bottom line).  If n == 0, be silent about errors.  Returns:\
+ true if successful; otherwise, false."}
 	1 => setMark ??
 	found = false
 
@@ -156,7 +156,7 @@ command msGotoBlockEnd(0) {description: "Go to block keyword paired with one in 
 		true
 	else
 		beep
-		-1 => message 'Fail, High', errorMsg
+		1 => message 'Fail, High', errorMsg
 	endif
 endroutine
 

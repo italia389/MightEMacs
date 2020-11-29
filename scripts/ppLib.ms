@@ -73,7 +73,7 @@ command ppWrapList(0) {description: 'Format [-]n lines (default 1) containing id
  the block are rewrapped so that they have the same indentation as the first line of the block (if any) but do not extend past\
  the current wrap column (set in $wrapCol).'}
 	if $wrapCol == 0
-		return -1 => message 'Fail, High', 'Wrap column not set'
+		return 1 => message 'Fail, High', 'Wrap column not set'
 	endif
 	if (endCol = $wrapCol - 2) < 0
 		endCol = 0
@@ -90,7 +90,7 @@ command ppWrapList(0) {description: 'Format [-]n lines (default 1) containing id
 		while $lineChar != ?,
 			backChar
 			if $lineOffset == 0
-				return -1 => message 'Fail, High', 'Cannot find comma in line block'
+				return 1 => message 'Fail, High', 'Cannot find comma in line block'
 			endif
 		endloop
 		forwChar
@@ -151,7 +151,7 @@ command ppGotoIfEndif(0) {description: "Go to ~u#if...~U or ~u#endif~U paired wi
 			gotoMark ?.				# Other keyword not found!
 			if $0 != 0
 				beep
-				-1 => message 'Fail, High', that, ' not found'
+				1 => message 'Fail, High', that, ' not found'
 			endif
 			found = false
 			break
@@ -213,7 +213,7 @@ function ppDeletePPLines1(1)
 			endif
 		else
 			# No matching #endif found.  Bail out.
-			return -1 => message 'Fail, High', '#endif not found!'
+			return 1 => message 'Fail, High', '#endif not found!'
 		endif
 	endloop
 

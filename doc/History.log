@@ -1,6 +1,25 @@
 MightEMacs RELEASE HISTORY
 
 ----------
+9.5.1	27 Nov 2020
+ 1. Fixed bug where pressing "C-x ]" (nextBuf) or "C-x [" (prevBuf) in the Linux
+    version of the editor would cause it to go into an endless loop.
+ 2. Changed filename completion so that non-fatal errors such as an invalid
+    symbolic link in a directory are ignored, instead of an error being
+    displayed and the command being terminated.
+ 3. Enhanced "C-x f" user command (findFiles):
+	- changed to operate on a shell glob pattern instead of a shell command.
+	- added options to find matching buffer names instead of files if n
+	  argument, and to prompt for an exclusion pattern if n < 0.
+ 4. Fixed bug where searching for an MScript command or function with "C-c C-f"
+    (msFindRoutine) would always fail.  There was a problem with the regular
+    expression used to match the routine name which was fixed.
+ 5. Fixed bug where the "exitBuf" and "enterBuf" hooks would not be executed
+    when switching windows under certain circumstances, thereby causing a
+    programming language library to not be loaded in a buffer that was switched
+    to when it should have been.
+
+----------
 9.5.0	1 Sep 2020
 
  1. Changed switch processing:

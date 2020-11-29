@@ -31,7 +31,7 @@ endif
 
 # Check if any macros exist.
 function macExist?(0)
-	ringSize('Macro')[0] == 0 ? -1 => message('Fail, High', 'No macro defined') : true
+	ringSize('Macro')[0] == 0 ? 1 => message('Fail, High', 'No macro defined') : true
 endroutine
 
 # Prompt for a macro name and return it, or nil if none.  Arguments: (1), prompt prefix.

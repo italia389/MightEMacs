@@ -73,7 +73,7 @@
 
 // Program identification.
 #define ProgName	"MightEMacs"
-#define ProgVer		"9.5.0"
+#define ProgVer		"9.5.1"
 
 /***** BEGIN CUSTOMIZATIONS *****/
 
@@ -582,7 +582,7 @@ typedef struct EScreen {
 #define SWB_Repeat	0x0001		// n argument is a repeat count.
 #define SWB_Forw	0x0002		// Repeat forward; otherwise, backward.
 #define SWB_ExitHook	0x0004		// Run "exitBuf" hook; otherwise, "enterBuf".
-#define SWB_NoHooks	0x0008		// Don't run "exitBuf" or "enterBuf" hook.
+#define SWB_NoBufHooks	0x0008		// Don't run "exitBuf" or "enterBuf" hook.
 #define SWB_NoLastBuf	0x0010		// Don't update "last buffer" pointer in current screen.
 
 // Line delimiter.

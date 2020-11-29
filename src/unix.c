@@ -1593,6 +1593,10 @@ int eopendir(const char *fileSpec, char **pFilePath) {
 	}
 
 // Get next filename from directory opened with eopendir().  Return NotFound if none left.
+//
+// The errors below are ignored in the stat() call (assumed to be from invalid symbolic links):
+//	ENOENT		The named file does not exist.
+//	ENOTDIR		A component of the path prefix is not a directory.
 int ereaddir(void) {
 	struct DIRENTRY *pDirEntry;
 	struct stat s;
@@ -1613,9 +1617,13 @@ int ereaddir(void) {
 				// "Cannot read directory \"%s\": %s"
 			}
 		strcpy(filePathEnd, pDirEntry->d_name);
-		if(stat(filePath, &s) != 0)
-			return rsset(Failure, 0, text33, text163, filePath, strerror(errno));
-					// "Cannot get %s of file \"%s\": %s", "status"
+		if(stat(filePath, &s) != 0) {
+			if(errno == ENOENT || errno == ENOTDIR)		// Ignore these errors.
+				s.st_mode = 0;
+			else
+				return rsset(Failure, 0, text33, text163, filePath, strerror(errno));
+						// "Cannot get %s of file \"%s\": %s", "status"
+			}
 
 		// Skip all entries except regular files and directories.
 		} while(((s.st_mode & S_IFMT) & (S_IFREG | S_IFDIR)) == 0);

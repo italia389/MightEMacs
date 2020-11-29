@@ -1513,7 +1513,7 @@ int bswitch(Buffer *pBuf, ushort flags) {
 		return sess.rtn.status;
 
 	// Run exit-buffer user hook on current (old) buffer, if applicable.
-	if(!(flags & SWB_NoHooks) && runBufHook(&pRtnVal, SWB_ExitHook) != Success)
+	if(!(flags & SWB_NoBufHooks) && runBufHook(&pRtnVal, SWB_ExitHook) != Success)
 		return sess.rtn.status;
 
 	// Decrement window use count of current (old) buffer and save the current window settings.
@@ -1534,15 +1534,15 @@ int bswitch(Buffer *pBuf, ushort flags) {
 	bufFaceToWindFace(sess.pCurBuf, sess.pCurWind);
 
 	// Run enter-buffer user hook on current (new) buffer, if applicable.
-	if(sess.rtn.status == Success && !(flags & SWB_NoHooks))
+	if(sess.rtn.status == Success && !(flags & SWB_NoBufHooks))
 		(void) runBufHook(&pRtnVal, 0);
 
 	return sess.rtn.status;
 	}
 
-// Switch to the previous or next visible buffer in the buffer list n times per flags and return status.  (n is assumed to be
-// greater than zero.)  Set pRtnVal (if not NULL) to name of last buffer switched to, or leave as is (nil) if no switch
-// occurred.
+// Switch to the previous or next visible buffer in the buffer list n times (default once) per flags and return status.  Set
+// pRtnVal (if not NULL) to name of last buffer switched to, or leave as is (nil) if no switch occurred.  n is assumed to be
+// INT_MIN or greater than zero.
 //
 // Buffers are selected per flags:
 //	BT_Backward	Traverse buffer list backward; otherwise, forward.
@@ -1559,6 +1559,8 @@ int prevNextBuf(Datum *pRtnVal, int n, ushort flags) {
 	bool firstPass = true;
 
 	// Cycle backward or forward through buffer list n times.
+	if(n == INT_MIN)
+		n = 1;
 	do {
 		// Get the current buffer list pointer.
 		(void) bsrch(sess.pCurBuf->bufname, &index);
@@ -1712,9 +1714,9 @@ static int bundisplay(Buffer *pBuf) {
 			if(pWind->pBuf == pBuf) {
 
 				// Found window displaying buffer... switch to it.
-				(void) sswitch(pScrn, SWB_NoHooks);		// Can't fail.
-				(void) wswitch(pWind, SWB_NoHooks);		// Can't fail.
-				if(pLastBuf != NULL) {				// Try pLastBuf first.
+				(void) sswitch(pScrn, SWB_NoBufHooks);		// Can't fail.
+				(void) wswitch(pWind, SWB_NoBufHooks);		// Can't fail.
+				if(pLastBuf != NULL) {				// Try "last buffer" first.
 					if(bswitch(pLastBuf, 0) != Success)
 						goto Retn;
 					}
@@ -1735,8 +1737,8 @@ static int bundisplay(Buffer *pBuf) {
 		} while((pScrn = pScrn->next) != NULL);
 
 	// Restore original screen and window.
-	(void) sswitch(pOldScrn, SWB_NoHooks);
-	(void) wswitch(pOldWind, SWB_NoHooks);
+	(void) sswitch(pOldScrn, SWB_NoBufHooks);
+	(void) wswitch(pOldWind, SWB_NoBufHooks);
 Retn:
 	return sess.rtn.status;
 	}

@@ -3,7 +3,7 @@
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# memacs.ms		Ver. 9.5.0
+# memacs.ms		Ver. 9.5.1
 #	MightEMacs startup file.
 
 ##### Global Variables #####
@@ -27,7 +27,7 @@ command showCheatSheet(0) {description: 'Display %s cheat sheet on a separate sc
 				0 => readFile path
 				1 => chgBufAttr name, 'Hidden, ReadOnly, TermAttr'
 			else
-				return -1 => message 'Fail, High', 'Cheat sheet not found "', path, '"'
+				return 1 => message 'Fail, High', 'Cheat sheet not found "', path, '"'
 			endif
 		else
 			# Find screen displaying buffer and switch to it.
@@ -83,7 +83,7 @@ command openTutor(0) {description: join(' ', 'Open', getInfo('Editor'), 'Tutoria
 			 stat? (path = sprintf('%s/../help/%s', 1 => dirname(path), TutorFile)), 'f'
 				StockTutorFile = pathname(path)
 			else
-				return -1 => message 'Fail, High', 'Master tutorial file not found'
+				return 1 => message 'Fail, High', 'Master tutorial file not found'
 			endif
 		endif
 
@@ -170,7 +170,7 @@ command popFileList(0) {description: 'Display a file listing in a pop-up window 
 	# Get options.
 	if !empty?(options = prompt('Options (~b~uA~ZllFiles, No~b~uE~Zxpand, Multi~b~uC~Zol)', 'TermAttr'))
 		if (optionsLC = lowerCaseStr(options)) !~ '^[aec]+$'
-			return -1 => message 'Fail', 'Invalid options "', options, '"'
+			return 1 => message 'Fail', 'Invalid options "', options, '"'
 		endif
 
 		loop
@@ -203,7 +203,7 @@ command renameFile(2, 3) {arguments: '{filename | bufname}, new-name[, opts]', d
 	if $0 != defn
 		if !empty?(options = prompt('Options (From~b~uB~Zuffer, ~b~uD~ZiskOnly)', 'TermAttr'))
 			if (optionsLC = lowerCaseStr(options)) !~ '^[bd]+$'
-				return -1 => message 'Fail', 'Invalid options "', options, '"'
+				return 1 => message 'Fail', 'Invalid options "', options, '"'
 			endif
 
 			loop
@@ -227,7 +227,7 @@ command renameFile(2, 3) {arguments: '{filename | bufname}, new-name[, opts]', d
 				return
 			endif
 		elsif type?(bufname = $1) != 'string'
-			return -1 => message 'Fail, High', 'Invalid buffer name ', 1 => toStr(bufname, 'Visible, Quote2')
+			return 1 => message 'Fail, High', 'Invalid buffer name ', 1 => toStr(bufname, 'Visible, Quote2')
 		endif
 
 		# Have buffer name.  Get associated filename.
@@ -236,11 +236,11 @@ command renameFile(2, 3) {arguments: '{filename | bufname}, new-name[, opts]', d
 		elsif defined?('Name', bufname) == 'buffer'
 			oldFilename = bufInfo(bufname)[1]
 		else
-			return -1 => message 'Fail, High', "No such buffer '", bufname, "'"
+			return 1 => message 'Fail, High', "No such buffer '", bufname, "'"
 		endif
 
 		if empty? oldFilename
-			return -1 => message 'Fail, High', "No filename set in buffer '", bufname, "'"
+			return 1 => message 'Fail, High', "No filename set in buffer '", bufname, "'"
 		endif
 
 	# Get disk filename.
@@ -249,7 +249,7 @@ command renameFile(2, 3) {arguments: '{filename | bufname}, new-name[, opts]', d
 			return
 		endif
 	elsif type?(oldFilename = $1) != 'string'
-		return -1 => message 'Fail, High', 'Invalid filename ', 1 => toStr(oldFilename, 'Visible, Quote2')
+		return 1 => message 'Fail, High', 'Invalid filename ', 1 => toStr(oldFilename, 'Visible, Quote2')
 	endif
 
 	# Have old filename.  Get new one.
@@ -259,7 +259,7 @@ command renameFile(2, 3) {arguments: '{filename | bufname}, new-name[, opts]', d
 			return
 		endif
 	elsif type?(newFilename = $2) != 'string'
-		return -1 => message 'Fail, High', 'Invalid filename ', 1 => toStr(newFilename, 'Visible, Quote2')
+		return 1 => message 'Fail, High', 'Invalid filename ', 1 => toStr(newFilename, 'Visible, Quote2')
 	endif
 
 	# Rename file on disk if it exists.
@@ -268,7 +268,7 @@ command renameFile(2, 3) {arguments: '{filename | bufname}, new-name[, opts]', d
 			return false
 		endif
 	elsif $0 == defn || diskOnly
-		return -1 => message 'Fail, High', 'No such file "', oldFilename, '"'
+		return 1 => message 'Fail, High', 'No such file "', oldFilename, '"'
 	endif
 
 	# Rename buffer file, if applicable.
@@ -292,7 +292,7 @@ command delFile(1) {arguments: '{bufname | filename}',\
 
 		# Delete file.
 		if not stat? filename, 'e'
-			-1 => message 'Fail, High', 'No such file "', filename, '"'
+			1 => message 'Fail, High', 'No such file "', filename, '"'
 		else
 			kind = stat?(filename, 'd') ? 'Directory' : 'File'
 			if 1 => shellCmd 'NoPop', 'rm ', shQuote(filename)
@@ -309,7 +309,7 @@ command delFile(1) {arguments: '{bufname | filename}',\
 
 		# Check if buffer exists.
 		if defined?('Name', bufname) != 'buffer'
-			return -1 => message 'Fail, High', 'No such buffer "', bufname, '"'
+			return 1 => message 'Fail, High', 'No such buffer "', bufname, '"'
 		endif
 
 		# Have valid buffer name.  Get associated filename.
@@ -407,16 +407,16 @@ command prevHomeBuf(0) {description: 'Switch to previous visible buffer that has
 	$0 => pnHomeBuf false
 endroutine
 
-# Get buffer list from $fileListInfo for current screen and switch to next or previous buffer in that list n times, given
-# "forward?" argument.  If n < 0, delete current buffer after buffer switch and remove buffer name from list in $fileListInfo.
+# Get buffer list from $bufListInfo for current screen and switch to next or previous buffer in that list n times, given
+# "forward?" argument.  If n < 0, delete current buffer after buffer switch and remove buffer name from list in $bufListInfo.
 # Return name of last buffer switched to.
 function pnListBuf(1)
 	nukeBuf = nil
 
-	# Buffer list in $fileListInfo defined and not empty?
-	if !defined?('Name', '$fileListInfo') || length($fileListInfo) < $screenNum ||\
-	 nil?(screenRec = $fileListInfo[$screenNum - 1]) || empty?(bufList = screenRec[1])
-		return -1 => message 'Fail, High', 'No buffer list'
+	# Buffer list in $bufListInfo defined and not empty?
+	if !defined?('Name', '$bufListInfo') || length($bufListInfo) < $screenNum ||\
+	 nil?(screenRec = $bufListInfo[$screenNum - 1]) || empty?(bufList = screenRec[1])
+		return 1 => message 'Fail, High', 'No buffer list'
 	elsif $0 == defn
 		$0 = 1
 	elsif $0 == 0
@@ -483,13 +483,13 @@ function pnListBuf(1)
 	$bufname
 endroutine
 
-# Switch to next buffer in $fileListInfo n times.
+# Switch to next buffer in $bufListInfo n times.
 command nextListBuf(0) {description: 'Switch to next buffer in list created from most recent ~bfindFiles~B invocation n times. \
  If n < 0, switch once and delete buffer that was exited.  Returns: name of last buffer switched to.'}
 	$0 => pnListBuf true
 endroutine
 
-# Switch to previous buffer in $fileListInfo n times.
+# Switch to previous buffer in $bufListInfo n times.
 command prevListBuf(0) {description: 'Switch to previous buffer in list created from most recent ~bfindFiles~B invocation n\
  times.  If n < 0, switch once and delete buffer that was exited.  Returns: name of last buffer switched to.'}
 	$0 => pnListBuf false
@@ -500,7 +500,7 @@ command showVar(0) {description: 'Show a variable and its value on the message l
 	varName = prompt('Show variable', 'Type: Var')
 	if !empty? varName
 		if defined?('Name', varName) != 'variable'
-			-1 => message 'Fail, High', "No such variable '", varName, "'"
+			1 => message 'Fail, High', "No such variable '", varName, "'"
 		else
 			1 => message 'NoWrap', varName, ' = ', quote eval varName
 		endif
@@ -538,7 +538,7 @@ command fenceWord(1) {arguments: 'c', description: 'Wrap a pair of quotes, fence
 
 		# Any word(s) in buffer?
 		if status == false
-			-1 => message 'Fail, High', 'No word found'
+			1 => message 'Fail, High', 'No word found'
 			break
 		endif
 
@@ -556,7 +556,7 @@ command fenceWord(1) {arguments: 'c', description: 'Wrap a pair of quotes, fence
 			if fence > ?\s && fence <= ?~ && (fence == ?_ || !wordChar?(fence))
 				leftFence = rightFence = fence
 			else
-				status = -1 => message 'Fail, High', "Invalid fence '", chr(fence), "'"
+				status = 1 => message 'Fail, High', "Invalid fence '", chr(fence), "'"
 				break
 			endif
 		endif
@@ -567,7 +567,7 @@ command fenceWord(1) {arguments: 'c', description: 'Wrap a pair of quotes, fence
 		# Try to move to other end.
 		1 => setMark ?_
 		if ($0 < 0 ? abs($0) => backWord : $0 => endWord) == false
-			status = -1 => message 'Fail, High', 'Too many words to fence'
+			status = 1 => message 'Fail, High', 'Too many words to fence'
 			delMark ?_
 			break
 		endif
@@ -603,9 +603,9 @@ function iodent(2)
 	elsif empty?(stops = 1 => prompt('Tab stops', 1))
 		return nil
 	elsif !numeric? stops
-		return -1 => message 'Fail, High', "Invalid number '", stops, "'"
+		return 1 => message 'Fail, High', "Invalid number '", stops, "'"
 	elsif (stops = toInt(stops)) < 0
-		return -1 => message 'Fail, High', 'Repeat count (', stops, ') must be 0 or greater'
+		return 1 => message 'Fail, High', 'Repeat count (', stops, ') must be 0 or greater'
 	endif
 	if stops > 0
 
@@ -651,10 +651,10 @@ command chgIndent(0) {description: 'Change indentation at beginning of current l
 	-1 => gotoMark ??
 endroutine
 
-# Perform set intersection on two lists.  Return list of all elements in second list which are (if default n or n > 0) or are
-# not (if n <= 0) in first list.  Arguments: (1), first list; (2), second list.
-function select(2) {arguments: 'list1, list2', description: 'Perform set intersection on two lists (non-matching if n < 0). \
- Returns: list of all elements in second list which are (if default n or n > 0) or are not (if n <= 0) in first list.'}
+# Perform set intersection on two arrays.  Return array of all elements in second array which are (if default n or n > 0) or are
+# not (if n <= 0) in first array.  Arguments: (1), first array; (2), second array.
+function select(2) {arguments: 'array1, array2', description: 'Perform set intersection on two arrays (non-matching if n < 0). \
+ Returns: array of all elements in second array which are (if default n or n > 0) or are not (if n <= 0) in first array.'}
 	exclude = $0 <= 0 && $0 != defn
 	if empty? $1
 		return exclude ? $2 : []
@@ -671,16 +671,16 @@ function select(2) {arguments: 'list1, list2', description: 'Perform set interse
 endroutine
 
 # Get a buffer list to process: either all visible buffers (default n or n > 0) or only those also in buffer list in
-# $fileListInfo for current screen (n <= 0).  Return false if error; otherwise, a two-element array containing Boolean "all
+# $bufListInfo for current screen (n <= 0).  Return false if error; otherwise, a two-element array containing Boolean "all
 # buffers selected" and the buffer list (array).
-function getBufList(0) {description: 'Get list of all visible buffers (or only those also in buffer list in $fileListInfo for\
+function getBufList(0) {description: 'Get list of all visible buffers (or only those also in buffer list in $bufListInfo for\
  current screen if n <= 0).  Returns: false if error; otherwise, a two-element array containing Boolean "all buffers selected"\
  and the buffer list (array).'}
 
 	if $0 != defn && $0 <= 0
-		if !defined?('Name', '$fileListInfo') || length($fileListInfo) < $screenNum ||\
-		 nil?(screenRec = $fileListInfo[$screenNum - 1])
-			return -1 => message 'Fail, High', 'No buffer list found to search'
+		if !defined?('Name', '$bufListInfo') || length($bufListInfo) < $screenNum ||\
+		 nil?(screenRec = $bufListInfo[$screenNum - 1])
+			return 1 => message 'Fail, High', 'No buffer list found to search'
 		endif
 		searchList = select(1 => bufInfo(nil, 'Visible, Brief'), screenRec[1])
 		allBufs = false
@@ -688,7 +688,7 @@ function getBufList(0) {description: 'Get list of all visible buffers (or only t
 		searchList = 1 => bufInfo(nil, 'Visible, Brief')
 		allBufs = true
 	endif
-	empty?(searchList) ? -1 => message('Fail, High', 'No matching buffers found to search') : [allBufs, searchList]
+	empty?(searchList) ? 1 => message('Fail, High', 'No matching buffers found to search') : [allBufs, searchList]
 endroutine
 
 # Process a buffer list, given (1), buffer list; (2), name of user function to invoke on each buffer; and (3...), optional
@@ -702,9 +702,9 @@ function doBufList(2,) {arguments: 'list, function[, ...]', description: 'Invoke
 
 	# Do sanity checks.
 	if empty?($1)
-		return -1 => message 'Fail, High', 'Empty buffer list'
+		return 1 => message 'Fail, High', 'Empty buffer list'
 	elsif defined?('Name', $2) != 'user function'
-		return -1 => message 'Fail, High', "No such function '", $2, "'"
+		return 1 => message 'Fail, High', "No such function '", $2, "'"
 	endif
 
 	bufList = shift($ARGV)
@@ -833,11 +833,11 @@ function queryReplaceOne(0)
 	(i = 1 => index($ReturnMsg, ?,, 'Char')) != nil ? substr($ReturnMsg, 0, i) : $ReturnMsg
 endroutine
 
-# Query-replace multiple buffers (files).  Use buffer list in $fileListInfo if n <= 0; otherwise, all visible buffers.
+# Query-replace multiple buffers (files).  Use buffer list in $bufListInfo if n <= 0; otherwise, all visible buffers.
 command queryReplaceAll(0) {description: 'Invoke ~bqueryReplace~B command on all visible buffers (or just those that matched\
  the most recent ~bfindFiles~B invocation if n <= 0).  Returns: false if error occurs; otherwise, true.'}
 
-	# Get list of buffers to search: either all visible buffers or only those also in buffer list in $fileListInfo.
+	# Get list of buffers to search: either all visible buffers or only those also in buffer list in $bufListInfo.
 	if (searchList = $0 => getBufList) == false
 		return false
 	endif
@@ -922,117 +922,209 @@ function locateFile(3) {arguments: 'dir, glob, pat', description: 'Find files ma
 	delScreen screenNum
 
 	# Return result if search string found; otherwise, false.
-	nil?(bufname) ? -1 => message('Fail, High', 'Not found') : [bufname, mark]
+	nil?(bufname) ? 1 => message('Fail, High', 'Not found') : [bufname, mark]
 endroutine
 
-# Open list of files returned from given shell command in background.  Return false if error; otherwise, list of buffer names.
-function openFiles(1) {arguments: 'shell-cmd', description: 'Open list of files in background.  Returns: false if error occurs;\
- otherwise, list of buffer names.'}
-
-	# Get file list into scratch buffer (one filename per line).
-	if !(listBuf = 0 => readPipe($1))
-		return -1 => message 'Fail, High', 'Not found'
-	endif
-	listBuf = listBuf[0]
-
-	# Open the "regular" files (if any) in the background.
-	bufList = []
-	until nil?(filename = bgets(listBuf))
-		if null? filename
-			break
-		endif
-		if stat?(pathname(filename), 'f')
-			fileInfo = 0 => findFile(filename)
-			push bufList, fileInfo[0]
-		endif
-	endloop
-
-	# Clean up.
-	delBuf listBuf
-	bufList
-endroutine
-
-# Find files that match a shell template and optionally, a pattern, and open them in the background.  Save resulting buffer list
-# (array) in $fileListInfo variable using current screen number - 1 as index.  The pattern is checked for the usual trailing
-# option characters if any, and processed accordingly.
-command findFiles(0) {description: 'Open all files matching a shell template and optionally, also matching a search pattern. \
- The search pattern may optionally contain standard trailing option character(s) preceded by a colon.  The user is prompted for\
- both strings unless n <= 0, in which case the search pattern prompt is skipped.  If a search pattern is entered, only files\
- that contain at least one occurrence of the pattern are selected.  (However, if a file matching the template is already opened\
- in the editor, its current buffer is searched, not the file on disk.)  The files that match are opened in the background and\
- their buffer names are saved in a global variable so that they can be subsequently searched by the ~bqueryReplaceAll~B or\
- ~bppDeletePPLines~B command, or stepped through with the ~bprevListBuf~B and ~bnextListBuf~B commands.  Returns: false if\
- error occurs; otherwise, true.'}
-
-	# Prompt for filename template.  Use last one as default.  $fileListInfo is an array containing a nested array for each
-	# screen.  Each nested array contains two arrays: [[filename-template, RE-pattern], [buf-name,...]].
-	defined?('Name', '$fileListInfo') or $fileListInfo = []
-	if length($fileListInfo) < $screenNum || nil?(screenRec = $fileListInfo[$screenNum - 1])
-		$fileListInfo[$screenNum - 1] = screenRec = array(2, [])
-	endif
-	fileSelector = screenRec[0]
-	length(fileSelector) < 2 and fileSelector[0] = fileSelector[1] = nil
-	fileSelector[0] = 1 => prompt('Filename template', fileSelector[0], 'Type: File')
-	if empty?(fileSelector[0])
-		return
-	endif
-	substr(fileSelector[0], -1, 1) == '/' and fileSelector[0] &= '*'
-	fileSelector[0] = 2 => sub(fileSelector[0], ' ', '\ ')
-
-	# Prompt for search pattern unless n <= 0.  If a non-empty value is entered, save pattern in $searchPat for user's
-	# convenience.
-	if $0 <= 0 && $0 != defn
-		pat = nil
+# Find buffers in given list matching an apropos or search pattern and return them.
+function matchBuffers(3) {arguments: 'buf-list, pat, match-bufname', description: 'Find buffers in given array whose names\
+ match given apropos pattern (if match-bufname is true), or whose contents match given search pattern (if match-bufname is\
+ false).  If an element in buf-list is an array, it is assumed to be of form [bufname, created?]; otherwise, it is assumed to\
+ be a buffer name.  If pat is nil or null, all buffers are considered to be a match.  Returns: array of matching buffer names.'}
+	if empty?($2) && (empty?($1) || type?($1[0]) == 'string')
+		$1
 	else
-		fileSelector[1] = pat = 1 => prompt('Search pattern', fileSelector[1], 'Type: SearchRing',\
-		 'Delim: %s' % $searchDelim)
-		empty?(pat) or $searchPat = pat
-	endif
+		bufList = []
 
-	# Open files that match template in background.
-	if (bufList = openFiles(fileSelector[0] == '*' ? 'ls -1' : "ls -1d #{fileSelector[0]}")) == false
-		false
-	elsif empty? bufList
-		return -1 => message 'Fail, High', 'Not found'
-	else
-		# If a search pattern was specified, eliminate new buffers that don't contain the pattern.
-		if !empty?(pat)
-			1 => setMark ?_
-			saveBuf
-			bufList1 = bufList
-			bufList = []
-			for bufRec in 1 => bufInfo(nil, 'Visible')
-				if include? bufList1, bufRec[0]
-					selectBuf bufRec[0]
+		if $3
+			# Find matching buffer names.  Add ":i" (ignore case) to pattern if no option characters specified.
+			if !empty?($2) && $2 !~ '^.+:[eifmpr]+$'
+				$2 &= ':i'
+			endif
+
+			for buf in $1
+				bufname = type?(buf) == 'array' ? buf[0] : buf
+				if empty?($2) || !nil?(index bufname, $2)
+					push bufList, bufname
+				endif
+			endloop
+		else
+			# Search buffers.
+			if !empty?($2)
+				$searchPat = $2
+				1 => setMark ?_
+				saveBuf
+			endif
+			for buf in $1
+				bufname = type?(buf) == 'array' ? buf[0] : buf
+				if empty?($2)
+					found = true
+				else
+					selectBuf bufname
 					1 => setMark ??
 					beginBuf
 					found = huntForw
 					0 => gotoMark ??
-					if found
-						push bufList, $bufname
-					elsif bufRec[3] == 0
-						restoreBuf
-						delBuf bufRec[0]
-					endif
+				endif
+				found && push(bufList, bufname)
+			endloop
+			if !empty?($2)
+				restoreBuf
+				0 => gotoMark ?_
+				delRingEntry 'Search'
+			endif
+		endif
+		bufList
+	endif
+endroutine
+
+# Open list of files returned from given shell glob pattern in background.  Return (possibly empty) array of
+# [bufname, created?] elements.
+function openFiles(1) {arguments: 'glob-pat', description: 'Open list of files matching shell glob pattern in background. \
+ Returns: array of buffer names (which may be empty).'}
+	bufList = []
+
+	# Open the "regular" files (if any) in the background.
+	for filename in glob($1)
+		if stat?(filename, 'f')
+			fileInfo = 0 => findFile(filename)
+			push bufList, fileInfo
+		endif
+	endloop
+
+	# Return result.
+	bufList
+endroutine
+
+# Find files or buffers that match a template and optionally, a search pattern, and open matching files in the background.  Save
+# resulting buffer list (array) in $bufListInfo variable using current screen number - 1 as index.
+command findFiles(0) {description: 'Find all files or buffers matching a template and optionally, also matching a search\
+ pattern, and open matching files in the background.  If n is not the default, user is prompted to select zero or more of the\
+ following options: "FindBuffers" -> prompt for a buffer apropos pattern instead of a filename template; and "Exclude" ->\
+ prompt for an exclusion search pattern.  If the "FindBuffers" option is not selected or n is the default, user is prompted for\
+ a filename template and a search pattern.  If a search pattern is entered, only files matching the template that contain at\
+ least one occurrence of the pattern are selected.  (However, if a file matching the template is already opened in the editor,\
+ its current buffer is searched, not the file on disk.)  Conversely, if the "FindBuffers" option is selected, user is prompted\
+ for an apropos pattern and a search pattern.  In this case, all visible buffers whose names match the apropos pattern and that\
+ contain at least one occurrence of the search pattern are selected.  In either case, if the "Exclude" option is specified, the\
+ user is prompted for a second search pattern.  All selected buffers that contain at least one occurrence of the exclusion\
+ pattern are omitted.  Note that the apropos pattern, search pattern, and/or exclusion pattern (but not the filename template)\
+ may be null, in which case it has no effect on the buffer selection process (except that all visible buffers are selected if\
+ the apropos pattern is null).  The names of the resulting buffers are saved in a global variable so that they can be\
+ subsequently searched by the ~bqueryReplaceAll~B or ~bppDeletePPLines~B command, or stepped through with the ~bprevListBuf~B\
+ and ~bnextListBuf~B commands.  Returns: true if any files or buffers were found; otherwise, false.'}
+
+	# Set up $bufListInfo global variable, which is an array containing a nested array for each screen.  Each nested array
+	# contains two arrays: [[glob-pat, apropos-pat, search-pat, exclude-pat], [bufname, ...]].
+	defined?('Name', '$bufListInfo') or $bufListInfo = []
+	if length($bufListInfo) < $screenNum || nil?(screenRec = $bufListInfo[$screenNum - 1])
+		$bufListInfo[$screenNum - 1] = screenRec = array(2, [])
+	endif
+	bufSelector = screenRec[0]
+	empty?(bufSelector) and bufSelector[3] = nil
+
+	# Get options if n argument.
+	aproposBuf = excludeBuf = false
+	if $0 != defn
+		if empty?(options = prompt('Options (Find~b~uB~Zuffers, ~b~uE~Zxclude)', 'TermAttr'))
+			return
+		else
+			if (optionsLC = lowerCaseStr(options)) !~ '^[be]+$'
+				return 1 => message 'Fail', 'Invalid options "', options, '"'
+			endif
+
+			loop
+				option = strShift(optionsLC, nil)
+				if option == 'b'
+					aproposBuf = true
+				else	# option == 'e'
+					excludeBuf = true
+				endif
+				if empty? optionsLC
+					break
 				endif
 			endloop
-			restoreBuf
-			0 => gotoMark ?_
+		endif
+	endif
+
+	# Get ready.
+	if aproposBuf
+		i = 1
+		promptStr = 'Apropos bufname'
+		type = 'String'
+	else
+		i = 0
+		promptStr = 'Filename template'
+		type = 'File'
+	endif
+
+	# Prompt for filename template or apropos pattern, using last one as default.
+	bufSelector[i] = 1 => prompt(promptStr, bufSelector[i], 'Type: %s' % type)
+	if empty?(bufSelector[i]) && !aproposBuf
+		return
+	endif
+	if !aproposBuf
+		substr(bufSelector[0], -1, 1) == '/' and bufSelector[0] &= '*'
+		bufSelector[0] = 2 => sub(bufSelector[0], ' ', '\ ')
+	endif
+
+	# Prompt for search pattern.
+	bufSelector[2] = searchPat = 1 => prompt('Search pattern', bufSelector[2], 'Type: SearchRing',\
+	 'Delim: %s' % $searchDelim)
+
+	# Find files and buffers.  Break out of loop if none found.
+	loop
+		if aproposBuf
+			# Find buffers whose names match apropos pattern.  bufList contains: [bufname, ...]
+			bufList = 1 => bufInfo(nil, 'Visible, Brief')
+			if !empty?(bufSelector[1]) && empty?(bufList = matchBuffers(bufList, bufSelector[1], true))
+				break
+			endif
+		else
+			# Open files that match template in background.  bufList contains: [[bufname, created?], ...]
+			if empty?(globList = openFiles(bufSelector[0]))
+				break
+			endif
+			bufList = globList
 		endif
 
-		# Success.  Remember buffer list (which may be empty) and report results.
-		screenRec[1] = bufList
-		count = length(bufList)
-		msg = sprintf('%u file%s found', count, count == 1 ? '' : 's')
-		if count > 0
-			fileList = ''
-			for bufname in bufList
-				strPush fileList, ', ', basename(bufInfo(bufname)[1])
-			endloop
-			msg &= ': %s' % fileList
+		# If a search pattern was specified, scan for matching buffers.
+		bufList = matchBuffers(bufList, searchPat, false)
+
+		# Prompt for exclusion search pattern if requested, using last one as default.
+		if excludeBuf
+			if !empty?(bufSelector[3] = 1 => prompt('Exclude', bufSelector[3], 'Type: SearchRing',\
+			 'Delim: %s' % $searchDelim)) && !empty?(xBufList = matchBuffers(bufList, bufSelector[3], false))
+
+				# Exclusion buffers found.  Remove them from match list.
+				bufList = -1 => select(xBufList, bufList)
+			endif
 		endif
-		1 => message 'High', msg
-	endif
+
+		# If a search pattern was entered, add it to search ring for user's convenience.
+		empty?(searchPat) or $searchPat = searchPat
+
+		# Lastly, if file search was performed, remove buffers that were created but not selected.
+		if !aproposBuf
+			for bufRec in globList
+				if bufRec[1] && !include?(bufList, bufRec[0])
+					delBuf bufRec[0]
+				endif
+			endloop
+		endif
+
+		# Done.  Remember buffer list and report results.
+		screenRec[1] = bufList
+		if((count = length(bufList)) == 0)
+			break
+		endif
+		itemList = ''
+		for bufname in bufList
+			strPush itemList, ', ', aproposBuf ? bufname : basename(bufInfo(bufname)[1])
+		endloop
+		return 1 => message 'High',\
+		 sprintf('%u %s%s found: %s', count, aproposBuf ? 'buffer' : 'file', count == 1 ? '' : 's', itemList)
+	endloop
+	1 => message 'Fail, High', 'Not found'
 endroutine
 
 # Find a file and open it in a new screen associated with a specified directory.  If n <= 0, set its buffer to read-only.
@@ -1173,7 +1265,7 @@ endroutine
 # Display man page for word at point.
 command showMan(0) {description: 'Display man page for word at point.'}
 	if nil?(word = getWord)
-		-1 => message 'Fail, High', 'Not in a word'
+		1 => message 'Fail, High', 'Not in a word'
 	else
 		cols, rows = $TermSize
 		1 => shellCmd 'NoHdr', 'MANWIDTH=', cols, ' man ', word, ' | col -b'

@@ -184,7 +184,7 @@ command rubyGotoBlockEnd(0) {description: "Go to block keyword paired with one i
 		true
 	elsif $0 != 0
 		beep
-		-1 => message 'Fail, High', errorMsg
+		1 => message 'Fail, High', errorMsg
 	endif
 endroutine
 

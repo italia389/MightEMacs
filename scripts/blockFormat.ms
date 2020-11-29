@@ -205,12 +205,12 @@ command bfFormatItem(0) {description: join(nil, 'Format a block of comment lines
 
 	# Check wrap column.
 	if $wrapCol == 0
-		return -1 => message 'Fail, High', 'Wrap column not set'
+		return 1 => message 'Fail, High', 'Wrap column not set'
 	endif
 
 	# Check if buffer is narrowed.
 	if bufAttr? $bufname, 'Narrowed'
-		return -1 => message 'Fail, High', 'Buffer is narrowed'
+		return 1 => message 'Fail, High', 'Buffer is narrowed'
 	endif
 
 	searchPat = $searchPat				# Save current search pattern.
@@ -341,16 +341,16 @@ command bfFormatList(0) {description: 'Format a sequence of numbered list items 
 
 	# Check wrap column, current line, and n argument.
 	if $wrapCol == 0
-		return -1 => message 'Fail, High', 'Wrap column not set'
+		return 1 => message 'Fail, High', 'Wrap column not set'
 	endif
 	beginText
 	if $lineChar == 012
-		return -1 => message 'Fail, High', 'Not in a list'
+		return 1 => message 'Fail, High', 'Not in a list'
 	endif
 	if $0 == defn
 		$0 = 1
 	elsif $0 < 0
-		return -1 => message 'Fail, High', 'First item number (%d) must be 0 or greater' % $0
+		return 1 => message 'Fail, High', 'First item number (%d) must be 0 or greater' % $0
 	endif
 
 	ItemPrefixRE, BlankLineRE = $BFInfo

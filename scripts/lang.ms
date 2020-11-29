@@ -195,13 +195,13 @@ function langFindObj(1)
 			result = 1 => message('High, TermAttr', MarkMsg)
 		else
 			gotoMark ?`
-			result = -1 => message('Fail, High', NotFound)
+			result = 1 => message('Fail, High', NotFound)
 		endif
 		delRingEntry 'Search'
 	else
 		# Search files.  Call file scanner (dir, glob, pat) and render buffer if found.
 		if not result = locateFile(dir, template, sub(re, '%NAME%', routineName))
-			result = -1 => message('Fail, High', NotFound)
+			result = 1 => message('Fail, High', NotFound)
 		else
 			bufname, mark = result
 

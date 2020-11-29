@@ -261,10 +261,14 @@ bool windNewTop(EWindow *pWind, Line *pLine, int n) {
 // Switch to given window.  Return status.
 int wswitch(EWindow *pWind, ushort flags) {
 	Datum *pRtnVal = NULL;
-	bool differentBuf;
+	bool differentBuf = false;
+
+	// Nothing to do if requested window is already current.
+	if(pWind == sess.pCurWind)
+		return sess.rtn.status;
 
 	// Run exit-buffer hook if applicable.
-	if(!(flags & SWB_NoHooks)) {
+	if(!(flags & SWB_NoBufHooks)) {
 		differentBuf = (pWind->pBuf != sess.pCurBuf);
 		if(differentBuf && runBufHook(&pRtnVal, SWB_ExitHook) != Success)
 			return sess.rtn.status;
@@ -274,7 +278,7 @@ int wswitch(EWindow *pWind, ushort flags) {
 	sess.pCurBuf = (sess.pCurScrn->pCurWind = sess.pCurWind = pWind)->pBuf;
 
 	// Run enter-buffer hook if applicable.
-	if(!(flags & SWB_NoHooks) && differentBuf)
+	if(differentBuf)
 		(void) runBufHook(&pRtnVal, 0);
 
 	return sess.rtn.status;
@@ -574,7 +578,7 @@ static int delJoinWind(int n, Datum **args, bool join) {
 	windFaceToBufFace(sess.pCurWind, sess.pCurBuf);
 	free((void *) sess.pCurWind);
 
-	(void) wswitch(targWind, SWB_NoHooks);						// Can't fail.
+	(void) wswitch(targWind, 0);							// Can't fail.
 	targWind->flags |= (WFHard | WFMode);
 
 	// Delete old buffer if requested.
@@ -589,13 +593,13 @@ static int delJoinWind(int n, Datum **args, bool join) {
 	return sess.rtn.status;
 	}
 
-// Delete the current window, placing its space in another window, as described in delwind().  Return status.
+// Delete the current window, placing its space in another window, as described in delJoinWind().  Return status.
 int delWind(Datum *pRtnVal, int n, Datum **args) {
 
 	return delJoinWind(n, args, false);
 	}
 
-// Join the current window with another window, as described in delwind().  Return status.
+// Join the current window with another window, as described in delJoinWind().  Return status.
 int joinWind(Datum *pRtnVal, int n, Datum **args) {
 
 	return delJoinWind(n, args, true);
@@ -895,7 +899,7 @@ int resizeWind(Datum *pRtnVal, int n, Datum **args) {
 			success = true;
 			changed = false;
 			do {
-				(void) wswitch(pWind, SWB_NoHooks);		// Can't fail.
+				(void) wswitch(pWind, SWB_NoBufHooks);		// Can't fail.
 				if(leftover > 0) {
 					n = size + 1;
 					--leftover;
@@ -922,7 +926,7 @@ int resizeWind(Datum *pRtnVal, int n, Datum **args) {
 			} while(!success && changed);
 
 		// Adjustment loop completed... success or deadlocked.  Switch back to original window in either case.
-		(void) wswitch(pOldWind, 0);
+		(void) wswitch(pOldWind, SWB_NoBufHooks);
 		}
 	else
 		(void) chgWindSize(pRtnVal, n, 0);
@@ -1002,15 +1006,15 @@ int render(Datum *pRtnVal, int n, Buffer *pBuf, ushort flags) {
 				}
 			else if((pWind = windNextIs(sess.pCurWind)) == NULL)	// or the window above, if none found.
 				pWind = sess.pCurWind->next;
-			pOldWind = sess.pCurWind;				// save old window...
-			flags = (abs(n) == 2) ? SWB_NoHooks : 0;	// set wswitch() flag...
+			pOldWind = sess.pCurWind;			// save old window...
+			flags = (abs(n) == 2) ? SWB_NoBufHooks : 0;	// set wswitch() flag...
 			if(wswitch(pWind, flags) != Success ||		// make new one current...
 			 bswitch(pBuf, flags) != Success)		// and switch to new buffer.
 				return sess.rtn.status;
 			if(flags & RendReset)
 				faceInit(&pWind->face, pBuf->pFirstLine, NULL);
 			if(flags != 0)					// If not a force to new window...
-				(void) wswitch(pOldWind, flags);		// switch back to previous one (can't fail).
+				(void) wswitch(pOldWind, flags);	// switch back to previous one (can't fail).
 			}
 		}
 Retn:
@@ -1286,7 +1290,7 @@ int sfind(ushort scrNum, Buffer *pBuf, EScreen **ppScrn) {
 // Switch to given screen.  Return status.
 int sswitch(EScreen *pScrn, ushort flags) {
 
-	// Nothing to do if it is already current.
+	// Nothing to do if requested screen is already current.
 	if(pScrn == sess.pCurScrn)
 		return sess.rtn.status;
 
@@ -1298,7 +1302,7 @@ int sswitch(EScreen *pScrn, ushort flags) {
 	// Run exit-buffer user hook on current (old) buffer if the new screen's buffer is different.
 	Datum *pRtnVal = NULL;
 	bool differentBuf = false;
-	if(!(flags & SWB_NoHooks)) {
+	if(!(flags & SWB_NoBufHooks)) {
 		differentBuf = (pScrn->pCurWind->pBuf != sess.pCurBuf);
 		if(differentBuf && runBufHook(&pRtnVal, SWB_ExitHook) != Success)
 			return sess.rtn.status;
