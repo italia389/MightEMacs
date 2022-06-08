@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -19,8 +19,8 @@ typedef struct {
 	int replLen;			// Length of replacement string.
 	} LastMatch;			// Info about last replacement (for undo).
 typedef struct {
-	Datum *pReplPat;			// Plain text replacement string, or NULL if pattern.
-	int numSub;			// Number of substitutions.
+	Datum *pReplPat;		// Plain text replacement string, or NULL if pattern.
+	int numSub;			// Running count of substitutions made.
 	Mark origPoint;			// Original point position and offset (for . query response).
 	Match *pMatch;			// Match object pointer.
 	LastMatch lastMatch;		// Match information.
@@ -58,12 +58,13 @@ static int delInsert(int delLen, const char *src, bool useRMP, QueryCtrl *pQuery
 	const char *replStr;
 	int replLen = 0;
 
-//fprintf(logfile, "delInsert(delLen %d, src '%s', useRMP %d, pQueryCtrl %.8X)...\n",
-// delLen, src == NULL ? "NULL" : src, useRMP, (uint) pQueryCtrl); fflush(logfile);
-	// Zap what we gotta, and insert its replacement.
+#if MMDebug & Debug_SrchRepl
+	fprintf(logfile, "delInsert(delLen %d, src '%s', useRMP %d, pQueryCtrl %.8x)...\n",
+	 delLen, src == NULL ? "NULL" : src, useRMP, (uint) pQueryCtrl);
+#endif
+	// Zap the matched text, and insert its replacement.
 	if(edelc(delLen, 0) != Success)
 		return sess.rtn.status;
-
 	if(useRMP) {
 		Match *pMatch = &searchCtrl.match;
 		ReplPat *pReplPat = pMatch->compReplPat;
@@ -71,7 +72,9 @@ static int delInsert(int delLen, const char *src, bool useRMP, QueryCtrl *pQuery
 		while(pReplPat != NULL) {
 			replStr = (pReplPat->type == RPE_LitString) ? pReplPat->u.replStr :
 			 pMatch->grpMatch.groups[pReplPat->u.grpNum].str;
-//fprintf(logfile, "  useRMP: inserting '%s'...\n", replStr == NULL ? "NULL" : replStr); fflush(logfile);
+#if MMDebug & Debug_SrchRepl
+			fprintf(logfile, "  useRMP: inserting '%s'...\n", replStr == NULL ? "NULL" : replStr);
+#endif
 			if(einserts(replStr) != Success)
 				return sess.rtn.status;
 			replLen += strlen(replStr);
@@ -79,11 +82,15 @@ static int delInsert(int delLen, const char *src, bool useRMP, QueryCtrl *pQuery
 			}
 		}
 	else {
-//fprintf(logfile, "  useLIT: inserting '%s'...\n", src == NULL ? "NULL" : src); fflush(logfile);
+#if MMDebug & Debug_SrchRepl
+		fprintf(logfile, "  useLIT: inserting '%s'...\n", src == NULL ? "NULL" : src);
+#endif
 		if(einserts(src) != Success)
 			return sess.rtn.status;
 		replLen = strlen(replStr = src);
 		}
+
+	// Update controls and return.
 	if(pQueryCtrl != NULL) {
 		pQueryCtrl->lastMatch.replLen = replLen;
 		if(*replStr != '\0' && strchr(replStr, '\0')[-1] == '\n')
@@ -120,7 +127,7 @@ static int makeReplLit(ReplPat **curNode, ReplPat **prev, const char *src, int l
 	}
 
 // Set up a replacement pattern linked list and return status.  If SRegical is set in Match object, all back reference sequences
-// (\0..\9) are recognized in the pattern in addition to escaped characters; otherwise, just \0 and escaped characters (\1..\9
+// (\0..\9) are recognized in the pattern in addition to escaped characters, otherwise just \0 and escaped characters (\1..\9
 // generate an error).  Note that if there are no meta-characters encountered in the replacement string (RRegical flag not set
 // by this routine), the list is never actually used -- the find and replace routines will just use the character array
 // pMatch->replPat verbatim as the replacement string.
@@ -178,21 +185,18 @@ int compileRepl(Match *pMatch) {
 
 					// Check for \c.
 					switch(patChar) {
-						case MC_Tab:
-							patChar = '\t';
-							break;
-						case MC_CR:
-							patChar = '\r';
-							break;
-						case MC_NL:
-							patChar = '\n';
-							break;
-						case MC_FF:
-							patChar = '\f';
-							break;
-						case MC_Esc:
-							patChar = '\e';
-							break;
+						case 't':
+							patChar = '\t'; break;
+						case 'r':
+							patChar = '\r'; break;
+						case 'n':
+							patChar = '\n'; break;
+						case 'f':
+							patChar = '\f'; break;
+						case 'e':
+							patChar = '\e'; break;
+						case 'v':
+							patChar = '\v'; break;
 						}
 					pReplPat->u.replStr[litLen] = patChar;
 					++pat;
@@ -210,7 +214,8 @@ int compileRepl(Match *pMatch) {
 	// Finish last literal if needed.
 	if((pMatch->flags & RRegical) && litLen > 0)
 		(void) makeReplLit(&pReplPat, pNode, pat - litLen, litLen + 1);
-#if 0
+
+#if MMDebug & Debug_SrchRepl
 	// Dump compiled pattern to log file.
 	fputs("compileRepl():\n", logfile);
 	for(pReplPat = pMatch->compReplPat; pReplPat != NULL; pReplPat = pReplPat->next) {
@@ -229,16 +234,16 @@ static int replQuery(Datum *pPat) {
 	DFab msg;
 	Datum *pDatum;
 	Match *pMatch = &searchCtrl.match;
-	char pBuf[TTY_MaxCols + 1];
+	char lineBuf[TTY_MaxCols + 1];
 
 	// Display the matched string in roughly half the terminal width.
 	if(dnewtrack(&pDatum) != 0 || dopenwith(&msg, pDatum, FabClear) != 0 ||
-	 dputvizmem(pMatch->grpMatch.groups[0].str, 0, VizBaseDef, &msg) != 0 || dclose(&msg, Fab_String) != 0)
+	 dputs(pMatch->grpMatch.groups[0].str, &msg, DCvtVizChar) != 0 || dclose(&msg, FabStr) != 0)
 		goto LibFail;
-	strfit(pBuf, (size_t) term.cols / 2 - 9, pDatum->str, 0);
-	if(mlputs(MLHome | MLTermAttr, text87) != Success || mlputs(0, pBuf) != Success ||
+	strfit(lineBuf, (size_t) term.cols / 2 - 9, pDatum->str, 0);
+	if(mlputs(MLHome | MLTermAttr | MLForce, text87) != Success || mlputs(MLForce, lineBuf) != Success ||
 				// "~bReplace~B \""
-	 mlputs(MLTermAttr, text382) != Success)
+	 mlputs(MLTermAttr | MLForce, text382) != Success)
 			// "\" ~bwith~B \""
 		return sess.rtn.status;
 
@@ -252,23 +257,23 @@ static int replQuery(Datum *pPat) {
 		if(dopenwith(&msg, pDatum, FabClear) != 0)
 			goto LibFail;
 		while(pReplPat != NULL) {
-			if(dputvizmem(pReplPat->type == RPE_LitString ? pReplPat->u.replStr :
-			 pMatch->grpMatch.groups[pReplPat->u.grpNum].str, 0, VizBaseDef, &msg) != 0)
+			if(dputs(pReplPat->type == RPE_LitString ? pReplPat->u.replStr :
+			 pMatch->grpMatch.groups[pReplPat->u.grpNum].str, &msg, DCvtVizChar) != 0)
 				goto LibFail;
 			pReplPat = pReplPat->next;
 			}
-		if(dclose(&msg, Fab_String) != 0)
+		if(dclose(&msg, FabStr) != 0)
 LibFail:
 			return librsset(Failure);
 		pPat = pDatum;
 		}
-	strfit(pBuf, (size_t) term.cols - term.msgLineCol - 3, pPat->str, 0);
-	if(mlputs(0, pBuf) == Success)
-		(void) mlputs(MLNoEOL | MLFlush, "\"?");
+	strfit(lineBuf, (size_t) term.cols - term.msgLineCol - 3, pPat->str, 0);
+	if(mlputs(MLForce, lineBuf) == Success)
+		(void) mlputs(MLNoEOL | MLFlush | MLForce, "\"?");
 	return sess.rtn.status;
 	}
 
-// Return true if point has moved; otherwise, false.
+// Return true if point has moved, otherwise false.
 static bool pointMoved(Point *pPoint, QueryCtrl *pQueryCtrl) {
 
 	return pPoint->pLine != pQueryCtrl->origPoint.point.pLine || pPoint->offset != pQueryCtrl->origPoint.point.offset;
@@ -283,29 +288,30 @@ static int response(ushort *extKey, QueryCtrl *pQueryCtrl) {
 			return sess.rtn.status;
 		if(*extKey != 'u' || pQueryCtrl->lastMatch.replPoint.pLine != NULL)
 			break;
-		tbeep();				// Nothing to undo.
+		tbeep();					// Nothing to undo.
 		}
 
 	// Clear the prompt and respond appropriately.
-	if(mlerase() == Success && *extKey == coreKeys[CK_Abort].extKey)
+	if(mlerase(MLForce) == Success && *extKey == coreKeys[CK_Abort].extKey)
 		return abortInp();
 	return sess.rtn.status;
 	}
 
 // Search for a string in the current buffer and replace it with another string.  If script mode, args contains arguments;
 // otherwise, get them interactively.  If qRepl is true, do query replace and, if script mode, set pRtnVal to false if search
-// ends prematurely (failure); otherwise, true (success).  If point has moved after search ends, set mark WorkMark to original
+// ends prematurely (failure), otherwise true (success).  If point has moved after search ends, set mark WorkMark to original
 // position and notify user of such.  Return status.
 int replStr(Datum *pRtnVal, int n, Datum **args, bool qRepl) {
 	int status = NotFound;
+	int lineBreakLimit;
 	ushort extKey;
 	QueryCtrl queryCtrl;
 	long matchLen;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	// Get ready.
 	queryCtrl.pReplPat = NULL;
-	queryCtrl.flags = 0;
+	queryCtrl.flags = QR_Forever;
 	queryCtrl.pMatch = &searchCtrl.match;
 
 	// Get the pattern and replacement string.
@@ -313,12 +319,17 @@ int replStr(Datum *pRtnVal, int n, Datum **args, bool qRepl) {
 				// "Query replace" or "Replace"			"with"
 		return sess.rtn.status;
 
-	// Check repeat count.
+	// Check numeric argument.
 	if(n == INT_MIN || n == 0)
-		queryCtrl.flags = QR_Forever;
-	else if(n < 0)
-		return rsset(Failure, 0, text39, text137, n, 0);
-			// "%s (%d) must be %d or greater", "Repeat count"
+		lineBreakLimit = 0;
+	else if(n < 0) {
+		lineBreakLimit = -n;
+		n = INT_MIN;
+		}
+	else {
+		lineBreakLimit = 0;
+		queryCtrl.flags = 0;		// QR_Forever flag not set.
+		}
 
 	// Clear search groups and create search tables if needed.
 	grpFree(queryCtrl.pMatch);
@@ -343,8 +354,8 @@ int replStr(Datum *pRtnVal, int n, Datum **args, bool qRepl) {
 	if(!(queryCtrl.pMatch->flags & RRegical)) {
 		DFab fab;
 
-		if(dopentrack(&fab) != 0 || dputvizmem(queryCtrl.pMatch->replPat, 0, VizBaseDef, &fab) != 0 ||
-		 dclose(&fab, Fab_String) != 0)
+		if(dopentrack(&fab) != 0 || dputs(queryCtrl.pMatch->replPat, &fab, DCvtVizChar) != 0 ||
+		 dclose(&fab, FabStr) != 0)
 			goto LibFail;
 		queryCtrl.pReplPat = fab.pDatum;
 		}
@@ -357,28 +368,31 @@ int replStr(Datum *pRtnVal, int n, Datum **args, bool qRepl) {
 	else if(dnewtrack(&queryCtrl.lastMatch.pMatchStr) != 0)
 		goto LibFail;
 	queryCtrl.origPoint.point = *pPoint;
-	queryCtrl.origPoint.reframeRow = getWindPos(sess.pCurWind);
+	queryCtrl.origPoint.reframeRow = getWindPos(sess.cur.pWind);
 	queryCtrl.numSub = 0;
-	queryCtrl.lastMatch.replPoint.pLine = NULL;
+	queryCtrl.lastMatch.replPoint.pLine = NULL;	// Disable "undo".
 	if(n == 0)
 		goto Rpt;
 
 	// Scan the buffer until we make the nth substitution or hit a buffer boundary.  If point has moved at that time and
 	// interactive, prompt for action to take.
+#if MMDebug & Debug_SrchRepl
+	fputs("replStr(): Beginning scan loop...\n", logfile);
+#endif
 	for(;;) {
 		// Scan the buffer.  The basic loop is to find the next match and process it, jump forward in the buffer past
 		// the match (if it was not replaced), and repeat.
 		for(;;) {
-#if MMDebug & Debug_Temp
-fprintf(logfile, "replStr(): Searching for pattern /%s/...\n", queryCtrl.pMatch->pat);
+#if MMDebug & Debug_SrchRepl
+			fprintf(logfile, "replStr(): Searching for pattern /%s/...\n", queryCtrl.pMatch->pat);
 #endif
 			// Search for the pattern.  The scanning routines will set matchLen to the true length of the
 			// matched string.
 			if(queryCtrl.flags & QR_Regexp) {
-				if((status = regScan(1, Forward, &matchLen)) == NotFound)
+				if((status = regScan(1, &lineBreakLimit, Forward, &matchLen)) == NotFound)
 					break;			// All done.
 				}
-			else if((status = scan(1, Forward, &matchLen)) == NotFound)
+			else if((status = scan(1, &lineBreakLimit, Forward, &matchLen)) == NotFound)
 				break;				// All done.
 			if(status != Success)
 				return sess.rtn.status;
@@ -388,9 +402,9 @@ fprintf(logfile, "replStr(): Searching for pattern /%s/...\n", queryCtrl.pMatch-
 			if(bufEnd(pPoint))
 				queryCtrl.flags |= QR_LastHitEOB;
 			(void) moveChar(-matchLen);
-#if MMDebug & Debug_Temp
-fprintf(logfile, "replStr(): match found for /%s/, len %ld, at '%.*s'\n", queryCtrl.pMatch->pat, matchLen,
- (int)(pPoint->pLine->used - pPoint->offset), pPoint->pLine->text + pPoint->offset);
+#if MMDebug & Debug_SrchRepl
+			fprintf(logfile, "replStr(): match found for /%s/, len %ld, at '%.*s'\n", queryCtrl.pMatch->pat,
+			 matchLen, (int)(pPoint->pLine->used - pPoint->offset), pPoint->pLine->text + pPoint->offset);
 #endif
 
 			// If we are not doing query-replace and we have currently matched an empty string, make sure that we
@@ -414,11 +428,11 @@ fprintf(logfile, "replStr(): match found for /%s/, len %ld, at '%.*s'\n", queryC
 
 				// Update the position on the mode line if needed.
 				if(modeSet(MdIdxLine, NULL) || modeSet(MdIdxCol, NULL))
-					sess.pCurWind->flags |= WFMode;
+					sess.cur.pWind->flags |= WFMode;
 
 				// Loop until get valid response.  Show the proposed place to change and set hard update flag so
 				// that any previous replacement that is still visible will be updated on screen.
-				sess.pCurWind->flags |= WFHard;
+				sess.cur.pWind->flags |= WFHard;
 				for(;;) {
 					if(update(INT_MIN) != Success)
 						return sess.rtn.status;
@@ -450,14 +464,32 @@ fprintf(logfile, "replStr(): match found for /%s/, len %ld, at '%.*s'\n", queryC
 						case 'u':			// Undo last and re-prompt.
 Undo:
 							// Restore old position.
-							sess.pCurWind->face.point = queryCtrl.lastMatch.replPoint;
-							queryCtrl.lastMatch.replPoint.pLine = NULL;
-
-							// Delete the new string, restore the old match.
+							*pPoint = queryCtrl.lastMatch.replPoint;
+							queryCtrl.lastMatch.replPoint.pLine = NULL;	// Disable "undo".
 							(void) moveChar(-queryCtrl.lastMatch.replLen);
+
+							// Delete the new string and restore the old match.  If current line is
+							// the point origin line, set flag (and use queryCtrl.lastMatch.
+							// replPoint.pLine temporarily) so we a can update the line pointer
+							// after the substitution in case the line is reallocated by
+							// delInsert().
+							if(pPoint->pLine == queryCtrl.origPoint.point.pLine) {
+								queryCtrl.origPoint.point.pLine = NULL;
+								queryCtrl.lastMatch.replPoint.pLine = (pPoint->pLine ==
+								 sess.cur.pBuf->pFirstLine) ? NULL : pPoint->pLine->prev;
+								}
 							if(delInsert(queryCtrl.lastMatch.replLen,
 							 queryCtrl.lastMatch.pMatchStr->str, false, NULL) != Success)
 								return sess.rtn.status;
+
+							// Update origin line pointer if needed.
+							if(queryCtrl.origPoint.point.pLine == NULL) {
+								queryCtrl.origPoint.point.pLine =
+								 (queryCtrl.lastMatch.replPoint.pLine == NULL) ?
+								 sess.cur.pBuf->pFirstLine :
+								 queryCtrl.lastMatch.replPoint.pLine->next;
+								queryCtrl.lastMatch.replPoint.pLine = NULL;
+								}
 
 							// Decrement substitution counter, back up (to beginning of prior
 							// match), and reprompt.
@@ -468,7 +500,7 @@ Undo:
 							tbeep();
 							// Fall through.
 						case '?':			// Display help.
-							if(mlputs(MLHome | MLTermAttr | MLFlush, text90) != Success)
+							if(mlputs(MLHome | MLTermAttr | MLFlush | MLForce, text90) != Success)
 					// "~uSPC~U|~uy~U ~bYes~B, ~un~U ~bNo~B, ~uY~U ~bYes and stop~B, ~u!~U ~bDo rest~B,
 					// ~uu~U ~bUndo last~B, ~ur~U ~bRestart~B, ~uESC~U|~uq~U ~bStop here~B,
 					// ~u.~U ~bStop and go back~B, ~u?~U ~bHelp~B",
@@ -479,10 +511,10 @@ Undo:
 Replace:
 			// Do replacement.  If current line is the point origin line, set flag (and use
 			// queryCtrl.lastMatch.replPoint.pLine temporarily) so we a can update the line pointer after the
-			// substitution in case the line was reallocated by delInsert().
+			// substitution in case the line is reallocated by delInsert().
 			if(pPoint->pLine == queryCtrl.origPoint.point.pLine) {
 				queryCtrl.origPoint.point.pLine = NULL;
-				queryCtrl.lastMatch.replPoint.pLine = (pPoint->pLine == sess.pCurBuf->pFirstLine) ? NULL :
+				queryCtrl.lastMatch.replPoint.pLine = (pPoint->pLine == sess.cur.pBuf->pFirstLine) ? NULL :
 				 pPoint->pLine->prev;
 				}
 
@@ -494,11 +526,11 @@ Replace:
 			// Update origin line pointer if needed.
 			if(queryCtrl.origPoint.point.pLine == NULL)
 				queryCtrl.origPoint.point.pLine = (queryCtrl.lastMatch.replPoint.pLine == NULL) ?
-				 sess.pCurBuf->pFirstLine : queryCtrl.lastMatch.replPoint.pLine->next;
+				 sess.cur.pBuf->pFirstLine : queryCtrl.lastMatch.replPoint.pLine->next;
 
 			// Save our position, the match length, and the string matched if we are query-replacing, so that we may
 			// undo the replacement if requested.
-			queryCtrl.lastMatch.replPoint = sess.pCurWind->face.point;
+			queryCtrl.lastMatch.replPoint = *pPoint;
 			if(qRepl) {
 				queryCtrl.lastMatch.matchLen = matchLen;
 				if(dsetstr(queryCtrl.pMatch->grpMatch.groups[0].str, queryCtrl.lastMatch.pMatchStr) != 0)
@@ -522,12 +554,12 @@ Onward:;
 		// Inner loop completed.  Prompt user for final action to take if applicable.
 		if(!qRepl || (queryCtrl.flags & QR_LastWasYes) || !pointMoved(pPoint, &queryCtrl))
 			break;
-		if(mlputs(MLHome | MLTermAttr | MLFlush, text304) != Success)
+		if(mlputs(MLHome | MLTermAttr | MLFlush | MLForce, text304) != Success)
 					// "Scan completed.  Press ~uq~U to quit or ~u.~U to go back."
 			return sess.rtn.status;
 		if(queryCtrl.flags & QR_LastWasNo) {
 			(void) moveChar(-1);
-			sess.pCurWind->flags |= WFMove;
+			sess.cur.pWind->flags |= WFMove;
 			queryCtrl.flags &= ~QR_LastWasNo;
 			}
 
@@ -552,26 +584,29 @@ Onward:;
 					tbeep();
 					// Fall through.
 				case '?':			// Display help.
-					if(mlputs(MLHome | MLTermAttr | MLFlush, text258) != Success)
+					if(mlputs(MLHome | MLTermAttr | MLFlush | MLForce, text258) != Success)
 	// "~uESC~U|~uq~U ~bStop here~B, ~u.~U ~bStop and go back~B, ~uu~U ~bUndo last~B, ~ur~U ~bRestart~B, ~u?~U ~bHelp~B"
 						return sess.rtn.status;
 				}
 			}
 Restart:
 		// Return to original buffer position and start over.
-		sess.pCurWind->face.point = queryCtrl.origPoint.point;
+		*pPoint = queryCtrl.origPoint.point;
 		queryCtrl.lastMatch.replPoint.pLine = NULL;
 		}
 Retn:
+#if MMDebug & Debug_SrchRepl
+	fputs("replStr(): END scan loop.\n", logfile);
+#endif
 	// Adjust point if needed.
 	if(queryCtrl.flags & QR_GoBack) {
-		sess.pCurWind->face.point = queryCtrl.origPoint.point;
-		sess.pCurWind->reframeRow = queryCtrl.origPoint.reframeRow;
-		sess.pCurWind->flags |= WFReframe;
+		*pPoint = queryCtrl.origPoint.point;
+		sess.cur.pWind->reframeRow = queryCtrl.origPoint.reframeRow;
+		sess.cur.pWind->flags |= WFReframe;
 		}
 	else if(qRepl && (queryCtrl.flags & QR_LastWasNo)) {
 		(void) moveChar(-1);
-		sess.pCurWind->flags |= WFMove;
+		sess.cur.pWind->flags |= WFMove;
 		}
 Rpt:
 	// Report the results.
@@ -588,10 +623,10 @@ Rpt:
 		pMark->reframeRow = queryCtrl.origPoint.reframeRow;
 
 		// Append to return message if it was set successfully.
-		if(sess.rtn.flags & RSMsgSet) {
-			if(dopenwith(&msg, &sess.rtn.msg, FabAppend) != 0 || dputs(", ", &msg) != 0 ||
-			 dputc(lowCase[(int) *text233], &msg) != 0 || dputf(&msg, text233 + 1, WorkMark) != 0 ||
-			 dclose(&msg, Fab_String) != 0)
+		if(!disnull(&sess.rtn.msg)) {
+			if(dopenwith(&msg, &sess.rtn.msg, FabAppend) != 0 || dputs(", ", &msg, 0) != 0 ||
+			 dputc(lowCase[(int) *text233], &msg, 0) != 0 || dputf(&msg, 0, text233 + 1, WorkMark) != 0 ||
+			 dclose(&msg, FabStr) != 0)
 					// "Mark ~u%c~U set to previous position"
 LibFail:
 				return librsset(Failure);

@@ -69,7 +69,7 @@ commonly used ones:
 
 Many of the navigation commands accept a negative argument, which causes a
 backward action or a change in direction.  For example, to move the point to the
-beginning of the previous line, you would use the "beginLine" command with a
+beginning of the previous line, you would use the ~bbeginLine~B command with a
 numeric prefix of -1:
 
     ~#uC-- C-a~U
@@ -79,7 +79,7 @@ To move the point forward four words, you could enter either of the following:
     ~#uC-u 4 ESC f~U
     ~#uC-- 4 ESC b~U
 
-The second sequence invokes the "backWord" command with a numeric prefix of -4,
+The second sequence invokes the ~bbackWord~B command with a numeric prefix of -4,
 which causes the point to move forward instead of backward.  You probably
 wouldn't do this yourself while typing, but it might be useful in a script.
 

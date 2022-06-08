@@ -12,7 +12,7 @@ default mark that is set.
 A region exists at all times and is defined as all text between the point and
 the "dot" mark (which may may be none, if the point is at the mark).  When a
 buffer is created, the mark is initially set to be at end of buffer.  Some
-commands operate only on regions (like "indentRegion"), and several will
+commands operate only on regions (like ~bindentRegion~B), and several will
 alternately operate on all lines in the current region if a numeric prefix of
 zero is specified for the command.
 
@@ -45,7 +45,7 @@ the first (or last) line by pressing ~uC-SPC~U, move the point to the other end 
 the line block, then press ~#uESC )~U, optionally with a numeric prefix to specify
 the number of levels.  To copy a block of lines to the kill ring instead, mark
 the block in the same mannner, then press ~#uC-u C-u C-c C-l~U, which executes the
-"copyLine" command with a numeric prefix of zero.
+~bcopyLine~B command with a numeric prefix of zero.
 
 As a final example, to save the point position and window framing at say, the
 beginning of a routine called "myfunc" which is currently being displayed, press

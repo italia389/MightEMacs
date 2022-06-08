@@ -11,13 +11,13 @@ that the text is saved before it is deleted.
 Whenever a text object is copied or killed, it is saved in the "kill ring".  The
 kill ring is an area of memory which can hold any amount of text in multiple
 internal buffers, which are linked to each other in a circular fashion.  (The
-number of buffers is initially set to 50, but can be changed with the "ringSize"
+number of buffers is initially set to 50, but can be changed with the ~bringSize~B
 (~#uESC R~U) command.)  When a new kill occurs, previous kills are "pushed back" one
 position around the ring so that the most recent kill is always the first one to
 be retrieved.  If the ring is full, the oldest kill is discarded to make room
 for the new kill.
 
-The "yank" (~uC-y~U) command is used to insert text from the kill ring into the
+The ~byank~B (~uC-y~U) command is used to insert text from the kill ring into the
 current buffer at point.  It inserts the most recent copy or kill by default.
 The yanked text is also marked as a region.
 

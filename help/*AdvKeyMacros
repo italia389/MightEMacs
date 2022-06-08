@@ -60,7 +60,7 @@ command, it first prompts you for a macro name (which can be completed with the
 execute a macro by name other than the most recent one executed.  Additionally,
 you can press ~#uC-h M~U (showMacroRing) to see all macros that exist.
 
-You can also use the "seti" (~#uESC i~U) and "inserti" (~#uC-c i~U) commands in
+You can also use the ~bseti~B (~#uESC i~U) and ~binserti~B (~#uC-c i~U) commands in
 combination with a macro to insert a series of numbers (ascending or descending)
 into the current buffer, optionally with associated text.  For example, let's
 say you wanted to insert line numbers before ten consecutive lines in form
@@ -73,11 +73,11 @@ say you wanted to insert line numbers before ten consecutive lines in form
         moves the point to the beginning of the next line.
      4. Run the macro nine more times.
 
-The "seti" command initializes the editor's internal "i" variable, a format
+The ~bseti~B command initializes the editor's internal "i" variable, a format
 string, and an increment.  These three values are subsequently used by the
-"inserti" command to insert an integer converted to string form into the text.
+~binserti~B command to insert an integer converted to string form into the text.
 The format string must contain exactly one %d, %o, %u, %x, or %X specification.
-Each time the "inserti" command is called, it does the following abs(n) times:
+Each time the ~binserti~B command is called, it does the following abs(n) times:
 
      1. Evaluates the expression "fmt % i" (where ~ufmt~U is the format string and ~ui~U
         is the i variable).
@@ -96,16 +96,16 @@ Given this, we could do the following to number ten consecutive lines:
 The numbers will be inserted before each line with space padding so that they
 are vertically aligned.
 
-Note that you can also run the "inserti" command by itself with a repeat count
+Note that you can also run the ~binserti~B command by itself with a repeat count
 if you don't need to move the point after each iteration.  For example, try
 this:
 
      1. Type ~#uESC i~U and enter "1", "....+....%d", and "1" when prompted.
      2. Move the point to the beginning of an empty line.
-     3. Run "inserti" nine times: ~#uC-u 9 C-c i~U.
+     3. Run ~binserti~B nine times: ~#uC-u 9 C-c i~U.
 
 You now have a "line length" ruler in your buffer.
 
 One final note: you can display the "i" variable parameters at any time by
-invoking "seti" with a negative numeric prefix; for example, ~#uC-- ESC i~U.  The
+invoking ~bseti~B with a negative numeric prefix; for example, ~#uC-- ESC i~U.  The
 current values will be displayed on the message line.

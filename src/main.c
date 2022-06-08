@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -44,17 +44,21 @@
 #if LINUX
 #include <sys/stat.h>
 #endif
-#include "cxl/excep.h"
 #include "cxl/getSwitch.h"
 #include "cxl/lib.h"
 
 // Local definitions.
 #define ErrorRtnCode	1	// Error return code to OS (otherwise, zero).
 
+// Flags used by startup routines.
+#define ExecSite	0x0001		// Execute site startup file.
+#define ExecUser	0x0002		// Execute user startup file.
+
 enum h_type {h_copyright, h_version, h_usage, h_help};
 static const char				// Switch names.
-	*sw_buf_mode[] = {"pBuf-mode", "B", NULL},
+	*sw_buf_mode[] = {"buf-mode", "B", NULL},
 	*sw_copyright[] = {"copyright", "C", NULL},
+	*sw_D[] = {"D", NULL},
 	*sw_dir[] = {"dir", "d", NULL},
 	*sw_exec[] = {"exec", "e", NULL},
 	*sw_global_mode[] = {"global-mode", "G", NULL},
@@ -70,30 +74,44 @@ static const char				// Switch names.
 	*sw_search[] = {"search", "s", NULL},
 	*sw_shell[] = {"shell", "S", NULL},
 	*sw_usage[] = {"usage", "?", NULL},
-	*sw_version[] = {"version", "V", NULL};
+	*sw_version[] = {"version", "V", NULL},
+	*sw_xeq[] = {"xeq", "x", NULL};
 static Switch cmdSwitchTable[] = {		// Command switch table.
 /*1*/	{sw_copyright, SF_NoArg},
-/*2*/	{sw_dir, SF_RequiredArg},
-/*3*/	{sw_exec, SF_RequiredArg | SF_AllowRepeat},
-/*4*/	{sw_global_mode, SF_RequiredArg | SF_AllowRepeat},
-/*5*/	{sw_help, SF_NoArg},
-/*6*/	{sw_inp_delim, SF_RequiredArg},
-/*7*/	{sw_no_read, SF_NoArg},
-/*8*/	{sw_no_startup, SF_NoArg},
-/*9*/	{sw_no_user_startup, SF_NoArg},
-/*10*/	{sw_otp_delim, SF_RequiredArg},
-/*11*/	{sw_path, SF_RequiredArg},
-/*12*/	{sw_r, SF_NoArg},
-/*13*/	{sw_shell, SF_NoArg},
-/*14*/	{sw_usage, SF_NoArg},
-/*15*/	{sw_version, SF_NoArg}};
+/*2*/	{sw_D, SF_NoArg},
+/*3*/	{sw_dir, SF_RequiredArg},
+/*4*/	{sw_exec, SF_RequiredArg | SF_AllowRepeat},
+/*5*/	{sw_global_mode, SF_RequiredArg | SF_AllowRepeat},
+/*6*/	{sw_help, SF_NoArg},
+/*7*/	{sw_inp_delim, SF_RequiredArg},
+/*8*/	{sw_no_read, SF_NoArg},
+/*9*/	{sw_no_startup, SF_NoArg},
+/*10*/	{sw_no_user_startup, SF_NoArg},
+/*11*/	{sw_otp_delim, SF_RequiredArg},
+/*12*/	{sw_path, SF_RequiredArg | SF_AllowNullArg},
+/*13*/	{sw_r, SF_NoArg},
+/*14*/	{sw_shell, SF_NoArg},
+/*15*/	{sw_usage, SF_NoArg},
+/*16*/	{sw_version, SF_NoArg},
+/*17*/	{sw_xeq, SF_RequiredArg | SF_AllowRepeat}};
 
 #define CSW_copyright		1
-#define CSW_help		5
-#define CSW_no_startup		8
-#define CSW_no_user_startup	9
-#define CSW_usage		14
-#define CSW_version		15
+#define CSW_D			2
+#define CSW_dir			3
+#define CSW_exec		4
+#define CSW_global_mode		5
+#define CSW_help		6
+#define CSW_inp_delim		7
+#define CSW_no_read		8
+#define CSW_no_startup		9
+#define CSW_no_user_startup	10
+#define CSW_otp_delim		11
+#define CSW_path		12
+#define CSW_r			13
+#define CSW_shell		14
+#define CSW_usage		15
+#define CSW_version		16
+#define CSW_xeq			17
 
 static Switch argSwitchTable[] = {		// Argument switch table.
 /*1*/	{NULL, SF_NumericSwitch},
@@ -110,11 +128,17 @@ static Switch argSwitchTable[] = {		// Argument switch table.
 #include "var.h"
 #include "cmd.h"
 
-// Copy a string to open fabrication object pFab, escaping AttrSpecBegin (~) characters.  Return -1 if error; otherwise, 0.
-int esctosf(const char *str, DFab *pFab) {
+// Return true if in interactive mode.
+bool interactive(void) {
+
+	return !(sess.opFlags & (OpStartup | OpNoLoad)) && (!(sess.opFlags & OpScript) || (sess.opFlags & OpUserCmd));
+	}
+
+// Copy a string to open fabrication object pFab, escaping AttrSpecBegin (~) characters.  Return -1 if error, otherwise 0.
+int esctofab(const char *str, DFab *pFab) {
 
 	while(*str != '\0')
-		if((*str == AttrSpecBegin && dputc(AttrSpecBegin, pFab) != 0) || dputc(*str++, pFab) != 0)
+		if((*str == AttrSpecBegin && dputc(AttrSpecBegin, pFab, 0) != 0) || dputc(*str++, pFab, 0) != 0)
 			return -1;
 	return 0;
 	}
@@ -124,10 +148,10 @@ int esctosf(const char *str, DFab *pFab) {
 int escAttr(DFab *pFab) {
 	char *str = sess.rtn.msg.str;
 	if(sess.rtn.flags & RSTermAttr) {
-		if(dputs(str, pFab) != 0 || dputc(AttrSpecBegin, pFab) != 0 || dputc(AttrAllOff, pFab) != 0)
+		if(dputs(str, pFab, 0) != 0 || dputc(AttrSpecBegin, pFab, 0) != 0 || dputc(AttrAllOff, pFab, 0) != 0)
 			goto LibFail;
 		}
-	else if(esctosf(str, pFab) != 0)
+	else if(esctofab(str, pFab) != 0)
 LibFail:
 		return librsset(Failure);
 
@@ -148,8 +172,8 @@ static int rscpy(RtnStatus *pDest, RtnStatus *pSrc) {
 
 	pDest->flags = pSrc->flags;
 	if((pDest->status = pSrc->status) == HelpExit)
-		datxfer(&pDest->msg, &pSrc->msg);
-	else if(datcpy(&pDest->msg, &pSrc->msg) != 0)
+		dxfer(&pDest->msg, &pSrc->msg);
+	else if(dcpy(&pDest->msg, &pSrc->msg) != 0)
 		(void) librsset(Failure);
 #if MMDebug & Debug_Datum
 	fprintf(logfile, "rscpy(): copied from (%hu) '%s' [%d] to (%hu) '%s' [%d]\n",
@@ -181,13 +205,13 @@ void rsunfail(void) {
 //		- new message is set unless fmt is NULL or RSKeepMsg flag is set and message is not null.
 //		- current message is cleared if fmt is NULL, RSForce is set, and RSKeepMsg is not set.
 //		- new serverity is always set (which may be the same).
-// Additionally, the RSMsgSet flag is cleared at the beginning of this routine, then set again if a message is actually set so
-// that the calling routine can check the flag and append to the message if desired.
 int rsset(int status, ushort flags, const char *fmt, ...) {
+	bool newMsgSet = false;
 
-	// Clear RSMsgSet flag.
-	sess.rtn.flags &= ~RSMsgSet;
-
+#if MMDebug & Debug_MsgLine
+	fprintf(logfile, "rsset(%d, %.4hx, \"%s\", ...), current flags %.4hx, msg \"%s\"\n",
+	 status, flags, fmt, sess.rtn.flags, sess.rtn.msg.str);
+#endif
 	// Check status.  If this status is not more severe, or not force and either (1), Success and not displaying messages;
 	// or (2), same status but already have a message, return old one.
 	if(status > sess.rtn.status)				// Return if new status is less severe.
@@ -213,10 +237,13 @@ Retn:
 		return sess.rtn.status;
 		}
 Set:
+#if MMDebug & Debug_MsgLine
+	fprintf(logfile, "    -> attempting to set \"%s\" message...\n", fmt);
+#endif
 	// Save message (if RSKeepMsg flag not set) and new status.
 	if(status == HelpExit) {
-		dsetheapstr((char *) fmt, &sess.rtn.msg);
-		sess.rtn.flags |= RSMsgSet;
+		dadoptstr((char *) fmt, &sess.rtn.msg);
+		newMsgSet = true;
 		}
 	else if(fmt != NULL) {
 		if(!(flags & RSKeepMsg) || disnull(&sess.rtn.msg)) {
@@ -252,18 +279,17 @@ Set:
 				fputc('\n', stderr);
 				exit(ErrorRtnCode);
 				}
-			dsetheapstr(str, &sess.rtn.msg);
-			sess.rtn.flags |= RSMsgSet;
+			dadoptstr(str, &sess.rtn.msg);
+			newMsgSet = true;
 			}
 		}
 	else if((flags & (RSForce | RSKeepMsg)) == RSForce)
 		dsetnull(&sess.rtn.msg);
 
 	// Preserve RSNoWrap and RSTermAttr flags if new message was not set.
-	sess.rtn.flags = (sess.rtn.flags & RSMsgSet) ? flags | RSMsgSet :
-	 (sess.rtn.flags & (RSNoWrap | RSTermAttr)) | flags;
-#if MMDebug & Debug_Datum
-	fprintf(logfile, "rsset(%d, %.4X, ...): set msg '%s', status %d, new flags %.4X\n",
+	sess.rtn.flags = newMsgSet ? flags : (sess.rtn.flags & (RSNoWrap | RSTermAttr)) | flags;
+#if MMDebug & Debug_MsgLine
+	fprintf(logfile, "rsset(%d, %.4x, ...): set msg '%s', status %d, new flags %.4x\n",
 	 status, (uint) flags, sess.rtn.msg.str, status, (uint) sess.rtn.flags);
 #endif
 	return (sess.rtn.status = status);
@@ -272,8 +298,8 @@ Set:
 // Save current return code and message for $ReturnMsg.  Return status.
 int rssave(void) {
 
-	// Copy to sess.scriptRtn via dsetvizmem().
-	if(dsetvizmem(sess.rtn.msg.str, 0, VizBaseDef, &sess.scriptRtn.msg) == 0)
+	// Copy to sess.scriptRtn.
+	if(dcpy(&sess.scriptRtn.msg, &sess.rtn.msg) == 0)
 		sess.scriptRtn.status = sess.rtn.status;
 	return sess.rtn.status;
 	}
@@ -305,21 +331,21 @@ int librsset(int status) {
 	return rsset((cxlExcep.flags & ExcepMem) ? Panic : status, 0, "%s", cxlExcep.msg);
 	}
 
-// Concatenate any function arguments and save prefix and result in *ppDatum.  Return status.
-static int buildMsg(Datum **ppDatum, const char *prefix, int requiredCount) {
+// Concatenate any function arguments via catArgs() and save prefix and result in *ppDatum.  Return status.
+static int buildMsg(Datum **ppDatum, const char *prefix, int minRequired) {
 	DFab msg;
 	Datum *pDatum;
 
 	if(dnewtrack(&pDatum) != 0 || dnewtrack(ppDatum) != 0)
 		goto LibFail;
-	if(catArgs(pDatum, requiredCount, NULL, 0) != Success || (prefix == NULL && isEmpty(pDatum)))
+	if(catArgs(pDatum, minRequired, NULL, 0) != Success || (prefix == NULL && isNN(pDatum)))
 		return sess.rtn.status;
-	if(dopenwith(&msg, *ppDatum, FabClear) != 0 || (prefix != NULL && dputs(prefix, &msg) != 0))
+	if(dopenwith(&msg, *ppDatum, FabClear) != 0 || (prefix != NULL && dputs(prefix, &msg, 0) != 0))
 		goto LibFail;
-	if(!isEmpty(pDatum))
-		if((!disempty(&msg) && dputs(": ", &msg) != 0) || dputs(pDatum->str, &msg) != 0)
+	if(!isNN(pDatum))
+		if((!dfabempty(&msg) && dputs(": ", &msg, 0) != 0) || dputs(pDatum->str, &msg, 0) != 0)
 			goto LibFail;
-	if(dclose(&msg, Fab_String) != 0)
+	if(dclose(&msg, FabStr) != 0)
 LibFail:
 		(void) librsset(Failure);
 	return sess.rtn.status;
@@ -331,7 +357,7 @@ int abortInp(void) {
 
 	tbeep();
 	if(curMacro.state == MacRecord)
-		sess.pCurWind->flags |= WFMode;
+		sess.cur.pWind->flags |= WFMode;
 	curMacro.state = MacStop;
 	return rsset(UserAbort, RSNoFormat, text8);
 			// "Aborted"
@@ -365,7 +391,7 @@ int abortOp(Datum *pRtnVal, int n, Datum **args) {
 
 // Concatenate arguments and set result as a return message.  Return status.  First argument is option string if n argument;
 // otherwise, it is skipped.  Message is built from following argument(s).  Return value (pRtnVal) is set to false if "Fail"
-// option specified; otherwise, true.
+// option specified, otherwise true.
 int message(Datum *pRtnVal, int n, Datum **args) {
 	Datum *pDatum;
 	bool rtnVal = true;
@@ -405,16 +431,16 @@ int message(Datum *pRtnVal, int n, Datum **args) {
 	return sess.rtn.status;
 	}
 
-// Check current buffer state.  Return error if "edit" is true and current buffer is read only or being executed.
+// Check state of current edit buffer.  Return error if "edit" is true and buffer is read only or being executed.
 int allowEdit(bool edit) {
 
 	if(edit) {
-		if(sess.pCurBuf->flags & BFReadOnly) {
+		if(sess.edit.pBuf->flags & BFReadOnly) {
 			tbeep();
 			return rsset(Failure, 0, text109, text58, text460);
 				// "%s is %s", "Buffer", "read-only"
 			}
-		if(sess.pCurBuf->pCallInfo != NULL && sess.pCurBuf->pCallInfo->execCount > 0) {
+		if(sess.edit.pBuf->pCallInfo != NULL && sess.edit.pBuf->pCallInfo->execCount > 0) {
 			tbeep();
 			return rsset(Failure, 0, text284, text276, text248);
 				// "Cannot %s %s buffer", "modify", "an executing"
@@ -459,12 +485,8 @@ char *strSamp(const char *src, size_t srcLen, size_t maxLen) {
 	return strfit(sampBuf.buf, len, src, srcLen);
 	}
 
-// Return true if have fence character and other conditions are met that warrant display of matching fence; otherwise, false.
+// Return true if have fence character and other conditions are met that warrant display of matching fence, otherwise false.
 static bool hiliteFence(short fence, bool rightOnly) {
-
-	// Script mode?
-	if(sess.opFlags & OpScript)
-		return false;
 
 	// Valid fence?
 	switch(fence) {
@@ -503,8 +525,11 @@ static int execKey(KeyBind *pKeyBind, int n) {
 	dsetnil(pSink);
 
 	// Bound to a user command?
-	if(pUniv->type == PtrUserCmd)
+	if(pUniv->type == PtrUserCmd) {
+		sess.opFlags |= OpUserCmd;
 		(void) execBuf(pSink, n, pUniv->u.pBuf, NULL, 0);
+		sess.opFlags &= ~OpUserCmd;
+		}
 	else {
 		// Bound to a system command.  Skip execution if n is zero and a repeat count; otherwise, perform "edit" check
 		// before invoking it.
@@ -527,28 +552,17 @@ static int execKey(KeyBind *pKeyBind, int n) {
 	return sess.rtn.status;
 	}
 
-// Initialize the Datum objects.  Return status.
+// Initialize global Datum objects and return status.
 static int editInit0(void) {
-#if DCaller
-	static const char myName[] = "editInit0";
-#endif
+
 	// Initialize i var, return status, and numeric literals.
-#if DCaller
-	dinit(&iVar.format, myName);
-	dinit(&sess.rtn.msg, myName);
-	dinit(&sess.scriptRtn.msg, myName);
-	dinit(&curMacro.name, myName);
-#else
 	dinit(&iVar.format);
 	dinit(&sess.rtn.msg);
-	dinit(&sess.scriptRtn.msg);
-	dinit(&curMacro.name);
-#endif
-	if(dsetsubstr("%d", 2, &iVar.format) != 0)
-		return librsset(Failure);
 	dsetnull(&sess.rtn.msg);
+	dinit(&sess.scriptRtn.msg);
 	dsetnull(&sess.scriptRtn.msg);
-	return sess.rtn.status;
+	dinit(&curMacro.name);
+	return dsetsubstr("%d", 2, &iVar.format) != 0 ? librsset(Failure) : sess.rtn.status;
 	}
 
 // Set a list of characters to be considered in a word.  The word table is assumed to be already cleared.  Return status.
@@ -569,7 +583,7 @@ static int setWordList(const char *wordList) {
 	return sess.rtn.status;
 	}
 
-// Initialize all of the core data structures.  Return status.
+// Initialize all of the core data structures and return status.
 static int editInit1(void) {
 	uint n;
 	CoreKey *pCoreKey;
@@ -586,9 +600,11 @@ static int editInit1(void) {
 		} *aliasInfo;
 	static struct AliasInfo aliases[] = {
 		{"cd",{PtrSysCmd, cmdFuncTable + cf_chgDir}},
+		{"lcstr",{PtrSysFunc, cmdFuncTable + cf_lowerCaseStr}},
 		{"pwd",{PtrSysCmd, cmdFuncTable + cf_showDir}},
 		{"quit",{PtrSysCmd, cmdFuncTable + cf_exit}},
 		{"require",{PtrSysCmd, cmdFuncTable + cf_xeqFile}},
+		{"ucstr",{PtrSysFunc, cmdFuncTable + cf_upperCaseStr}},
 		{NULL,{PtrNull, NULL}}};
 	struct ModeGrpInfo {
 		const char *name;
@@ -605,23 +621,24 @@ static int editInit1(void) {
 		ushort flags;
 		short group;
 		} *modeInit, modeInitTable[] = {
-			{modeInfo.MdLitASave, MLit_AutoSave, MdGlobal | MdLocked, -1},
-			{modeInfo.MdLitATerm, MLit_AutoTerm, 0, -1},
-			{modeInfo.MdLitBak, MLit_Backup, 0, -1},
-			{modeInfo.MdLitClob, MLit_Clobber, MdGlobal | MdLocked | MdHidden, -1},
-			{modeInfo.MdLitCol, MLit_ColDisp, MdHidden | MdInLine, -1},
-			{modeInfo.MdLitExact, MLit_Exact, MdGlobal | MdEnabled, -1},
-			{modeInfo.MdLitFence1, MLit_Fence1, MdGlobal | MdHidden | MdEnabled, 1},
-			{modeInfo.MdLitFence2, MLit_Fence2, MdGlobal | MdHidden, 1},
-			{modeInfo.MdLitHScrl, MLit_HorzScroll, MdGlobal | MdEnabled, -1},
-			{modeInfo.MdLitLine, MLit_LineDisp, MdHidden | MdInLine, -1},
-			{modeInfo.MdLitOver, MLit_Overwrite, MdLocked, 2},
-			{modeInfo.MdLitRegexp, MLit_Regexp, MdGlobal, -1},
-			{modeInfo.MdLitRepl, MLit_Replace, MdLocked, 2},
-			{modeInfo.MdLitRtnMsg, MLit_RtnMsg, MdGlobal | MdLocked | MdHidden | MdEnabled, -1},
-			{modeInfo.MdLitSafe, MLit_SafeSave, MdGlobal, -1},
-			{modeInfo.MdLitWkDir, MLit_WorkDir, MdGlobal | MdLocked | MdHidden | MdInLine, -1},
-			{modeInfo.MdLitWrap, MLit_Wrap, 0, -1},
+			{"ASave", MLit_AutoSave, MdGlobal | MdLocked, -1},
+			{"ATerm", MLit_AutoTerm, 0, -1},
+			{"Bak", MLit_Backup, 0, -1},
+			{"Clob", MLit_Clobber, MdGlobal | MdLocked | MdHidden, -1},
+			{"Col", MLit_ColDisp, MdHidden | MdInLine, -1},
+			{"Exact", MLit_Exact, MdGlobal | MdEnabled, -1},
+			{"Fence1", MLit_Fence1, MdGlobal | MdHidden | MdEnabled, 1},
+			{"Fence2", MLit_Fence2, MdGlobal | MdHidden, 1},
+			{"HScrl", MLit_HorzScroll, MdGlobal | MdEnabled, -1},
+			{"Line", MLit_LineDisp, MdHidden | MdInLine, -1},
+			{"Over", MLit_Overwrite, MdLocked, 2},
+			{"ReadOnly", MLit_ReadOnly, MdGlobal | MdLocked, -1},
+			{"Regexp", MLit_Regexp, MdGlobal, -1},
+			{"Repl", MLit_Replace, MdLocked, 2},
+			{"RtnMsg", MLit_RtnMsg, MdGlobal | MdLocked | MdHidden | MdEnabled, -1},
+			{"Safe", MLit_SafeSave, MdGlobal, -1},
+			{"WkDir", MLit_WorkDir, MdGlobal | MdLocked | MdHidden | MdInLine, -1},
+			{"Wrap", MLit_Wrap, 0, -1},
 			{NULL, NULL, 0, -1}};
 
 	// Initialize macro object.
@@ -720,120 +737,158 @@ static int editInit2(void) {
 
 	// Allocate the initial buffer and screen.
 	ainit(&bufTable);
-	if(bfind(buffer1, BS_Create, 0, &sess.pCurBuf, NULL) != Success || sfind(1, sess.pCurBuf, &sess.scrnHead) != Success)
+	if(bfind(buffer1, BS_Create, 0, &sess.cur.pBuf, NULL) != Success || sfind(1, sess.cur.pBuf, &sess.scrnHead) != Success)
 		return sess.rtn.status;
 
 	// Set the global screen and window pointers.
-	sess.pCurWind = sess.windHead = (sess.pCurScrn = sess.scrnHead)->pCurWind = sess.scrnHead->windHead;
+	sess.edit.pBuf = sess.cur.pBuf;
+	sess.cur.pWind = sess.windHead = (sess.edit.pScrn = sess.cur.pScrn = sess.scrnHead)->pCurWind = sess.scrnHead->windHead;
+	sess.edit.pFace  = sess.cur.pFace = &(sess.edit.pWind = sess.cur.pWind)->face;
 
 	return sess.rtn.status;
 	}
 
-// Set execPath global variable using heap space.  Return status.
-int setExecPath(const char *path, bool prepend) {
-	char *str1, *str2;
-	size_t len;
+// Set execPath global variable using allocated memory.  Return status.
+int setExecPath(const char *path) {
+	char *str;
+	Datum datum;
+	DFab fab;
+	char pathname[PATH_MAX + 1];
 
-	len = strlen(path) + 1;
-	if(prepend)
-		len += strlen(execPath) + 1;
-	if((str1 = (char *) malloc(len)) == NULL)
-		return rsset(Panic, 0, text94, "setExecPath");
-			// "%s(): Out of memory!"
-	str2 = stpcpy(str1, path);
-	if(prepend) {
-		*str2++ = ':';
-		strcpy(str2, execPath);
+	// Save path to a fabrication object with each directory converted to an absolute pathname.
+	dinit(&datum);
+	if(dopen(&fab) != 0)
+		goto LibFail;
+	while(*path != '\0') {
+		if(*path == ':') {
+			if(dputc(*path++, &fab, 0) != 0)
+				goto LibFail;
+			}
+		else {
+			// Get next directory path.
+			str = (char *) path;
+			do {
+				++str;
+				} while(*str != '\0' && *str != ':');
+			if(*path == '/') {
+				if(dputmem(path, str - path, &fab, 0) != 0)
+					goto LibFail;
+				}
+			else {
+				if(dsetsubstr(path, str - path, &datum) != 0)
+					goto LibFail;
+				if(realpath(datum.str, pathname) == NULL) {
+					(void) rsset(Failure, 0, text404, datum.str, strerror(errno));
+						// "Cannot resolve path \"%s\": %s"
+					goto ErrExit;
+					}
+				if(dputs(pathname, &fab, 0) != 0)
+					goto LibFail;
+				}
+			path = str;
+			}
 		}
+
+	// Finished expanding path.  Set it and clean up.
+	if(dclose(&fab, FabStrRef) != 0)
+LibFail:
+		return librsset(Failure);
 	if(execPath != NULL)
 		free((void *) execPath);
-	execPath = str1;
+	execPath = fab.pDatum->str;
+	dfree(fab.pDatum);
+ErrExit:
+	dclear(&datum);
 
 	return sess.rtn.status;
 	}
 
-// Execute a script file with arguments and return status.  Called for -shell (-S) switch, @file arguments, and site and user
-// startup files.  "xeqFile" command line is built and executed.  First argument in argList is skipped.
-static int doScript(char *filename, int argCount, char *argList[]) {
+// Execute a script file with arguments and return status.  Called for -shell (-S) and -xeq (-x) switches, and site and user
+// startup files.  If argList is NULL (-xeq switch), "filename" contains a script filename plus optional arguments and is used
+// directly as the argument(s) to the "xeqFile" command (with the script filename quoted).  If argList is not NULL, an "xeqFile"
+// command line is built from argCount and argList (skipping first argument in argList) and executed.
+static int runScript(char *filename, int argCount, char *argList[]) {
 	DFab cmd;
 	Datum *pSink;
 
-	// Build command line...
-	if(dnewtrack(&pSink) != 0 || dopentrack(&cmd) != 0 || dputs("xeqFile ", &cmd) != 0)
+	if(dnewtrack(&pSink) != 0 || dopentrack(&cmd) != 0 || dputs("xeqFile ", &cmd, 0) != 0)
 		goto LibFail;
-	if(quote(&cmd, filename, true) != Success)
-		return sess.rtn.status;
-	while(--argCount > 0) {
-		if(dputc(',', &cmd) != 0)
+	if(argList == NULL) {
+		char *str = filename;
+
+		// Use existing command line.  Pick off initial filename, quote it, and add a comma.
+		while(*str != '\0' && *str != ' ' && *str != '\t')
+			++str;
+		if(dputsubstr(filename, str - filename, &cmd, DCvtLang) != 0)
 			goto LibFail;
-		if(quote(&cmd, *++argList, true) != Success)
-			return sess.rtn.status;
+		if(*str != '\0')
+			if(dputc(',', &cmd, 0) != 0 || dputs(str, &cmd, 0) != 0)
+				goto LibFail;
 		}
-	if(dclose(&cmd, Fab_String) != 0)
+	else {
+		// Build command line.
+		if(dputs(filename, &cmd, DCvtLang) != 0)
+			goto LibFail;
+		while(--argCount > 0)
+			if(dputc(',', &cmd, 0) != 0 || dputs(*++argList, &cmd, DCvtLang) != 0)
+				goto LibFail;
+		}
+	if(dclose(&cmd, FabStr) != 0)
 LibFail:
 		return librsset(Failure);
 
-	// and execute it.
-	return execExprStmt(pSink, cmd.pDatum->str, TokC_Comment, NULL);
+	// Have command line in fabrication object.  Execute it.
+	return execExprStmt(pSink, cmd.pDatum->str, 0, NULL);
 	}
 
-// Execute a startup file, given filename, "search HOME only" flag, "ignore missing" flag, and command line arguments.  If file
-// not found and ignore is true, return (Success) status; otherwise, return an error.
-static int startup(const char *filename, ushort homeOnly, bool ignore, int argCount, char *argList[]) {
-	char *filename1;	// Resulting filename to execute.
+// Execute a startup file, given filename, optional XP_HomeOnly (search HOME only) flag, and command line arguments.  If file
+// not found, ignore it.  Return status.
+static int startup(const char *filename, ushort flag, int argCount, char *argList[]) {
+	char *filename1;	// Filename to execute.
 
-	if(pathSearch(filename, homeOnly, (void *) &filename1, NULL) != Success)
-		return sess.rtn.status;
-	if(filename1 == NULL) {
-		if(ignore)
-			return sess.rtn.status;
-		char workBuf[strlen(text136) + strlen(execPath)];
-				// " in path \"%s\"",
-		if(strchr(filename, '/') == NULL)
-			sprintf(workBuf, text136, execPath);
-		else
-			workBuf[0] = '\0';
-		return rsset(Failure, 0, text40, filename, workBuf);
-			// "Script file \"%s\" not found%s"
-		}
-
-	// File found: execute the sucker.
-	return doScript(filename1, argCount, argList);
+	// Look for script file on "execPath".  If found, execute the sucker; otherwise, return (no error).
+	return pathSearch(filename, flag, (void *) &filename1, NULL) != Success || filename1 == NULL ? sess.rtn.status :
+	 runScript(filename1, argCount, argList);
 	}
 
-// Build a command line with one argument in given fabrication object and execute it with return messages disabled.  If
-// fullQuote is true, quote() argument; otherwise, just wrap it in double quotes.
-int runCmd(Datum *pSink, DFab *cmd, const char *cmdName, const char *arg, bool fullQuote) {
+// Build a command line with one argument per given flags and execute it with return messages disabled.  If RunQFull flag is
+// set, quote argument; if RunQSimple flag is set, wrap argument in double quotes; otherwise, leave it as is (unquoted).
+// If cmdSuffix not NULL, append it to "cmdPrefix + arg".  Return status.
+int runCmd(Datum *pRtnVal, const char *cmdPrefix, const char *arg, const char *cmdSuffix, ushort flags) {
+	DFab cmd;
 
 	// Concatenate command name with arguments.
-	if(dopentrack(cmd) != 0 || dputs(cmdName, cmd) != 0 || dputc(' ', cmd) != 0)
+	if(dopentrack(&cmd) != 0 || dputs(cmdPrefix, &cmd, 0) != 0 || dputc(' ', &cmd, 0) != 0)
 		goto LibFail;
-	if(fullQuote) {
-		if(quote(cmd, arg, true) != Success)
-			return sess.rtn.status;
+	if(flags & RunQFull) {
+		if(dputs(arg, &cmd, DCvtLang) != 0)
+			goto LibFail;
 		}
-	else if(dputc('"', cmd) != 0 || dputs(arg, cmd) != 0 || dputc('"', cmd) != 0)
+	else if(((flags & RunQSimple) && dputc('"', &cmd, 0) != 0) ||
+	 dputs(arg, &cmd, 0) != 0 || ((flags & RunQSimple) && dputc('"', &cmd, 0) != 0))
+		goto LibFail;
+	if(cmdSuffix != NULL && dputs(cmdSuffix, &cmd, 0) != 0)
 		goto LibFail;
 
 	// Close fabrication object, disable "RtnMsg" mode, execute command line, and restore the mode.
-	if(dclose(cmd, Fab_String) != 0)
+	if(dclose(&cmd, FabStr) != 0)
 LibFail:
 		return librsset(Failure);
 	ushort oldMsgFlag = modeInfo.cache[MdIdxRtnMsg]->flags & MdEnabled;
 	if(oldMsgFlag)
 		clearGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
-	(void) execExprStmt(pSink, cmd->pDatum->str, TokC_Comment, NULL);
+	(void) execExprStmt(pRtnVal, cmd.pDatum->str, 0, NULL);
 	if(oldMsgFlag)
 		setGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
 	return sess.rtn.status;
 	}
 
-// Process -pBuf-mode (pBuf not NULL) or -global-mode (pBuf NULL) switch value.
+// Process -buf-mode (pBuf not NULL) or -global-mode (pBuf NULL) switch value.
 static int modeSwitch(SwitchResult *pResult, Buffer *pBuf) {
 	size_t len;
 	ushort offset;
 	int nArg;
-	char *end, *value = pResult->value;
+	char *end, *value = pResult->arg;
 	char workBuf[32];
 
 	for(;;) {
@@ -883,7 +938,7 @@ static int helpExit(enum h_type t, const char *binName) {
 	char *info;
 
 	if(t == h_version) {
-		if(asprintf(&info, "%s%s%s", Myself, Help0, Version) < 0)
+		if(asprintf(&info, "%s %s (GPLv3) [linked with %s, %s]", Myself, Version, cxlvers(), xrevers()) < 0)
 			goto Err;
 		}
 	else if(t == h_copyright) {
@@ -909,10 +964,9 @@ Err:
 	return rsset(HelpExit, 0, info);
 	}
 
-// Scan command line arguments, looking for a -usage, -copyright, -help, -no-start, -no-user-start, or -version switch.  If one
-// other than -no-start or -no-user-start is found, return helpExit(); otherwise, set *pDoStart to zero if -no-start found, -1
-// if -no-user-start (only) found, or 1 otherwise, and return status.
-static int scanCmdLine(int argCount, char *argList[], int *pDoStart) {
+// Scan command line arguments, looking for any of the informational switches: -copyright, -help, -usage, or -version.  If one
+// of the switches is found, return helpExit(); otherwise, return status.
+static int procInfoSwitches(int argCount, char *argList[]) {
 	char *binName;			// My binary name.
 	short *pHelpSwitch;
 	int rtnCode;
@@ -921,34 +975,83 @@ static int scanCmdLine(int argCount, char *argList[], int *pDoStart) {
 	static short helpSwitchTable[] = {
 		CSW_copyright, CSW_version, CSW_usage, CSW_help, 0};
 
-
-	// Get my name and set default return value.
+	// Get my name and scan command line arguments.
 	binName = fbasename(*argList++, true);
-	*pDoStart = 1;
-
-	// Scan command line arguments.
 	--argCount;
 	while((rtnCode = getSwitch(&argCount, &argList, &pSwitch, elementsof(cmdSwitchTable), &result)) > 0) {
-		if(!(cmdSwitchTable[rtnCode - 1].flags & SF_NumericSwitch)) {
-			if(rtnCode == CSW_no_startup)
-				*pDoStart = 0;
-			else if(rtnCode == CSW_no_user_startup)
-				*pDoStart = -1;
-			else {
-				pHelpSwitch = helpSwitchTable;
-				do {
-					if(rtnCode == *pHelpSwitch)
-						return helpExit((enum h_type)(pHelpSwitch - helpSwitchTable), binName);
-					} while(*++pHelpSwitch != 0);
-				}
-			}
+		pHelpSwitch = helpSwitchTable;
+		do {
+			if(rtnCode == *pHelpSwitch)
+				return helpExit((enum h_type)(pHelpSwitch - helpSwitchTable), binName);
+			} while(*++pHelpSwitch != 0);
 		}
 
 	return (rtnCode < 0) ? librsset(Failure) : sess.rtn.status;
 	}
 
-// Process command line and return status.  Special processing is done for the -shell (-S) switch.  For example, if file
-// "/home/jack/bin/testit" contained:
+// Scan command line arguments, looking for -D, -dir, -no-start, -no-user-start, and -path switches and (1), change current
+// directory if -D or -dir switch found (and also change filename pointer in argList if -D switch); (2), clear ExecSite and
+// ExecUser flags in *pFlags if -no-start found; (3), clear ExecUser flag in *pFlags if -no-user-start found; and (4), set
+// *pPath to switch value if -path found, otherwise NULL.
+static int procPreSwitches(int argCount, char *argList[], ushort *pFlags, char **pPath) {
+	Datum *pDatum;
+	int rtnCode;
+	bool foundD = false;
+	SwitchResult result;
+	Switch *pSwitch = cmdSwitchTable;
+
+	// Set default return value.
+	*pPath = NULL;
+	if(dnewtrack(&pDatum) != 0)
+		goto LibFail;
+
+	// Scan command line arguments.
+	--argCount;
+	++argList;
+	while((rtnCode = getSwitch(&argCount, &argList, &pSwitch, elementsof(cmdSwitchTable), &result)) > 0) {
+		switch(rtnCode) {
+			case CSW_D:			// -D
+				foundD = true;
+				break;
+			case CSW_dir:			// -d
+				if(runCmd(pDatum, "chgDir ", result.arg, NULL, RunQFull) != Success)
+					return sess.rtn.status;
+				break;
+			case CSW_no_startup:		// -n
+				*pFlags &= ~(ExecSite | ExecUser);
+				break;
+			case CSW_no_user_startup:	// -N
+				*pFlags &= ~ExecUser;
+				break;
+			case CSW_path:			// -path
+				*pPath = result.arg;
+				break;
+			}
+		}
+	if(rtnCode < 0)
+		goto LibFail;
+
+	// Process -D switch if found.
+	if(foundD && argCount > 0) {
+		char *dirname;
+		uint dirLen;
+
+		if(dsetstr(*argList, pDatum) != 0)
+			goto LibFail;
+		if(*(dirname = fdirname(pDatum->str, INT_MIN)) != '\0') {
+			dirLen = strlen(dirname);
+			if(runCmd(pDatum, "chgDir ", dirname, NULL, RunQFull) == Success)
+				*argList += dirLen + 1;
+			}
+		}
+
+	return sess.rtn.status;
+LibFail:
+	return librsset(Failure);
+	}
+
+// Process command line arguments, skipping switches processed by procInfoSwitches() and procPreSwitches(), and return status.
+// Note that special processing is done for the -shell (-S) switch.  For example, if file "/home/jack/bin/testit" contained:
 //	#!/usr/local/bin/memacs -S -r
 //	...
 //
@@ -963,9 +1066,10 @@ static int scanCmdLine(int argCount, char *argList[], int *pDoStart) {
 //	4: 'abc'
 //	5: 'xyz'
 //
-// The doScript() function would be called with 'home/jack/bin/testit' as the first argument in argList.
-static int doCmdLine(int argCount, char *argList[]) {
-	int rtnCode, n;
+// The runScript() function would be called with 'home/jack/bin/testit' as the first argument in argList.
+static int procCmdLine(int argCount, char *argList[]) {
+	int rtnCode;
+	ushort bufFlags;
 	ushort fileActionCt = 0;	// Count of data files.
 	Buffer *pBuf;			// Temp buffer pointer.
 	Buffer *pBuf1 = NULL;		// Buffer pointer to data file to read first.
@@ -979,7 +1083,6 @@ static int doCmdLine(int argCount, char *argList[]) {
 	bool shellScript = false;	// Running as shell script?
 	char *str;
 	Datum *pSink;
-	DFab cmd;
 	bool readFirst = true;		// Read first file?
 	SwitchResult result;
 	Switch *pSwitch = cmdSwitchTable;
@@ -993,45 +1096,37 @@ static int doCmdLine(int argCount, char *argList[]) {
 	++argList;
 	while((rtnCode = getSwitch(&argCount, &argList, &pSwitch, elementsof(cmdSwitchTable), &result)) > 0) {
 		switch(rtnCode) {
-			case 2:		// -dir for change working directory.
-				str = "chgDir ";
-				n = true;		// Escape string.
-				goto DoCmd;
-			case 3:		// -exec to execute a command line.
-				if(execExprStmt(pSink, result.value, TokC_Comment, NULL) != Success)
+			case CSW_exec:
+				if(execExprStmt(pSink, result.arg, ParseStmtEnd, NULL) != Success)
 					return sess.rtn.status;
 				break;
-			case 4:		// -global-mode for set/clear global mode(s).
+			case CSW_global_mode:
 				if(modeSwitch(&result, NULL) != Success)
 					return sess.rtn.status;
 				break;
-			case 6:		// -inp-delim for setting $inpDelim system variable.
+			case CSW_inp_delim:
 				str = "$inpDelim = ";
-				n = false;		// Don't escape string.
 				goto DoCmd;
-			case 7:		// -no-read for not reading first file at startup.
+			case CSW_no_read:
 				readFirst = false;
-				// Fall through.
-			case 8:
-			case 9:		// -no-startup and -no-user-startup for skipping startup files (already processed).
 				break;
-			case 10:	// -otp-delim for setting $otpDelim system variable.
+			case CSW_otp_delim:
 				str = "$otpDelim = ";
-				n = false;		// Don't escape string.
 DoCmd:
-				if(runCmd(pSink, &cmd, str, result.value, n) != Success)
+				if(runCmd(pSink, str, result.arg, NULL, RunQSimple) != Success)
 					return sess.rtn.status;
 				break;
-			case 11:	// -path for setting file-execution search path.
-				str = (*result.value == '^') ? result.value + 1 : result.value;
-				if(setExecPath(str, *result.value != '^') != Success)
-					return sess.rtn.status;
-				break;
-			case 12:	// -r for read-only file.
+			case CSW_r:
 				cRdOnly = true;
+				modeInfo.cache[MdIdxReadOnly]->flags |=  MdEnabled;
 				break;
-			case 13:	// -shell for execute script file from shell.
+			case CSW_shell:
 				shellScript = true;
+				break;
+			case CSW_xeq:
+				// Process script file.
+				if(runScript(result.arg, 0, NULL) != Success)
+					return sess.rtn.status;
 			}
 		}
 
@@ -1047,94 +1142,88 @@ DoCmd:
 					return rsset(FatalError, 0, text45);
 						// "Multiple \"-\" arguments"
 				stdInpFlag = 1;			// Process it.
-				goto DoFile;
+				bufFlags = BS_Create | BS_CreateHook;
+				str = buffer1;
 				}
-			if((*argList)[0] == '@') {		// Process startup script.
-				if(startup(*argList + 1, 0, false, argCount + 1, argList) != Success)
-					return sess.rtn.status;
-				++argList;
+			else {
+				str = *argList;
+				bufFlags = BS_Create | BS_CreateHook | BS_Force | BS_Derive;
 				}
-			else {					// Process a data file.
-DoFile:
-				// Set up a buffer for the file and set it to inactive.
-				str = *argList++;
-				if(stdInpFlag > 0) {
-					if(bfind(buffer1, BS_Create | BS_CreateHook, 0, &pBuf, NULL) != Success)
-						return sess.rtn.status;
-					}
-				else if(bfind(str, BS_Create | BS_CreateHook | BS_Force | BS_Derive, 0, &pBuf, NULL) != Success)
-					return sess.rtn.status;
-				if(stdInpFlag > 0)		// If using standard input...
-					stdInpFlag = -1;		// disable the flag so it can't be used again.
-				else if(setFilename(pBuf, str, true) != Success)
-					return sess.rtn.status;
-				pBuf->flags &= ~BFActive;
-				if(cRdOnly)
-					pBuf->flags |= BFReadOnly;
+			++argList;
 
-				if(pBuf1 == NULL)
-					pBuf1 = pBuf;
+			// Process a data file.  Set up a buffer for the file and set it to inactive.
+			if(bfind(str, bufFlags, 0, &pBuf, NULL) != Success)
+				return sess.rtn.status;
+			if(stdInpFlag > 0)		// If using standard input...
+				stdInpFlag = -1;	// disable the flag so it can't be used again.
+			else if(setFilename(pBuf, str, BF_UpdBufDir) != Success)
+				return sess.rtn.status;
+			pBuf->flags &= ~BFActive;
+			if(cRdOnly)
+				pBuf->flags |= BFReadOnly;
 
-				// Check for argument switches.
-				aRdOnly = aRdWrite = false;
-				pSwitch = argSwitchTable;
-				while((rtnCode = getSwitch(&argCount, &argList, &pSwitch, elementsof(argSwitchTable),
-				 &result)) > 0) {
-					switch(rtnCode) {
-						case 1:
-						case 2:		//  {+|-}line for initial line to go to.
-							if(++fileActionCt > 1 || gotoFlag)
-								goto Conflict2;
-							if(!readFirst)
-								goto Conflict3;
-							(void) ascToLong(result.value, &goLine, false);
-							gotoFlag = true;
-							pBuf1 = pBuf;
-							break;
-						case 3:		// -pBuf-mode for set/clear buffer mode(s).
-							if(modeSwitch(&result, pBuf) != Success)
-								return sess.rtn.status;
-							break;
-						case 4:		// -r for read-only file.
-							if(aRdWrite)
-								goto Conflict1;
-							aRdOnly = true;
-							goto SetRW;
-						case 5:		// -rw for read/write file.
-							if(aRdOnly)
+			if(pBuf1 == NULL)
+				pBuf1 = pBuf;
+
+			// Check for argument switches.
+			aRdOnly = aRdWrite = false;
+			pSwitch = argSwitchTable;
+			while((rtnCode = getSwitch(&argCount, &argList, &pSwitch, elementsof(argSwitchTable),
+			 &result)) > 0) {
+				switch(rtnCode) {
+					case 1:
+					case 2:		//  {+|-}line for initial line to go to.
+						if(++fileActionCt > 1 || gotoFlag)
+							goto Conflict2;
+						if(!readFirst)
+							goto Conflict3;
+						(void) ascToLong(result.arg, &goLine, false);
+						gotoFlag = true;
+						pBuf1 = pBuf;
+						break;
+					case 3:		// -pBuf-mode for set/clear buffer mode(s).
+						if(modeSwitch(&result, pBuf) != Success)
+							return sess.rtn.status;
+						break;
+					case 4:		// -r for read-only file.
+						if(aRdWrite)
+							goto Conflict1;
+						aRdOnly = true;
+						goto SetRW;
+					case 5:		// -rw for read/write file.
+						if(aRdOnly)
 Conflict1:
-								return rsset(FatalError, 0, text1);
-									// "-r and -rw switch conflict"
-							aRdWrite = true;
+							return rsset(FatalError, 0, text1);
+								// "-r and -rw switch conflict"
+						aRdWrite = true;
 SetRW:
-							// Set or clear read-only attribute.
-							if(!aRdOnly)
-								pBuf->flags &= ~BFReadOnly;
-							else
-								pBuf->flags |= BFReadOnly;
-							break;
-						default:	// -search for initial search string.
-							if(++fileActionCt > 1 || gotoFlag)
+						// Set or clear read-only attribute.
+						if(!aRdOnly)
+							pBuf->flags &= ~BFReadOnly;
+						else
+							pBuf->flags |= BFReadOnly;
+						break;
+					default:	// -search for initial search string.
+						if(++fileActionCt > 1 || gotoFlag)
 Conflict2:
-								return rsset(FatalError, 0, text101, text175);
-										// "%sconflict", "-search, + or - switch "
-							if(!readFirst)
+							return rsset(FatalError, 0, text101, text175);
+									// "%sconflict", "-search, + or - switch "
+						if(!readFirst)
 Conflict3:
-								return rsset(FatalError, 0, text61, text175);
-								// "%sconflicts with -no-read", "-search, + or - switch "
-							if(newSearchPat(result.value, &searchCtrl.match, NULL, true) != Success)
-								return sess.rtn.status;
-							searchFlag = true;
-							pBuf1 = pBuf;
-							break;
-						}
+							return rsset(FatalError, 0, text61, text175);
+							// "%sconflicts with -no-read", "-search, + or - switch "
+						if(newSearchPat(result.arg, &searchCtrl.match, NULL, true) != Success)
+							return sess.rtn.status;
+						searchFlag = true;
+						pBuf1 = pBuf;
+						break;
 					}
-				if(rtnCode < 0)
-					return librsset(FatalError);
 				}
+			if(rtnCode < 0)
+				return librsset(FatalError);
 			}
 		}
-	else if(doScript(*argList, argCount, argList) != Success)
+	else if(runScript(*argList, argCount, argList) != Success)
 		return sess.rtn.status;
 
 	// Done processing arguments.  Select initial buffer.
@@ -1146,7 +1235,7 @@ Conflict3:
 		char workBuf[WorkBufSize];
 
 		sprintf(workBuf, goLine >= 0 ? "gotoLine %ld" : "endBuf() || %ld => forwLine", goLine);
-		(void) execExprStmt(pSink, workBuf, TokC_Comment, NULL);
+		(void) execExprStmt(pSink, workBuf, 0, NULL);
 		}
 	else if(searchFlag)
 		(void) huntForw(pSink, 1, NULL);
@@ -1159,18 +1248,18 @@ LibFail:
 // Prepare to insert one or more characters at point.  Delete characters first if in replace or overwrite mode and not at end
 // of line.  Assume n > 0.  Return status.
 int overPrep(int n) {
-	bool mdRepl = isBufModeSet(sess.pCurBuf, modeInfo.cache[MdIdxRepl]);
+	bool mdRepl = isBufModeSet(sess.cur.pBuf, modeInfo.cache[MdIdxRepl]);
 
-	if(mdRepl || isBufModeSet(sess.pCurBuf, modeInfo.cache[MdIdxOver])) {
+	if(mdRepl || isBufModeSet(sess.cur.pBuf, modeInfo.cache[MdIdxOver])) {
 		int count = 0;
-		Point *pPoint = &sess.pCurWind->face.point;
+		Point *pPoint = &sess.cur.pFace->point;
 		do {
 			if(pPoint->offset == pPoint->pLine->used)
 				break;
 
 			// Delete character if we are in replace mode, character is not a tab, or we are at a tab stop.
 			if(mdRepl || (pPoint->pLine->text[pPoint->offset] != '\t' ||
-			 (getCol(NULL, false) + count) % sess.hardTabSize == (sess.hardTabSize - 1)))
+			 (getCol(NULL, false) + count) % sess.cur.pScrn->hardTabSize == (sess.cur.pScrn->hardTabSize - 1)))
 				if(edelc(1, 0) != Success)
 					break;
 			++count;
@@ -1179,9 +1268,9 @@ int overPrep(int n) {
 	return sess.rtn.status;
 	}
 
-// This is the general interactive command execution routine.  It handles the fake binding of all the printable keys to
-// "self-insert".  It also clears out the "curFlags" word and arranges to move it to "prevFlags" so that the next command can
-// look at it.  "extKey" is the key to execute with argument "n".  Return status.
+// This is the general interactive command execution routine for a key or key sequence.  It handles the fake binding of all the
+// printable keys to "self-insert".  It also clears out the "curFlags" word and arranges to move it to "prevFlags" so that the
+// next command can look at it.  "extKey" is the key to execute with argument "n".  Return status.
 static int execute(int n, ushort extKey, KeyBind *pKeyBind) {
 	char keyBuf[16];
 
@@ -1241,11 +1330,7 @@ ASaveChk:
 			if((modeInfo.cache[MdIdxASave]->flags & MdEnabled) && sess.autoSaveTrig > 0 &&
 			 --sess.autoSaveCount == 0) {
 				Datum sink;		// For throw-away return value, if any.
-#if DCaller
-				dinit(&sink, "execute");
-#else
 				dinit(&sink);
-#endif
 				keyEntry.prevFlags = keyEntry.curFlags;
 				keyEntry.curFlags = 0;
 				if(execCmdFunc(&sink, 1, cmdFuncTable + cf_saveFile, 0, 0) < Failure)
@@ -1268,21 +1353,15 @@ ErrRtn:
 
 // Interactive command-processing routine.  Read key sequences and process them.  Return if program exit.
 static int editLoop(void) {
-	ushort extKey;		// Extended key read from user.
-	int n;			// Numeric argument.
-	ushort oldFlag;		// Old last flag value.
+	ushort extKey;			// Extended key read from user.
+	int n;				// Numeric argument.
+	ushort oldFlag;			// Old last flag value.
 	KeyBind *pKeyBind;
 	RtnStatus lastRtn;		// Return code from last key executed.
-	Datum hookRtnVal;	// For calling pre/postKey hooks.
-#if DCaller
-	static const char myName[] = "editLoop";
+	Datum hookRtnVal;		// For calling pre/postKey hooks.
 
-	dinit(&lastRtn.msg, myName);
-	dinit(&hookRtnVal, myName);
-#else
 	dinit(&lastRtn.msg);
 	dinit(&hookRtnVal);
-#endif
 	dsetnull(&lastRtn.msg);
 	lastRtn.status = Success;
 	sess.opFlags &= ~OpStartup;
@@ -1295,8 +1374,8 @@ static int editLoop(void) {
 	// Do forever.
 	for(;;) {
 		rsclear(0);
-		garbPop(NULL);				// Throw out all the garbage.
-		if(awGarbFree() != Success)
+		dgPop(NULL);				// Throw out all the datum garbage...
+		if(agFree() != Success)			// and the array garbage.
 			break;
 
 		// Fix up the screen.
@@ -1311,7 +1390,7 @@ static int editLoop(void) {
 			if(lastRtn.flags & RSTermAttr)
 				flags |= MLTermAttr;
 			if(mlputs(flags, lastRtn.msg.str) != Success ||
-			 tmove(sess.pCurScrn->cursorRow, sess.pCurScrn->cursorCol) != Success || tflush() != Success)
+			 tmove(sess.cur.pScrn->cursorRow, sess.cur.pScrn->cursorCol) != Success || tflush() != Success)
 				break;
 			}
 
@@ -1330,7 +1409,7 @@ JumpStart:
 			}
 
 		// If there is something on the message line, clear it.
-		if(mlerase() != Success)
+		if(mlerase(0) != Success)
 			break;
 
 		// Set default.
@@ -1481,7 +1560,7 @@ Decr5:
 				n = -n;
 
 			// Clear the message line.
-			if(mlerase() != Success)
+			if(mlerase(0) != Success)
 				break;
 			}
 
@@ -1541,14 +1620,8 @@ Retn:
 	return sess.rtn.status;
 	}
 
-// Return a random seed.
-ulong seedInit(void) {
-
-	return time(NULL) & ULONG_MAX;
-	}
-
-// Convert return message to multiple lines (at ", in") and remove ~ (AttrSpecBegin) sequences if RSTermAttr flag set.  Return
-// Success or Failure.
+// Convert return message to multiple lines (at ", in"), translate to visual form in case it contains non-printable
+// character(s), and remove ~ (AttrSpecBegin) sequences if RSTermAttr flag set.  Return Success or Failure.
 static int cleanMsg(char **pStr) {
 	DFab msg;
 	char *str = *pStr = sess.scriptRtn.msg.str;
@@ -1589,21 +1662,17 @@ static int cleanMsg(char **pStr) {
 					}
 				}
 			else if(strncmp(str - 1, text229, len) == 0) {
-				if(dputf(&msg, ",\n %s", text229 + 1) != 0)
+				if(dputf(&msg, 0, ",\n %s", text229 + 1) != 0)
 					break;
 				str += len - 1;
 				continue;
 				}
 
-			// Make any invisible characters other than newline and tab visible.
-			if(c == '\n' || c == '\t' || (c >= ' ' && c <= '~')) {
-				if(dputc(c, &msg) != 0)
-					break;
-				}
-			else if(dputvizc(c, VizBaseDef, &msg) != 0)
+			// Make any non-printable characters other than newline and tab visible.
+			if(dputc(c, &msg, c == '\n' || c == '\t' || (c >= ' ' && c <= '~') ? 0 : DCvtVizChar) != 0)
 				break;
 			}
-		if(dclose(&msg, Fab_String) == 0) {
+		if(dclose(&msg, FabStr) == 0) {
 			*pStr = msg.pDatum->str;
 			return Success;
 			}
@@ -1618,12 +1687,11 @@ static int cleanMsg(char **pStr) {
 //   4. If no errors, enter user-key-entry loop.
 //   5. At loop exit, display any error message and return proper exit code to OS.
 int main(int argCount, char *argList[]) {
-	int doStart = 1;	// -1 (-no-user-startup), 0 (-no-startup), or 1 (default -- do startup).
 	char *path;
 	Buffer *pBuf;
+	ushort flags = ExecSite | ExecUser;
 
 	// Do global initializations.
-	sess.randSeed = seedInit();
 	sess.myPID = (unsigned) getpid();
 	initCharTables();
 #if MMDebug & Debug_Logfile
@@ -1638,33 +1706,36 @@ int main(int argCount, char *argList[]) {
 	fprintf(logfile, "\n----------\n%s started %s\n", Myself, ctime(&t));
 #endif
 	// Begin using sess.rtn (RtnStatus): do pre-edit-loop stuff, but use the same return-code mechanism as command calls.
-	if(editInit0() == Success &&			// Initialize the return value structures.
-	 scanCmdLine(argCount, argList, &doStart) == Success &&	// Scan command line for informational, -n, and -U switches.
-	 editInit1() == Success &&			// Initialize the core data structures.
-	 vtinit() == Success &&				// Initialize the virtual terminal.
-	 editInit2() == Success) {			// Initialize buffers, windows, and screens.
+	if(editInit0() == Success &&				// Initialize the return value structures.
+	 procInfoSwitches(argCount, argList) == Success &&	// Scan command line for informational switches.
+	 editInit1() == Success &&				// Initialize the core data structures.
+	 vtinit() == Success &&					// Initialize the virtual terminal.
+	 editInit2() == Success &&				// Initialize buffers, windows, and screens.
+	 procPreSwitches(argCount, argList,
+	  &flags, &path) == Success) {				// Scan command line for -D, -dir, -path, -n, and -N switches.
 
-		// At this point, we are fully operational (ready to process commands).  Set $execPath.
-		if((path = getenv(MMPath_Name)) == NULL)
+		// At this point, we are fully operational (ready to process commands).  Set $execPath (in -path, MSPATH,
+		// built-in path order of priority).
+		if(path == NULL && (path = getenv(MMPath_Name)) == NULL)
 			path = MMPath;
-		if(setExecPath(path, false) != Success)
+		if(setExecPath(path) != Success)
 			goto Retn;
 
 		// Run site and user startup files and check for errors.
-		if((doStart && startup(SiteStartup, 0, true, argCount, argList) != Success) ||
-		 (doStart > 0 && startup(UserStartup, XP_HomeOnly, true, argCount, argList) != Success))
+		if(((flags & ExecSite) && startup(SiteStartup, 0, argCount, argList) != Success) ||
+		 ((flags & ExecUser) && startup(UserStartup, XP_HomeOnly, argCount, argList) != Success))
 			goto Retn;
 
 		// Run create-buffer and change-directory hooks.
-		if(execHook(NULL, INT_MIN, hookTable + HkCreateBuf, 1, sess.pCurBuf->bufname) != Success ||
+		if(execHook(NULL, INT_MIN, hookTable + HkCreateBuf, 1, sess.cur.pBuf->bufname) != Success ||
 		 execHook(NULL, INT_MIN, hookTable + HkChDir, 0) != Success)
 			goto Retn;
 
 		// Process the command line.
-		if(doCmdLine(argCount, argList) == Success) {
+		if(procCmdLine(argCount, argList) == Success) {
 
 			// Enter user-command loop.
-			sess.pCurWind->flags |= WFMode;
+			sess.cur.pWind->flags |= WFMode;
 			(void) editLoop();
 			}
 		}
@@ -1740,9 +1811,9 @@ Retn:
 	return ErrorRtnCode;
 	}
 
-// Loop through the list of buffers (ignoring user commands and functions) and return true if any were changed; otherwise,
+// Loop through the list of buffers (ignoring user commands and functions) and return true if any were changed, otherwise
 // false.
-static bool dirtyBuf(void) {
+static bool changedBuf(void) {
 	Datum *pArrayEl;
 	Buffer *pBuf;
 	Array *pArray = &bufTable;
@@ -1765,21 +1836,25 @@ int quit(Datum *pRtnVal, int n, Datum **args) {
 	if((sess.exitNArg = n) == INT_MIN)
 		n = 0;
 
-	// Not argument-force and dirty buffer?
-	if(n == 0 && dirtyBuf()) {
+	// Not argument-force and changed buffer?
+	if(n == 0 && changedBuf()) {
 		bool yep;
 
 		// Have changed buffer(s)... user okay with that?
 		if(terminpYN(text104, &yep) != Success)
 				// "Modified buffers exist.  Exit anyway"
 			return sess.rtn.status;
-		if(yep)
+		if(yep) {
 			// Force clean exit.
 			forceClean = true;
-		else
+			}
+		else {
 			// User changed his mind... don't exit (no error).
 			status = Success;
-		if(mlerase() != Success)
+			}
+
+		// Clear prompt if script mode and user changed his mind.
+		if((sess.opFlags & OpScript) && status == Success && mlerase(MLForce) != Success)
 			return sess.rtn.status;
 		}
 
@@ -1790,10 +1865,10 @@ int quit(Datum *pRtnVal, int n, Datum **args) {
 		// Get return message, if any, and save it if exiting.
 		if(buildMsg(&pDatum, NULL, 0) == Success && status != Success) {
 			rsclear(0);
-			if(!isEmpty(pDatum))
+			if(!isNN(pDatum))
 				msg = pDatum->str;
-			if(!forceClean && dirtyBuf())
-				status = ScriptExit;	// Forced exit from a script with dirty buffer(s).
+			if(!forceClean && changedBuf())
+				status = ScriptExit;	// Forced exit from a script with changed buffer(s).
 			}
 		}
 

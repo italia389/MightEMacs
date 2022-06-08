@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -226,8 +226,8 @@ int sysCallError(const char *caller, const char *call, bool addTERM) {
 	if(addTERM && vTerm.termName != NULL) {
 		DFab msg;
 
-		if(dopenwith(&msg, &sess.rtn.msg, FabAppend) != 0 || dputf(&msg, ", TERM '%s'", vTerm.termName) != 0 ||
-		 dclose(&msg, Fab_String) != 0)
+		if(dopenwith(&msg, &sess.rtn.msg, FabAppend) != 0 || dputf(&msg, 0, ", TERM '%s'", vTerm.termName) != 0 ||
+		 dclose(&msg, FabStr) != 0)
 			(void) librsset(Failure);
 		}
 	return sess.rtn.status;
@@ -453,11 +453,12 @@ int topen(void) {
 		return sess.rtn.status;
 	setTermSize(cols, rows);
 
-	// Initialize locale and screen.  *NOTE: For future use if and when multibyte support is added.  For now the default
-	// "C" locale gives the best performance.
+	// Initialize locale.  *NOTE: For future use if and when multibyte support is added.  For now the default "C" locale
+	// gives the best performance.
 #if 0
 	(void) setlocale(LC_ALL, "");
 #endif
+	// Initialize screen.
 	(void) initscr();
 	if(has_colors()) {
 		chtype wideChar, freePairs;
@@ -687,7 +688,7 @@ int chgWorkDir(Datum *pRtnVal, int n, Datum **args) {
 	// Get directory name.
 	if(sess.opFlags & OpScript)
 		expandPath(pRtnVal, args[0]);
-	else if(termInp(pRtnVal, text277, ArgNil1, Term_C_Filename, &termInpCtrl) != Success || pRtnVal->type == dat_nil)
+	else if(termInp(pRtnVal, text277, ArgNil1, Term_C_Filename, &termInpCtrl) != Success || disnil(pRtnVal))
 			// "Change directory"
 		return sess.rtn.status;
 
@@ -696,14 +697,14 @@ int chgWorkDir(Datum *pRtnVal, int n, Datum **args) {
 		return sess.rtn.status;
 
 	// Get new path (absolute pathname), save it in current screen, and return it to caller.
-	if(setWorkDir(sess.pCurScrn) != Success)
+	if(setWorkDir(sess.cur.pScrn) != Success)
 		return sess.rtn.status;
-	if(dsetstr(sess.pCurScrn->workDir, pRtnVal) != 0)
+	if(dsetstr(sess.cur.pScrn->workDir, pRtnVal) != 0)
 		return librsset(Failure);
 
 	// Set mode line update flag if needed.
 	if(modeInfo.cache[MdIdxWkDir]->flags & MdEnabled)
-		sess.pCurWind->flags |= WFMode;
+		sess.cur.pWind->flags |= WFMode;
 
 	// Run change-directory user hook unless it is not set or is currently running.
 	if(pHookRec->func.type != PtrNull && !pHookRec->running && execHook(NULL, n, pHookRec, 0) != Success)
@@ -711,7 +712,7 @@ int chgWorkDir(Datum *pRtnVal, int n, Datum **args) {
 
 	// Display new directory if 'WkDir' global mode not enabled.
 	return (modeInfo.cache[MdIdxWkDir]->flags & MdEnabled) ? sess.rtn.status :
-	 rsset(Success, RSNoFormat | RSNoWrap, sess.pCurScrn->workDir);
+	 rsset(Success, RSNoFormat | RSNoWrap, sess.cur.pScrn->workDir);
 	}
 
 // Suspend MightEMacs.
@@ -821,9 +822,9 @@ int shellCLI(Datum *pRtnVal, int n, Datum **args) {
 	if(tclose(true) != Success)			// Close down...
 		return sess.rtn.status;
 	rtnCode = system(sh);				// spawn a shell...
-	dsetbool(rtnCode == 0, pRtnVal);		// set return value to false if error occurred; otherwise, true...
+	dsetbool(rtnCode == 0, pRtnVal);		// set return value to false if error occurred, otherwise true...
 	if(rtnCode != 0)
-		(void) rsset(Failure, 0, text194, sh);
+		(void) rsset(Failure, RSHigh, text194, sh);
 			// "Shell command \"%s\" failed"
 	return topen2(true);				// and restart system.
 	}
@@ -851,7 +852,7 @@ static int insertPipeData(int fileHandle, int n, Buffer *pBuf, DataInsert *pData
 
 	if(inpInit(fileHandle) == Success) {
 		pDataInsert->pTargBuf = pBuf;
-		pDataInsert->pTargPoint = (pBuf == sess.pCurBuf) ? NULL : &pBuf->face.point;
+		pDataInsert->pTargPoint = (pBuf == sess.cur.pBuf) ? NULL : &pBuf->face.point;
 		pDataInsert->msg = (flags & PipeInsert) ? text153 : text139;
 					// "Inserting data...", "Reading data..."
 
@@ -938,7 +939,7 @@ int pipeCmd(Datum *pRtnVal, int n, const char *prompt, ushort flags) {
 	ushort action;
 	ushort rendFlags = RendNewBuf | RendAltML | RendWait;
 	static Option optTable[] = {
-		{"^Shift", "^Shift", 0, 0},
+		{"^Shift", "^Shft", 0, 0},
 		{"No^Pop", NULL, 0, 0},
 		{"No^Hdr", NULL, 0, 0},
 		{NULL, NULL, 0, 0}};
@@ -963,12 +964,12 @@ int pipeCmd(Datum *pRtnVal, int n, const char *prompt, ushort flags) {
 		}
 
 	// Get shell command.  Cancel operation if nothing entered.
-	if(getCmd(&pCmdLine, prompt) != Success || pCmdLine->type == dat_nil)
+	if(getCmd(&pCmdLine, prompt) != Success || disnil(pCmdLine))
 		return sess.rtn.status;
 
 	// If target buffer is current buffer and executing a pipeBuf or readPipe command, verify it can be erased (getting user
 	// okay if necessary) before proceeding.
-	if(!(flags & (PipePopOnly | PipeInsert)) && (n == INT_MIN || n == 1) && bconfirm(sess.pCurBuf, 0) != Success)
+	if(!(flags & (PipePopOnly | PipeInsert)) && (n == INT_MIN || n == 1) && bconfirm(sess.cur.pBuf, 0) != Success)
 		return sess.rtn.status;
 
 	// Target buffer ready.  Create three pipes: one for writing target buffer into (pipeBuf command), one for reading
@@ -1043,10 +1044,10 @@ DupErr:
 				// Child process.  Write current buffer to pipe 1 and return success or failure (to parent).
 				(void) close(pipe2[0]);
 				(void) close(pipe3[0]);
-				otpInit(sess.pCurBuf, pipe1[1]);
+				otpInit(sess.cur.pBuf, pipe1[1]);
 				fileInfo.filename = pipeFilename;
 				fileInfo.flags |= FIRetry;
-				exit(writeDiskPipe(sess.pCurBuf, NULL) == Success ? 0 : -1);
+				exit(writeDiskPipe(sess.cur.pBuf, NULL) == Success ? 0 : -1);
 			case -1:
 				filename = FNfork;
 				goto OSErr;
@@ -1147,7 +1148,7 @@ DupErr:
 			DataInsert dataInsert;
 
 			if((flags & PipeInsert) || (!(flags & PipeWrite) && (n == INT_MIN || n == 1))) {
-				pBuf = sess.pCurBuf;
+				pBuf = sess.cur.pBuf;
 				if(!(flags & PipeInsert) && readPrep(pBuf, BC_IgnChgd) != Success)
 					goto CloseWait;
 				}
@@ -1157,7 +1158,7 @@ DupErr:
 				if(dopentrack(&fab) != 0)
 					goto LibFail;
 				if(ioStat(&fab, dataInsert.finalDelim ? 0 : IOS_NoDelim, NULL, Success, NULL,
-				 flags & PipeInsert ? text154 : text140, dataInsert.lineCt) == Success) {
+				 flags & PipeInsert ? text154 : text131, dataInsert.lineCt) == Success) {
 						// "Inserted", "Read"
 					if(!(flags & PipeInsert)) {
 						pBuf->flags &= ~BFChanged;
@@ -1166,14 +1167,14 @@ DupErr:
 						// contents of scratch buffer and current buffer and delete the scratch.
 						if((flags & PipeWrite) && (n == INT_MIN || n == 1)) {
 							Line *pLine = pBuf->pFirstLine;
-							pBuf->pFirstLine = sess.pCurBuf->pFirstLine;
-							sess.pCurBuf->pFirstLine = pLine;
+							pBuf->pFirstLine = sess.cur.pBuf->pFirstLine;
+							sess.cur.pBuf->pFirstLine = pLine;
 							(void) bdelete(pBuf, BC_IgnChgd);		// Can't fail.
-							pBuf = sess.pCurBuf;
+							pBuf = sess.cur.pBuf;
 							pBuf->flags &= ~BFChanged;
 							supd_windFlags(pBuf, WFHard | WFMode);
 							}
-						faceInit(pBuf == sess.pCurBuf ? &sess.pCurWind->face :
+						faceInit(pBuf == sess.cur.pBuf ? &sess.cur.pWind->face :
 						 &pBuf->face, pBuf->pFirstLine, pBuf);
 						(void) render(pRtnVal, n == INT_MIN ? 1 : n, pBuf, n == INT_MIN ? 0 :
 						 RendNewBuf | RendNotify);
@@ -1188,11 +1189,11 @@ DupErr:
 			if(!(flags & PipePopOnly)) {
 				DFab alert;
 
-				if(dopenwith(&alert, pRtnVal, FabClear) != 0 || dputf(&alert, text194, pCmdLine->str) != 0 ||
+				if(dopenwith(&alert, pRtnVal, FabClear) != 0 || dputf(&alert, 0, text194, pCmdLine->str) != 0 ||
 										// "Shell command \"%s\" failed"
-				 dclose(&alert, Fab_String) != 0)
+				 dclose(&alert, FabStr) != 0)
 					goto LibFail;
-				if(mlputs(MLHome | MLFlush, pRtnVal->str) != Success)
+				if(mlputs(MLHome | MLFlush | MLForce, pRtnVal->str) != Success)
 					goto CloseWait;
 				centiPause(160);
 				}
@@ -1246,7 +1247,7 @@ int expandPath(Datum *pDest, Datum *pSrc) {
 				if(str != str1)
 					break;
 				if(*str == '/') {
-					if((name = getenv("HOME")) != NULL && dputs(name, &fab) != 0)
+					if((name = getenv("HOME")) != NULL && dputs(name, &fab, 0) != 0)
 						goto LibFail;
 					continue;
 					}
@@ -1269,7 +1270,7 @@ int expandPath(Datum *pDest, Datum *pSrc) {
 					}
 
 				// So far so good.  Scan to end of name.
-				str = strpspn(name = str, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_");
+				str = strcbrk(name = str, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_");
 				if(braceForm && *str != '}') {
 					str = name - 1;
 					break;
@@ -1293,14 +1294,14 @@ int expandPath(Datum *pDest, Datum *pSrc) {
 						}
 
 					// Found it.
-					if(dputs(pPass->pw_dir, &fab) != 0)
+					if(dputs(pPass->pw_dir, &fab, 0) != 0)
 						goto LibFail;
 					*str = c2;
 					continue;
 					}
 
 				// Have "$var" or "${var}".
-				if((name = getenv(name)) != NULL && dputs(name, &fab) != 0)
+				if((name = getenv(name)) != NULL && dputs(name, &fab, 0) != 0)
 					goto LibFail;
 				*str = c2;
 				if(braceForm)
@@ -1309,25 +1310,25 @@ int expandPath(Datum *pDest, Datum *pSrc) {
 			}
 
 		// Not a special character... just copy it.
-		if(dputc(c1, &fab) != 0)
+		if(dputc(c1, &fab, 0) != 0)
 			goto LibFail;
 		}
 
 	// Expansion completed... return result.
-	if(dclose(&fab, Fab_String) != 0)
+	if(dclose(&fab, FabStr) != 0)
 		goto LibFail;
 	if(pSrc == NULL)
-		datxfer(pDest, fab.pDatum);
+		dxfer(pDest, fab.pDatum);
 	return sess.rtn.status;
 LibFail:
 	return librsset(Failure);
 	}
 
-// Return pointer to base filename, given pathname or filename.  If withExt if false, return base filename without extension.
-// "name" is not modified in either case.
+// Return pointer to base filename, given pathname or filename.  If withExt is true, return base filename with extension,
+// otherwise without.  "name" is not modified in either case.
 char *fbasename(const char *name, bool withExt) {
 	char *str1, *str2;
-	static char pBuf[MaxFilename + 1];
+	static char nameBuf[MaxFilename + 1];
 
 	if((str1 = str2 = strchr(name, '\0')) > name) {
 
@@ -1347,8 +1348,8 @@ char *fbasename(const char *name, bool withExt) {
 					if(str2 == str1)		// Bail out if '.' is first character.
 						break;
 					len = str2 - str1 + 1;
-					stplcpy(pBuf, str1, len > sizeof(pBuf) ? sizeof(pBuf) : len);
-					return pBuf;
+					stplcpy(nameBuf, str1, len > sizeof(nameBuf) ? sizeof(nameBuf) : len);
+					return nameBuf;
 					}
 				}
 			}
@@ -1358,7 +1359,7 @@ char *fbasename(const char *name, bool withExt) {
 	}
 
 // Return pointer to directory name, given pathname or filename and n argument.  If non-default n, return "." if no directory
-// portion found in name; otherwise, null.  Given name is modified (truncated).
+// portion found in name, otherwise a null string.  Given name is modified (truncated).
 char *fdirname(char *name, int n) {
 	char *str;
 
@@ -1404,7 +1405,7 @@ static int savePath(char **pDest, const char *name) {
 //	- caller must call globfree() after processing pathnames if gl_pathc > 0.
 // If XP_GlobPat flag is not set:
 //	- result must be of type char **.
-//	- *result is set to the absolute pathname if a match was found; otherwise, NULL.
+//	- *result is set to the absolute pathname if a match was found, otherwise NULL.
 //	- searches are for the original filename first, followed by <filename>ScriptExt unless the filename already has that
 //	  extension.
 // In all cases, if XP_SkipNull flag is set, null directories in $execPath are skipped.
@@ -1446,8 +1447,9 @@ int pathSearch(const char *name, ushort flags, void *result, const char *funcNam
 	// If the path begins with '/', check only that.
 	if(*name == '/') {
 		if(!(flags & XP_GlobPat))
-			return fileExist(name) == 0 ? savePath(pPath, name) : (!disnull(pExtName) &&
-			 fileExist(pExtName->str) == 0) ? savePath(pPath, pExtName->str) : sess.rtn.status;
+			return fileExists(name) & (FTypRegular | FTypSymLink) ? savePath(pPath, name) : (!disnull(pExtName) &&
+			 (fileExists(pExtName->str) & (FTypRegular | FTypSymLink))) ? savePath(pPath, pExtName->str) :
+			 sess.rtn.status;
 		return rsset(Failure, 0, text407, funcName);
 			// "Invalid argument for %s glob search"
 		}
@@ -1459,7 +1461,7 @@ int pathSearch(const char *name, ushort flags, void *result, const char *funcNam
 
 			// Build pathname and check it.
 			sprintf(pathBuf, "%s/%s", str1, name);
-			if(fileExist(pathBuf) == 0)
+			if(fileExists(pathBuf) & (FTypRegular | FTypSymLink))
 				return savePath(pPath, pathBuf);
 			}
 		return sess.rtn.status;
@@ -1500,7 +1502,7 @@ int pathSearch(const char *name, ushort flags, void *result, const char *funcNam
 						if(pGlob->gl_pathc > 0)
 							return sess.rtn.status;
 						}
-					else if(fileExist(pathBuf) == 0)
+					else if(fileExists(pathBuf) & (FTypRegular | FTypSymLink))
 						return savePath(pPath, pathBuf);
 					}
 				} while(*++ppName != NULL);
@@ -1520,7 +1522,7 @@ LibFail:
 // Get absolute pathname of "filename" (which may be modified) and return in "pPath".  Resolve it if it's a symbolic link and
 // "resolve" is true.  Return status.
 int getPath(char *filename, bool resolve, Datum *pPath) {
-	char pBuf[MaxPathname + 1];
+	char nameBuf[MaxPathname + 1];
 
 	if(!resolve) {
 		struct stat s;
@@ -1537,19 +1539,19 @@ int getPath(char *filename, bool resolve, Datum *pPath) {
 		strcpy(base, str);
 		if(dopenwith(&fab, pPath, FabClear) != 0)
 			goto LibFail;
-		if(realpath(filename = fdirname(filename, 1), pBuf) == NULL)
+		if(realpath(filename = fdirname(filename, 1), nameBuf) == NULL)
 			goto ErrRetn;
-		if(dputs(pBuf, &fab) != 0 || (strcmp(pBuf, "/") != 0 && dputc('/', &fab) != 0) ||
-		 dputs(base, &fab) != 0 || dclose(&fab, Fab_String) != 0)
+		if(dputs(nameBuf, &fab, 0) != 0 || (strcmp(nameBuf, "/") != 0 && dputc('/', &fab, 0) != 0) ||
+		 dputs(base, &fab, 0) != 0 || dclose(&fab, FabStr) != 0)
 			goto LibFail;
 		}
 	else {
 RegFile:
-		if(realpath(filename, pBuf) == NULL)
+		if(realpath(filename, nameBuf) == NULL)
 ErrRetn:
 			return rsset(errno == ENOMEM ? FatalError : Failure, 0, text33, text37, filename, strerror(errno));
 				// "Cannot get %s of file \"%s\": %s", "pathname"
-		if(dsetstr(pBuf, pPath) != 0)
+		if(dsetstr(nameBuf, pPath) != 0)
 LibFail:
 			(void) librsset(Failure);
 		}
@@ -1563,7 +1565,7 @@ int eopendir(const char *fileSpec, char **pFilePath) {
 	char *fn, *term;
 	size_t prefLen;
 
-	// Find directory prefix.  Terminate after slash if Unix root directory; otherwise, at rightmost slash.
+	// Find directory prefix.  Terminate after slash if Unix root directory, otherwise at rightmost slash.
 	term = ((fn = fbasename(fileSpec, true)) > fileSpec && fn - fileSpec > 1) ? fn - 1 : fn;
 
 	// Get space for directory name plus maximum filename.
@@ -1580,7 +1582,7 @@ int eopendir(const char *fileSpec, char **pFilePath) {
 		dir = NULL;
 		}
 	if((dir = opendir(*filePath == '\0' ? "." : filePath)) == NULL)
-		return rsset(Failure, 0, text88, filePath, strerror(errno));
+		return rsset(Failure, RSHigh, text88, filePath, strerror(errno));
 			// "Cannot read directory \"%s\": %s"
 
 	// Set filePathEnd, restore trailing slash in pathname if applicable, and return.
@@ -1613,7 +1615,7 @@ int ereaddir(void) {
 				return NotFound;	// No entries left.
 				}
 			*filePathEnd = '\0';
-			return rsset(Failure, 0, text88, filePath, strerror(errno));
+			return rsset(Failure, RSHigh, text88, filePath, strerror(errno));
 				// "Cannot read directory \"%s\": %s"
 			}
 		strcpy(filePathEnd, pDirEntry->d_name);

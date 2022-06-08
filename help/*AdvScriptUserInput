@@ -1,21 +1,19 @@
 ~bUser Input~B
 
-It is possible to get user input from a script by using the "prompt" function,
+It is possible to get user input from a script by using the ~bprompt~B function,
 which displays a prompt on the message line, reads a response, and returns the
 result.  When using the function, note the following:
 
-  * It accepts one or more arguments in the following order:
+  * It accepts zero to three arguments in the following order:
 
          1. A prompt string, which may be ~unil~U or a null string.
-         2. An optional default value, which may be ~unil~U, the ASCII value of a
-            character, an integer, or a string (including a null string),
-            depending on the prompt type.  If an n argument is given, the
-            argument is required; otherwise, it must be omitted.
-         3. Zero or more options, specified as strings in form "option" or
-            "keyword: value".
+         2. One or more options in a string argument, specified as comma-
+            separated keywords of form "keyword" or "keyword: value".
+         3. A default value, which may be ~unil~U, a character, an integer, or a
+            string (including a null string), depending on the prompt type.
 
-  * The first argument is required.  If n argument, the second argument is also
-    required.  All other arguments are optional.
+  * All arguments are optional.  If none are given, the user is prompted for
+    input with no prompt string displayed.
 
   * Options of the first form are:
 
@@ -25,10 +23,13 @@ result.  When using the function, note the following:
 
   * Keyword options are:
 
-        Delim: ~ukey-lit~U      Specify an input delimiter, in the same format as a
-                            key literal.
-        Type: ~uvalue~U         Specify one of the following input types for ~uvalue~U:
+        Delim: ~ukey-lit~U      Specify an input delimiter in the same format as a
+                            key literal.  This option must be the last option
+                            specified.  All text following the colon that
+                            remains in the string argument, including any
+                            comma(s), are assumed to be part of the key literal.
 
+        Type: ~ut~U             Specify one of the following input types for ~ut~U:
                                 Buffer          Buffer name completion.
                                 Char            Single character.
                                 DelRing         Delete ring access.
@@ -49,12 +50,12 @@ result.  When using the function, note the following:
                                                 mutable and immutable.
 
   * The prompt string may be nil or a null string for a null prompt; otherwise,
-    the following steps are taken to build the prompt string:
+    the following steps are taken to build the prompt string that is displayed:
 
          1. If the prompt string begins with a letter, a colon and a space
             (": ") are appended to the string; otherwise, it is used verbatim,
             however any leading ' or " quote character is stripped off first
-            (which force the rest of the string to be used verbatim) and any
+            (which forces the rest of the string to be used verbatim) and any
             trailing white space is moved to the very end of the final prompt
             string that is built.
          2. If a non-empty default value is specified, it is displayed after the
@@ -97,14 +98,14 @@ result.  When using the function, note the following:
             case; otherwise, it must be string or integer and is stored in the
             input buffer in string form as the initial value to be returned.
             The default value may also be specified as ~unil~U for none (the
-            default).
+            default) or simply omitted.
 
           - A key literal is returned for types "Key" and "KeySeq"; otherwise,
             if the user enters just the delimiter key, the default value is
             returned as an ASCII character if it exists and the prompt type is
             "Char"; otherwise, ~unil~U is returned.  If the user presses ~uC-SPC~U at
-            any time, a null string is returned instead (or a null character if
-            the prompt type is "Char"); otherwise, the string in the input
+            any time, a null string is returned instead (or null character ?\0
+            if the prompt type is "Char"); otherwise, the string in the input
             buffer is returned when the delimiter key is entered.
 
   * The "Type" option specifies the type of input, as follows:
@@ -129,7 +130,7 @@ result.  When using the function, note the following:
         String          Read a string without completion (the default).
         Var             Enable variable name completion during input and
                         include all system and global variables.
-        MutableVar      Enable variable name completion during input, and
+        MutableVar      Enable variable name completion during input and
                         include all system and global variables except read-only
                         system variables and global variables that begin with a
                         capital letter.
@@ -148,20 +149,18 @@ result.  When using the function, note the following:
     screen, a ~u$~U character will appear at the end of the input area.  Supported
     line editing and navigation keys are:
 
-        ~Uc-b~U or ~uleft-arrow~U           Move cursor backward one character.
+        ~uC-b~U or ~uleft-arrow~U           Move cursor backward one character.
         ~uC-f~U or ~uright-arrow~U          Move cursor forward one character.
         ~uC-a~U                         Move cursor to beginning of line.
-        ~uC-p~U or ~uup-arrow~U             If prompt type is 'K', 'R', or 'S', replace
-                                    input with next older entry from the
-                                    corresponding ring, beginning with the top
-                                    entry; otherwise, move cursor to beginning
-                                    of line.
+        ~uC-p~U or ~uup-arrow~U             If prompt type is a ring access type,
+                                    replace input with next "older" entry from
+                                    the corresponding ring (the top entry);
+                                    otherwise, move cursor to beginning of line.
         ~uC-e~U                         Move cursor to end of line.
-        ~uC-n~U or ~udown-arrow~U           If prompt type is 'K', 'R', or 'S', replace
-                                    input with next newer entry from the
-                                    corresponding ring, beginning with the
-                                    bottom entry; otherwise, move cursor to end
-                                    of line.
+        ~uC-n~U or ~udown-arrow~U           If prompt type is a ring access type,
+                                    replace input with next "newer" entry from
+                                    the corresponding ring (the bottom entry);
+                                    otherwise, move cursor to end of line.
         ~uDEL~U                         Delete backward one character.
         ~uC-d~U                         Delete forward one character.
         ~uC-u~U                         Erase line.
@@ -171,12 +170,13 @@ result.  When using the function, note the following:
         ~uTAB~U                         Perform a completion on current text if a
                                     completion prompt type was specified;
                                     otherwise, insert a tab character.
-        ~uC-SPC~U                       Erase line and return a null char result if
-                                    prompt type is "Char"; otherwise, return a
-                                    null string result.
+        ~uC-SPC~U                       Erase line and return a null character
+                                    result (?\0) if prompt type is "Char";
+                                    otherwise, return a null string result ('').
 
   * An input delimiter may be specified with "Delim: ~ukey-lit~U" when the prompt
-    type is not "Key" or "KeySeq".  The key literal can be "RTN", which
-    specifies the default delimiter (the ~ureturn~U key), or a different key (for
-    example, the ~uesc~U key, coded as "Delim: ESC") so that ~ureturn~U can be entered
-    as part of the input string.
+    type is not "Key" or "KeySeq" (and as explained previously, this option must
+    be the last one specified).  The key literal can be "RTN", which specifies
+    the default delimiter (the ~ureturn~U key), or a different key (for example, the
+    ~uesc~U key, coded as "Delim: ESC") so that ~ureturn~U can be entered as part of the
+    input string.

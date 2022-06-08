@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -72,7 +72,7 @@ int killPrep(int kill) {
 
 	if(!(keyEntry.prevFlags & flag))			// If last command was not in "kill" or "delete" family...
 		(void) rnew(flag == SF_Kill ?			// cycle kill or delete ring and start fresh (don't append this
-		 ringTable + RingIdxKill : ringTable + RingIdxDel);				// kill or delete to the last one).
+		 ringTable + RingIdxKill : ringTable + RingIdxDel);	// kill or delete to the last one).
 
 	keyEntry.curFlags |= flag;				// Mark this command as a "kill" or "delete".
 	return sess.rtn.status;
@@ -96,7 +96,7 @@ void dumpRing(Ring *pRing) {
 	}
 #endif
 
-// Find an entry in a ring.  If found, return slot pointer; otherwise, NULL.
+// Find an entry in a ring.  If found, return slot pointer, otherwise NULL.
 static RingEntry *rfind(Ring *pRing, const char *value) {
 
 	if(pRing->size > 0) {
@@ -232,7 +232,7 @@ int rdelete(Ring *pRing, int n) {
 				// "%s ring cleared"
 	else
 NukeMsg:
-		(void) rsset(Success, 0, text357, pRing->ringName, pRing->entryName, n > 1 ? "s" : "");
+		(void) rsset(Success, RSHigh, text357, pRing->ringName, pRing->entryName, n > 1 ? "s" : "");
 				// "%s%s%s deleted"
 
 	return sess.rtn.status;
@@ -250,7 +250,7 @@ Ring *findRing(Datum *pName) {
 		} while(++pRing < pRingEnd);
 
 	// No such ring.
-	(void) rsset(Failure, 0, text395, text486, pName->str);
+	(void) rsset(Failure, 0, text395, text157, pName->str);
 			// "No such %s '%s'", "ring"
 	return NULL;
 	}
@@ -265,7 +265,7 @@ int getRingName(Ring **ppRing) {
 		return librsset(Failure);
 
 	if(!(sess.opFlags & OpScript)) {
-		if(termInp(pDatum, text488, ArgFirst | ArgNotNull1, Term_C_Ring, NULL) != Success || pDatum->type == dat_nil)
+		if(termInp(pDatum, text43, ArgFirst | ArgNotNull1, Term_C_Ring, NULL) != Success || disnil(pDatum))
 				// "Ring name"
 			return sess.rtn.status;
 		}
@@ -297,9 +297,9 @@ int ringSize(Datum *pRtnVal, int n, Datum **args) {
 		if(!(sess.opFlags & OpScript)) {
 			char workBuf[WorkBufSize];
 
-			sprintf(workBuf, text491, pRing->maxSize);
+			sprintf(workBuf, text126, pRing->maxSize);
 				// "Current size: %hu, new size"
-			if(termInp(pRtnVal, workBuf, ArgInt1, 0, NULL) != Success || pRtnVal->type == dat_nil ||
+			if(termInp(pRtnVal, workBuf, ArgInt1, 0, NULL) != Success || disnil(pRtnVal) ||
 			 ascToLong(pRtnVal->str, &longVal, false) != Success)
 				goto Retn;
 			}
@@ -309,7 +309,7 @@ int ringSize(Datum *pRtnVal, int n, Datum **args) {
 			longVal = pRtnVal->u.intNum;
 			}
 		if(longVal < 0 || longVal > USHRT_MAX)
-			return rsset(Failure, 0, text12, text487, (int) longVal, 0, USHRT_MAX);
+			return rsset(Failure, 0, text12, text155, (int) longVal, 0, USHRT_MAX);
 				// "%s (%d) must be between %d and %d", "Ring size"
 		if(longVal < pRing->size)
 			return rsset(Failure, 0, text241, longVal, (int) pRing->size);
@@ -320,16 +320,15 @@ int ringSize(Datum *pRtnVal, int n, Datum **args) {
 	// Success.  Set return value and message.
 	if((pArray = anew(2, NULL)) == NULL)
 		goto LibFail;
-	if(awWrap(pRtnVal, pArray) == Success) {
-		if((pArrayEl = aget(pArray, 0, false)) == NULL)
-			goto LibFail;
-		dsetint((long) pRing->size, pArrayEl);
-		if((pArrayEl = aget(pArray, 1, false)) == NULL)
-			goto LibFail;
-		dsetint((long) pRing->maxSize, pArrayEl);
-		(void) rsset(Success, RSNoWrap | RSTermAttr, text490, pRing->ringName, pRing->size, pRing->maxSize);
-				// "~bRing~B: %s, ~bentries~B: %hu, ~bsize~B: %hu"
-		}
+	agStash(pRtnVal, pArray);
+	if((pArrayEl = aget(pArray, 0, 0)) == NULL)
+		goto LibFail;
+	dsetint((long) pRing->size, pArrayEl);
+	if((pArrayEl = aget(pArray, 1, 0)) == NULL)
+		goto LibFail;
+	dsetint((long) pRing->maxSize, pArrayEl);
+	(void) rsset(Success, RSNoWrap | RSTermAttr, text114, pRing->ringName, pRing->size, pRing->maxSize);
+			// "~bRing~B: %s, ~bentries~B: %hu, ~bsize~B: %hu"
 Retn:
 	return sess.rtn.status;
 LibFail:
@@ -429,12 +428,13 @@ static int iorChar(short c, ushort t) {
 		return einsertNL();
 
 	// Not a newline or processing literally.  Overwrite or replace and not at end of line?
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.edit.pFace->point;
 	if(!(t & Txt_Insert) && pPoint->offset < pPoint->pLine->used) {
+		int hardTabSize = sess.edit.pScrn != NULL ? sess.edit.pScrn->hardTabSize : 8;
 
 		// Yes.  Replace mode, not a tab, or at a tab stop?
 		if((t & Txt_Replace) || pPoint->pLine->text[pPoint->offset] != '\t' ||
-		 getCol(NULL, false) % sess.hardTabSize == (sess.hardTabSize - 1)) {
+		 getCol(NULL, false) % hardTabSize == hardTabSize - 1) {
 
 			// Yes.  Delete before insert.
 			if(edelc(1, 0) != Success)
@@ -447,21 +447,23 @@ static int iorChar(short c, ushort t) {
 	}
 
 // Insert, overwrite, or replace a string from a string buffer (src != NULL) or a kill or delete ring entry (src == NULL) at
-// point n times.  In the latter case, use given ring and and mark text as a region if kill ring.  If n == 0, do one repetition
-// and leave point before the new text; otherwise, after.  If n < 0 and src != NULL, treat newline characters literally.  If
-// n < 0 and src == NULL, get the -nth ring entry instead of the most recent one without cycling the ring.  Update kill state
-// if src is NULL.  Return status.
+// point n times (default 1) and return status.  In the latter case, use given ring and mark text as a region.  If n == 0, do
+// one repetition and leave point before the new text, otherwise after.  If n < 0 and src != NULL, process newline characters
+// literally.  If n < 0 and src == NULL, get the -nth ring entry instead of the most recent one without cycling the ring.
+// Update kill state if src is NULL.
 int iorStr(const char *src, int n, ushort style, Ring *pRing) {
 	long size;
 	int reps;
-	const char *str;		// Pointer into string to insert.
+	const char *str;	// Pointer into string to insert.
 	Line *pCurLine;
 	int curOffset;
 	RingEntry *pEntry;
 	bool preText;		// Leave point before inserted text?
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.edit.pFace->point;
 
 	// Check if we have something to insert.  Not an error if no text.
+	if(n == INT_MIN)
+		n = 1;
 	if(src == NULL) {
 
 		// Which kill?
@@ -476,13 +478,14 @@ int iorStr(const char *src, int n, ushort style, Ring *pRing) {
 			n = 1;
 			}
 
-		if(isEmpty(&pEntry->data)) {
+		if(disnull(&pEntry->data)) {
 			lastYankSize = 0;
 			return sess.rtn.status;
 			}
 
-		// Save point in RegionMark.
-		setWindMark(&sess.pCurBuf->markHdr, sess.pCurWind);
+		// Set region mark.  Can assume we're editing current buffer (and current window) here because we got the
+		// text from a ring, which implies a yank or undelete command.
+		setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
 		}
 	else if(*src == '\0')
 		return sess.rtn.status;
@@ -490,7 +493,7 @@ int iorStr(const char *src, int n, ushort style, Ring *pRing) {
 	// If n == 0, remember point.  However, must save the *previous* line (if possible), since the line we are on may
 	// disappear due to re-allocation.
 	if((preText = n == 0)) {
-		pCurLine = (pPoint->pLine == sess.pCurBuf->pFirstLine) ? NULL : pPoint->pLine->prev;
+		pCurLine = (pPoint->pLine == sess.edit.pBuf->pFirstLine) ? NULL : pPoint->pLine->prev;
 		curOffset = pPoint->offset;
 		n = 1;
 		}
@@ -512,10 +515,11 @@ int iorStr(const char *src, int n, ushort style, Ring *pRing) {
 			} while(*str != '\0');
 		}
 
-	// If requested, set point back to the beginning of the new text and move RegionMark.
+	// If requested, set point back to the beginning of the new text and move region mark.
 	if(preText) {
-		setWindMark(&sess.pCurBuf->markHdr, sess.pCurWind);
-		pPoint->pLine = (pCurLine == NULL) ? sess.pCurBuf->pFirstLine : pCurLine->next;
+		if(src == NULL)
+			setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
+		pPoint->pLine = (pCurLine == NULL) ? sess.edit.pBuf->pFirstLine : pCurLine->next;
 		pPoint->offset = curOffset;
 		}
 

@@ -1,9 +1,9 @@
-# (c) Copyright 2019 Richard W. Marinelli
+# (c) Copyright 2022 Richard W. Marinelli
 #
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# blockFormat.ms	Ver. 9.5.0
+# blockFormat.ms	Ver. 9.6.0
 #	Routines for formatting comment blocks and numbered item lists.
 
 # Don't load this file if it has already been done so.
@@ -55,7 +55,7 @@ function bfFormatOneItem(1)
 	workBuf = nil?($1) ? (0 => scratchBuf)[0] : $1	# Get a scratch buffer...
 	-1 => clearBuf workBuf				# clear it...
 	selectBuf workBuf				# switch to it...
-	bufAttr?(bufname, 'TermAttr') and\
+	bufAttr?('TermAttr', bufname) and\
 	 1 => chgBufAttr($bufname, 'TermAttr')		# set 'TermAttr' if needed...
 	0 => insertBuf bufname				# and insert item text.
 	loop
@@ -93,7 +93,7 @@ function bfFormatOneItem(1)
 		# Not at end of buffer... process bulleted list.
 		2 => beginText
 		bulletOffset = $lineOffset
-		prefixLen => overwrite ' '		# Overwrite bullet with space(s).
+		prefixLen => overwriteCol ' '		# Overwrite bullet with space(s).
 		forwChar				# Grab indentation.
 		bulletIndent = subline(-$lineOffset, $lineOffset)
 		$lineOffset = bulletOffset
@@ -119,7 +119,7 @@ function bfFormatOneItem(1)
 			999999999 => wrapLine nil, $EndSentence	# Rewrap all visible lines.
 			beginBuf
 			bulletOffset => forwChar
-			0 => overwrite bulletPrefix	# Restore bullet on first line.
+			0 => overwriteCol bulletPrefix	# Restore bullet on first line.
 
 			# All bullets processed?
 			endBuf
@@ -139,7 +139,7 @@ function bfFormatOneItem(1)
 
 	# Finished processing list item.
 	beginBuf
-	0 => overwrite itemNum				# Restore item number text.
+	0 => overwriteCol itemNum			# Restore item number text.
 	endBuf
 	bufLines = $bufLineNum
 	selectBuf bufname				# Return to original (narrowed) buffer.
@@ -192,16 +192,16 @@ endroutine
 command bfFormatItem(0) {description: join(nil, 'Format a block of comment lines, one list item, or a plain line block.  Point\
  must be within the line block.  If the first non-whitespace character(s) on the current line match any of the text strings in\
  the $CommentList global variable, the current line is assumed to be part of a comment block; otherwise, if the current line is\
- not blank and a backward search for the pattern "', $BFInfo[0], '" succeeds without passing over a blank line, the line\
+ not blank and a backward search for the pattern "', $BFInfo[0], "\" succeeds without passing over a blank line, the line\
  matching the RE is assumed to be the first line of a numbered list item; otherwise, if a blank line is found either preceding\
- or following the current line, the current line is assumed to be part of a plain line block.  All lines in a comment block or\
- plain line block are rewrapped (using the $EndSentence global variable to control spacing between joined lines) so that they\
- all have the same indentation as the first line of the block but do not extend past the current wrap column set in $wrapCol. \
- All lines in a numbered list item are similarly rewrapped so that the first line begins with "nn. " (where "nn" is a one or\
- two digit number) and all subsequent lines are indented by four spaces.  Additionally, any text within either a comment block\
- or numbered list item matching the pattern "', $BFInfo[2], '" is assumed to be a numbered "phrase", and all such numbers are\
- resequenced beginning at 1.  Line blocks are bounded by beginning of buffer, end of buffer, a blank line, or the first line of\
- a numbered list item.')}
+ or following the current line, the current line is assumed to be part of a plain line block.\n\nAll lines in a comment block\
+ or plain line block are rewrapped (using the $EndSentence global variable to control spacing between joined lines) so that\
+ they all have the same indentation as the first line of the block but do not extend past the current wrap column set in\
+ $wrapCol.  All lines in a numbered list item are similarly rewrapped so that the first line begins with \"nn. \" (where \"nn\"\
+ is a one or two digit number) and all subsequent lines are indented by four spaces.  Additionally, any text within either a\
+ comment block or numbered list item matching the pattern \"", $BFInfo[2], "\" is assumed to be a numbered \"phrase\", and all\
+ such numbers are resequenced beginning at 1.\n\nLine blocks are bounded by beginning of buffer, end of buffer, a blank line,\
+ or the first line of a numbered list item.")}
 
 	# Check wrap column.
 	if $wrapCol == 0
@@ -209,7 +209,7 @@ command bfFormatItem(0) {description: join(nil, 'Format a block of comment lines
 	endif
 
 	# Check if buffer is narrowed.
-	if bufAttr? $bufname, 'Narrowed'
+	if bufAttr? 'Narrowed'
 		return 1 => message 'Fail, High', 'Buffer is narrowed'
 	endif
 

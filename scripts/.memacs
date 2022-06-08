@@ -1,12 +1,12 @@
-# .memacs	Ver. 9.5.0
+# .memacs	Ver. 9.6.0
 #	MightEMacs user startup file.
 
 # Pop or open file whose pathname is in current buffer.
-command openBufPath(0) {description: 'Extract a pathname from current buffer and display the file in a pop-up window or open\
- it.  User is prompted to enter one or two of the following options: "FindFile" -> open file with ~bfindFile~B command;\
- "PopFile" -> display the file in a pop-up window; and "UseRegion" -> use region contents as pathname.  Either "FindFile" or\
- "PopFile" must be specified.  If "UseRegion" not specified, pathname is extracted from buffer at point and is assumed to be\
- bounded by white space and/or line breaks.'}
+command openBufPath(0) {description: "Extract a pathname from current buffer and display the file in a pop-up window or open\
+ it.  User is prompted to enter one or two of the following options:\n\tFindFile\tOpen file with ~bfindFile~B command.\n\t\
+PopFile\t\tDisplay the file in a pop-up window.\n\tUseRegion\tUse region contents as pathname.\nEither \"FindFile\" or\
+ \"PopFile\" must be specified.  If \"UseRegion\" not specified, pathname is extracted from buffer at point and is assumed to\
+ be bounded by white space and/or line breaks."}
 
 	# Get options.
 	if empty?(options = prompt('Options (~u~bF~ZindFile, ~u~bP~ZopFile, Use~u~bR~Zegion)', 'TermAttr'))
@@ -45,9 +45,13 @@ command openBufPath(0) {description: 'Extract a pathname from current buffer and
 		if $lineChar == ?\s || $lineChar == ?\t
 			endWhite
 			if $lineChar == ?\n
-				return message('Pathname not found')
+				beginWhite
+				if $lineOffset == 0
+					return 1 => message('Fail', 'Pathname not found')
+				endif
+			else
+				goBack = false
 			endif
-			goBack = false
 		endif
 
 		# Find beginning and end of pathname.
@@ -62,7 +66,7 @@ command openBufPath(0) {description: 'Extract a pathname from current buffer and
 	endif
 
 	# Open or pop file.
-	if !empty?(path = 1 => prompt(findPop == 'f' ? 'Find file' : 'Pop file', path, 'Type: File'))
+	if !empty?(path = prompt(findPop == 'f' ? 'Find file' : 'Pop file', 'Type: File', path))
 		if findPop == 'f'
 			findFile path
 		else

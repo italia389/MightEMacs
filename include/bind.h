@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -225,16 +225,19 @@ static KeyItem keyItems[] = {
 	{Pref1 | 'a', cf_chgBufAttr},
 	{Pref1 | 'B', cf_renameBuf},
 	{Pref1 | 'b', cf_selectBuf},
+	{Pref1 | 'D', cf_delFile},
 	{Pref1 | 'e', cf_xeqMacro},
 	{Pref1 | 'F', cf_setBufFile},
 	{Pref1 | 'g', cf_editModeGroup},
 	{Pref1 | 'j', cf_joinWind},
+	{Pref1 | 'L', cf_linkFile},
 	{Pref1 | 'l', cf_lowerCaseRegion},
 	{Pref1 | 'm', cf_editMode},
 	{Pref1 | 'N', cf_renameMacro},
 	{Pref1 | 'n', cf_nextWind},
 	{Pref1 | 'o', cf_openLineI},
 	{Pref1 | 'p', cf_prevWind},
+	{Pref1 | 'R', cf_renameFile},
 	{Pref1 | 'S', cf_sortRegion},
 	{Pref1 | 't', cf_titleCaseRegion},
 	{Pref1 | 'U', cf_delRoutine},

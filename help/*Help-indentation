@@ -12,7 +12,7 @@ of the $softTabSize system variable to determine the tab stops.
 
 The current tabbing method is determined as follows: if $softTabSize is zero,
 hard tabs are in effect; otherwise, soft tabs.  You can enable soft tabs by
-using the "let" (~#uESC =~U) command to set the value of the $softTabSize variable to
+using the ~blet~B (~#uESC =~U) command to set the value of the $softTabSize variable to
 a positive number.  Or alternately and more simply, specify a numeric prefix
 that is zero or negative and press the ~utab~U key.  This will set the $softTabSize
 variable to the negated value of the number that you entered.  For example,
@@ -21,13 +21,17 @@ variable to the negated value of the number that you entered.  For example,
 When hard tabs are used (which is the default), you can simply insert or delete
 tab characters in the text to change the indentation.  The point will jump to
 the next tab stop when it is moved past a tab character.  When soft tabs are
-used however, spaces are inserted so you must use the "forwTab" (~#uESC C-f~U) or
-"backTab" (~#uESC C-b~U) command to get the same behavior.  However, these commands
+used however, spaces are inserted so you must use the ~bforwTab~B (~#uESC C-f~U) or
+~bbackTab~B (~#uESC C-b~U) command to get the same behavior.  However, these commands
 are infrequently used when coding.  A more common occurrence is the need to
 delete a tab that was just entered.  As it turns out, the ~udelete~U key is bound to
-the "backspace" command, which automatically deletes the previous soft tab when
-soft tabs are in effect (via the "delBackTab" command).  So pressing ~udelete~U is
+the ~bbackspace~B command, which automatically deletes the previous soft tab when
+soft tabs are in effect (via the ~bdelBackTab~B command).  So pressing ~udelete~U is
 usually all that is required.
+
+Note that tab settings are maintained separately for each screen, so if a
+different screen is selected, the tab settings for the new screen will be put
+into effect.
 
 Following are all the commands that are used for managing tabs and indentation:
 
@@ -55,7 +59,7 @@ Following are all the commands that are used for managing tabs and indentation:
     ~#uESC TAB~U     delForwTab      Delete forward [-]n hard or soft tabs
                                 (default 1).
 
-Of these commands, "indentRegion" and "outdentRegion" are probably the most
+Of these commands, ~bindentRegion~B and ~boutdentRegion~B are probably the most
 commonly used (other than the ~utab~U key itself).  These two commands change the
 indentation of all lines in the current region.  The steps to indent or outdent
 all region lines are as follows:

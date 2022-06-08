@@ -6,8 +6,8 @@ Several data types are supported in the scripting language:
     type.  There is also a pseudo "char" type, implemented as an 8-bit integer.
     With few exceptions, values are not automatically converted from one type to
     another when expressions are evaluated (like in the Perl language, for
-    example).  However, you can use the "toInt" function to convert a numeric
-    string literal to an integer, and the "toStr" function to convert any value
+    example).  However, you can use the ~btoInt~B function to convert a numeric
+    string literal to an integer, and the ~btoStr~B function to convert any value
     to a string.  nil and Boolean types are coded using the keywords ~unil~U, ~utrue~U,
     and ~ufalse~U.  ~unil~U represents a "nothing" value and is different from a null
     string.  Additionally, the ~udefn~U keyword exists, which holds an integer value
@@ -34,6 +34,7 @@ Several data types are supported in the scripting language:
             ~u\t~U    011    Tab
             ~u\f~U    014    Form feed
             ~u\e~U    033    Escape
+            ~u\v~U    013    Vertical tab
 
         To specify the octal or hexadecimal value of an ASCII character, use
         ~u\0nnn~U (zero to three digits after the zero) or ~u\0xnn~U (one or two

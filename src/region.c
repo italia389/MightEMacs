@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -22,8 +22,8 @@ int getRegion(Region *pRegion, ushort flags) {
 		long size;
 		int lineCount;
 		} fwd, bwd;
-	Point *pMarkPoint = &sess.pCurBuf->markHdr.point;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pMarkPoint = &sess.cur.pBuf->markHdr.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	if(pMarkPoint->offset < 0)
 		return rsset(Failure, RSTermAttr, text11, RegionMark);
@@ -49,7 +49,7 @@ int getRegion(Region *pRegion, ushort flags) {
 	bwd.lineCount = (bwd.size = (long) pPoint->offset) == 0 ? 0 : 1;
 	fwd.size = (long) (fwd.pLine->used - pPoint->offset + 1);
 	fwd.lineCount = 1;
-	while(fwd.pLine->next != NULL || bwd.pLine != sess.pCurBuf->pFirstLine) {
+	while(fwd.pLine->next != NULL || bwd.pLine != sess.cur.pBuf->pFirstLine) {
 		if(fwd.pLine->next != NULL) {
 			fwd.pLine = fwd.pLine->next;
 			if(fwd.pLine == pMarkPoint->pLine) {
@@ -61,7 +61,7 @@ int getRegion(Region *pRegion, ushort flags) {
 			fwd.size += fwd.pLine->used + 1;
 			++fwd.lineCount;
 			}
-		if(bwd.pLine != sess.pCurBuf->pFirstLine) {
+		if(bwd.pLine != sess.cur.pBuf->pFirstLine) {
 			bwd.pLine = bwd.pLine->prev;
 			bwd.size += bwd.pLine->used + 1;
 			++bwd.lineCount;
@@ -82,7 +82,7 @@ int getRegion(Region *pRegion, ushort flags) {
 		}
 
 	// Huh?  Didn't find mark RegionMark!  This is a bug.
-	return rsset(FatalError, 0, text77, "getRegion", RegionMark, sess.pCurBuf->bufname);
+	return rsset(FatalError, 0, text77, "getRegion", RegionMark, sess.cur.pBuf->bufname);
 		// "%s() bug: Mark '%c' not found in buffer '%s'!"
 	}
 
@@ -130,7 +130,7 @@ void getTextRegion(Point *pPoint, int n, Region *pRegion, ushort flags) {
 			pRegion->lineCount = 0;
 		pLine = pPoint->pLine;
 		do {
-			if(pLine == sess.pCurBuf->pFirstLine)
+			if(pLine == sess.cur.pBuf->pFirstLine)
 				break;
 			pLine = pLine->prev;
 			chunk -= 1 + pLine->used;
@@ -150,7 +150,7 @@ void getTextRegion(Point *pPoint, int n, Region *pRegion, ushort flags) {
 // RInclDelim flag set, include delimiter of last line of block; otherwise, omit it.  If REmptyOK flag set, allow empty
 // region.  If RLineSelect flag set, include current line in line count if not a EOB.  Return status.
 int getLineRegion(int n, Region *pRegion, ushort flags) {
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	// Empty buffer?
 	if(bempty(NULL)) {
@@ -163,7 +163,7 @@ int getLineRegion(int n, Region *pRegion, ushort flags) {
 			return sess.rtn.status;
 		if(pRegion->size == 0 && !(flags & REmptyOK))		// If empty region and not allowed...
 			goto NoText;					// no lines were selected.
-		Point *pMarkPoint = &sess.pCurBuf->markHdr.point;
+		Point *pMarkPoint = &sess.cur.pBuf->markHdr.point;
 
 		// Bump line count in region if it ends at the beginning of a line which is not at EOB and region is not empty.
 		if((flags & RLineSelect) && pRegion->size > 0) {
@@ -261,7 +261,7 @@ int regionToKill(Region *pRegion) {
 		if(pRegion->size > 0)					// Going forward?
 			do {						// Yes, copy forward.
 				if(offset == pLine->used) {		// End of line.
-					if(dputc('\n', &fab) != 0)
+					if(dputc('\n', &fab, 0) != 0)
 						goto LibFail;
 					pLine = pLine->next;
 					offset = 0;
@@ -269,7 +269,7 @@ int regionToKill(Region *pRegion) {
 					}
 				else {					// Beginning or middle of line.
 					chunk = (pLine->used - offset > pRegion->size) ? pRegion->size : pLine->used - offset;
-					if(dputmem((void *) (pLine->text + offset), chunk, &fab) != 0)
+					if(dputmem((void *) (pLine->text + offset), chunk, &fab, 0) != 0)
 						goto LibFail;
 					offset += chunk;
 					pRegion->size -= chunk;
@@ -279,7 +279,7 @@ int regionToKill(Region *pRegion) {
 			char *str;
 			do {
 				if(offset == 0) {			// Beginning of line.
-					if(dputc('\n', &fab) != 0)
+					if(dputc('\n', &fab, 0) != 0)
 						goto LibFail;
 					pLine = pLine->prev;
 					offset = pLine->used;
@@ -294,14 +294,14 @@ int regionToKill(Region *pRegion) {
 						chunk = offset;
 						str = pLine->text;
 						}
-					if(dputmem((void *) str, chunk, &fab) != 0)
+					if(dputmem((void *) str, chunk, &fab, 0) != 0)
 						goto LibFail;
 					offset -= chunk;
 					pRegion->size += chunk;
 					}
 				} while(pRegion->size < 0);
 			}
-		if(dclose(&fab, Fab_String) != 0)
+		if(dclose(&fab, FabStr) != 0)
 			goto LibFail;
 		}
 	return sess.rtn.status;
@@ -315,16 +315,14 @@ char *regionToStr(char *buf, Region *pRegion) {
 	Line *pLine;
 	int offset;
 	long replTableSize, len;
-	char *dest;
 
-	dest = buf;
-	pLine = pRegion->point.pLine;					// Current line.
+	pLine = pRegion->point.pLine;				// Current line.
 	offset = pRegion->point.offset;				// Current offset.
 	replTableSize = pRegion->size;
 
 	while(replTableSize > 0) {
 		if((len = pLine->used - offset) == 0) {		// End of line.
-			*dest++ = '\n';
+			*buf++ = '\n';
 			pLine = pLine->next;
 			--replTableSize;
 			offset = 0;
@@ -332,13 +330,13 @@ char *regionToStr(char *buf, Region *pRegion) {
 		else {						// Beginning or middle of line.
 			if(len > replTableSize)
 				len = replTableSize;
-			dest = (char *) memstpcpy((void *) dest, (void *) (pLine->text + offset), len);
+			buf = (char *) memstpcpy((void *) buf, (void *) (pLine->text + offset), len);
 			offset += len;
 			replTableSize -= len;
 			}
 		}
-	*dest = '\0';
-	return dest;
+	*buf = '\0';
+	return buf;
 	}
 
 // Indent a region n tab stops.
@@ -359,10 +357,10 @@ int indentRegion(Datum *pRtnVal, int n, Datum **args) {
 	// Get number of lines and set mark at starting point.
 	if(regionLines(&n) != Success)
 		return sess.rtn.status;
-	setWindMark(&sess.pCurBuf->markHdr, sess.pCurWind);
+	setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
 
 	// Loop through lines in block.
-	pPoint = &sess.pCurWind->face.point;
+	pPoint = &sess.cur.pFace->point;
 	keyEntry.prevFlags &= ~SF_VertMove;
 	do {
 		pPoint->offset = 0;				// Start at the beginning.
@@ -370,7 +368,7 @@ int indentRegion(Datum *pRtnVal, int n, Datum **args) {
 
 		// Shift current line using tabs.
 		if(pLine->used > 0 && !isWhite(pLine, pLine->used)) {
-			if(sess.softTabSize == 0)
+			if(sess.cur.pScrn->softTabSize == 0)
 				(void) einsertc(count, '\t');
 			else {
 				beginTxt();
@@ -387,7 +385,7 @@ int indentRegion(Datum *pRtnVal, int n, Datum **args) {
 	if(!bufEnd(pPoint))
 		pPoint->offset = 0;
 	keyEntry.curFlags &= ~SF_VertMove;			// Flag that this resets the goal column...
-	bchange(sess.pCurBuf, WFHard);			// and a line other than the current one was changed.
+	bchange(sess.cur.pBuf, WFHard);			// and a line other than the current one was changed.
 	return sess.rtn.status;
 	}
 
@@ -408,10 +406,10 @@ int outdentRegion(Datum *pRtnVal, int n, Datum **args) {
 	// Get number of lines and set mark at starting point.
 	if(regionLines(&n) != Success)
 		return sess.rtn.status;
-	setWindMark(&sess.pCurBuf->markHdr, sess.pCurWind);
+	setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
 
 	// Loop through lines in block.
-	pPoint = &sess.pCurWind->face.point;
+	pPoint = &sess.cur.pFace->point;
 	keyEntry.prevFlags &= ~SF_VertMove;
 	do {
 		pPoint->offset = 0;
@@ -423,6 +421,6 @@ int outdentRegion(Datum *pRtnVal, int n, Datum **args) {
 		} while(--n > 0);
 
 	keyEntry.curFlags &= ~SF_VertMove;			// Flag that this resets the goal column...
-	bchange(sess.pCurBuf, WFHard);			// and a line other than the current one was changed.
+	bchange(sess.cur.pBuf, WFHard);			// and a line other than the current one was changed.
 	return sess.rtn.status;
 	}

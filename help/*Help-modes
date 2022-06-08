@@ -19,7 +19,7 @@ can be deleted, but built-in modes cannot.
 All modes, whether built-in or user-created, have attributes (or properties)
 which are set when the mode is created.  They can also be changed later, with
 some exceptions.  Attributes include the mode type, and whether it is visible or
-hidden.  Modes are created, deleted, and edited with the "editMode" (~#uC-x m~U)
+hidden.  Modes are created, deleted, and edited with the ~beditMode~B (~#uC-x m~U)
 command.
 
 Sometimes it is desirable to prevent more than one mode of the same kind from
@@ -28,10 +28,10 @@ for a programming language.  This is accomplished by using a ~bmode group~B.  Mo
 groups may contain zero or more modes.  All modes in a group must be of the same
 type (global or buffer), and are mutually exclusive (only one may be enabled at
 a given time).  And like modes, mode groups can be built-in or user defined and
-have attributes.  They are created, deleted, and edited with the "editModeGroup"
+have attributes.  They are created, deleted, and edited with the ~beditModeGroup~B
 (~#uC-x g~U) command.
 
-To see all available modes and mode groups, use the "showModes" (~#uC-h m~U) command,
+To see all available modes and mode groups, use the ~bshowModes~B (~#uC-h m~U) command,
 which will display all global and buffer mode names, group names, their current
 statuses, and a brief description of each in a pop-up window.  (Modes and mode
 groups are described in detail in Advanced Help.)

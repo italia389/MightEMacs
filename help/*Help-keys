@@ -18,7 +18,7 @@ command.  Consequently, when you press the letter ~ux~U for example, MightEMacs
 looks up the "key binding" for the ~ux~U key, discovers that it is bound to "self
 insert", and runs that command (which inserts one copy of itself into the text
 by default).  If you had pressed ~uC-f~U instead, it would have matched the key to
-the "forwChar" command, and would have executed that command instead (which
+the ~bforwChar~B command, and would have executed that command instead (which
 moves the cursor one character forward).
 
 So it is important to remember that all keys are bound to a command (either
@@ -52,7 +52,7 @@ syntax is ~#uESC k~U and they will always be shown in the editor and this Help S
 in the latter form.
 
 Lastly, there is a special command that you need to be aware of sooner rather
-than later.  It is the "abort" command, bound to ~uC-g~U ("control g").  You can
+than later.  It is the ~babort~B command, bound to ~uC-g~U ("control g").  You can
 press ~uC-g~U at almost any time to abort an operation in MightEMacs, similar to
 pressing ~uC-c~U in the shell.
 

@@ -1,9 +1,9 @@
-# (c) Copyright 2019 Richard W. Marinelli
+# (c) Copyright 2022 Richard W. Marinelli
 #
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# shLib.ms		Ver. 9.5.0
+# shLib.ms		Ver. 9.6.0
 #	MightEMacs library for shell script editing.
 
 ##### Commands and Functions #####
@@ -27,10 +27,9 @@ endroutine
 
 # Go to matching if... or fi if current line begins with one of the two keywords.  Save current position in mark '.', set
 # mark 'T' to if... line, mark 'E' to else (if it exists), and mark 'B' to fi.  If $0 == 0, be silent about errors.
-# Return true if successful; otherwise, false.
+# Return true if successful, otherwise false.
 command shGotoIfEndif(0) {description: "Go to ~uif...~U or ~ufi~U paired with one in current line and set marks '.' (previous\
- position), 'T' (top line), 'E' (else line, if any), and 'B' (bottom line).  Returns: true if successful;\
- otherwise, false."}
+ position), 'T' (top line), 'E' (else line, if any), and 'B' (bottom line).\n\nReturns: true if successful, otherwise false."}
 
 	# Current line begin with if... or fi?
 	x = subline(-$lineOffset, 6)

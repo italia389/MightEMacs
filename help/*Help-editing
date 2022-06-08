@@ -61,7 +61,7 @@ lines forward instead, you would enter: ~#uC-u C-l~U.  Other examples:
     ~#uC-u C-u C-h C-k~U     Kill text from point to beginning of line (per zero
                         numeric prefix).
 
-There is one exception to this rule: the "delFencedText" command, which is
+There is one exception to this rule: the ~bdelFencedText~B command, which is
 ~#uC-x '~U.  Being that the fenced region text object (an apostrophe) is a printable
 character and would be inserted into the text if entered by itself, the ~uC-x~U
 prefix (for ~bexterminate~B) is needed.
@@ -89,7 +89,7 @@ follows:
 
 Note that even though delete commands do not save the target text in the kill
 ring, the text ~bis~B saved on the "delete ring", and deleted text can always be
-restored via the "undelete" (~#uESC u~U) and "undeleteCycle" (~#uESC U~U) commands.  This
+restored via the ~bundelete~B (~#uESC u~U) and ~bundeleteCycle~B (~#uESC U~U) commands.  This
 is explained in detail in the next section, ~bUndeleting Text~B.
 
 You are encouraged to practice copying, killing, and deleting text with the

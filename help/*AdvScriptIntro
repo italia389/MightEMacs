@@ -11,10 +11,10 @@ a script operates identically to a built-in command; that is, it accepts a
 numeric prefix, can be bound to a key (and invoked interactively), can be called
 from a script with arguments, and returns a value.
 
-Scripts are written in buffers or files and then executed with the "xeqBuf"
-(~#uC-x x~U) or "xeqFile" (~#uC-x /~U) command.  MScript files may also be executed from
+Scripts are written in buffers or files and then executed with the ~bxeqBuf~B
+(~#uC-x x~U) or ~bxeqFile~B (~#uC-x /~U) command.  MScript files may also be executed from
 the command line when starting the editor or from another script (for example,
-from the "memacs.ms" site startup file or the "~/.memacs" user startup file).
+from the "memacs.ms" site startup file or the "~~/.memacs" user startup file).
 
 You can try this out for yourself in the editor.  Create a scratch buffer and
 enter the following lines:
@@ -26,16 +26,18 @@ enter the following lines:
     endroutine
 
 Execute the buffer by entering ~#uC-x x~U and typing the name of the scratch buffer
-at the prompt.  Function "example" is now defined.  (You can verify this via the
-"showFunctions" (~#uC-h f~U) command.  You should see "example" in the "user" section
-of the list with no key binding or description.)
+at the prompt.  Function ~bexample~B is now defined.  (You can verify this via the
+~bshowFunctions~B (~#uC-h f~U) command.  Enter "exam" at the "Apropos function" prompt
+and you should see "example" in the "user" section of the list with no key
+binding or description.)
 
 Now let's execute the function and capture it's return value in a global
 variable.  Type ~#uESC C-x~U (eval) to execute a command line.  At the prompt, enter:
 
     $result = example '/dir1/myfile.txt', 77
 
-and press ~ureturn~U, which will run the function.  You should see:
+and press ~ureturn~U, which will execute the assignment statement and run the
+function.  You should see:
 
     Base name of file '/dir1/myfile.txt' is 'myfile'
 
@@ -43,14 +45,14 @@ on the message line.  Now check the global variable.  Enter ~#uC-h v res~U, pres
 ~ureturn~U, and observe that variable $result has a value of 77.
 
 This was admittedly a contrived example of writing a script and a user routine,
-but does illustrate the basics of how it's done.  For something more practical,
-consider the following.  Say you are testing a script and want to clear all
-hooks at the beginning of it so that they will not be invoked when your script
-is run.  This script snippet accomplishes that by getting a list of all hook
-names into a buffer, positioning the point in the buffer and looping through the
-lines, clearing each hook by extracting its name from the line and building a
-"clearHook" statement that is executed with the "eval" command.  Lastly, it
-deletes the temporary buffer:
+but it does illustrate the basics of how it's done.  For something more
+practical, consider the following.  Say you are testing a script and want to
+clear all hooks at the beginning of it so that they will not be invoked when
+your script is run.  This MScript code fragment accomplishes that by getting a
+list of all hook names into a buffer, positioning the point in the buffer and
+looping through the lines, clearing each hook by extracting its name from the
+line and building a ~bclearHook~B statement that is executed with the ~beval~B
+command.  Lastly, it deletes the temporary buffer:
 
     # Clear all hooks.  Process lines which begin
     # with a lower-case letter.
@@ -63,11 +65,11 @@ deletes the temporary buffer:
     delBuf bufname
 
 As you can see, useful work can be done with just a few lines of code.  Note
-that this script snippet uses the "showHooks" command to get all the hooks
+that this code fragment uses the ~bshowHooks~B command to get all the hooks
 names.  This was the only way to obtain them prior to version 9.0 of the editor.
-Now the "getInfo" function is available.  It provides various types of system
-and session information, including hook names.  Here is the same script snippet
-rewritten to use "getInfo":
+Now the ~bgetInfo~B function is available.  It provides various types of system
+and session information, including hook names.  Here is the same code fragment
+rewritten using ~bgetInfo~B:
 
     # Clear all hooks.  getInfo returns hooks as an array in
     # form: [[hook-name, func-name], ...].

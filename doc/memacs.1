@@ -1,10 +1,10 @@
-.\" (c) Copyright 2020 Richard W. Marinelli    Ver. 9.5.0
+.\" (c) Copyright 2022 Richard W. Marinelli    Ver. 9.6.0
 .\"
 .\" This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 .\" "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 .\"
 .ad l
-.TH MEMACS 1 2020-09-01 "Ver. 9.5" "MightEMacs Documentation"
+.TH MEMACS 1 2022-06-06 "Ver. 9.6" "MightEMacs Documentation"
 .nh \" Turn off hyphenation.
 .SH "NAME"
 \fBmemacs\fR \- fast and full-featured Emacs-style text editor
@@ -18,69 +18,69 @@
 \fBmemacs\fR
 .in +.7i
 .sp -1v
-[\fB\-d\fR, \fB\-dir\fR \fId\fR]
-[\fB\-e\fR, \fB\-exec\fR \fIstmt\fR] [\fB\-G\fR, \fB\-global\-mode\fR [^]\fIm\fR[,...]]
-[\fB\-i\fR, \fB\-inp\-delim\fR \fId\fR] [\fB\-N\fR, \fB\-no\-user\-startup\fR] [\fB\-n\fR, \fB\-no\-startup\fR]
-[\fB\-o\fR, \fB\-otp\-delim\fR \fId\fR] [\fB\-path\fR \fIlist\fR] [\fB\-R\fR, \fB\-no\-read\fR] [\fB\-r\fR]
-[\fB\-S\fR, \fB\-shell\fR] [[\fB@\fR]\fIfile\fR [{\fB+\fR|\fB\-\fR}}\fIline\fR] [\fB\-B\fR, \fB\-buf\-mode\fR [^]\fIm\fR[,...]]
+[\fB\-d\fR, \fB\-dir\fR \fId\fR] \c
+[\fB\-e\fR, \fB\-exec\fR \fIstmt\fR] [\fB\-G\fR, \fB\-global\-mode\fR [^]\fIm\fR[,...]] \c
+[\fB\-i\fR, \fB\-inp\-delim\fR \fId\fR] [\fB\-N\fR, \fB\-no\-user\-startup\fR] [\fB\-n\fR, \fB\-no\-startup\fR] \c
+[\fB\-o\fR, \fB\-otp\-delim\fR \fId\fR] [\fB\-path\fR \fIlist\fR] [\fB\-R\fR, \fB\-no\-read\fR] [\fB\-r\fR] \c
+[\fB\-S\fR, \fB\-shell\fR] [\fB\-x\fR, \fB\-xeq\fR \fIfile\fR [\fIarg\fR, ...]] \c
+[\fIfile\fR [{\fB+\fR|\fB\-\fR}}\fIline\fR] [\fB\-B\fR, \fB\-buf\-mode\fR [^]\fIm\fR[,...]] \c
 [\fB\-r\fR | \fB\-rw\fR] [\fB\-s\fR, \fB\-search\fR \fIpat\fR] ...]
 .SH DESCRIPTION
-\fBmemacs\fR (or \fBmm\fR) is MightEMacs, a fast and full-featured Emacs-style text editor that uses a Text User Interface.
-It is very robust, designed for the programmer, and focused on rapid text manipulation with few
-keystrokes.  For speed and ease of learning, it uses a simplified scheme in which only four prefix keys
-(\fIESC\fR, \fIC-x\fR, \fIC-c\fR, and \fIC-h\fR) are used and all commands are either one or two keystrokes.  Features include:
+\fBmemacs\fR (or \fBmm\fR) is MightEMacs, a fast and full-featured Emacs-style text editor that uses a Text
+User Interface.  It is very robust, designed for the programmer, and focused on rapid text manipulation with
+few keystrokes.  For speed and ease of learning, it uses a simplified scheme in which only four prefix keys
+(\fIESC\fR, \fIC-x\fR, \fIC-c\fR, and \fIC-h\fR) are used and all commands are either one or two keystrokes.
+Features include:
 .RS 4
 .IP \fB\-\fR 2
 A user interface that provides for quick entry of commands, and rigorous error detection and reporting.
 .IP \fB\-\fR 2
-A comprehensive set of commands, including several for buffer, file, window, and screen management and control,
-and a powerful group of text editing commands that allow deleting, killing, copying, or moving
-words, partial or full lines, and fenced or marked regions of text either forward or backward quickly and easily.
+A comprehensive set of commands, including several for buffer, file, window, and screen management and
+control, and a powerful group of text editing commands that allow deleting, killing, copying, or moving words,
+partial or full lines, and fenced or marked regions of text either forward or backward quickly and easily.
 .IP \fB\-\fR 2
-Auto-indenting/outdenting (with hard tabs or space characters)
-and fence matching for C, C++, HTML, Java, JavaScript, MScript, Perl, PHP, macOS PList, Python, Ruby, Rust, Shell, SQL,
+Auto-indenting/outdenting (with hard tabs or space characters) and fence matching for
+C, C++, HTML, Java, JavaScript, MScript, Perl, PHP, macOS PList, Python, Ruby, Rust, Shell, SQL,
 and Swift languages.
 .IP \fB\-\fR 2
-Sophisticated search and replace features using plain text patterns or regular expressions with or without case sensitivity,
-search and replace rings, and the ability to override the default search modes by specifying option characters on the pattern
-itself.
+Sophisticated search and replace features using plain text patterns or regular expressions with or without
+case sensitivity, search and replace rings, and the ability to override the default search modes by specifying
+option characters on the pattern itself.
 .IP \fB\-\fR 2
-A simple but powerful scripting language called MScript that uses C-like operators and expressions and provides
-many features, including numerous built-in commands, functions, and variables, statements for
-sophisticated looping and flow control, ability to create custom commands and functions, recursion, and runaway loop
-detection.  User variables are either "global" (permanent) or "local" (exist only during command, function,
-or buffer execution) and may be nil, Boolean, integer, string, or array data types.  The
-language also provides the ability to code non-printable characters and imbedded expressions in
-string literals, pause execution to display a message, call a command or function with arguments, assign
-values to command or function arguments, and call a system or user command as a function and return a value.
-Built-in commands and functions include several for manipulating strings and arrays, interacting
-with the shell, and reading and writing text from and to a buffer.  There is also a \fIprompt\fR
-function, which provides extensive user prompting and input capabilities, including
-single-character entry and automatic completion of buffer names, filenames, mode names,
-variable names, and various ring entries (like a search pattern).
+A powerful scripting language called MScript that uses C-like operators and expressions and provides many
+features, including numerous built-in commands, functions, and variables, statements for sophisticated looping
+and flow control, ability to create custom commands and functions, recursion, and runaway loop detection.
+User variables are either "global" (permanent) or "local" (exist only during command, function, or buffer
+execution) and may be nil, Boolean, integer, string, or array data types.  The language also provides the
+ability to code non-printable characters and imbedded expressions in string literals, pause execution to
+display a message, call a command or function with arguments, assign values to command or function arguments,
+and call a system or user command as a function and return a value.  Built-in commands and functions include
+several for manipulating strings and arrays, interacting with the shell, and reading and writing text from and
+to a buffer.  There is also a \fIprompt\fR function, which provides extensive user prompting and input
+capabilities, including single-character entry and automatic completion of buffer names, filenames, mode
+names, variable names, and various ring entries (like a search pattern).
 .IP \fB\-\fR 2
 Colored display elements and the ability to set and display colored text in MScript.
 .IP \fB\-\fR 2
-The ability to edit a file read from standard input, and the ability to
-read or write files with CR, NL, or CR-LF line delimiters, including auto-detection on input.
+The ability to edit a file read from standard input, and the ability to read or write files with CR, NL, or
+CR-LF line delimiters, including auto-detection on input.
 .IP \fB\-\fR 2
-Simplified screen management and the ability to resize
-MightEmacs's terminal dimensions when the size of the terminal emulator's window changes (for example, when using a
-smart phone).
+Simplified screen management and the ability to resize MightEmacs's terminal dimensions when the size of the
+terminal emulator's window changes (for example, when using a smart phone).
 .IP \fB\-\fR 2
 Pop-up windows that can be scrolled backward or forward, and in half-pages or lines in addition to full pages
 using a subset of commands from the "less" file viewer.
 .IP \fB\-\fR 2
 Several "hooks" for customizing various operations (for example, reading and writing files, changing a mode,
-or switching buffers)
-including command hooks that allow for total control of the editing session from a user function.
+or switching buffers) including command hooks that allow for total control of the editing session from a user
+function.
 .IP \fB\-\fR 2
-Quick informational displays; for example, \fIapropos\fR, \fIshowBuffers\fR, \fIshowCommands\fR, \fIshowKey\fR,
-\fIshowMarks\fR, \fIshowModes\fR, \fIshowRing\fR, and \fIshowVariables\fR.
+Quick informational displays; for example, \fBapropos\fR, \fBshowBuffers\fR, \fBshowCommands\fR, \fBshowKey\fR,
+\fBshowMarks\fR, \fBshowModes\fR, \fBshowRing\fR, and \fBshowVariables\fR.
 .IP \fB\-\fR 2
 Help systems for both the beginner and advanced user.
 .IP \fB\-\fR 2
-The ability to create and name multiple key macros and execute them quickly by name using name completion.  They can also
+The ability to create and name key macros and execute them quickly by name using name completion.  They can also
 be saved to a file so that they can be used in every editing session.
 .IP \fB\-\fR 2
 Several predefined commands and functions written in MScript for various tasks, including performing a search and replace on
@@ -90,18 +90,21 @@ file containing a C function and opening it at that location.
 .PP
 See on-line help (\fIESC ?\fR) for various help topics (including an introductory overview of the editor and a cheat sheet),
 the MightEMacs Tutorial (\fIC-h t\fR) for an interactive tutorial which can be saved at any time and resumed later,
-the \fIshowCommands\fR (\fIC-h c\fR) command for a list of all interactive commands and their key bindings, and the
-\fIshowFunctions\fR (\fIC-h f\fR) and \fIshowVariables\fR (\fIC-h v\fR) commands for a list of all functions
+the \fBshowCommands\fR (\fIC-h c\fR) command for a list of all interactive commands and their key bindings, and the
+\fBshowFunctions\fR (\fIC-h f\fR) and \fBshowVariables\fR (\fIC-h v\fR) commands for a list of all functions
 (in addition to commands) and variables that are available for use in a script.
 .SH COMMAND SWITCHES AND ARGUMENTS
 .IP "\fB\-?\fR, \fB\-usage\fR" 4
 Display usage and exit.
 .IP "\fB\-C\fR, \fB\-copyright\fR" 4
 Display copyright information and exit.
+.IP "\fB\-D\fR" 4
+Change working directory to directory component of first file argument if present,
+before processing \-path switch or reading files.
 .IP "\fB\-d\fR, \fB\-dir\fR \fIdir\fR" 4
-Specify a working directory to change to before reading files.
+Specify a working directory to change to before processing \-path switch or reading files.
 .IP "\fB\-e\fR, \fB\-exec\fR \fIstmt\fR" 4
-Specify an expression statement to be executed.  Switch may be repeated.
+Specify an expression statement to execute.  Switch may be repeated.
 .IP "\fB\-G\fR, \fB\-global\-mode\fR [^]\fIm\fR[,...]" 4
 Specify one or more global modes to clear (^) or set (no ^), separated by commas.  Switch may be repeated.
 .IP "\fB\-help\fR" 4
@@ -119,91 +122,102 @@ Do not load the site or user startup file.
 Specify one or two characters (processed as a double-quoted "..." string) to use as file output record delimiter(s); otherwise,
 delimiter(s) found in input file ($BufInpDelim) is used.
 .IP "\fB\-path\fR \fIlist\fR" 4
-Specify colon-separated list of script search directories to prepend to existing path.
+Specify colon-separated list of directories to set as script execution path.
 .IP "\fB\-R\fR, \fB\-no\-read\fR" 4
 Do not read first file at startup.
 .IP "\fB\-r\fR" 4
-Read-only: open all files with "ReadOnly" buffer attribute \fIon\fR by default; otherwise, \fIoff\fR.
+Enable "ReadOnly" global mode at startup.
 .IP "\fB\-S\fR, \fB\-shell\fR" 4
-Execute file as a MightEMacs "shell script".  The file is expected to contain MScript code.
-First line of file must contain "#!" followed by the pathname to the
-MightEMacs binary and the \fB\-S\fR or \fB\-shell\fR switch; for example, "#!/usr/local/bin/memacs -S".  Other switches may be
-specified as well.  The file must be executed as a shell script (with execute permission).  Any arguments specified on
-the command line will be passed as string arguments to the script in the file.
-Additionally, an \fIexit\fR command must be coded in the script to terminate MightEMacs after the script completes (if
-desired) to prevent MightEMacs from entering interactive mode.
+Execute file as a MightEMacs "shell script".  The file is expected to contain MScript code.  First line of
+file must contain "#!" followed by the pathname to the MightEMacs binary and the \fB\-S\fR or \fB\-shell\fR
+switch; for example, "#!/usr/local/bin/memacs -S".  Other switches may be specified as well.  The file must be
+executed as a shell script (with execute permission).  Any arguments specified on the command line will be
+passed as string arguments to the script in the file.  Additionally, an \fBexit\fR command must be coded in
+the script to terminate MightEMacs after the script completes (if desired) to prevent MightEMacs from entering
+interactive mode.
 .IP "\fB\-V\fR, \fB\-version\fR" 4
 Display program version and exit.
-.IP "\fB@\fR\fIfile\fR" 4
-Execute specified script file (in path) before processing argument(s) that follow it.  Multiple script files may be specified
-intermixed with data files.
+.IP "\fB\-x\fR, \fB\-xeq\fR \fIfile\fR [\fIarg\fR, ...]" 4
+Specify an MScript file to execute with zero or more arguments.  Switch may be repeated.  \fIfile\fR is searched
+for on the execution path verbatim first, then with the ".ms" extension if the first search failed (unless the
+file already has that extension).  Note that the switch argument is used as argument(s) to a "xeqFile"
+command, hence if argument(s) are specified following \fIfile\fR, then (1), the entire switch argument should
+be enclosed in quotes to protect it from the shell; (2), arguments must be separated by commas; and (3),
+string arguments must be quoted.  For example, -x "myScript 1, 'abc', true".
 .IP "\fIfile\fR" 4
-File to open for viewing or editing.  If "\-" is specified as the filename, data is read from standard input into buffer
-"untitled".  Multiple data files may be specified intermixed with script files.
+File to open for viewing or editing.  If "\-" is specified as the filename, data is read from standard input
+into buffer "unnamed".
 .SH ARGUMENT SWITCHES
 .IP "{\fB+\fR|\fB\-\fR}\fIline\fR" 4
-Go to specified line number from beginning (+) or end (-) of data file, or to end of file if line number is zero.
+Go to specified line number from beginning (+) or end (-) of file, or to end of file if line number is zero.
 .IP "\fB\-B\fR, \fB\-buf\-mode\fR [^]\fIm\fR[,...]" 4
-Specify one or more buffer modes to clear (^) or set (no ^) on data file, separated by commas.  Switch may be repeated.
+Specify one or more buffer modes to clear (^) or set (no ^) on file, separated by commas.  Switch may be repeated.
 .IP "\fB\-r\fR" 4
-Read-only: open data file with "ReadOnly" buffer attribute \fIon\fR.
+Read-only: open file with "ReadOnly" buffer attribute \fIon\fR.
 .IP "\fB\-rw\fR" 4
-Read-write: open data file with "ReadOnly" buffer attribute \fIoff\fR (overrides command-level \fB\-r\fR switch).
+Read-write: open file with "ReadOnly" buffer attribute \fIoff\fR (overrides command-level \fB\-r\fR switch).
 .IP "\fB\-s\fR, \fB\-search\fR \fIpat\fR" 4
-Search for specified pattern in data file.
+Search for specified pattern in file.
 .SH ENVIRONMENT
-.IP "\fBMMPATH\fR" 4
-The script execution path is initially set to the value of this environmental variable if it is defined,
-even if it is null.
+.IP "\fBMSPATH\fR" 4
+The script execution path (which is used to search for MScript files) is initially set to the value of this
+environmental variable if it is defined, even if it is null, unless overridden by the \fB\-path\fR switch
+(discussed in "startup steps" below).
 .SH NOTES
 .IP \fB*\fR 2
-If the \fB\-no\-read\fR switch is not specified, one data file is read after all switches and arguments are processed,
-determined as follows: if the \fB+\fR or \fB-\fR (go to line) or \fB-search\fR switch is specified on a data file argument,
-the corresponding file is read and the action is performed; otherwise, the first data file specified is read.
+If the \fB\-no\-read\fR switch is not specified, one file is read after all switches and arguments are
+processed, determined as follows: if the \fB+\fR or \fB-\fR (go to line) or \fB-search\fR switch is specified
+on a file argument, the corresponding file is read and the action is performed; otherwise, the first data
+file specified is read.
 .IP \fB*\fR 2
-The \fB\-r\fR and \fB\-rw\fR argument switches may not both be specified on the same argument.
+The \fB\-r\fR and \fB\-rw\fR argument switches may not both be specified on the same file argument.
 .IP \fB*\fR 2
 MightEMacs takes the following steps at startup to initialize its environment and prepare to enter interactive mode:
 .sp
 .PD 0
 .RS 2
-.IP 1. 3
-Buffer "untitled" is created and set as the current buffer.
-.IP 2. 3
-The script execution path is initialized to the value of the MMPATH environmental variable if it is defined; otherwise,
-":/usr/local/share/memacs/scripts".
-.IP 3. 3
-If the \fB-no-startup\fR switch was not specified,
-the site startup file \fImemacs.ms\fR is searched for on the execution path and executed if found.
-.IP 4. 3
-If neither the \fB-no-startup\fR nor the \fB-no-user-startup\fR switch was specified and the HOME environmental variable is
-defined, the user startup file ".memacs" is searched for in the HOME directory (only), and executed if found.
-.IP 5. 3
+.IP " 1." 4
+Buffer "unnamed" is created and set as the current buffer.
+.IP " 2." 4
+If a \fB-D\fR or \fB\-dir\fR switch was specified, the current directory is changed to the specified directory.
+.IP " 3." 4
+The script execution path is initialized to either the value of the \fB\-path\fR switch, the MSPATHx\
+environmental variable if it is defined, or ":/usr/local/share/memacs/scripts", in that order of priority.
+.IP " 4." 4
+If the \fB-no-startup\fR switch was not specified, the site startup file "memacs.ms" is searched for on
+the execution path and executed if found.
+.IP " 5." 4
+If neither the \fB-no-startup\fR nor the \fB-no-user-startup\fR switch was specified and the HOME
+environmental variable is defined, the user startup file ".memacs" is searched for in the HOME directory
+(only), and executed if found.
+.IP " 6." 4
 The "createBuf" hook is executed if it is defined.
-.IP 6. 3
+.IP " 7." 4
 The "chDir" hook is executed if it is defined.
-.IP 7. 3
-Switches and arguments on the command line (if any) are processed in order until no arguments remain (or just
-until all leading switches have been processed if the \fB-shell\fR switch was specified).
+.IP " 8." 4
+Switches and arguments on the command line (if any, and other than the switches described above) are processed
+in order until no arguments remain, or just until all leading switches have been processed if the \fB-shell\fR
+switch was specified.
+.IP " 9." 4
+If a \fB-xeq\fR switch is found, the specified file portion of the switch argument is searched for verbatim if
+the name begins with a \fI/\fR character; otherwise, it is searched for in the directories in the current
+execution path (which may have been changed by a prior \fB-exec\fR switch).  In either case, the same file
+with a ".ms" extension is also searched for unless that extension is already present in \fIfile\fR.
 .sp
-If any \fB@\fR\fIfile\fR argument is found,
-the indicated file is searched for verbatim if the name contains a \fI/\fR; otherwise, it is searched for in
-the directories in the current execution path (which may have been changed by a prior \fB-path\fR or \fB-exec\fR switch).
-In either case, the file with \fI.ms\fR appended is also searched for unless that extension is already present in
-\fIfile\fR.
-If the file is found, it is executed with all remaining command line arguments passed to the script as string arguments;
-otherwise, execution halts with a non-zero return code and error message.
-Execution will also halt if a fatal error occurs or the editor is instructed to exit during execution
-of a \fB-exec\fR switch or a script.
-.sp
-If a \fB-S\fR or \fB-shell\fR switch is found, the argument that follows the last switch
-is assumed to be an absolute file pathname and is executed verbatim as a script.
-Any arguments following the pathname argument are passed to the script as string arguments.
-.IP 8. 3
-If no exit was warranted from the previous step, the \fB-no-read\fR switch was not specified, and one or more files were
-specified to edit, the file associated with a \fB+\fR, \fB-\fR, or \fB-search\fR argument switch (or first file
-otherwise) is read into a new buffer in the current window and buffer "untitled" is deleted.
-.IP 9. 3
+If the file is found, it is executed with any arguments specified after the file portion of the switch
+argument.  If the file is not found, execution halts with a non-zero return code and error message.
+.IP 10. 4
+If the editor is instructed to exit during execution of a \fB\-xeq\fR MScript file or \fB-exec\fR switch
+expression, execution halts.
+.IP 11. 4
+If a \fB-S\fR or \fB-shell\fR switch is found, the argument that follows the last command switch is assumed to
+be an absolute file pathname and is executed verbatim as a script.  Any arguments following the pathname
+argument are passed to the script as string arguments.
+.IP 12. 4
+If no exit was warranted from any previous step, the \fB-no-read\fR switch was not specified, and one or more
+files were specified to edit, the file associated with a \fB+\fR, \fB-\fR, or \fB-search\fR argument switch
+(or first file otherwise) is read into a new buffer in the current window and buffer "unnamed" is deleted.
+.IP 13. 4
 Lastly, if a \fB+\fR, \fB-\fR, or \fB-search\fR switch was specified, it is executed in the current buffer.
 The contents of the current window are then displayed and the user may begin entering commands.
 .RE
@@ -235,10 +249,10 @@ File containing routines for formatting line "blocks", which may be comments or 
 .IP "\fI\s-1/usr/local/share/memacs/scripts/macroUtil.ms\s0\fR" 4
 File containing macro management routines, including ones for saving and restoring macros from a file in the HOME directory.
 .IP "\fI\s-1/usr/local/share/memacs/help/*\s0\fR" 4
-Files used by built-in help system which is entered via help command (\fIESC ?\fR).
+Files used by built-in help system which is entered via \fBhelp\fR command (\fIESC ?\fR).
 .SH BUGS
 To report bugs in the editor, please contact the author.  Bug reports should include a detailed description
 along with information to reproduce.
 .SH AUTHOR
-MightEMacs was written and is currently maintained by Richard W. Marinelli <italian389@yahoo.com>.  See the \fIabout\fR command
+MightEMacs was written and is currently maintained by Richard W. Marinelli <italian389@yahoo.com>.  See the \fBabout\fR command
 (\fIC-h A\fR) for version, copyright, contact, licensing, and build information.

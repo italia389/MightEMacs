@@ -1,6 +1,185 @@
 MightEMacs RELEASE HISTORY
 
 ----------
+9.6.0	6 Jun 2022
+ 1. Updated code per changes made in CXL library version 1.1.0.
+ 2. Added option to restrict buffer search and/or replace operations to a fixed
+    number of lines before or after the point by specifying a negative numeric
+    prefix for the "searchForw" (C-s), "searchBack" (C-r), "huntForw" (C-]),
+    "huntBack" (C-^), "replace" (ESC r), or "queryReplace" (ESC q) commands.
+ 3. Improved screen and buffer management:
+	- added ability to delete all buffers "homed" to a particular screen:
+		. added "Homed" keyword as an option to "delBuf" (C-x C-b)
+		  command, which causes all buffers homed to current screen to
+		  be deleted.
+		. changed "delScreen" (ESC C-d) command to call "delBuf" command
+		  with "Homed" option after screen is deleted if n < 0.
+	- changed $wrapCol, $hardTabSize, and $softTabSize system variables to
+	  be screen-specific and to automatically change when a screen switch
+	  occurs.
+	- changed "prevBuf" (C-x [) and "nextBuf" (C-x ]) commands to:
+		. always switch just once.
+		. switch to previous or next "homed" buffer if n >= 0.
+		. delete buffer that was exited from after switch if n <= 0.
+	- changed mode line to display total number of screens after the screen
+	  number; for example, "S1/2" (screen 1 of 2).
+    Now all buffers with the same home directory can be deleted at once via the
+    "delBuf" or "delScreen" command, and wrap column and tab settings can be
+    specified separately for each screen.
+ 4. Added ability to insert line breaks and indentation in help text:
+	- changed code that formats text for the show* commands to recognize
+	  newlines (begin new line), tabs (indent up to four spaces), and
+	  terminal attribute specifications.
+	- changed help text for all system commands and functions with keyword
+	  options or item lists to display them on separate lines with
+	  indentation.
+	- improved built-in help text for several commands and functions to
+	  better explain how they work.
+    Now interactive help displays are greatly improved and easier to read,
+    especially those with keyword or item lists.
+ 5. Changed help subsystem to display an informational message instead of a
+    blank screen when an apropos search matches no entries.
+ 6. Changed buffer processing to retain filename extension when creating an
+    initial buffer name so that all buffer names derived from files will include
+    the extension (which makes it much easier to select a buffer by name when
+    two buffers are attached to files that differ only in their extension).
+ 7. Changed "splitWind" (C-x 2) command to split window just above current line
+    if n < 0, instead of shrinking upper window by abs(n) lines, as previously,
+    and to also switch to upper window if n <= -2.
+ 8. Created "setDefault" function, which provides a means to set a default wrap
+    column and tab sizes for new screens.
+ 9. Changed "getInfo" function to return an array of default values if
+    "Defaults" keyword given.
+10. Changed "setWrapCol" (ESC w) command to display current and previous wrap
+    columns on message line if interactive and n < 0 (or new values is same as
+    existing value), and to swap current and previous wrap columns if n >= 0.
+11. Made "delFile" (C-x F) and "renameFile" (C-x R) commands built-in to the
+    editor, and created "linkFile" (C-x L) command, which creates hard and
+    symbolic links on disk.
+12. Renamed $ARGV system variable to $ArgList, which is more descriptive and
+    consistent with other variable names.
+13. Changed "split" function to:
+	- remove white space from resultant elements if n argument given (by
+	  passing n argument and elements to "strip" function).
+	- split a string into individual characters (subject to a limit value
+	  greater than zero) if the delimiter is a null character (?\0) or nil.
+14. Created new array functions: acompact, adelete, adeleteif, afill, aindex,
+    and ainsert, which for the most part call the corresponding CXL library
+    function.
+15. Expanded number of operators allowing arrays as operands in an expression:
+	- expanded *, *=, -, and -= to perform set intersection and exclusion.
+	- expanded | and  |= to perform set union.
+	- eliminated "array push" capability of & operator when the first
+	  operand was an array, and ability to concatenate an array with a
+	  string, which were confusing features.
+16. Renamed "wordChar?" system function to "isClass?" and generalized to (1),
+    handle any of character classes "alnum", "alpha", "blank", "cntrl", "digit",
+    "graph", "lower", "print", "punct", "space", "upper", "word", or "xdigit"
+    (from the Standard C Library), which is given as the first argument; and
+    (2), accept either a character or a string (as the second argument) to test.
+17. Renamed the following functions to make it more obvious that they manipulate
+    arrays and to avoid name conflicts:
+		clone		-> aclone
+		include?	-> ainclude?
+		pop		-> apop
+		push		-> apush
+		shift		-> ashift
+		unshift		-> aunshift
+    Also simplified "ainclude?" function to accept exactly two arguments
+    instead of multiple values, as previously.
+18. Enhanced "glob" function to allow braces in a shell glob pattern.
+19. Expanded "toStr" function to allow all available conversion flags from CXL
+    library to be used.
+20. Changed "join" function to skip nil arguments if n <= 0, and eliminated
+    "skip null arguments" option.
+21. Changed bufInfo, getKey, groupMode?, index, mode?, toStr, updateScreen, and
+    xPathname functions to allow an options argument without requiring a
+    non-default n argument.
+22. Eliminated options argument and simplified calling format for mode? and
+    groupMode? functions.
+23. Simplified calling format for bufAttr? function.
+24. Created "insertf" function, which inserts a formatted string into the
+    current buffer.
+25. Combined multiple option arguments of "prompt" function into one argument
+    and simplified calling format.
+26. Added built-in aliases "lcstr" and "ucstr" (which are more succinct) for
+    "lowerCaseStr" and "upperCaseStr" functions.
+27. Enhanced "findFiles" (C-x f) command to maintain a stack of search results
+    for each screen that can be pushed and popped.
+28. Added user confirmation for overwriting files and for creating a buffer
+    interactively with "selectBuf" (C-x b) command.
+29. Fixed long-standing problem with how certain switches and command-line
+    arguments were processed:
+	- renamed MMPATH environmental variable to MSPATH for "MScript Path".
+	- changed program initialization to process -dir and -path switches
+	  early in the startup sequence.
+	- changed -path switch to allow a null argument (no path).
+	- created -xeq command switch for executing a file at startup (with
+	  optional arguments), which replaces @file arguments, and dropped
+	  support for the latter syntax.
+	- changed $execPath management to:
+		. always add directories to the search path as absolute
+		  pathnames.
+		. set the search path to either (1), the value from the -path
+		  switch; (2), the value of the MSPATH environmental variable;
+		  or (3), the built-in path, in that order, and before startup
+		  files are loaded.
+    Now (1), a custom memacs.ms file will be found in the -path list at startup,
+    in addition to the MSPATH list; (2), the -path list is relative to the
+    -dir directory, if specified; (3), the weird @file syntax is gone; and (4),
+    a script can be executed on the shell command line with its own arguments.
+    Additionally, this fixed a problem where a switch (such as -s) that followed
+    a @file argument was processed as a file.
+30. Added -D command switch, which causes working directory to be changed to
+    directory component of first file argument, if present.  Now for example,
+    "mm -D dir/file" can be specified to change the directory at startup instead
+    of "mm -d dir file" which is a bit easier and allows for shell filename
+    completion.
+31. Improved "read only" feature:
+	- created "ReadOnly" global mode which, if enabled, forces all new files
+	  to be opened in read-only mode.
+	- changed -r command switch to enable "ReadOnly" mode at startup in
+	  addition to opening files on command line in read-only mode, as
+	  previously.
+    Now multiple files can be viewed without risk of accidental modification via
+    "mm -r file ...".
+32. Changed random number subsystem:
+	- deleted $randNumSeed system variable.
+	- changed "rand" function to use new subsystem from CXL library and to
+	  return values in range 0 to N - 1 instead of 1 to N, as previously.
+33. Changed message-line management to suppress messages from built-in commands
+    by default in a running script (just like return messages) so that
+    undesirable messages like "Reading data..." will not interfere with more
+    important ones generated from the script.
+34. Renamed functions "overwrite" and "replaceText" to "overwriteCol" and
+    "overwriteChar" respectively, to better describe what they do and how they
+    differ from each other.
+35. Changed MScript expression evaluation to allow multiple expressions
+    separated by a semicolon (;) on one line; specifically, in script lines that
+    do not begin with a statement keyword, in #{...} string interpolation, in
+    the "eval" command argument (or interactively via ESC C-x), and the -exec
+    switch argument.
+36. Changed evaluation of the assignment expression "$lineChar = ?\n" to replace
+    the character at point in the current buffer with a literal newline instead
+    of creating a new line, as previously (which didn't make much sense).
+37. Fixed problem where the progress message "[Searching...]" was never being
+    displayed on the message line for a time-consuming regular expression search
+    on a large buffer.
+38. Fixed bug in "bprint" function where it was treating a negative numeric
+    argument as an error.
+39. Fixed bug where a /#...#/ comment on a line by itself in a script caused a
+    "Token expected" error.
+40. Fixed bug where a '%' expession containing '%s' was returning an error for a
+    nil argument.
+41. Fixed bug where exception message "Unknown keyword 'endroutine'" was being
+    erroneously generated when a command or function definition was inside "if
+    false" and "endif" statements.
+42. Fixed bug in "queryReplace" (ESC q) command where doing an "undo" of a
+    replacement that began on the original line and included the trailing
+    newline, followed by a dot (.) request to "stop and go back" could cause a
+    crash.
+
+----------
 9.5.1	27 Nov 2020
  1. Fixed bug where pressing "C-x ]" (nextBuf) or "C-x [" (prevBuf) in the Linux
     version of the editor would cause it to go into an endless loop.

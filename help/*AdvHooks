@@ -9,23 +9,23 @@ function returns false, an error message is displayed and the hook is disabled.
 
 Note that you cannot assign a system or user command to a hook because it makes
 no sense to do so.  You also cannot assign a system function to a hook, with one
-exception: the "wrapWord" system function, which is set to the "wrap" hook by
-default (discussed in the ~bLine~B ~bWrapping~B section).  The "wrapWord" function is
+exception: the ~bwrapWord~B system function, which is set to the "wrap" hook by
+default (discussed in the ~bLine~B ~bWrapping~B section).  The ~bwrapWord~B function is
 designed just for this purpose.
 
 You also may not assign a user function to a hook unless the function was
 defined with an argument count that is the same as the hook's argument count,
-which is shown in the "showHooks" display.  (User command and function
+which is shown in the ~bshowHooks~B display.  (User command and function
 definitions are explained in detail in the ~bStatements~B section.)
 
-A hook is set with the "setHook" function and cleared with the "clearHook"
+A hook is set with the ~bsetHook~B function and cleared with the ~bclearHook~B
 function, usually in a script.  For example, this line from the "memacs.ms"
 startup file:
 
     setHook 'help', hkHelp
 
-sets the "help" hook to the "hkHelp" function.  To clear a hook, use
-"clearHook"; for example:
+sets the "help" hook to the ~bhkHelp~B function.  To clear a hook, use
+~bclearHook~B; for example:
 
     clearHook 'help'
 
@@ -36,7 +36,7 @@ The complete list of hooks follows:
     ~bHook name~B   ~bMacro arguments~B     ~bDescription~B
 
     chgDir       (none)             Change-directory hook -- called at program
-                                    startup and after the "chgDir" command is
+                                    startup and after the ~bchgDir~B command is
                                     executed.
 
     createBuf   Buffer name         Create-buffer hook -- called at program

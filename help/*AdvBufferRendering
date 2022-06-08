@@ -49,10 +49,10 @@ examples:
     ~#uC-u C-u C-x C-f~U     Find a file, but don't select its buffer (to be edited
                         later).  Leave its buffer in the background.
 
-You can also use the "popFile" (~#uC-h C-p~U) or "popBuf" (~#uC-h p~U) command to display
+You can also use the ~bpopFile~B (~#uC-h C-p~U) or ~bpopBuf~B (~#uC-h p~U) command to display
 a file or buffer in a pop-up window.  These commands are designed just for this
 purpose and provides options for controlling how the pop-up window is displayed
-(like left-shifting long lines).  A common use of the "popFile" command is to
+(like left-shifting long lines).  A common use of the ~bpopFile~B command is to
 pop a file on disk during an editing session, scroll through it, then dismiss
-the window and return to where you left off.  See the "showKey" (~#uC-h ?~U) or
-"showCommands" (~#uC-h c~U) descriptions for details.
+the window and return to where you left off.  See the ~bshowKey~B (~#uC-h ?~U) or
+~bshowCommands~B (~#uC-h c~U) descriptions for details.

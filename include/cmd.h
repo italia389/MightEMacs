@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -27,16 +27,43 @@ CmdFunc cmdFuncTable[] = {
 	{"abort",		CFBind1 | CFUniq, 0,		0, -1,	abortOp,	text800,	CFLit_abort},
 	{"about",		0, 0,				0, 0,	aboutMM,	NULL,		CFLit_about},
 	{"abs",			CFFunc, ArgInt1,		1, 1,	NULL,		text820,	CFLit_abs},
+	{"aclone",		CFFunc, ArgArray1,		1, 1,	NULL,		text822,	CFLit_aclone},
+		// Returns new array.
+	{"acompact",		CFFunc, ArgArray1,		1, 1,	NULL,		text822,	CFLit_acompact},
+		// Returns existing array.
+	{"adelete",	CFFunc, ArgArray1 | ArgInt2 | ArgInt3,	2, 3,	NULL,		text846,	CFLit_adelete},
+		// Returns array element or slice.
+	{"adeleteif", CFFunc, ArgArray1 | ArgBool2 | ArgArray2 | ArgNIS2, 2, 2,	NULL,	text824,	CFLit_adeleteif},
+		// Returns deletion count.
+	{"afill",		CFFunc, ArgArray1 | ArgBool2 | ArgArray2 | ArgNIS2 | ArgInt3 | ArgInt4,
+								4, 4,	NULL,		text877,	CFLit_afill},
+		// Returns existing array.
+	{"ainclude?",	CFFunc, ArgArray1 | ArgBool2 | ArgArray2 | ArgNIS2, 2, 2, NULL,	text824,	CFLit_aincludeQ},
+		// Returns true if a value occurs in given array.
+	{"aindex",	CFFunc, ArgArray1 | ArgBool2 | ArgArray2 | ArgNIS2, 2, 2, NULL,	text824,	CFLit_aindex},
+		// Returns index if a value occurs in given array.
+	{"ainsert", 	CFFunc, ArgArray1 | ArgBool2 | ArgArray2 | ArgNIS2 | ArgInt3,
+								3, 3,	NULL,		text878,	CFLit_ainsert},
+		// Returns array element or slice.
 	{"alias",		CFSpecArgs | CFNoLoad, 0,	2, 2,	alias,		text801,	CFLit_alias},
+	{"apop",		CFFunc, ArgArray1,		1, 1,	NULL,		text822,	CFLit_apop},
+		// Returns popped value, or nil if none left.
 	{"appendFile",		CFNoLoad, 0,			1, 1,	NULL,		text868,	CFLit_appendFile},
 		// Returns filename.
 	{"apropos",		CFAddlArg, ArgNil1,		1, 2,	apropos,	text873,	CFLit_apropos},
+	{"apush", CFFunc, ArgArray1 | ArgBool2 | ArgArray2 | ArgNIS2, 2, 2, NULL,	text824,	CFLit_apush},
+		// Returns new array value.
 	{"array", CFFunc, ArgInt1 | ArgBool2 | ArgArray2 | ArgNIS2, 0, 2, array,	text828,	CFLit_array},
 		// Returns new array.
+	{"ashift",		CFFunc, ArgArray1,		1, 1,	NULL,		text822,	CFLit_ashift},
+		// Returns shifted value, or nil if none left.
+	{"aunshift", CFFunc, ArgArray1 | ArgBool2 | ArgArray2 | ArgNIS2,
+								2, 2,	NULL,		text824,	CFLit_aunshift},
+		// Returns new array value.
 	{"backChar",		CFNCount, 0,			0, 0,	backChar,	NULL,		CFLit_backChar},
-		// Returns false if hit buffer boundary; otherwise, true.
+		// Returns false if hit buffer boundary, otherwise true.
 	{"backLine",		CFNCount, 0,			0, 0,	backLine,	NULL,		CFLit_backLine},
-		// Returns false if hit buffer boundary; otherwise, true.
+		// Returns false if hit buffer boundary, otherwise true.
 	{"backPage",		0, 0,				0, 0,	backPage,	NULL,		CFLit_backPage},
 	{"backPageNext",	0, 0,				0, 0,	NULL,		NULL,		CFLit_backPageNext},
 	{"backPagePrev",	0, 0,				0, 0,	NULL,		NULL,		CFLit_backPagePrev},
@@ -52,22 +79,21 @@ CmdFunc cmdFuncTable[] = {
 	{"beginText",		0, 0,				0, 0,	beginText,	NULL,		CFLit_beginText},
 	{"beginWhite",		0, 0,				0, 0,	NULL,		NULL,		CFLit_beginWhite},
 	{"bempty?",	CFFunc | CFAddlArg, ArgNotNull1,	0, 1,	NULL,		text808,	CFLit_bemptyQ},
-		// Returns true if specified buffer is empty; otherwise, false.
+		// Returns true if specified buffer is empty, otherwise false.
 	{"bgets",	CFFunc | CFNCount | CFNoLoad, 0,	1, 1,	bgets,		text867,	CFLit_bgets},
 		// Returns nth next line from buffer.
 	{"bindKey",	CFSpecArgs | CFShortLoad, ArgNotNull1,	2, 2,	bindKey,	text806,	CFLit_bindKey},
 	{"binding",	CFFunc, ArgNotNull1 | ArgNotNull2,	2, 2,	binding,	text856,	CFLit_binding},
 		// Returns name of command key is bound to, or nil if none; or array of key bindings for given command.
-	{"bprint", CFFunc | CFShortLoad, ArgNotNull1,		2, -1,	bprint,		text804,	CFLit_bprint},
+	{"bprint", CFFunc | CFShortLoad, ArgNotNull1,		2, -1,	NULL,		text804,	CFLit_bprint},
 		// Returns text written.
 	{"bprintf",		CFFunc, ArgNotNull1,		2, -1,	NULL,		text852,	CFLit_bprintf},
 		// Returns text written.
-	{"bufAttr?",	CFFunc, ArgNotNull1 | ArgNotNull2,	2, 2,	bufAttrQ,	text863,	CFLit_bufAttrQ},
-		// Returns true if attribute flag set in buffer; otherwise, false.
+	{"bufAttr?",	CFFunc, ArgNotNull1 | ArgNotNull2,	1, 2,	bufAttrQ,	text863,	CFLit_bufAttrQ},
+		// Returns true if attribute set in buffer, otherwise false.
 	{"bufBound?",		CFFunc, 0,			0, 0,	NULL,		NULL,		CFLit_bufBoundQ},
-		// Returns true if point is at beginning, middle, or end of buffer per n argument.
-	{"bufInfo", CFFunc | CFAddlArg, ArgNil1 | ArgNotNull1 | ArgNotNull2,
-								1, 2,	bufInfo,	text842,	CFLit_bufInfo},
+		// Returns true if point is at beginning, middle, or end of buffer per n argument, otherwise false.
+	{"bufInfo", CFFunc, ArgNil1 | ArgNotNull1 | ArgNotNull2, 1, 2,	bufInfo,	text842,	CFLit_bufInfo},
 		// Returns buffer information per keyword options.
 	{"bufWind",		CFFunc, 0,			1, 1,	NULL,		text867,	CFLit_bufWind},
 		// Returns ordinal number of first window on current screen displaying given buffer, or nil if none.
@@ -81,12 +107,10 @@ CmdFunc cmdFuncTable[] = {
 	{"chr",			CFFunc, ArgInt1,		1, 1,	NULL,		text820,	CFLit_chr},
 		// Returns ordinal value of a character in string form.
 	{"clearBuf",		CFNoLoad, 0,			0, 1,	clearBuf,	text808,	CFLit_clearBuf},
-		// Returns false if buffer is not cleared; otherwise, true.
+		// Returns false if buffer is not cleared, otherwise true.
 	{"clearHook",		CFFunc | CFNoLoad, 0,		0, -1,	clearHook,	text872,	CFLit_clearHook},
-		// Returns zero if failure; otherwise, number of hooks cleared.
+		// Returns zero if failure, otherwise number of hooks cleared.
 	{"clearMsgLine",	CFFunc, 0,			0, 0,	NULL,		NULL,		CFLit_clearMsgLine},
-	{"clone",		CFFunc, ArgArray1,		1, 1,	NULL,		text822,	CFLit_clone},
-		// Returns new array.
 	{"copyFencedRegion",	0, 0,				0, 0,	NULL,		NULL,		CFLit_copyFencedRegion},
 	{"copyLine",		0, 0,				0, 0,	NULL,		NULL,		CFLit_copyLine},
 	{"copyRegion",		0, 0,				0, 0,	NULL,		NULL,		CFLit_copyRegion},
@@ -100,13 +124,15 @@ CmdFunc cmdFuncTable[] = {
 								2, 2,	definedQ,	text866,	CFLit_definedQ},
 		// Returns kind of object, or nil if not found.
 	{"delAlias",		CFSpecArgs | CFNoLoad, 0,	1, -1,	delAlias,	text807,	CFLit_delAlias},
-		// Returns zero if failure; otherwise, number of aliases deleted.
+		// Returns zero if failure, otherwise number of aliases deleted.
 	{"delBackChar",		CFEdit | CFNCount, 0,		0, 0,	NULL,		NULL,		CFLit_delBackChar},
 	{"delBackTab",		CFEdit | CFNCount, 0,		0, 0,	NULL,		NULL,		CFLit_delBackTab},
 	{"delBlankLines",	CFEdit, 0,			0, 0,	delBlankLines,	NULL,		CFLit_delBlankLines},
 	{"delBuf",		CFNoLoad, 0,			1, -1,	delBuf,		text836,	CFLit_delBuf},
-		// Returns zero if failure; otherwise, number of buffers deleted.
+		// Returns zero if failure, otherwise number of buffers deleted.
 	{"delFencedRegion",	CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_delFencedRegion},
+	{"delFile",		CFNoLoad, 0,			1, 2,	delFile,	text879,	CFLit_delFile},
+		// Returns filename if successful.
 	{"delForwChar",		CFEdit | CFNCount, 0,		0, 0,	NULL,		NULL,		CFLit_delForwChar},
 	{"delForwTab",		CFEdit | CFNCount, 0,		0, 0,	NULL,		NULL,		CFLit_delForwTab},
 	{"delLine",		CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_delLine},
@@ -114,7 +140,7 @@ CmdFunc cmdFuncTable[] = {
 	{"delRegion",		CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_delRegion},
 	{"delRingEntry",	CFNoLoad, 0,			1, 2,	delRingEntry,	text876,	CFLit_delRingEntry},
 	{"delRoutine",		CFSpecArgs | CFNoLoad, 0,	1, -1,	delRoutine,	text807,	CFLit_delRoutine},
-		// Returns zero if failure; otherwise, number of user commands and/or functions deleted.
+		// Returns zero if failure, otherwise number of user commands and/or functions deleted.
 	{"delScreen",		CFNoLoad, 0,			1, 1,	delScreen,	text820,	CFLit_delScreen},
 	{"delToBreak",		CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_delToBreak},
 	{"delWhite",		CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_delWhite},
@@ -133,7 +159,7 @@ CmdFunc cmdFuncTable[] = {
 	{"endMacro",		CFTerm, 0,			0, 0,	endMacro,	NULL,		CFLit_endMacro},
 	{"endWhite",		0, 0,				0, 0,	NULL,		NULL,		CFLit_endWhite},
 	{"endWord",		CFNCount, 0,			0, 0,	endWord,	NULL,		CFLit_endWord},
-		// Returns false if hit buffer boundary; otherwise, true.
+		// Returns false if hit buffer boundary, otherwise true.
 	{"entabLine",	CFEdit, ArgInt1 | ArgNil1 | ArgMay,	1, 1,	entabLine,	text862,	CFLit_entabLine},
 	{"env",			CFFunc, 0,			1, 1,	NULL,		text803,	CFLit_env},
 		// Returns value of environmental variable, or nil if not found.
@@ -145,9 +171,9 @@ CmdFunc cmdFuncTable[] = {
 	{"findFile",		CFNoLoad, 0,			1, 1,	NULL,		text868,	CFLit_findFile},
 		// Returns [name of buffer, "true" or "false" indicating whether the buffer was created].
 	{"forwChar",		CFNCount, 0,			0, 0,	forwChar,	NULL,		CFLit_forwChar},
-		// Returns false if hit buffer boundary; otherwise, true.
+		// Returns false if hit buffer boundary, otherwise true.
 	{"forwLine",		CFNCount, 0,			0, 0,	forwLine,	NULL,		CFLit_forwLine},
-		// Returns false if hit buffer boundary; otherwise, true.
+		// Returns false if hit buffer boundary, otherwise true.
 	{"forwPage",		0, 0,				0, 0,	forwPage,	NULL,		CFLit_forwPage},
 	{"forwPageNext",	0, 0,				0, 0,	NULL,		NULL,		CFLit_forwPageNext},
 	{"forwPagePrev",	0, 0,				0, 0,	NULL,		NULL,		CFLit_forwPagePrev},
@@ -155,29 +181,25 @@ CmdFunc cmdFuncTable[] = {
 	{"forwWord",		CFNCount, 0,			0, 0,	forwWord,	NULL,		CFLit_forwWord},
 	{"getInfo",		CFFunc, ArgNotNull1,		1, 1,	getInfo,	text843,	CFLit_getInfo},
 		// Returns informational item per keyword argument.
-	{"getKey",	CFFunc | CFAddlArg, ArgNotNull1,	0, 1,	fGetKey,	text844,	CFLit_getKey},
+	{"getKey",		CFFunc, ArgNotNull1,		0, 1,	fGetKey,	text844,	CFLit_getKey},
 		// Returns key in encoded form.
 	{"getWord",		CFFunc, 0,			0, 0,	getWord,	NULL,		CFLit_getWord},
 		// Returns word from current buffer.
 	{"glob",		CFFunc, 0,			1, 1,	globPat,	text805,	CFLit_glob},
 		// Returns array of pathnames.
 	{"gotoFence",		CFAddlArg, ArgInt1,		0, 1,	gotoFence,	text857,	CFLit_gotoFence},
-		// Returns true if matching fence found; otherwise, false.
+		// Returns true if matching fence found, otherwise false.
 	{"gotoLine",		CFAddlArg | CFNoLoad, 0,	1, 2,	gotoLine,	text833,	CFLit_gotoLine},
 	{"gotoMark",		CFNoLoad, 0,			1, 1,	gotoMark,	text834,	CFLit_gotoMark},
-	{"groupMode?",	CFFunc | CFAddlArg, ArgNotNull1 | ArgNil1 | ArgNotNull2 | ArgNotNull3,
-								2, 3,	groupModeQ,	text855,	CFLit_groupModeQ},
-		// Returns name of mode if a mode in a group is set; otherwise, nil.
+	{"groupMode?",	CFFunc, ArgNotNull1 | ArgNotNull2,	1, 2,	groupModeQ,	text855,	CFLit_groupModeQ},
+		// Returns name of mode if a mode in group is set, otherwise nil.
 	{"growWind",		CFNCount, 0,			0, 0,	NULL,		NULL,		CFLit_growWind},
-	{"huntBack",		CFNCount, 0,			0, 0,	huntBack,	NULL,		CFLit_huntBack},
+	{"huntBack",		0, 0,				0, 0,	huntBack,	NULL,		CFLit_huntBack},
 		// Returns string found, or false if not found.
 	{"huntForw",		CFNCount, 0,			0, 0,	huntForw,	NULL,		CFLit_huntForw},
 		// Returns string found, or false if not found.
-	{"include?",		CFFunc | CFNoLoad, 0,		2, -1,	doIncl,		text846,	CFLit_includeQ},
-		// Returns true if any/all expression values are in given array.
 	{"indentRegion",	CFEdit | CFNCount, 0,		0, 0,	indentRegion,	NULL,		CFLit_indentRegion},
-	{"index",	CFFunc | CFAddlArg, ArgInt2 | ArgMay | ArgNotNull3,
-								2, 3,	fIndex,		text818,	CFLit_index},
+	{"index",	CFFunc, ArgInt2 | ArgMay | ArgNotNull3,	2, 3,	fIndex,		text818,	CFLit_index},
 		// Returns position of pattern in string, or nil if not found.
 	{"insert",	CFFunc | CFEdit | CFShortLoad, 0,	1, -1,	NULL,		text809,	CFLit_insert},
 		// Returns text inserted.
@@ -188,9 +210,14 @@ CmdFunc cmdFuncTable[] = {
 	{"insertPipe",		CFEdit | CFNoLoad, 0,		1, -1,	NULL,		text809,	CFLit_insertPipe},
 		// Returns false if failure.
 	{"insertSpace",		CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_insertSpace},
+	{"insertf",		CFFunc | CFEdit, 0,		1, -1,	NULL,		text831,	CFLit_insertf},
+		// Returns text inserted.
 	{"inserti",		CFEdit | CFNCount, 0,		0, 0,	inserti,	NULL,		CFLit_inserti},
 	{"interactive?",	CFFunc, 0,			0, 0,	NULL,		NULL,		CFLit_interactiveQ},
 		// Returns true if script is being executed interactively.
+	{"isClass?",	CFFunc, ArgNotNull1 | ArgInt2 | ArgMay | ArgNotNull2,
+								2, 2,	NULL,		text860,	CFLit_isClassQ},
+		// Returns true if a character is in a given class.
 	{"join",		CFFunc | CFShortLoad, ArgNil1,	2, -1,	NULL,		text819,	CFLit_join},
 		// Returns string result.
 	{"joinLines",		CFEdit, ArgNil1,		1, 1,	joinLines,	text829,	CFLit_joinLines},
@@ -207,7 +234,9 @@ CmdFunc cmdFuncTable[] = {
 		// Returns name of buffer.
 	{"length",		CFFunc, ArgArray1 | ArgMay,	1, 1,	NULL,		text812,	CFLit_length},
 		// Returns string or array length.
-	{"let",			CFTerm, 0,			0, 0,	setVar,		NULL,		CFLit_let},
+	{"let",			CFTerm, 0,			0, 0,	let,		NULL,		CFLit_let},
+	{"linkFile",		CFNoLoad, 0,			2, 3,	linkFile,	text880,	CFLit_linkFile},
+		// Returns new filename if successful.
 	{"lowerCaseLine",	CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_lowerCaseLine},
 	{"lowerCaseRegion",	CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_lowerCaseRegion},
 	{"lowerCaseStr",	CFFunc, 0,			1, 1,	NULL,		text811,	CFLit_lowerCaseStr},
@@ -221,9 +250,8 @@ CmdFunc cmdFuncTable[] = {
 	{"message",		CFFunc | CFNoLoad, 0,		1, -1,	message,	text861,	CFLit_message},
 		// Returns Boolean value.
 	{"metaPrefix", CFHidden | CFPrefix | CFBind1 | CFPerm, 0, 0, 0,	NULL,		NULL,		CFLit_metaPrefix},
-	{"mode?", CFFunc | CFAddlArg, ArgNotNull1 | ArgNil1 | ArgNotNull2 | ArgArray2 | ArgMay | ArgNotNull3,
-								2, 3,	modeQ,		text802,	CFLit_modeQ},
-		// Returns true if any/all mode(s) set; otherwise, false.
+	{"mode?",	CFFunc, ArgNotNull1 | ArgNotNull2,	1, 2,	modeQ,		text802,	CFLit_modeQ},
+		// Returns true if mode set, otherwise false.
 	{"moveWindDown",	CFNCount, 0,			0, 0,	NULL,		NULL,		CFLit_moveWindDown},
 	{"moveWindUp",		CFNCount, 0,			0, 0,	moveWindUp,	NULL,		CFLit_moveWindUp},
 	{"narrowBuf",		0, 0,				0, 0,	narrowBuf,	NULL,		CFLit_narrowBuf},
@@ -246,15 +274,15 @@ CmdFunc cmdFuncTable[] = {
 	{"ord",			CFFunc, 0,			1, 1,	NULL,		text811,	CFLit_ord},
 		// Returns ordinal value of first character of a string.
 	{"outdentRegion",	CFEdit | CFNCount, 0,		0, 0,	outdentRegion,	NULL,		CFLit_outdentRegion},
-	{"overwrite",	CFFunc | CFEdit | CFShortLoad, 0,	1, -1,	NULL,		text809,	CFLit_overwrite},
+	{"overwriteChar", CFFunc | CFEdit | CFShortLoad, 0,	1, -1,	NULL,		text809,	CFLit_overwriteChar},
+		// Returns new text.
+	{"overwriteCol", CFFunc | CFEdit | CFShortLoad, 0,	1, -1,	NULL,		text809,	CFLit_overwriteCol},
 		// Returns new text.
 	{"pathname",	CFFunc, ArgArray1 | ArgMay | ArgPath,	1, 1,	absPathname,	text858,	CFLit_pathname},
 		// Returns absolute pathname, or array of absolute pathnames.
 	{"pause",		CFFunc, ArgInt1,		1, 1,	NULL,		text820,	CFLit_pause},
 	{"pipeBuf",		CFEdit | CFNoLoad, 0,		1, -1,	NULL,		text809,	CFLit_pipeBuf},
 		// Returns false if failure.
-	{"pop",			CFFunc, ArgArray1,		1, 1,	NULL,		text822,	CFLit_pop},
-		// Returns popped value, or nil if none left.
 	{"popBuf",		CFNoLoad, 0,			1, 2,	NULL,		text842,	CFLit_popBuf},
 		// Returns name of buffer.
 	{"popFile",		CFNoLoad, 0,			1, 2,	NULL,		text870,	CFLit_popFile},
@@ -268,12 +296,11 @@ CmdFunc cmdFuncTable[] = {
 	{"prevWind",		0, 0,				0, 0,	prevWind,	NULL,		CFLit_prevWind},
 	{"print",		CFFunc | CFShortLoad, 0,	1, -1,	NULL,		text809,	CFLit_print},
 	{"printf",		CFFunc, 0,			1, -1,	NULL,		text831,	CFLit_printf},
-	{"prompt",		CFFunc, ArgNil1,		1, -1,	userPrompt,	text823,	CFLit_prompt},
+	{"prompt", CFFunc, ArgNil1 | ArgNotNull1 | ArgNil2 | ArgNotNull2 | ArgNIS3,
+								0, 3,	userPrompt,	text823,	CFLit_prompt},
 		// Returns response read from keyboard.
-	{"push", CFFunc, ArgArray1 | ArgBool2 | ArgArray2 | ArgNIS2, 2, 2, NULL,	text824,	CFLit_push},
-		// Returns new array value.
 	{"queryReplace",	CFEdit, ArgNotNull1 | ArgNil2,	2, 2,	NULL,		text810,	CFLit_queryReplace},
-		// Returns false if search stopped prematurely by user; otherwise, true.
+		// Returns false if search stopped prematurely by user, otherwise true.
 	{"quickExit",		0, 0,				0, 0,	NULL,		NULL,		CFLit_quickExit},
 	{"quote",	CFFunc, ArgBool1 | ArgArray1 | ArgNIS1,	1, 1,	NULL,		text812,	CFLit_quote},
 		// Returns quoted expression.
@@ -287,12 +314,11 @@ CmdFunc cmdFuncTable[] = {
 	{"reframeWind",		0, 0,				0, 0,	NULL,		NULL,		CFLit_reframeWind},
 	{"renameBuf",		CFNoLoad, 0,			2, 2,	renameBuf,	text849,	CFLit_renameBuf},
 		// Returns name of new buffer.
+	{"renameFile",		CFNoLoad, 0,			2, 3,	renameFile,	text881,	CFLit_renameFile},
 	{"renameMacro",		CFNoLoad, 0,			2, 2,	renameMacro,	text849,	CFLit_renameMacro},
 		// Returns name of new macro.
 	{"replace",		CFEdit, ArgNotNull1 | ArgNil2,	2, 2,	NULL,		text810,	CFLit_replace},
-		// Returns false if fewer than n replacements were made; otherwise, true.
-	{"replaceText",	CFFunc | CFEdit | CFShortLoad, 0,	1, -1,	NULL,		text809,	CFLit_replaceText},
-		// Returns new text.
+		// Returns false if fewer than n replacements were made, otherwise true.
 	{"resetTerm",		0, 0,				0, 0,	resetTerm,	NULL,		CFLit_resetTerm},
 	{"resizeWind",		0, 0,				0, 0,	resizeWind,	NULL,		CFLit_resizeWind},
 	{"restoreBuf",		CFFunc, 0,			0, 0,	NULL,		NULL,		CFLit_restoreBuf},
@@ -325,6 +351,7 @@ CmdFunc cmdFuncTable[] = {
 		// Returns two-element array containing new buffer name and new filename.
 	{"setColorPair", CFFunc, ArgInt1 | ArgInt2 | ArgInt3,	3, 3,	setColorPair,	text864,	CFLit_setColorPair},
 		// Returns color pair number.
+	{"setDefault",		CFFunc, ArgInt2,		2, 2,	setDefault,	text882,	CFLit_setDefault},
 	{"setDispColor", CFFunc, ArgNotNull1 | ArgArray2 | ArgNil2 | ArgMay,
 								2, 2,	setDispColor,	text865,	CFLit_setDispColor},
 	{"setHook", CFFunc | CFSpecArgs | CFShortLoad, ArgNotNull1,
@@ -338,8 +365,6 @@ CmdFunc cmdFuncTable[] = {
 		// Returns false if failure.
 	{"shellCmd",		CFNoLoad, 0,			1, -1,	NULL,		text861,	CFLit_shellCmd},
 		// Returns false if failure.
-	{"shift",		CFFunc, ArgArray1,		1, 1,	NULL,		text822,	CFLit_shift},
-		// Returns shifted value, or nil if none left.
 	{"showAliases",		0, ArgNil1,			1, 1,	showAliases,	text805,	CFLit_showAliases},
 	{"showBuffers",		CFAddlArg, ArgNotNull1,		0, 1,	showBuffers,	text844,	CFLit_showBuffers},
 	{"showColors",		0, 0,				0, 0,	showColors,	NULL,		CFLit_showColors},
@@ -349,7 +374,7 @@ CmdFunc cmdFuncTable[] = {
 	{"showFence",		CFAddlArg, ArgInt1,		0, 1,	showFence,	text857,	CFLit_showFence},
 	{"showFunctions",	CFAddlArg, ArgNil1,		1, 2,	showFunctions,	text873,	CFLit_showFunctions},
 	{"showHooks",		0, 0,				0, 0,	showHooks,	NULL,		CFLit_showHooks},
-	{"showKey",		0, ArgNotNull1,			1, 1,	showKey,	text815,	CFLit_showKey},
+	{"showKey",		CFTerm, ArgNotNull1,		1, 1,	showKey,	text815,	CFLit_showKey},
 	{"showMarks",		0, 0,				0, 0,	showMarks,	NULL,		CFLit_showMarks},
 	{"showModes",		0, 0,				0, 0,	showModes,	NULL,		CFLit_showModes},
 	{"showPoint",		CFTerm, 0,			0, 0,	showPoint,	NULL,		CFLit_showPoint},
@@ -362,8 +387,7 @@ CmdFunc cmdFuncTable[] = {
 	{"shrinkWind",		CFNCount, 0,			0, 0,	NULL,		NULL,		CFLit_shrinkWind},
 	{"sortRegion",	CFEdit | CFAddlArg, ArgNotNull1,	0, 1,	sortRegion,	text844,	CFLit_sortRegion},
 	{"space",		CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_space},
-	{"split",		CFFunc, ArgInt1 | ArgNil1 | ArgInt3,
-								2, 3,	strSplit,	text838,	CFLit_split},
+	{"split",		CFFunc, ArgNIS1 | ArgInt3,	2, 3,	strSplit,	text838,	CFLit_split},
 		// Returns array.
 	{"splitWind",		0, 0,				0, 0,	NULL,		NULL,		CFLit_splitWind},
 		// Returns ordinal number of new window not containing point.
@@ -398,26 +422,22 @@ CmdFunc cmdFuncTable[] = {
 	{"titleCaseWord",	CFEdit | CFNCount, 0,		0, 0,	NULL,		NULL,		CFLit_titleCaseWord},
 	{"toInt",		CFFunc, ArgInt1 | ArgMay,	1, 1,	NULL,		text811,	CFLit_toInt},
 		// Returns integer result.
-	{"toStr", CFFunc | CFAddlArg, ArgBool1 | ArgArray1 | ArgNIS1 | ArgNotNull2,
-								1, 2,	toString,	text841,	CFLit_toStr},
+	{"toStr", CFFunc, ArgBool1 | ArgArray1 | ArgNIS1 | ArgNil2 | ArgNotNull2,
+								1, 3,	toString,	text841,	CFLit_toStr},
 		// Returns string result.
 	{"tr",			CFFunc, ArgNil3,		3, 3,	NULL,		text817,	CFLit_tr},
 		// Returns translated string.
 	{"traverseLine",	0, 0,				0, 0,	traverseLine,	NULL,		CFLit_traverseLine},
 	{"trimLine",		CFEdit, 0,			0, 0,	trimLine,	NULL,		CFLit_trimLine},
 	{"truncBuf",		CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_truncBuf},
-		// Returns name of buffer.
 	{"type?",	CFFunc, ArgBool1 | ArgArray1 | ArgNIS1,	1, 1,	NULL,		text812,	CFLit_typeQ},
 		// Returns type of value.
 	{"unbindKey",		0, ArgNotNull1,			1, 1,	unbindKey,	text815,	CFLit_unbindKey},
-		// Returns Boolean result if script mode; otherwise, nil.
+		// Returns Boolean result if script mode, otherwise nil.
 	{"undelete",		CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_undelete},
 	{"undeleteCycle",	CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_undeleteCycle},
 	{"universalArg", CFHidden | CFBind1 | CFUniq, 0,	0, 0,	NULL,		NULL,		CFLit_universalArg},
-	{"unshift", CFFunc, ArgArray1 | ArgBool2 | ArgArray2 | ArgNIS2,
-								2, 2,	NULL,		text824,	CFLit_unshift},
-		// Returns new array value.
-	{"updateScreen", CFFunc | CFAddlArg, ArgNotNull1,	0, 1,	updateScrn,	text844,	CFLit_updateScreen},
+	{"updateScreen",	CFFunc, ArgNotNull1,		0, 1,	updateScrn,	text844,	CFLit_updateScreen},
 	{"upperCaseLine",	CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_upperCaseLine},
 	{"upperCaseRegion",	CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_upperCaseRegion},
 	{"upperCaseStr",	CFFunc, 0,			1, 1,	NULL,		text811,	CFLit_upperCaseStr},
@@ -426,15 +446,13 @@ CmdFunc cmdFuncTable[] = {
 	{"viewFile",		CFNoLoad, 0,			1, 1,	NULL,		text868,	CFLit_viewFile},
 		// Returns [name of buffer, "true" or "false" indicating whether the buffer was created].
 	{"widenBuf",		0, 0,				0, 0,	widenBuf,	NULL,		CFLit_widenBuf},
-	{"wordChar?",		CFFunc, ArgInt1,		1, 1,	NULL,		text860,	CFLit_wordCharQ},
-		// Returns true if a character is a word character.
 	{"wrapLine",		CFEdit, ArgNil1 | ArgNil2,	2, 2,	wrapLine,	text830,	CFLit_wrapLine},
 	{"wrapWord",		CFFunc | CFHook | CFEdit, 0,	0, 0,	wrapWord,	NULL,		CFLit_wrapWord},
 	{"writeBuf",		CFNoLoad, 0,			1, 1,	writeBuf,	text867,	CFLit_writeBuf},
 		// Returns text copied.
 	{"writeFile",		CFNoLoad, 0,			1, 1,	NULL,		text868,	CFLit_writeFile},
 		// Returns filename.
-	{"xPathname", CFFunc | CFAddlArg, ArgPath | ArgNotNull2, 1, 2,	xPathname,	text859,	CFLit_xPathname},
+	{"xPathname", 		CFFunc, ArgPath | ArgNotNull2,	1, 2,	xPathname,	text859,	CFLit_xPathname},
 		// Returns pathname, or array of pathnames.
 	{"xeqBuf",		CFNoLoad, 0,			1, -1,	xeqBuf,		text816,	CFLit_xeqBuf},
 		// Returns execution result.
@@ -445,7 +463,7 @@ CmdFunc cmdFuncTable[] = {
 	{"yankCycle",		CFEdit, 0,			0, 0,	NULL,		NULL,		CFLit_yankCycle},
 	{NULL,			0, 0,				0, 0,	NULL,		NULL,		NULL}
 	};
-Hash *execTable;			// Table of executable names (commands, functions, and aliases).
+HashTable *execTable;			// Table of executable names (commands, functions, and aliases).
 
 #define CmdFuncCount	(sizeof(cmdFuncTable) / sizeof(CmdFunc)) - 1
 
@@ -456,5 +474,5 @@ Hash *execTable;			// Table of executable names (commands, functions, and aliase
 // External variable declarations.
 extern Alias *ahead;
 extern CmdFunc cmdFuncTable[];
-extern Hash *execTable;
+extern HashTable *execTable;
 #endif

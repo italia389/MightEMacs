@@ -10,7 +10,7 @@ a ~bpop-up window~B which also appears on the screen, but will never contain the
 point, and only exists for a short time to display information.  When a pop-up
 window is being displayed, the cursor will always be at a prompt at the bottom
 of the screen and will remain there until the window is dismissed.  Pop-up
-windows operate the same way as the "less" Unix command (file viewer) and
+windows operate the same way as the ~bless~B Unix command (file viewer) and
 support a subset of its commands.
 
 When you are viewing a pop-up window in MightEMacs, you can press ~u?~U to see the
@@ -22,7 +22,7 @@ dismissed.
 
 Pop-up windows are used extensively in MightEMacs for many purposes, including
 the display of help and state information by all of the "show" commands.  For
-example, you can use the "showVariables" (~#uC-h v~U) command now to display a pop-up
+example, you can use the ~bshowVariables~B (~#uC-h v~U) command now to display a pop-up
 window and figure out how to move around in it.  Remember that ~u?~U displays the
 available commands and ~uq~U or ~uESC~U exits.
 

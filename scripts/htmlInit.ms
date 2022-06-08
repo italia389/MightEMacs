@@ -1,9 +1,9 @@
-# (c) Copyright 2019 Richard W. Marinelli
+# (c) Copyright 2022 Richard W. Marinelli
 #
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# htmlInit.ms		Ver. 9.5.0
+# htmlInit.ms		Ver. 9.6.0
 #	MightEMacs initialization file for HTML.  Returns registration array as described in lang.ms.
 
 [nil,								/# Library name (if different from mode name) #/\

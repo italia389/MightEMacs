@@ -1,11 +1,9 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 //
 // misc.c	Miscellaneous functions for MightEMacs.
-//
-// This file contains command processing routines for some random commands.
 
 #include "std.h"
 #include "cxl/lib.h"
@@ -14,6 +12,74 @@
 #include "cmd.h"
 #include "search.h"
 #include "var.h"
+
+#if MMDebug & Debug_Datum
+// Dump Datum object to log file.
+void ddump(const Datum *pDatum, const char *tag) {
+	char *label, *membName;
+
+	fprintf(logfile, "%s\n\taddr: %.8x\n", tag, (uint) pDatum);
+	if(pDatum != NULL)
+		switch(pDatum->type) {
+			case dat_nil:
+				label = "nil";
+				goto Konst;
+			case dat_false:
+				label = "false";
+				goto Konst;
+			case dat_true:
+				label = "true";
+Konst:
+				fprintf(logfile, "\t%s\n", label);
+				break;
+			case dat_int:
+				fprintf(logfile, "\tint: %ld\n", pDatum->u.intNum);
+				break;
+			case dat_uint:
+				fprintf(logfile, "\tuint: %lu\n", pDatum->u.uintNum);
+				break;
+			case dat_real:
+				fprintf(logfile, "\treal: %.12lg\n", pDatum->u.realNum);
+				break;
+			case dat_miniStr:
+				label = "MINI STR";
+				goto String;
+			case dat_longStr:
+			case dat_longStrRef:
+				label = (pDatum->type == dat_longStr) ? "HEAP STR" : "REF STR";
+				if(pDatum->u.longStr == NULL) {
+					membName = "u.longStr";
+					goto Bad;
+					}
+String:
+				if(pDatum->str == NULL) {
+					membName = "str";
+Bad:
+					fprintf(logfile,
+					 "*** %s member of Datum object passed to ddump() is NULL ***\n", membName);
+					}
+				else {
+					short c;
+					char *str = pDatum->str;
+					fprintf(logfile, "\t%s (%hu): \"", label, pDatum->type);
+					while((c = *str++) != '\0')
+						fputs(vizc(c, VizBaseDef), logfile);
+					fputs("\"\n", logfile);
+					}
+				break;
+			case dat_byteStr:
+			case dat_byteStrRef:
+				fprintf(logfile, "\t%s (size %lu): %.8x\n", pDatum->type == dat_byteStrRef ? "MEMREF" : "MEM",
+				 pDatum->u.mem.size, (uint) pDatum->u.mem.ptr);
+				break;
+			case dat_array:
+			case dat_arrayRef:
+				fprintf(logfile, "\t%s (size %ld): %.8x\n", pDatum->type == dat_arrayRef ? "ARRAYREF" : "ARRAY",
+				 pDatum->u.pArray->used, (uint) pDatum->u.pArray);
+				break;
+			}
+	}
+#endif
 
 // Is a character a lower case letter?
 bool isLowerCase(short c) {
@@ -136,7 +202,7 @@ long getLineNum(Buffer *pBuf, Line *pTargLine) {
 // Return new column, given character in line and old column.
 int newCol(short c, int col) {
 
-	return col + (c == '\t' ? -(col % sess.hardTabSize) + sess.hardTabSize :
+	return col + (c == '\t' ? -(col % sess.cur.pScrn->hardTabSize) + sess.cur.pScrn->hardTabSize :
 	 c < 0x20 || c == 0x7F ? 2 : c > 0x7F ? 4 : 1);
 	}
 
@@ -144,7 +210,7 @@ int newCol(short c, int col) {
 // current buffer.  *attrLen is set to length of specification, or zero if none.
 int newColTermAttr(Point *pPoint, int col, int *attrLen) {
 	short c = pPoint->pLine->text[pPoint->offset];
-	if(c != AttrSpecBegin || !(sess.pCurBuf->flags & BFTermAttr)) {
+	if(c != AttrSpecBegin || !(sess.cur.pBuf->flags & BFTermAttr)) {
 		*attrLen = 0;
 		return newCol(c, col);
 		}
@@ -164,7 +230,7 @@ int getCol(Point *pPoint, bool termAttr) {
 	int i, col;
 
 	if(pPoint == NULL)
-		pPoint = &sess.pCurWind->face.point;
+		pPoint = &sess.cur.pFace->point;
 
 	col = 0;
 	if(termAttr) {
@@ -188,7 +254,7 @@ int setPointCol(int pos) {
 	int i;			// Index into current line.
 	int col;		// Current point column.
 	int lineLen;		// Length of line in bytes.
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	col = 0;
 	lineLen = pPoint->pLine->used;
@@ -222,9 +288,35 @@ bool isWhite(Line *pLine, int length) {
 	return true;
 	}
 
-// Find pattern within source, using given Match record if pMatch not NULL; otherwise, global "matchRE" record.  Return status.
-// If Idx_Char flag set, pattern is assumed to be a single character; otherwise, a plain text pattern or regular expression.  If
-// Idx_Last flag set, last (rightmost) match is found; otherwise, first.  pRtnVal is set to 0-origin match position, or nil if
+// Set a default value for a screen parameter.
+int setDefault(Datum *pRtnVal, int n, Datum **args) {
+	static OptHdr optHdr = {
+		0, text497, true, defOptions};
+			// "parameter name"
+	Option *pOption;
+	int *pDef;
+
+	// Get options and set flags.
+	if(parseOpts(&optHdr, NULL, args[0], NULL) != Success)
+		return sess.rtn.status;
+
+	// Save new default value in table.
+	pOption = defOptions;
+	for(;;) {
+		if(pOption->ctrlFlags & OptSelected) {
+			pDef = defParams + (pOption - defOptions);
+			break;
+			}
+		++pOption;
+		}
+	*pDef = args[1]->u.intNum;
+
+	return sess.rtn.status;
+	}
+
+// Find pattern within source, using given Match record if pMatch not NULL, otherwise global "matchRE" record.  Return status.
+// If Idx_Char flag set, pattern is assumed to be a single character, otherwise a plain text pattern or regular expression.  If
+// Idx_Last flag set, last (rightmost) match is found, otherwise first.  pRtnVal is set to 0-origin match position, or nil if
 // no match.
 int strIndex(Datum *pRtnVal, ushort flags, Datum *pSrc, Datum *pPat, Match *pMatch) {
 
@@ -332,7 +424,7 @@ int fIndex(Datum *pRtnVal, int n, Datum **args) {
 			// "function option"
 
 	// Get options and set flags.
-	if(n != INT_MIN) {
+	if(args[2] != NULL) {
 		if(parseOpts(&optHdr, NULL, args[2], NULL) != Success)
 			return sess.rtn.status;
 		flags = getFlagOpts(options);
@@ -369,7 +461,7 @@ int seti(Datum *pRtnVal, int n, Datum **args) {
 		if(*args != NULL) {
 
 			// Yes, get it.
-			datxfer(pRtnVal, *args++);
+			dxfer(pRtnVal, *args++);
 			newFmt = true;
 
 			// Have "incr" argument?
@@ -464,111 +556,64 @@ int seti(Datum *pRtnVal, int n, Datum **args) {
 	iVar.i = i;
 	iVar.incr = incr;
 	if(newFmt)
-		datxfer(&iVar.format, pRtnVal);
+		dxfer(&iVar.format, pRtnVal);
 	dsetnil(pRtnVal);
 	return sess.rtn.status;
 	}
 
-// Return a pseudo-random integer in range 1..max.  If max <= 0, return zero.  This is a slight variation of the Xorshift
-// pseudorandom number generator discovered by George Marsaglia.
-long xorShift64Star(long max) {
-	if(max <= 0)
+// Return a (uniform) pseudo-random integer in range 0 to upperBound - 1.  If upperBound <= 1, return zero.
+long urand(long upperBound) {
+	if(upperBound <= 0)
 		return 0;
-	else if(max == 1)
-		return 1;
-	else {
-		sess.randSeed ^= sess.randSeed >> 12; // a
-		sess.randSeed ^= sess.randSeed << 25; // b
-		sess.randSeed ^= sess.randSeed >> 27; // c
-		}
-	return ((sess.randSeed * 0x2545F4914F6CDD1D) & LONG_MAX) % max + 1;
+	if(upperBound <= UINT32_MAX)
+		return rand32Uniform(upperBound);
+
+	// Upper bound exceeds 32 bits, so splice two random 32-bit numbers together and return modulus.
+	ulong u = rand32();
+	u = (u << 32) | rand32();
+	return (u & LONG_MAX) % upperBound;
 	}
 
-// Do include? system function.  Return status.  First argument is option string if n argument; otherwise, it is skipped.
-int doIncl(Datum *pRtnVal, int n, Datum **args) {
-	bool result;
-	Array *pArray;
-	ArraySize elCount;
-	Datum *pDatum, **ppArrayEl;
-	bool aryMatch, elMatch;
-	bool firstArg = true;
-	uint argFlags = ArgFirst;
-	static bool any;
-	static bool ignore;
-	static Option options[] = {
-		{"^All", NULL, OptFalse, .u.ptr = (void *) &any},
-		{"^Ignore", NULL, 0, .u.ptr = (void *) &ignore},
-		{NULL, NULL, 0, 0}};
-	static OptHdr optHdr = {
-		ArgNotNull1, text451, false, options};
-			// "function option"
+// Do "afill" system function and return status.
+int doFill(Datum *pRtnVal, Datum **args) {
+	int rtnCode;
+	Array *pArray = args[0]->u.pArray;
+	Datum *pVal = args[1];
+	bool arrayVal = false;
 
-	if(dnewtrack(&pDatum) != 0)
-		return librsset(Failure);
-
-	// Get options and set flags.
-	initBoolOpts(options);
-	if(n != INT_MIN) {
-		if(funcArg(pDatum, ArgFirst) != Success || parseOpts(&optHdr, NULL, pDatum, NULL) != Success)
-			return sess.rtn.status;
-		setBoolOpts(options);
-		argFlags = 0;
+	// Call library function.  If fill value is an array, dereference it in the datum first (temporarily) so it will be
+	// cloned into each element.
+	if(pVal->type == dat_arrayRef) {
+		dadoptarray(pVal->u.pArray, pVal);
+		arrayVal = true;
 		}
+	rtnCode = afill(pArray, pVal, args[2]->u.intNum, args[3]->u.intNum, AOpGrow);
+	if(libpanic())
+		goto LibFail;
+	if(arrayVal) {
+		Datum **ppArrayEl, **ppArrayElEnd;
 
-	// Get array argument.
-	if(funcArg(pDatum, argFlags | ArgArray1) != Success)
-		return sess.rtn.status;
-	pArray = wrapPtr(pDatum)->pArray;
-
-	// Get remaining argument(s).
-	result = !any;
-	for(;;) {
-		if(!firstArg && !haveSym(s_comma, false))
-			break;					// At least one argument retrieved and none left.
-		if(funcArg(pDatum, ArgNIS1 | ArgBool1 | ArgArray1) != Success)
-			return sess.rtn.status;
-		firstArg = false;
-
-		// Loop through array elements and compare them to the argument if final result has not yet been
-		// determined.
-		if(result == !any) {
-			elCount = pArray->used;
-			ppArrayEl = pArray->elements;
-			elMatch = false;
-			while(elCount-- > 0) {
-				if((*ppArrayEl)->type == dat_blobRef) {
-					if(pDatum->type != dat_blobRef)
-						goto NextEl;
-					if(arrayEQ(pDatum, *ppArrayEl, ignore, &aryMatch) != Success)
-						return sess.rtn.status;
-					if(aryMatch)
-						goto Match;
-					goto NextEl;
-					}
-				else if(dateq(pDatum, *ppArrayEl, ignore)) {
-Match:
-					if(any)
-						result = true;
-					else
-						elMatch = true;
-					break;
-					}
-NextEl:
-				++ppArrayEl;
-				}
-
-			// Match found or all array elements checked.  Fail if "all" mode and no match found.
-			if(!any && !elMatch)
-				result = false;
+		// Un-dereference datum, change cloned array(s) to reference types, and add them to garbage list.
+		(void) drelease(pVal);
+		ppArrayElEnd = (ppArrayEl = pArray->elements) + pArray->used;
+		while(ppArrayEl < ppArrayElEnd) {
+			if((*ppArrayEl)->type == dat_array)
+				agTrack(*ppArrayEl);
+			++ppArrayEl;
 			}
-		}
+		}		
+	if(rtnCode != 0)
+		goto LibFail;
 
-	dsetbool(result, pRtnVal);
+	// Return result.
+	dxfer(pRtnVal, args[0]);
 	return sess.rtn.status;
+LibFail:
+	return librsset(Failure);
 	}
 
 // Perform binary search on a sorted array of string elements (which may be empty) given key string, array pointer, number of
-// elements, comparison function pointer, fetch function pointer, and index pointer.  Return true if match found; otherwise,
+// elements, comparison function pointer, fetch function pointer, and index pointer.  Return true if match found, otherwise
 // false.  In either case, set *pIndex to index of matching element or slot where key should be.
 bool binSearch(const char *key, const void *table, ssize_t n, int (*cmp)(const char *str1, const char *str2),
  const char *(*fetch)(const void *table, ssize_t i), ssize_t *pIndex) {
@@ -606,7 +651,10 @@ bool binSearch(const char *key, const void *table, ssize_t n, int (*cmp)(const c
 // Create an array with len elements, stash into pRtnVal, and store pointer to it in *ppAry.  Return status.
 int makeArray(Datum *pRtnVal, ArraySize len, Array **ppAry) {
 
-	return (*ppAry = anew(len, NULL)) == NULL ? librsset(Failure) : awWrap(pRtnVal, *ppAry);
+	if((*ppAry = anew(len, NULL)) == NULL)
+		return librsset(Failure);
+	agStash(pRtnVal, *ppAry);
+	return sess.rtn.status;
 	}
 
 // Mode and group attribute control flags.
@@ -620,9 +668,9 @@ int makeArray(Datum *pRtnVal, ArraySize len, Array **ppAry) {
 #define MG_Hidden	4		// Index of "hidden" table entry.
 
 static struct AttrInfo {
-	const char *name;	// Attribute name.
-	const char *abbr;	// Abbreviated name (for small screens).
-	short letterIndex;	// Name index of interactive prompt letter.
+	const char *name;		// Attribute name.
+	const char *abbr;		// Abbreviated name (for small screens).
+	short letterIndex;		// Name index of interactive prompt letter.
 	ushort ctrlFlags;		// Control flags.
 	} attrInfoTable[] = {
 		{"buffer", "pBuf", 0, MG_Bool | MG_ScopeAttr | MG_ModeAttr},
@@ -640,7 +688,7 @@ bool modeSet(ushort id, Buffer *pBuf) {
 	if(pModeSpec->flags & MdGlobal)
 		return pModeSpec->flags & MdEnabled;
 	if(pBuf == NULL)
-		pBuf = sess.pCurBuf;
+		pBuf = sess.cur.pBuf;
 	return isBufModeSet(pBuf, pModeSpec);
 	}
 
@@ -649,7 +697,7 @@ void setGlobalMode(ModeSpec *pModeSpec) {
 
 	if(!(pModeSpec->flags & MdEnabled)) {
 		pModeSpec->flags |= MdEnabled;
-		if((pModeSpec->flags & (MdHidden | MdInLine)) != MdHidden)		// If mode line update needed...
+		if((pModeSpec->flags & (MdHidden | MdInLine)) != MdHidden)	// If mode line update needed...
 			windNextIs(NULL)->flags |= WFMode;			// update mode line of bottom window.
 		}
 	}
@@ -659,7 +707,7 @@ void clearGlobalMode(ModeSpec *pModeSpec) {
 
 	if(pModeSpec->flags & MdEnabled) {
 		pModeSpec->flags &= ~MdEnabled;
-		if((pModeSpec->flags & (MdHidden | MdInLine)) != MdHidden)		// If mode line update needed...
+		if((pModeSpec->flags & (MdHidden | MdInLine)) != MdHidden)	// If mode line update needed...
 			windNextIs(NULL)->flags |= WFMode;			// update mode line of bottom window.
 		}
 	}
@@ -684,7 +732,7 @@ static const char *modeName(const void *table, ssize_t i) {
 	return modePtr(((Datum **) table)[i])->name;
 	}
 
-// Search the mode table for given name and return pointer to ModeSpec object if found; otherwise, NULL.  In either case, set
+// Search the mode table for given name and return pointer to ModeSpec object if found, otherwise NULL.  In either case, set
 // *pIndex to target array index if pIndex not NULL.
 ModeSpec *msrch(const char *name, ssize_t *pIndex) {
 	ssize_t i = 0;
@@ -744,8 +792,8 @@ int mcreate(const char *name, ssize_t index, const char *desc, ushort flags, Mod
 	// Insert record into mode table array and return.
 	if(dnew(&pDatum) != 0)
 		goto LibFail;
-	dsetblobref((void *) pModeSpec, 0, pDatum);
-	if(ainsert(&modeInfo.modeTable, index, pDatum, false) != 0)
+	dsetmemref((void *) pModeSpec, 0, pDatum);
+	if(ainsert(&modeInfo.modeTable, pDatum, index, 0) != 0)
 LibFail:
 		(void) librsset(Failure);
 	return sess.rtn.status;
@@ -773,16 +821,16 @@ static int mdelete(ModeSpec *pModeSpec, ssize_t index) {
 
 	// Usage check completed... nuke the mode.
 	if(pModeSpec->descrip != NULL)				// If mode description present...
-		free((void *) pModeSpec->descrip);			// free it.
+		free((void *) pModeSpec->descrip);		// free it.
 	pDatum = adelete(&modeInfo.modeTable, index);		// Free the array element...
 	free((void *) modePtr(pDatum));				// the ModeSpec object...
-	ddelete(pDatum);					// and the Datum object.
+	dfree(pDatum);						// and the Datum object.
 
-	return rsset(Success, 0, "%s %s", text387, text10);
+	return rsset(Success, RSHigh, "%s %s", text387, text10);
 				// "Mode", "deleted"
 	}
 
-// Clear all global modes.  Return true if any mode was enabled; otherwise, false.
+// Clear all global modes.  Return true if any mode was enabled, otherwise false.
 static bool globalClearModes(void) {
 	Array *pArray = &modeInfo.modeTable;
 	Datum *pArrayEl;
@@ -911,7 +959,7 @@ static int mgdelete(ModeGrp *pModeGrp1, ModeGrp *pModeGrp2) {
 		free((void *) pModeGrp2->descrip);
 	free((void *) pModeGrp2);
 
-	return rsset(Success, 0, "%s %s", text388, text10);
+	return rsset(Success, RSHigh, "%s %s", text388, text10);
 				// "Group", "deleted"
 	}
 
@@ -945,7 +993,7 @@ static int membSet(ModeSpec *pModeSpec, ModeGrp *pModeGrp) {
 					if(pModeSpec2->flags & MdEnabled)
 						activeFound = true;
 					}
-				else if(isBufModeSet(sess.pCurBuf, pModeSpec2))
+				else if(isBufModeSet(sess.cur.pBuf, pModeSpec2))
 					activeFound = true;
 				}
 			}
@@ -956,7 +1004,7 @@ static int membSet(ModeSpec *pModeSpec, ModeGrp *pModeGrp) {
 		// Disable mode if an enabled mode was found in group.
 		if(activeFound)
 			(pModeSpec->flags & MdGlobal) ? clearGlobalMode(pModeSpec) :
-			 isAnyBufModeSet(sess.pCurBuf, true, 1, pModeSpec);
+			 isAnyBufModeSet(sess.cur.pBuf, true, 1, pModeSpec);
 		}
 
 	// Group is empty or scopes match... add mode.
@@ -1068,7 +1116,7 @@ GlobalToBuf:								// Do global -> buffer.
 					haveTrue = (*flags & MdEnabled);
 					*flags &= ~(MdEnabled | MdGlobal);
 					if(haveTrue)			// If mode was enabled, set it in current buffer.
-						(void) setBufMode(sess.pCurBuf, pModeSpec, false, NULL);
+						(void) setBufMode(sess.cur.pBuf, pModeSpec, false, NULL);
 					}
 				else {					// "buffer: false"
 BufToGlobal:								// Do buffer -> global.
@@ -1076,7 +1124,7 @@ BufToGlobal:								// Do buffer -> global.
 						return sess.rtn.status;	// Not buffer mode or scope mismatch.
 
 					// If mode was enabled in current buffer, set it globally.
-					haveTrue = isBufModeSet(sess.pCurBuf, pModeSpec);
+					haveTrue = isBufModeSet(sess.cur.pBuf, pModeSpec);
 					clearBufMode(pModeSpec);
 					*flags |= haveTrue ? (MdGlobal | MdEnabled) : MdGlobal;
 					}
@@ -1165,27 +1213,27 @@ static int getAttr(Datum *pRtnVal, ushort type) {
 
 	// Build prompt for attribute to set or change.
 	if(dnewtrack(&pDatum) != 0 || dopenwith(&result, pRtnVal, FabClear) != 0 || dopenwith(&prompt, pDatum, FabClear) != 0 ||
-	 dputc(upCase[(int) text186[0]], &prompt) != 0 || dputs(text186 + 1, &prompt) != 0)
+	 dputc(upCase[(int) text186[0]], &prompt, 0) != 0 || dputs(text186 + 1, &prompt, 0) != 0)
 					// "attribute"
 		goto LibFail;
 	pAttrInfoEnd = (pAttrInfo = attrInfoTable) + elementsof(attrInfoTable);
 	do {
 		if(pAttrInfo->ctrlFlags & type) {
 			attrName = (term.cols >= 80) ? pAttrInfo->name : pAttrInfo->abbr;
-			if(dputs(lead, &prompt) != 0 || (pAttrInfo->letterIndex == 1 && dputc(attrName[0], &prompt) != 0) ||
-			 dputf(&prompt, "~u~b%c~Z%s", (int) attrName[pAttrInfo->letterIndex],
+			if(dputs(lead, &prompt, 0) != 0 ||
+			 (pAttrInfo->letterIndex == 1 && dputc(attrName[0], &prompt, 0) != 0) ||
+			 dputf(&prompt, 0, "~u~b%c~Z%s", (int) attrName[pAttrInfo->letterIndex],
 			  attrName + pAttrInfo->letterIndex + 1) != 0)
 				goto LibFail;
 			lead = ", ";
 			}
 		} while(++pAttrInfo < pAttrInfoEnd);
-	if(dputc(')', &prompt) != 0 || dclose(&prompt, Fab_String) != 0)
+	if(dputc(')', &prompt, 0) != 0 || dclose(&prompt, FabStr) != 0)
 		goto LibFail;
 
 	// Get attribute from user and validate it.
-	dclear(pRtnVal);
 	if(termInp(pDatum, pDatum->str, ArgNotNull1 | ArgNil1, Term_LongPrmt | Term_Attr | Term_OneChar, NULL) != Success ||
-	 pDatum->type == dat_nil)
+	 disnil(pDatum))
 		return sess.rtn.status;
 	pAttrInfoEnd = (pAttrInfo = attrInfoTable) + elementsof(attrInfoTable);
 	do {
@@ -1197,19 +1245,21 @@ static int getAttr(Datum *pRtnVal, ushort type) {
 			// "Invalid %s %s '%s'"			"group", "mode", "attribute"
 Found:
 	// Return result if Boolean attribute; otherwise, get string value.
-	if(dputf(&result, "%s: ", pAttrInfo->name) != 0)
+	if(dputf(&result, 0, "%s: ", pAttrInfo->name) != 0)
 		goto LibFail;
 	if(pAttrInfo->ctrlFlags & MG_Bool) {
-		if(dputs(viz_true, &result) != 0)
+		if(dputs(viz_true, &result, 0) != 0)
 			goto LibFail;
 		}
 	else {
 		if(termInp(pDatum, text53, (pAttrInfo->ctrlFlags & MG_Nil) ? ArgNotNull1 | ArgNil1 : ArgNotNull1,
 				// "Value"
-		 0, NULL) != Success || dtosf(pDatum, NULL, CvtShowNil, &result) != Success)
+		 0, NULL) != Success)
 			return sess.rtn.status;
+		if(dputd(pDatum, &result, NULL, DCvtShowNil) < 0)	// Can't be an array.
+			goto LibFail;
 		}
-	if(dclose(&result, Fab_String) != 0)
+	if(dclose(&result, FabStr) != 0)
 LibFail:
 		(void) librsset(Failure);
 	return sess.rtn.status;
@@ -1220,9 +1270,9 @@ static int editMGPrompt(ushort type, int n, Datum *pDatum) {
 	DFab prompt;
 
 	return (dopenwith(&prompt, pDatum, FabClear) != 0 ||
-	 dputf(&prompt, "%s %s", n == INT_MIN ? text402 : n <= 0 ? text26 : text403, text389) != 0 ||
+	 dputf(&prompt, 0, "%s %s", n == INT_MIN ? text402 : n <= 0 ? text26 : text403, text389) != 0 ||
 					// "Edit"		"Delete", "Create or edit", "mode"
-	 (type == MG_GrpAttr && dputf(&prompt, " %s", text390) != 0) || dclose(&prompt, Fab_String) != 0) ?
+	 (type == MG_GrpAttr && dputf(&prompt, 0, " %s", text390) != 0) || dclose(&prompt, FabStr) != 0) ?
 						// "group"
 	 librsset(Failure) : sess.rtn.status;
 	}
@@ -1247,7 +1297,7 @@ static int editMG(Datum *pRtnVal, int n, Datum **args, ushort type) {
 
 		// Get mode or group name from user.
 		if(termInp(pDatum, pDatum->str, ArgNil1 | ArgNotNull1,
-		 type == MG_ModeAttr ? Term_C_Mode : 0, NULL) != Success || pDatum->type == dat_nil)
+		 type == MG_ModeAttr ? Term_C_Mode : 0, NULL) != Success || disnil(pDatum))
 			return sess.rtn.status;
 		name = pDatum->str;
 		}
@@ -1255,38 +1305,38 @@ static int editMG(Datum *pRtnVal, int n, Datum **args, ushort type) {
 		ssize_t index;
 		ModeSpec *pModeSpec;
 
-		if((pModeSpec = msrch(name, &index)) == NULL) {			// Mode not found.  Create it?
-			if(n <= 0)						// No, error.
+		if((pModeSpec = msrch(name, &index)) == NULL) {				// Mode not found.  Create it?
+			if(n <= 0)							// No, error.
 				return rsset(Failure, 0, text395, text389, name);
 						// "No such %s '%s'", "mode"
 			if(mcreate(name, index, NULL, MdUser, &pModeSpec) != Success)	// Yes, create it.
 				return sess.rtn.status;
 			created = true;
 			}
-		else if(n <= 0 && n != INT_MIN)					// Mode found.  Delete it?
-			return mdelete(pModeSpec, index);			// Yes.
+		else if(n <= 0 && n != INT_MIN)						// Mode found.  Delete it?
+			return mdelete(pModeSpec, index);				// Yes.
 		p = (void *) pModeSpec;
 		}
 	else {
 		ModeGrp *pModeGrp1, *pModeGrp2;
 
-		if(!mgsrch(name, &pModeGrp1, &pModeGrp2)) {					// Group not found.  Create it?
-			if(n <= 0)						// No, error.
+		if(!mgsrch(name, &pModeGrp1, &pModeGrp2)) {				// Group not found.  Create it?
+			if(n <= 0)							// No, error.
 				return rsset(Failure, 0, text395, text390, name);
 						// "No such %s '%s'", "group"
-			if(mgcreate(name, pModeGrp1, NULL, &pModeGrp2) != Success)		// Yes, create it.
+			if(mgcreate(name, pModeGrp1, NULL, &pModeGrp2) != Success)	// Yes, create it.
 				return sess.rtn.status;
 			created = true;
 			}
-		else if(n <= 0 && n != INT_MIN)					// Group found.  Delete it?
+		else if(n <= 0 && n != INT_MIN)						// Group found.  Delete it?
 			return mgdelete(pModeGrp1, pModeGrp2);				// Yes.
 		p = (void *) pModeGrp2;
 		}
 
 	// If interactive mode, get an attribute; otherwise, loop through attribute arguments and process them.
 	if(!(sess.opFlags & OpScript)) {
-		if(getAttr(pDatum, type) == Success && pDatum->type != dat_nil && doAttr(pDatum, type, p) == Success)
-			rsset(Success, 0, "%s %s", type == MG_ModeAttr ? text387 : text388, created ? text392 : text394);
+		if(getAttr(pDatum, type) == Success && !disnil(pDatum) && doAttr(pDatum, type, p) == Success)
+			rsset(Success, RSHigh, "%s %s", type == MG_ModeAttr ? text387 : text388, created ? text392 : text394);
 								// "Mode", "Group", "created", "attribute changed"
 		}
 	else {
@@ -1328,7 +1378,7 @@ int getModes(Datum *pRtnVal, Buffer *pBuf) {
 			while((pArrayEl = aeach(&pArray)) != NULL) {
 				pModeSpec = modePtr(pArrayEl);
 				if((pModeSpec->flags & (MdGlobal | MdEnabled)) == (MdGlobal | MdEnabled))
-					if(dsetstr(pModeSpec->name, &datum) != 0 || apush(pArray0, &datum, true) != 0)
+					if(dsetstr(pModeSpec->name, &datum) != 0 || apush(pArray0, &datum, AOpCopy) != 0)
 						goto LibFail;
 				}
 			}
@@ -1336,7 +1386,7 @@ int getModes(Datum *pRtnVal, Buffer *pBuf) {
 			BufMode *pBufMode;
 
 			for(pBufMode = pBuf->modes; pBufMode != NULL; pBufMode = pBufMode->next)
-				if(dsetstr(pBufMode->pModeSpec->name, &datum) != 0 || apush(pArray0, &datum, true) != 0)
+				if(dsetstr(pBufMode->pModeSpec->name, &datum) != 0 || apush(pArray0, &datum, AOpCopy) != 0)
 					goto LibFail;
 			}
 		dclear(&datum);
@@ -1346,8 +1396,8 @@ LibFail:
 	return librsset(Failure);
 	}
 
-// Check if a partial (or full) mode name is unique.  If "bufModeOnly" is true, consider buffer modes only; otherwise, global
-// modes.  Set *ppModeSpec to mode table entry if true; otherwise, NULL.  Return status.
+// Check if a partial (or full) mode name is unique.  If "bufModeOnly" is true, consider buffer modes only, otherwise global
+// modes.  Set *ppModeSpec to mode table entry if true, otherwise NULL.  Return status.
 static int modeSearch(const char *name, bool bufModeOnly, ModeSpec **ppModeSpec) {
 	Datum *pArrayEl;
 	Array *pArray = &modeInfo.modeTable;
@@ -1386,7 +1436,7 @@ Retn:
 
 // Change a mode, given name, action (< 0: clear, 0: toggle, > 0: set), Buffer pointer if buffer mode (otherwise, NULL),
 // optional "former state" pointer, and optional indirect ModeSpec pointer which is set to entry in mode table if mode was
-// changed; otherwise, NULL.  If action < -1 or > 2, partial mode names are allowed.  Return status.
+// changed, otherwise NULL.  If action < -1 or > 2, partial mode names are allowed.  Return status.
 int chgMode1(const char *name, int action, Buffer *pBuf, long *formerStatep, ModeSpec **result) {
 	ModeSpec *pModeSpec;
 	bool modeWasSet, modeWasChanged;
@@ -1474,16 +1524,15 @@ int chgMode(Datum *pRtnVal, int n, Datum **args) {
 
 		// Build prompt.
 		if(dopenwith(&prompt, pDatum, FabClear) != 0 ||
-		 dputs(action < 0 ? text65 : action == 0 ? text231 : action == 1 ? text64 : text296, &prompt) != 0 ||
+		 dputs(action < 0 ? text65 : action == 0 ? text231 : action == 1 ? text64 : text296, &prompt, 0) != 0 ||
 				// "Clear", "Toggle", "Set", "Clear all and set"
-		 dputs(text63, &prompt) != 0 || dclose(&prompt, Fab_String) != 0)
+		 dputs(text63, &prompt, 0) != 0 || dclose(&prompt, FabStr) != 0)
 				// " mode"
 			goto LibFail;
 
 		// Get mode name from user.  If action > 1 (clear all and set) and nothing entered, just return because there
 		// is no way to know whether to clear buffer modes or global modes.
-		if(termInp(pDatum, pDatum->str, ArgNil1, Term_C_Mode, NULL) != Success ||
-		 pDatum->type == dat_nil)
+		if(termInp(pDatum, pDatum->str, ArgNil1, Term_C_Mode, NULL) != Success || disnil(pDatum))
 			return sess.rtn.status;
 
 		// Valid?
@@ -1496,11 +1545,11 @@ int chgMode(Datum *pRtnVal, int n, Datum **args) {
 			global = true;
 		else {
 			if(n == INT_MIN)
-				pBuf = sess.pCurBuf;
+				pBuf = sess.cur.pBuf;
 			else {
 				pBuf = bdefault();
-				if(getBufname(pRtnVal, text229 + 2, pBuf != NULL ? pBuf->bufname : NULL, OpDelete, &pBuf, NULL)
-				 != Success || pBuf == NULL)
+				if(getBufname(pRtnVal, text229 + 2, pBuf != NULL ? pBuf->bufname : NULL, ArgFirst | OpDelete,
+				 &pBuf, NULL) != Success || pBuf == NULL)
 						// ", in"
 					return sess.rtn.status;
 				}
@@ -1509,7 +1558,7 @@ int chgMode(Datum *pRtnVal, int n, Datum **args) {
 		}
 	else {
 		// Script mode.  Check arguments.
-		if((!(global = args[0]->type == dat_nil) && (pBuf = findBuf(args[0])) == NULL) ||
+		if((!(global = disnil(args[0])) && (pBuf = findBuf(args[0])) == NULL) ||
 		 (n <= 1 && validateArg(args[1], ArgNotNull1 | ArgArray1 | ArgMay) != Success))
 			return sess.rtn.status;
 		}
@@ -1557,11 +1606,11 @@ DoMode:
 								}
 							} while((pWind = pWind->next) != NULL);
 						}
-					else if(sess.pCurScrn->firstCol > 0) {
-						sess.pCurWind->face.firstCol = sess.pCurScrn->firstCol;
-						sess.pCurWind->flags |= (WFHard | WFMode);
+					else if(sess.cur.pScrn->firstCol > 0) {
+						sess.cur.pFace->firstCol = sess.cur.pScrn->firstCol;
+						sess.cur.pWind->flags |= (WFHard | WFMode);
 						}
-					sess.pCurScrn->firstCol = 0;
+					sess.cur.pScrn->firstCol = 0;
 					}
 				}
 			if(!(sess.opFlags & OpScript))
@@ -1570,7 +1619,7 @@ DoMode:
 		}
 
 	// Display new mode line.
-	if(!(sess.opFlags & OpScript) && mlerase() != Success)
+	if(!(sess.opFlags & OpScript) && mlerase(0) != Success)
 		return sess.rtn.status;
 
 	// Return former state of last mode that was changed.

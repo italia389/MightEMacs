@@ -12,8 +12,8 @@ quantity (a number of lines or repetitions, for example).
 To illustrate this, let's do some navigation in this buffer.  Press ~#uESC f~U
 (forwWord) and notice that the point moves one word forward.  Now press ~#uC-u ESC
 f~U.  The point moves two words forward.  Try ~#uC-u 5 ESC f~U or ~#uC-u C-n~U and see what
-happens.  You get the idea.  (Remember that ~uC-n~U is "forwLine" and ~uC-p~U is
-"backLine".)
+happens.  You get the idea.  (Remember that ~uC-n~U is ~bforwLine~B and ~uC-p~U is
+~bbackLine~B.)
 
 ~uC-u~U provides (generally) a positive numeric prefix to a command and ~uC-_~U (~ucontrol~U
 + ~ushift~U + underscore) provides a negative one.

@@ -1,9 +1,9 @@
-# (c) Copyright 2019 Richard W. Marinelli
+# (c) Copyright 2022 Richard W. Marinelli
 #
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# help.ms		Ver. 9.5.0
+# help.ms		Ver. 9.6.0
 #	MightEMacs help system.
 
 ##### Set global constants. #####
@@ -25,16 +25,16 @@ function hsLoadFile(1)
 	if defined?('Name', $1) == 'buffer'
 		selectBuf $1
 	else
-		bufname = (viewFile join('/', $HelpDir, $1))[0]
+		bufname = (findFile join('/', $HelpDir, $1))[0]
 		setBufFile bufname, nil
 		2 => chgMode bufname, nil
 		1 => chgBufAttr bufname, 'Hidden, ReadOnly, TermAttr'
 	endif
 endroutine
 
-# Return true if character argument is one of "A-Za-z0-9-"; otherwise, false.
+# Return true if character argument is one of "A-Za-z0-9-", otherwise false.
 function hsWordChar?(1)
-	$1 == ?- || ($1 != ?_ && wordChar?($1))
+	$1 == ?- || ($1 != ?_ && isClass?('word', $1))
 endroutine
 
 # Move point forward one "link word".
@@ -51,7 +51,7 @@ function hsBackWord(0)
 	endloop
 endroutine
 
-# Return link name if point on a link; otherwise, nil.
+# Return link name if point on a link, otherwise nil.
 function hsOnLink?(0)
 	1 => setMark ??
 	result = nil
@@ -181,7 +181,7 @@ function hsMain(0)
 		# ...
 		loop
 			beginBuf
-			updateScreen
+			updateScreen()
 			nil?(choice = prompt('~u~bNN~Z menu item, ~u~bb~Zack, ~u~bq~Zuit [b]: ', 'TermAttr')) and\
 			 choice = 'b'
 			if choice == 'q'

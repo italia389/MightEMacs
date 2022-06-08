@@ -10,12 +10,12 @@ There is a group of commands for accessing the shell.  Following is the list:
 
     ~#uC-x |~U       pipeBuf         Feed current buffer through shell pipeline and
                                 read its output into current buffer (or another
-                                buffer), with same options as "readFile"
+                                buffer), with same options as ~breadFile~B
                                 command.
 
     ~#uC-x ~~~U       readPipe        Execute shell pipeline and read its output into
                                 current buffer (or another buffer), with same
-                                options as "readFile" command.
+                                options as ~breadFile~B command.
 
     ~#uC-x $~U       shell           Spawn an interactive shell session.
 

@@ -1,9 +1,9 @@
-# (c) Copyright 2019 Richard W. Marinelli
+# (c) Copyright 2022 Richard W. Marinelli
 #
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# javaLib.ms		Ver. 9.5.0
+# javaLib.ms		Ver. 9.6.0
 #	MightEMacs library for Java source code editing.
 
 ## Define regular expression that will match the first line of a method definition.  The javaFindMethod command will replace the

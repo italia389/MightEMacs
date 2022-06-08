@@ -7,14 +7,13 @@ privileges, do not want to install MightEMacs in your HOME directory, and do not
 want to customize the installation process, please refer to file Install.txt for
 instructions on using the standard installers.
 
-64-bit binaries and make files for macOS and Linux platforms are included in
-this distribution of MightEMacs.  If you are not installing on a macOS or
-GNU/Linux platform, the installation scripts will automatically select and use
-the appropriate make file from the included platforms for compilation.  However,
-compilation on other platforms has not been tested, so it is possible that there
-may be errors.  If this occurs, please contact the author with the details so
-that the problem can be resolved.  (See the ReadMe.md file for contact
-information.)
+Make files for macOS and Linux platforms are included in this distribution.
+Compilation on other Unix platforms should be possible as well, however it has
+not been tested, so there may be errors.  If this occurs, please contact the
+author with the details so that the problem can be resolved.  (See the ReadMe.md
+file for contact information.)  Note that if you are installing on a macOS
+system, Xcode must already be installed (vers. 7.2.1 or later recommended) so
+that command-line tools are available.
 
 To install MightEMacs with optional customizations, perform the following steps:
 
@@ -22,14 +21,7 @@ To install MightEMacs with optional customizations, perform the following steps:
 
 	$ cd MightEMacs-master
 
- 2. MightEMacs 64-bit binaries are included for GNU/Linux (built on a CentOS
-    vers. 6 machine) and macOS vers. 10.10 (Yosemite) and later.  If you want to
-    use one of these binaries and skip compilation, go to step 7; otherwise, go
-    to the next step.  Note that if you are installing on a macOS system, Xcode
-    must already be installed (vers. 7.2.1 or later recommended) so that
-    command-line tools are available.
-
- 3. The CXL and XRE libraries are required to compile and link MightEMacs.  You
+ 2. The CXL and XRE libraries are required to compile and link MightEMacs.  You
     will need to download these from GitHub and build and install them before
     proceeding.  They can be obtained with these links:
 
@@ -39,63 +31,48 @@ To install MightEMacs with optional customizations, perform the following steps:
     Please refer to the CustomInstall.txt file in each package for instructions
     on how to build and install the libraries on your platform (in your HOME
     directory, for example).  You will provide the paths to the installation
-    directory of each library in step 9.  Note that the XRE library should be
+    directory of each library in step 6.  Note that the XRE library should be
     built in 8-bit ASCII character mode (without wide character and multibyte
     character support) for linking with the MightEMacs object files.
 
- 4. Remove package binaries:
+ 3. Remove any existing package binaries:
 
 	$ make clean
 
- 5. Review and/or edit the beginning portion of include/std.h to customize
+ 4. Review and/or edit the beginning portion of include/std.h to customize
     MightEMacs compilation (optional).
 
- 6. Review and/or edit include/bind.h if you want to change the default key
+ 5. Review and/or edit include/bind.h if you want to change the default key
     bindings (not recommended).
 
- 7. To see a list of available platforms (optional):
+ 6. Build MightEMacs.  This will create link file "mm" in the current directory.
+    Note that during compilation you may see warnings about uninitialized
+    variables, signed/unsigned comparisons, or other messages with some
+    compilers.  These may be ignored.
 
-	$ make
+    To proceed, supply the paths to the CXL and XRE installation directories as
+    values of the CXL and XRE variables.  For example, on Linux with CXL
+    installed in the HOME directory and XRE installed in /usr/local:
 
- 8. Build and/or prepare MightEMacs for installation.  This will create link
-    file "mm" in the current directory.  If you are compiling the sources, go to
-    the next step; otherwise, go to step 10.
+	$ make CXL=$HOME/cxlib XRE=/usr/local
 
- 9. Compile sources and prepare for installation.  Note that you may see several
-    "...  may be used uninitialized ..." or other warnings with some compilers.
-    These may be ignored.
-
-    To proceed, supply the desired platform name in lower case as the value of
-    the PLATFORM variable and the paths to the CXL and XRE installation
-    directories as values of the CXL and XRE variables; for example, on Linux
-    with CXL installed in the HOME directory and XRE installed in /usr/local:
-
-	$ make PLATFORM=linux CXL=$HOME/cxlib XRE=/usr/local
-
-    Go to step 11.
-
-10. Prepare for installation.  To proceed, supply the desired platform name in
-    lower case as the value of the PLATFORM variable; for example, on Linux:
-
-	$ make PLATFORM=linux
-
-11. Install MightEMacs.  If you have customized file "site.ms" (site-wide
+ 7. Install MightEMacs.  If you have customized file "site.ms" (site-wide
     defaults) from a previous installation and want to save your changes, copy
     the file to another directory now.  For example, to copy the file to your
     home directory (assuming MightEMacs was previously installed in /usr/local):
 
 	$ cp /usr/local/lib/memacs/site.ms ~
 
-12. If you have superuser privileges and want to do a site-wide install, go to
-    the next step; otherwise, go to step 16.
+ 8. If you have superuser privileges and want to do a site-wide install, go to
+    the next step; otherwise, go to step 12.
 
-13. Perform a site-wide install:
+ 9. Perform a site-wide install:
 
 	$ su root
 	# make install
 	# exit
 
-14. Make sure directory /usr/local/bin is in your shell PATH so that the shell
+10. Make sure directory /usr/local/bin is in your shell PATH so that the shell
     can find the MightEMacs binary.  Display it with the following command:
 
 	$ echo $PATH
@@ -113,37 +90,37 @@ To install MightEMacs with optional customizations, perform the following steps:
     MightEMacs looks for its startup files in the current directory and
     directory /usr/local/share/memacs/scripts by default.  If you want to create
     your own scripts in another directory (for example, "$HOME/scripts"), you
-    can include it in the MMPATH environmental variable so that MightEMacs will
+    can include it in the MSPATH environmental variable so that MightEMacs will
     search that directory also.  To accomplish this, add this line to the
     startup file you modified above:
 
-	export MMPATH=":/usr/local/share/memacs/scripts:$HOME/scripts"
+	export MSPATH=":/usr/local/share/memacs/scripts:$HOME/scripts"
 
-15. Go to step 18.
+11. Go to step 14.
 
-16. Perform a local (user) install.  Supply the pathname of the local
-    installation directory as the value of the INSTALL variable; for example,
+12. Perform a local (user) install.  Supply the pathname of the local
+    installation directory with the INSTALL variable; for example,
     "$HOME/MightEMacs":
 
 	$ make install INSTALL=$HOME/MightEMacs
 
-17. Modify your shell startup file in your HOME directory so that the shell can
+13. Modify your shell startup file in your HOME directory so that the shell can
     find the MightEMacs binary and MightEMacs can find its startup files.  For
     example, add the following two lines to file ~/.profile if you are using the
     Bourne shell (bash) or to file ~/.zshenv if you are using zsh:
 
 	export PATH="$PATH:$HOME/MightEMacs/bin"
-	export MMPATH=":$HOME/MightEMacs/share/memacs/scripts"
+	export MSPATH=":$HOME/MightEMacs/share/memacs/scripts"
 
-18. If you want to install the sample user startup file (.memacs) into your HOME
+14. If you want to install the sample user startup file (.memacs) into your HOME
     directory (and rename any existing file to ".memacs.old"):
 
 	$ make user-install
 
-19. Review and/or edit file "site.ms" in the .../share/memacs/scripts
+15. Review and/or edit file "site.ms" in the .../share/memacs/scripts
     installation directory to customize site-wide defaults for the editor, such
     as scrolling options, the search string delimiter, etc.  If you saved an old
-    version of the file in step 11, you may have to change settings in the new
+    version of the file in step 7, you may have to change settings in the new
     "site.ms" file to match the old settings because some of the syntax may have
     changed, depending on the previous version of MightEMacs you were using.
 

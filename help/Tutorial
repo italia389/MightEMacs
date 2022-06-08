@@ -1793,11 +1793,9 @@ NOTE:
            the pattern is a regular expression.  Then press  ESC to do the
            search.  For example, the pattern "^\s+:r" (without the quotes) would
            match white space at the beginning of a line.
-        3. Note that the editor supports most of the commonly-used RE
-           metacharacters used by the "egrep" shell command.  The most notable
-           exception is the OR bar (|), which is not supported.  (See the
-           "Search Pattern Syntax" topic in the Advanced Help System for
-           details.)
+        3. Note that the editor supports most, if not all, of the RE
+           metacharacters used by the "egrep" shell command.  (See the "Search
+           Pattern Syntax" topic in the Advanced Help System for details.)
 
 
 --------------------------------------------------------------------------------^
@@ -2188,7 +2186,7 @@ Lesson 7 SUMMARY
     To learn how to write and use scripts, read the topics in Advanced Help.
 
 
-(c) Copyright 2020 Richard W. Marinelli
+(c) Copyright 2022 Richard W. Marinelli
 Email: italian389@yahoo.com
 Reddit: http://reddit.com/r/memacs
-Ver. 1.1.0
+Ver. 1.1.1

@@ -1,7 +1,7 @@
 ~bKey Binding Syntax~B
 
-The "bindKey" and "unbindKey" commands take a key binding as their first
-argument and the "binding" function optionally takes a key binding as its second
+The ~bbindKey~B and ~bunbindKey~B commands take a key binding as their first
+argument and the ~bbinding~B function optionally takes a key binding as its second
 argument.  Key bindings are specified in a coded string form as one or two "key
 literals" separated by a space.  A key literal is defined as:
 

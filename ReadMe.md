@@ -437,7 +437,7 @@ at `http://reddit.com/r/memacs`.
 
 Notes
 -----
-This distribution of MightEMacs is version 9.5.1.  Installer packages containing 64-bit binaries
+This distribution of MightEMacs is version 9.6.0.  Installer packages containing 64-bit binaries
 are included for Linux platforms and macOS ver. 10.12 and later.  The sources can be compiled as
 well if desired; however, the build process has not been tested on other Unix platforms and
 there may be some (hopefully minor) issues which will need to be resolved.  If you are compiling
@@ -450,7 +450,7 @@ for doing this are in file *CustomInstall.txt*.
 
 Credits
 -------
-MightEMacs (c) Copyright 2020 Richard W. Marinelli was written by Rick Marinelli
+MightEMacs (c) Copyright 2022 Richard W. Marinelli was written by Rick Marinelli
 <italian389@yahoo.com>.
 
 See License.txt for the MightEMacs license.

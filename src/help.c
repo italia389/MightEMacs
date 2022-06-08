@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -18,10 +18,9 @@
 #include "bind.h"
 #include "exec.h"
 #include "cmd.h"
+#include "file.h"
 #include "search.h"
 #include "var.h"
-#if WordCount
-#endif
 
 // System and session information table.
 typedef struct {
@@ -155,7 +154,7 @@ static int binfo(Array *pArray, Buffer *pBuf, bool extended) {
 		pOpt = bufAttrTable;
 		do {
 			if(pBuf->flags & pOpt->u.value)
-				if((pArrayEl = aget(pArray1, pArray1->used, true)) == NULL ||
+				if((pArrayEl = aget(pArray1, pArray1->used, AOpGrow)) == NULL ||
 				 dsetstr(*pOpt->keyword == '^' ? pOpt->keyword + 1 : pOpt->keyword, pArrayEl) != 0)
 					goto LibFail;
 			} while((++pOpt)->keyword != NULL);
@@ -196,11 +195,11 @@ int bufInfo(Datum *pRtnVal, int n, Datum **args) {
 	// Get options and set buffer flags.
 	if(makeArray(pRtnVal, 0, &pArray0) != Success)
 		return sess.rtn.status;
-	if(n != INT_MIN) {
+	if(args[1] != NULL) {
 		if(parseOpts(&optHdr, NULL, args[1], NULL) != Success)
 			return sess.rtn.status;
 		selVisible = options[0].ctrlFlags & OptSelected;
-		if((optFlags = getFlagOpts(options)) == 0 && !selVisible && pBufname->type == dat_nil)
+		if((optFlags = getFlagOpts(options)) == 0 && !selVisible && disnil(pBufname))
 			return rsset(Failure, 0, text455, optHdr.type);
 				// "Missing required %s"
 		if((options[4].ctrlFlags & OptSelected) && (options[5].ctrlFlags & OptSelected))
@@ -213,7 +212,7 @@ int bufInfo(Datum *pRtnVal, int n, Datum **args) {
 		}
 
 	// If single buffer requested, find it.
-	if(pBufname->type != dat_nil) {
+	if(!disnil(pBufname)) {
 		if((pBuf = bsrch(pBufname->str, NULL)) == NULL)
 			return rsset(Failure, 0, text118, pBufname->str);
 				// "No such buffer '%s'"
@@ -241,18 +240,17 @@ DoOneBuf:
 			// Create array for this buffer if needed.
 			if(count == 1) {
 				// Single buffer.  Use pArray0 and extend it to the correct size.
-				if((pArrayEl = aget(pArray1 = pArray0, arySize - 1, true)) == NULL)
+				if((pArrayEl = aget(pArray1 = pArray0, arySize - 1, AOpGrow)) == NULL)
 					goto LibFail;
 				}
 			else {
 				// Multiple buffers.  If not "Brief", create an array of the correct size.
-				if((pArrayEl = aget(pArray0, pArray0->used, true)) == NULL)
+				if((pArrayEl = aget(pArray0, pArray0->used, AOpGrow)) == NULL)
 					goto LibFail;
 				if(arySize > 1) {
 					if((pArray1 = anew(arySize, NULL)) == NULL)
 						goto LibFail;
-					if(awWrap(pArrayEl, pArray1) != Success)
-						return sess.rtn.status;
+					agStash(pArrayEl, pArray1);
 					}
 				}
 
@@ -278,139 +276,155 @@ static int buildArray(Datum *pRtnVal, int n, CmdFuncId id) {
 	Datum *pArrayEl, **ppArrayEl;
 	EScreen *pScrn;
 
-	if(makeArray(pRtnVal, 0, &pArray0) != Success)
-		goto Retn;
-	switch(id) {
-		case cf_showColors:;		// [[item-kw, [foreground-color, background-color]], ...] or [colors, pairs]
-			if(n == INT_MIN) {
-				ItemColor *pItemColor, *pItemColorEnd;
+	if(makeArray(pRtnVal, 0, &pArray0) == Success)
+		switch(id) {
+			case cf_showColors:;		// [[item-kw, [foreground-color, background-color]], ...] or
+							// [colors, pairs]
+				if(n == INT_MIN) {
+					ItemColor *pItemColor, *pItemColorEnd;
 
-				// Cycle through color items and make list.  For each item, create array in pArray1 and push
-				// onto pArray0.  Also create color-pair array in pArray and store in pArray1 if applicable.
-				pItemColorEnd = (pItemColor = term.itemColors) + sizeof(term.itemColors) / sizeof(ItemColor);
+					// Cycle through color items and make list.  For each item, create array in pArray1 and
+					// push onto pArray0.  Also create color-pair array in pArray and store in pArray1 if
+					// applicable.
+					pItemColorEnd = (pItemColor = term.itemColors) +
+					 sizeof(term.itemColors) / sizeof(ItemColor);
+					do {
+						if((pArray1 = anew(2, NULL)) == NULL)
+							goto LibFail;
+						if(pItemColor->colors[0] < -1)
+							dsetnil(pArray1->elements[1]);
+						else {
+							if((pArray = anew(2, NULL)) == NULL)
+								goto LibFail;
+							dsetint(pItemColor->colors[0], pArray->elements[0]);
+							dsetint(pItemColor->colors[1], pArray->elements[1]);
+							agStash(pArray1->elements[1], pArray);
+							}
+						if(dsetstr(pItemColor->name, pArray1->elements[0]) != 0 ||
+						 (pArrayEl = aget(pArray0, pArray0->used, AOpGrow)) == NULL)
+							goto LibFail;
+						agStash(pArrayEl, pArray1);
+						} while(++pItemColor < pItemColorEnd);
+					}
+				else {
+					// Create two-element array.
+					if((pArrayEl = aget(pArray0, pArray0->used, AOpGrow)) == NULL)
+						goto LibFail;
+					dsetint(term.maxColor, pArrayEl);
+					if((pArrayEl = aget(pArray0, pArray0->used, AOpGrow)) == NULL)
+						goto LibFail;
+					dsetint(term.maxWorkPair, pArrayEl);
+					}
+				break;
+			case cf_setDefault:;		// [[param-name, value], ...]
+				int *pDef = defParams;
+				Option *pOpt = defOptions;
+
+				// Cycle through defaults table and make list.  For each parameter, create array in pArray1 and
+				// push onto pArray0.
 				do {
 					if((pArray1 = anew(2, NULL)) == NULL)
 						goto LibFail;
-					if(pItemColor->colors[0] < -1)
-						dsetnil(pArray1->elements[1]);
-					else {
-						if((pArray = anew(2, NULL)) == NULL)
-							goto LibFail;
-						dsetint(pItemColor->colors[0], pArray->elements[0]);
-						dsetint(pItemColor->colors[1], pArray->elements[1]);
-						if(awWrap(pArray1->elements[1], pArray) != Success)
-							goto Retn;
-						}
-					if(dsetstr(pItemColor->name, pArray1->elements[0]) != 0 ||
-					 (pArrayEl = aget(pArray0, pArray0->used, true)) == NULL)
+					if(dsetstr(pOpt->keyword, pArray1->elements[0]) != 0 ||
+					 (pArrayEl = aget(pArray0, pArray0->used, AOpGrow)) == NULL)
 						goto LibFail;
-					if(awWrap(pArrayEl, pArray1) != Success)
-						goto Retn;
-					} while(++pItemColor < pItemColorEnd);
-				}
-			else {
-				// Create two-element array.
-				if((pArrayEl = aget(pArray0, pArray0->used, true)) == NULL)
-					goto LibFail;
-				dsetint(term.maxColor, pArrayEl);
-				if((pArrayEl = aget(pArray0, pArray0->used, true)) == NULL)
-					goto LibFail;
-				dsetint(term.maxWorkPair, pArrayEl);
-				}
-			break;
-		case cf_showHooks:;		// [[hook-name, function-name], ...]
-			HookRec *pHookRec = hookTable;
+					dsetint(*pDef++, pArray1->elements[1]);
+					agStash(pArrayEl, pArray1);
+					} while((++pOpt)->keyword != NULL);
+				break;
+			case cf_showHooks:;		// [[hook-name, function-name], ...]
+				HookRec *pHookRec = hookTable;
 
-			// Cycle through hook table and make list.  For each hook, create array in pArray1 and push onto
-			// pArray0.
-			do {
-				if((pArray1 = anew(2, NULL)) == NULL)
-					goto LibFail;
-				if(dsetstr(pHookRec->name, pArray1->elements[0]) != 0 || (pHookRec->func.type != PtrNull &&
-				 dsetstr(hookFuncName(&pHookRec->func), pArray1->elements[1]) != 0) ||
-				 (pArrayEl = aget(pArray0, pArray0->used, true)) == NULL)
-					goto LibFail;
-				if(awWrap(pArrayEl, pArray1) != Success)
-					goto Retn;
-				} while((++pHookRec)->name != NULL);
-			break;
-		case cf_showModes:;		// [[mode-name, group-name, user?, global?, hidden?, scope-lock?, active?], ...]
-			ModeSpec *pModeSpec;
-			static ushort modeFlags[] = {MdUser, MdGlobal, MdHidden, MdLocked, 0};
-			ushort *pFlag;
-
-			// Cycle through mode table and make list.  For each mode, create array in pArray1 and push onto
-			// pArray0.
-			pArray = &modeInfo.modeTable;
-			while((pArrayEl = aeach(&pArray)) != NULL) {
-				pModeSpec = modePtr(pArrayEl);
-				if((pArray1 = anew(7, NULL)) == NULL)
-					goto LibFail;
-				ppArrayEl = pArray1->elements;
-				if(dsetstr(pModeSpec->name, *ppArrayEl++) != 0 ||
-				 (pArrayEl = aget(pArray0, pArray0->used, true)) == NULL)
-					goto LibFail;
-				if(pModeSpec->pModeGrp == NULL)
-					++ppArrayEl;
-				else if(dsetstr(pModeSpec->pModeGrp->name, *ppArrayEl++) != 0)
-					goto LibFail;
-				pFlag = modeFlags;
+				// Cycle through hook table and make list.  For each hook, create array in pArray1 and push onto
+				// pArray0.
 				do {
-					dsetbool(pModeSpec->flags & *pFlag++, *ppArrayEl++);
-					} while(*pFlag != 0);
-				dsetbool((pModeSpec->flags & MdGlobal) ? (pModeSpec->flags & MdEnabled) :
-				 isBufModeSet(sess.pCurBuf, pModeSpec), *ppArrayEl++);
-				if(awWrap(pArrayEl, pArray1) != Success)
-					goto Retn;
-				}
-			break;
-		case cf_showScreens:;		// [[screen-num, wind-count, work-dir], ...]
+					if((pArray1 = anew(2, NULL)) == NULL)
+						goto LibFail;
+					if(dsetstr(pHookRec->name, pArray1->elements[0]) != 0 ||
+					 (pHookRec->func.type != PtrNull && dsetstr(hookFuncName(&pHookRec->func),
+					 pArray1->elements[1]) != 0) ||
+					 (pArrayEl = aget(pArray0, pArray0->used, AOpGrow)) == NULL)
+						goto LibFail;
+					agStash(pArrayEl, pArray1);
+					} while((++pHookRec)->name != NULL);
+				break;
+			case cf_showModes:;		// [[mode-name, group-name, user?, global?, hidden?, scope-lock?,
+							// active?], ...]
+				ModeSpec *pModeSpec;
+				static ushort modeFlags[] = {MdUser, MdGlobal, MdHidden, MdLocked, 0};
+				ushort *pFlag;
 
-			// Cycle through screens and make list.  For each screen, create array in pArray1 and push onto pArray0.
-			pScrn = sess.scrnHead;
-			do {
-				if((pArray1 = anew(3, NULL)) == NULL)
-					goto LibFail;
-				ppArrayEl = pArray1->elements;
-				dsetint((long) pScrn->num, *ppArrayEl++);
-				dsetint((long) getWindCount(pScrn, NULL), *ppArrayEl++);
-				if(dsetstr(pScrn->workDir, *ppArrayEl) != 0 ||
-				 (pArrayEl = aget(pArray0, pArray0->used, true)) == NULL)
-					goto LibFail;
-				if(awWrap(pArrayEl, pArray1) != Success)
-					goto Retn;
-				} while((pScrn = pScrn->next) != NULL);
-			break;
-		default:;			// [[windNum, bufname], ...] or [[screenNum, [windNum, bufname], ...]]
-			EWindow *pWind;
-			long windNum;
-
-			// Cycle through screens and make list.  For each window, create array in pArray1 and push onto pArray0.
-			pScrn = sess.scrnHead;
-			do {
-				if(pScrn->num == sess.pCurScrn->num || n != INT_MIN) {
-
-					// In all windows...
-					windNum = 0;
-					pWind = pScrn->windHead;
+				// Cycle through mode table and make list.  For each mode, create array in pArray1 and push onto
+				// pArray0.
+				pArray = &modeInfo.modeTable;
+				while((pArrayEl = aeach(&pArray)) != NULL) {
+					pModeSpec = modePtr(pArrayEl);
+					if((pArray1 = anew(7, NULL)) == NULL)
+						goto LibFail;
+					ppArrayEl = pArray1->elements;
+					if(dsetstr(pModeSpec->name, *ppArrayEl++) != 0 ||
+					 (pArrayEl = aget(pArray0, pArray0->used, AOpGrow)) == NULL)
+						goto LibFail;
+					if(pModeSpec->pModeGrp == NULL)
+						++ppArrayEl;
+					else if(dsetstr(pModeSpec->pModeGrp->name, *ppArrayEl++) != 0)
+						goto LibFail;
+					pFlag = modeFlags;
 					do {
-						++windNum;
-						if((pArray1 = anew(n == INT_MIN ? 2 : 3, NULL)) == NULL)
-							goto LibFail;
-						ppArrayEl = pArray1->elements;
-						if(n != INT_MIN)
-							dsetint((long) pScrn->num, *ppArrayEl++);
-						dsetint(windNum, *ppArrayEl++);
-						if(dsetstr(pWind->pBuf->bufname, *ppArrayEl) != 0 ||
-						 (pArrayEl = aget(pArray0, pArray0->used, true)) == NULL)
-							goto LibFail;
-						if(awWrap(pArrayEl, pArray1) != Success)
-							goto Retn;
-						} while((pWind = pWind->next) != NULL);
+						dsetbool(pModeSpec->flags & *pFlag++, *ppArrayEl++);
+						} while(*pFlag != 0);
+					dsetbool((pModeSpec->flags & MdGlobal) ? (pModeSpec->flags & MdEnabled) :
+					 isBufModeSet(sess.cur.pBuf, pModeSpec), *ppArrayEl++);
+					agStash(pArrayEl, pArray1);
 					}
-				} while((pScrn = pScrn->next) != NULL);
-		}
-Retn:
+				break;
+			case cf_showScreens:;		// [[screen-num, wind-count, work-dir], ...]
+
+				// Cycle through screens and make list.  For each screen, create array in pArray1 and push onto
+				// pArray0.
+				pScrn = sess.scrnHead;
+				do {
+					if((pArray1 = anew(3, NULL)) == NULL)
+						goto LibFail;
+					ppArrayEl = pArray1->elements;
+					dsetint((long) pScrn->num, *ppArrayEl++);
+					dsetint((long) getWindCount(pScrn, NULL), *ppArrayEl++);
+					if(dsetstr(pScrn->workDir, *ppArrayEl) != 0 ||
+					 (pArrayEl = aget(pArray0, pArray0->used, AOpGrow)) == NULL)
+						goto LibFail;
+					agStash(pArrayEl, pArray1);
+					} while((pScrn = pScrn->next) != NULL);
+				break;
+			default:;			// [[windNum, bufname], ...] or [[screenNum, [windNum, bufname], ...]]
+				EWindow *pWind;
+				long windNum;
+
+				// Cycle through screens and make list.  For each window, create array in pArray1 and push onto
+				// pArray0.
+				pScrn = sess.scrnHead;
+				do {
+					if(pScrn->num == sess.cur.pScrn->num || n != INT_MIN) {
+
+						// In all windows...
+						windNum = 0;
+						pWind = pScrn->windHead;
+						do {
+							++windNum;
+							if((pArray1 = anew(n == INT_MIN ? 2 : 3, NULL)) == NULL)
+								goto LibFail;
+							ppArrayEl = pArray1->elements;
+							if(n != INT_MIN)
+								dsetint((long) pScrn->num, *ppArrayEl++);
+							dsetint(windNum, *ppArrayEl++);
+							if(dsetstr(pWind->pBuf->bufname, *ppArrayEl) != 0 ||
+							 (pArrayEl = aget(pArray0, pArray0->used, AOpGrow)) == NULL)
+								goto LibFail;
+							agStash(pArrayEl, pArray1);
+							} while((pWind = pWind->next) != NULL);
+						}
+					} while((pScrn = pScrn->next) != NULL);
+			}
+
 	// Return results.
 	return sess.rtn.status;
 LibFail:
@@ -427,6 +441,7 @@ static const char *getInfoKeyword(const void *table, ssize_t i) {
 int getInfo(Datum *pRtnVal, int n, Datum **args) {
 	static InfoTable infoTable[] = {
 		{"colors", NULL, cf_showColors},	// [colors, pairs]
+		{"defaults", NULL, cf_setDefault},	// [[parm-name, value], ...]
 		{"editor", Myself, -1},
 		{"hooks", NULL, cf_showHooks},		// [[hook-name, function-name], ...]
 		{"language", Language, -1},
@@ -480,7 +495,7 @@ int showPoint(Datum *pRtnVal, int n, Datum **args) {
 	int endCol = 0;			// Column pos/end of current line.
 	Point workPoint;
 	char *info;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 	char *str, workBuf1[32], workBuf2[32];
 
 	str = strcpy(workBuf2, "0.0");
@@ -488,7 +503,7 @@ int showPoint(Datum *pRtnVal, int n, Datum **args) {
 		if(n == INT_MIN) {
 
 			// Start at the beginning of the buffer.
-			pLine = sess.pCurBuf->pFirstLine;
+			pLine = sess.cur.pBuf->pFirstLine;
 			curChar = '\0';
 
 			// Count characters and lines.
@@ -555,34 +570,34 @@ int showPoint(Datum *pRtnVal, int n, Datum **args) {
 	return sess.rtn.status;
 	}
 
-// Determine if an object is defined, given op and name.  If op is "Name", set pRtnVal to result: "alias", "buffer", "system
+// Determine if an object is defined, given op and object.  If op is "Name", set *pRtnVal to result: "alias", "buffer", "system
 // command", "pseudo command", "system function", "user command", "user function", "variable", or nil; if op is "Mode", set
-// pRtnVal to result: "buffer" or "global"; otherwise, set pRtnVal to true if mark is defined and active in current buffer (op
-// "Mark") or mode group exists (op "ModeGroup"); otherwise, false.
+// *pRtnVal to result: "buffer" or "global"; otherwise, set *pRtnVal to true if mark is defined and active in current buffer (op
+// "Mark") or mode group exists (op "ModeGroup"), otherwise false.
 int definedQ(Datum *pRtnVal, int n, Datum **args) {
 	char *op = args[0]->str;
-	Datum *pName = args[1];
+	Datum *pObj = args[1];
 	bool activeMark = false;
 	const char *result = NULL;
 	UnivPtr univ;
 
 	// Mark?
 	if(strcasecmp(op, "mark") == 0 || (activeMark = strcasecmp(op, "activemark") == 0)) {
-		if(isIntVal(pName) && validMark(pName)) {
+		if(isIntVal(pObj) && validMark(pObj)) {
 			Mark *pMark;
 
-			dsetbool(findBufMark(pName->u.intNum, &pMark, activeMark ? MKQuery | MKViz : MKQuery) == Success &&
+			dsetbool(findBufMark(pObj->u.intNum, &pMark, activeMark ? MKQuery | MKViz : MKQuery) == Success &&
 			 pMark != NULL, pRtnVal);
 			}
 		goto Retn;
 		}
 
-	if(!isStrVal(pName))
+	if(!isStrVal(pObj))
 		goto Retn;
 
 	// Mode?
 	if(strcasecmp(op, "mode") == 0) {
-		ModeSpec *pModeSpec = msrch(pName->str, NULL);
+		ModeSpec *pModeSpec = msrch(pObj->str, NULL);
 		if(pModeSpec != NULL)
 			result = (pModeSpec->flags & MdGlobal) ? text146 : text83;
 							// "global", "buffer"
@@ -591,7 +606,7 @@ int definedQ(Datum *pRtnVal, int n, Datum **args) {
 
 	// Mode group?
 	if(strcasecmp(op, "modegroup") == 0) {
-		dsetbool(mgsrch(pName->str, NULL, NULL), pRtnVal);
+		dsetbool(mgsrch(pObj->str, NULL, NULL), pRtnVal);
 		goto Retn;
 		}
 
@@ -603,12 +618,12 @@ int definedQ(Datum *pRtnVal, int n, Datum **args) {
 		}
 
 	// Variable?
-	if(findVar(pName->str, NULL, OpQuery))
+	if(findVar(pObj->str, NULL, OpQuery))
 		result = text292;
 			// "variable"
 
 	// Command, pseudo-command, function, or alias?
-	else if(execFind(pName->str, OpQuery, PtrAny, &univ))
+	else if(execFind(pObj->str, OpQuery, PtrAny, &univ))
 		switch(univ.type) {
 			case PtrSysCmd:
 				result = text414;
@@ -634,7 +649,7 @@ int definedQ(Datum *pRtnVal, int n, Datum **args) {
 				result = text127;
 					// "alias"
 			}
-	else if(bsrch(pName->str, NULL) != NULL)
+	else if(bsrch(pObj->str, NULL) != NULL)
 		result = text83;
 			// "buffer"
 Set:
@@ -714,16 +729,16 @@ static int getApropos(ShowCtrl *pShowCtrl, const char *prompt, Datum **args) {
 				// "Apropos"
 		if(termInp(pPat, workBuf, ArgNil1, 0, NULL) != Success)
 			return sess.rtn.status;
-		if(pPat->type == dat_nil)
+		if(disnil(pPat))
 			dsetnull(pPat);
 		}
-	else if(args[0]->type == dat_nil)
+	else if(disnil(args[0]))
 		dsetnull(pPat);
 	else
-		datxfer(pPat, args[0]);
+		dxfer(pPat, args[0]);
 
 	// Set up match record if pattern given.  Force "ignore" if non-RE and non-Exact.
-	if(pPat->type != dat_nil && !disnull(pPat) && newSearchPat(pPat->str, &pShowCtrl->match, NULL, false) == Success) {
+	if(!disnil(pPat) && !disnull(pPat) && newSearchPat(pPat->str, &pShowCtrl->match, NULL, false) == Success) {
 		if(pShowCtrl->match.flags & SOpt_Regexp) {
 			if(compileRE(&pShowCtrl->match, SCpl_ForwardRE) != Success)
 				freeSearchPat(&pShowCtrl->match);
@@ -813,7 +828,7 @@ char *inflate(char *dest, const char *src, bool plural) {
 // Otherwise, page width is calculated from pWidth array, title is written in bold, centered in calculated width, and headings
 // are written in bold and color.  The minWidth member of the second-to-last element of the pWidth array may be -1, which
 // indicates a width from the current column position to the right edge of the screen.  Spacing between columns is 1 if terminal
-// width < 96; otherwise, 2.  *pPageWidth is set to page width if pPageWidth not NULL.
+// width < 96, otherwise 2.  *pPageWidth is set to page width if pPageWidth not NULL.
 static int rptHdr(DFab *rpt, const char *title, bool plural, const char *colHead, ColHdrWidth *pWidth, int *pPageWidth) {
 	ColHdrWidth *pWidth1;
 	int leadIn, whitespace, width;
@@ -829,11 +844,11 @@ static int rptHdr(DFab *rpt, const char *title, bool plural, const char *colHead
 			width = term.cols;
 		else {
 			width = strlen(colHead);
-			if((leadIn = (term.cols - width) >> 1) > 0 && dputf(rpt, "%*s", leadIn, "") != 0)
+			if((leadIn = (term.cols - width) >> 1) > 0 && dputf(rpt, 0, "%*s", leadIn, "") != 0)
 				goto LibFail;
 			}
 		if((colorPair[0] >= -1) &&
-		 dputf(rpt, "~%dc", term.maxWorkPair - ColorPairIH) != 0)
+		 dputf(rpt, 0, "~%dc", term.maxWorkPair - ColorPairIH) != 0)
 			goto LibFail;
 		}
 	else {
@@ -854,7 +869,7 @@ static int rptHdr(DFab *rpt, const char *title, bool plural, const char *colHead
 	// Write centered title line in bold.
 	whitespace = width - strlen(workBuf);
 	leadIn = whitespace >> 1;
-	if(dputf(rpt, "%*s~b%s~B", leadIn, "", workBuf) != 0)
+	if(dputf(rpt, 0, "%*s~b%s~B", leadIn, "", workBuf) != 0)
 		goto LibFail;
 
 	// Finish title line and write column headings if requested.
@@ -862,37 +877,37 @@ static int rptHdr(DFab *rpt, const char *title, bool plural, const char *colHead
 		const char *str = colHead;
 		int curCol = 0;
 
-		if(dputs("\n\n", rpt) != 0)
+		if(dputs("\n\n", rpt, 0) != 0)
 			goto LibFail;
 
 		// Write column headings in bold, and in color if available.
-		if(dputs("~b", rpt) != 0)
+		if(dputs("~b", rpt, 0) != 0)
 			goto LibFail;
 		pWidth1 = pWidth;
 		do {
 			if(pWidth1 != pWidth) {
-				if(dputs(space, rpt) != 0)
+				if(dputs(space, rpt, 0) != 0)
 					goto LibFail;
 				curCol += spacing;
 				}
 			width = (pWidth1->minWidth == -1) ? term.cols - curCol : (int) pWidth1->minWidth;
 			if(colorPair[0] >= -1) {
-				if(dputf(rpt, "~%dc%-*.*s~C", term.maxWorkPair - ColorPairIH, width, (int) pWidth1->maxWidth,
+				if(dputf(rpt, 0, "~%dc%-*.*s~C", term.maxWorkPair - ColorPairIH, width, (int) pWidth1->maxWidth,
 				 str) != 0)
 					goto LibFail;
 				}
-			else if(dputf(rpt, "%-*.*s", width, (int) pWidth1->maxWidth, str) != 0)
+			else if(dputf(rpt, 0, "%-*.*s", width, (int) pWidth1->maxWidth, str) != 0)
 				goto LibFail;
 			curCol += width;
 			str += pWidth1->maxWidth;
 			++pWidth1;
 			} while(pWidth1->minWidth != 0);
-		if(dputs("~B", rpt) != 0)
+		if(dputs("~B", rpt, 0) != 0)
 			goto LibFail;
 
 		// Underline each column header if no color.
 		if(!(sess.opFlags & OpHaveColor)) {
-			if(dputc('\n', rpt) != 0)
+			if(dputc('\n', rpt, 0) != 0)
 				goto LibFail;
 			dupChar(workBuf, '-', term.cols);
 			str = workBuf;
@@ -900,12 +915,12 @@ static int rptHdr(DFab *rpt, const char *title, bool plural, const char *colHead
 			pWidth1 = pWidth;
 			do {
 				if(pWidth1 != pWidth) {
-					if(dputs(space, rpt) != 0)
+					if(dputs(space, rpt, 0) != 0)
 						goto LibFail;
 					curCol += spacing;
 					}
 				width = (pWidth1->minWidth == -1) ? term.cols - curCol : (int) pWidth1->minWidth;
-				if(dputf(rpt, "%.*s", width, str) != 0)
+				if(dputf(rpt, 0, "%.*s", width, str) != 0)
 					goto LibFail;
 				curCol += width;
 				str += pWidth1->minWidth;
@@ -913,7 +928,7 @@ static int rptHdr(DFab *rpt, const char *title, bool plural, const char *colHead
 				} while(pWidth1->minWidth != 0);
 			}
 		}
-	else if((sess.opFlags & OpHaveColor) && dputf(rpt, "%*s~C", whitespace - leadIn, "") != 0)
+	else if((sess.opFlags & OpHaveColor) && dputf(rpt, 0, "%*s~C", whitespace - leadIn, "") != 0)
 		goto LibFail;
 	return sess.rtn.status;
 LibFail:
@@ -927,12 +942,135 @@ static int showHdr(ShowCtrl *pShowCtrl, const char *title) {
 	if(!(sess.opFlags & OpHaveColor)) {
 		char workBuf[term.cols + 1];
 		dupChar(workBuf, '=', term.cols);
-		if(dputs(workBuf, &pShowCtrl->rpt) != 0 || dputc('\n', &pShowCtrl->rpt) != 0)
+		if(dputs(workBuf, &pShowCtrl->rpt, 0) != 0 || dputc('\n', &pShowCtrl->rpt, 0) != 0)
 			return librsset(Failure);
 		}
 
 	// Write title.
 	return rptHdr(&pShowCtrl->rpt, title, true, NULL, NULL, NULL);
+	}
+
+// Store indented description in report buffer if present and not blank, and return status.  Wrap into as many lines as needed.
+// Text may contain terminal attribute sequences, newlines, and/or tabs.
+static int storeDesc(ShowCtrl *pShowCtrl) {
+	int attrLen, col, tabCol, spaces;
+	ushort flags = TA_ScanOnly;
+	char *str0, *str1, *str, *strEnd, *line, *lineEnd;
+	char lineBuf[term.cols * 2];
+
+	str0 = (char *) pShowCtrl->descrip;
+
+	// Skip leading white space and trailing newlines in text.
+	for(;;) {
+		if(*str0 != ' ')
+			break;
+		++str0;
+		}
+	for(strEnd = strchr(str0, '\0'); strEnd > str0 && strEnd[-1] == '\n'; --strEnd);
+	if(str0 == strEnd)
+		return sess.rtn.status;
+
+	tabCol = 4;
+	lineEnd = lineBuf + sizeof(lineBuf);
+	str = str0;
+	goto Init;
+
+	// Wrap loop.
+	for(;;) {
+		switch(*str) {
+			case '\n':
+				tabCol = 4;
+				goto NewLine;
+			case '\t':
+				col += (spaces = 4 - col % 4);
+				if(col >= term.cols - 16)
+					goto WrapErr;			// Left indent too far.
+				tabCol = col;
+				do {
+					if(line == lineEnd)
+						goto WrapErr;
+					*line++ = ' ';
+					} while(--spaces > 0);
+				break;
+			case AttrSpecBegin:
+				if(str + 1 == strEnd)
+					goto NewLine;			// Ignore '~' at end of text.
+				if(str[1] == AttrSpecBegin) {
+					str1 = str + 2;
+					++col;
+					}
+				else {
+					str1 = putAttrStr(str + 1, strEnd, &flags, (void *) &attrLen);
+					col += str1 - str - attrLen;
+					}
+
+				if(col >= term.cols)
+					goto NewLine;
+				while(str < str1) {			// Copy attribute sequence to line buffer.
+					if(line == lineEnd)
+						goto WrapErr;
+					*line++ = *str++;
+					}
+				continue;
+			default:
+				// Store plain character.  Check if any room left.
+				if(col < term.cols) {
+					if(line == lineEnd) {
+WrapErr:
+						// Line overflow.  Find end of help item name and return error.
+						for(str = pShowCtrl->name.str; *str != '\0' && *str != ' '; ++str);
+						return rsset(Failure, RSTermAttr, text40, (int) (str - pShowCtrl->name.str),
+							// "Line overflow, wrapping descriptive text for name '~b%.*s~B'"
+						 pShowCtrl->name.str);
+						}
+					*line++ = *str;
+					++col;
+					break;
+					}
+
+				// Current column at right edge of screen.  Break line at last space character.
+				str1 = str;
+				for(;;) {
+					if(*str == ' ') {
+						line -= (str1 - str);
+						break;
+						}
+					if(--str == str0) {
+						// Space not found.
+						str = str1;
+						break;
+						}
+					}
+				goto NewLine;
+			}
+
+		if(++str == strEnd) {
+NewLine:
+			// Write line buffer and check if done.
+			if(dputc('\n', &pShowCtrl->rpt, 0) != 0 ||
+			 dputmem((void *) lineBuf, line - lineBuf, &pShowCtrl->rpt, 0) != 0)
+				goto LibFail;
+			if(str == strEnd)
+				break;
+			if(*str == ' ' || *str == '\n')
+				++str;
+			if(str == strEnd)
+				break;
+Init:
+			// Have more text to store.  Indent next line.
+			line = lineBuf;
+			col = 0;
+			do {
+				line = stpcpy(line, "    ");
+				} while((col += 4) < tabCol);
+
+			str0 = str;
+			}
+		}
+
+	return sess.rtn.status;
+LibFail:
+	return librsset(Failure);
 	}
 
 // Build a "show" listing in a report buffer, given ShowCtrl object, flags, section title (which may be NULL), and pointer to
@@ -942,9 +1080,9 @@ static int showBuild(ShowCtrl *pShowCtrl, ushort flags, const char *title,
  int (*func)(ShowCtrl *pShowCtrl, ushort request, const char **pName)) {
 	const char *nameTable[] = {NULL, NULL, NULL};
 	const char **pName;
-	char *str0, *str, *strEnd;
+	char *str;
 	bool firstItem = true;
-	bool doApropos = pShowCtrl->pat.type != dat_nil;
+	bool doApropos = !disnil(&pShowCtrl->pat);
 	Datum *pIndex, *pSrc;
 	short *colorPair = term.itemColors[ColorIdxInfo].colors;
 	char sepLine[term.cols + 1];
@@ -987,7 +1125,7 @@ static int showBuild(ShowCtrl *pShowCtrl, ushort flags, const char *title,
 						goto LibFail;
 					if(strIndex(pIndex, 0, pSrc, &pShowCtrl->pat, &pShowCtrl->match) != Success)
 						return sess.rtn.status;
-					if(pIndex->type != dat_nil)
+					if(!disnil(pIndex))
 						goto MatchFound;
 					} while(*pName != NULL);
 				continue;
@@ -1000,13 +1138,13 @@ MatchFound:
 
 		// Begin next line.
 		if((flags & SHSepLine) || firstItem) {
-			if(dputc('\n', &pShowCtrl->rpt) != 0)
+			if(dputc('\n', &pShowCtrl->rpt, 0) != 0)
 				goto LibFail;
-			if(colorPair[0] >= -1 && dputf(&pShowCtrl->rpt, "~%dc", term.maxWorkPair - ColorPairISL) != 0)
+			if(colorPair[0] >= -1 && dputf(&pShowCtrl->rpt, 0, "~%dc", term.maxWorkPair - ColorPairISL) != 0)
 				goto LibFail;
-			if(dputs(sepLine, &pShowCtrl->rpt) != 0)
+			if(dputs(sepLine, &pShowCtrl->rpt, 0) != 0)
 				goto LibFail;
-			if(colorPair[0] >= -1 && dputs("~C", &pShowCtrl->rpt) != 0)
+			if(colorPair[0] >= -1 && dputs("~C", &pShowCtrl->rpt, 0) != 0)
 				goto LibFail;
 			}
 		firstItem = false;
@@ -1018,49 +1156,18 @@ MatchFound:
 			if(str[-2] != ' ')
 				strcpy(str, str[-1] == ' ' ? " " : "  ");
 			}
-		if(dputc('\n', &pShowCtrl->rpt) != 0 || dputs(workBuf, &pShowCtrl->rpt) != 0)
+		if(dputc('\n', &pShowCtrl->rpt, 0) != 0 || dputs(workBuf, &pShowCtrl->rpt, 0) != 0)
 			goto LibFail;
 		if(nameTable[0] != NULL && func(pShowCtrl, SHReqValue, NULL) != Success)
 			return sess.rtn.status;
 
-		// Store indented description, if present and not blank.  Wrap into as many lines as needed.  May contain
-		// terminal attribute sequences.
-		if(pShowCtrl->descrip != NULL) {
-			int len;
-			str0 = (char *) pShowCtrl->descrip;
-			for(;;) {						// Skip leading white space.
-				if(*str0 != ' ')
-					break;
-				++str0;
-				}
-			strEnd = strchr(str0, '\0');
-			for(;;) {						// Wrap loop.
-				len = attrCount(str0, strEnd - str0, term.cols - 4);
-				if(strEnd - str0 - len <= term.cols - 4)	// Remainder too long?
-					str = strEnd;				// No.
-				else {						// Yes, find space to break on.
-					str = str0 + len + term.cols - 4;
-					for(;;) {
-						if(*--str == ' ')
-							break;
-						if(str == str0) {
-							str += len + term.cols - 4;
-							break;
-							}
-						}
-					}
-				if(dputc('\n', &pShowCtrl->rpt) != 0 || dputs("    ", &pShowCtrl->rpt) != 0 ||
-				 dputmem((void *) str0, str - str0, &pShowCtrl->rpt) != 0)
-					goto LibFail;
-				if(str == strEnd)
-					break;
-				str0 = *str == ' ' ? str + 1 : str;
-				}
-			}
+		// Store indented description, if present and not blank.
+		if(pShowCtrl->descrip != NULL && storeDesc(pShowCtrl) != Success)
+			return sess.rtn.status;
 		}
 
 	// Close fabrication object and append report (string) to report buffer if any items were written.
-	if(dclose(&pShowCtrl->rpt, Fab_String) != 0)
+	if(dclose(&pShowCtrl->rpt, FabStr) != 0)
 LibFail:
 		return librsset(Failure);
 	if(!firstItem) {
@@ -1085,8 +1192,13 @@ int showClose(Datum *pRtnVal, int n, ShowCtrl *pShowCtrl) {
 	dclear(&pShowCtrl->pat);
 	freeSearchPat(&pShowCtrl->match);
 
+	// Add "no entries found" message to empty report buffer.
+	if(bempty(pShowCtrl->pRptBuf) && bappend(pShowCtrl->pRptBuf, text456) != Success)
+						// "\n\n\t(No entries found)"
+		return sess.rtn.status;
+
 	// Display the list.
-	return render(pRtnVal, n, pShowCtrl->pRptBuf, RendNewBuf | RendReset);
+	return render(pRtnVal, n, pShowCtrl->pRptBuf, RendNewBuf | RendRewind);
 	}
 
 // Get name, arguments, and key bindings (if any) for current list item (system/user command or function) and save in
@@ -1106,8 +1218,8 @@ static int findKeys(ShowCtrl *pShowCtrl, uint keyType, void *pItem) {
 		name = pBuf->bufname + 1;
 		pCallInfo = pBuf->pCallInfo;
 		if(pCallInfo != NULL) {
-			argSyntax = (pCallInfo->argSyntax.type != dat_nil) ? pCallInfo->argSyntax.str : NULL;
-			pShowCtrl->descrip = (pCallInfo->descrip.type != dat_nil) ? pCallInfo->descrip.str : NULL;
+			argSyntax = !disnil(&pCallInfo->argSyntax) ? pCallInfo->argSyntax.str : NULL;
+			pShowCtrl->descrip = !disnil(&pCallInfo->descrip) ? pCallInfo->descrip.str : NULL;
 			}
 		else
 			pShowCtrl->descrip = argSyntax = NULL;
@@ -1147,12 +1259,12 @@ static int findKeys(ShowCtrl *pShowCtrl, uint keyType, void *pItem) {
 
 				// Add the key sequence.
 				ektos(pKeyBind->code, keyBuf, true);
-				if((sep != NULL && dputs(sep, &fab) != 0) || dputf(&fab, "~#u%s~U", keyBuf) != 0)
+				if((sep != NULL && dputs(sep, &fab, 0) != 0) || dputf(&fab, 0, "~#u%s~U", keyBuf) != 0)
 					goto LibFail;
 				sep = ", ";
 				}
 			} while((pKeyBind = nextBind(&keyWalk)) != NULL);
-		if(dclose(&fab, Fab_String) != 0)
+		if(dclose(&fab, FabStr) != 0)
 			goto LibFail;
 		}
 
@@ -1199,8 +1311,8 @@ static int getCFOpts(ShowCtrl *pShowCtrl, int n, Datum **args, const char *type)
 	}
 
 // Flags for nextCmdFunc().
-#define CFUser		0x0001		// Process user command or function; otherwise, system.
-#define CFCommand	0x0002		// Process a command; otherwise, a function.
+#define CFUser		0x0001		// Process user command or function, otherwise system.
+#define CFCommand	0x0002		// Process a command, otherwise a function.
 #define CFSelAll	0x0004		// Select all items that match pattern, ignoring any other requirements.
 
 // Get next system/user command/function name or description and store in report-control object.  If request is SHReqNext,
@@ -1240,8 +1352,8 @@ static int nextCmdFunc(ShowCtrl *pShowCtrl, ushort request, const char **pName, 
 					// Select if command or function buffer is right type and (is a command or CFSelAll flag
 					// set or has help text or is bound to a hook).
 					if((pBuf->flags & BFCmdFunc) == attrFlag && (attrFlag == BFCommand ||
-					 (flags & CFSelAll) || pBuf->pCallInfo->argSyntax.type != dat_nil ||
-					 pBuf->pCallInfo->descrip.type != dat_nil || isHook(pBuf, false))) {
+					 (flags & CFSelAll) || !disnil(&pBuf->pCallInfo->argSyntax) ||
+					 !disnil(&pBuf->pCallInfo->descrip) || isHook(pBuf, false))) {
 
 						// Found user command or function... return its name.
 						*pName = pBuf->bufname + 1;
@@ -1274,17 +1386,17 @@ static int nextCmdFunc(ShowCtrl *pShowCtrl, ushort request, const char **pName, 
 				if(findKeys(pShowCtrl, (flags & CFCommand) ? PtrUserCmd : PtrUserFunc,
 				 (void *) pBuf) != Success)
 					return sess.rtn.status;
-				*pName = (pShowCtrl->value.type == dat_nil) ? NULL : pBuf->bufname;
+				*pName = disnil(&pShowCtrl->value) ? NULL : pBuf->bufname;
 				}
 			else {
 				if(findKeys(pShowCtrl, (flags & CFCommand) ? PtrSysCmdType : PtrSysFunc,
 				 (void *) pCmdFunc) != Success)
 					return sess.rtn.status;
-				*pName = (pShowCtrl->value.type == dat_nil) ? NULL : pCmdFunc->name;
+				*pName = disnil(&pShowCtrl->value) ? NULL : pCmdFunc->name;
 				}
 			break;
 		default: // SHReqValue
-			if(dputs(pShowCtrl->value.str, &pShowCtrl->rpt) != 0)
+			if(dputs(pShowCtrl->value.str, &pShowCtrl->rpt, 0) != 0)
 				(void) librsset(Failure);
 		}
 Retn:
@@ -1393,7 +1505,7 @@ static int nextAlias(ShowCtrl *pShowCtrl, ushort request, const char **pName) {
 		default: // SHReqValue
 			{const char *name2 = (pAlias->targ.type & PtrUserCmdFunc) ? pAlias->targ.u.pBuf->bufname :
 			 pAlias->targ.u.pCmdFunc->name;
-			if(dputs("-> ", &pShowCtrl->rpt) != 0 || dputs(name2, &pShowCtrl->rpt) != 0)
+			if(dputs("-> ", &pShowCtrl->rpt, 0) != 0 || dputs(name2, &pShowCtrl->rpt, 0) != 0)
 				goto LibFail;
 			}
 		}
@@ -1423,10 +1535,10 @@ int sepLine(int len, DFab *pFab) {
 		len = term.cols;
 	char line[len + 1];
 	dupChar(line, '-', len);
-	if(dputc('\n', pFab) != 0)
+	if(dputc('\n', pFab, 0) != 0)
 		return -1;
 	return (term.itemColors[ColorIdxInfo].colors[0] >= -1) ?
-	 dputf(pFab, "~%dc%s~C", term.maxWorkPair - ColorPairISL, line) : dputs(line, pFab);
+	 dputf(pFab, 0, "~%dc%s~C", term.maxWorkPair - ColorPairISL, line) : dputs(line, pFab, 0);
 	}
 
 // Build and pop up a buffer containing a list of all visible buffers (default) or those selected per options if n argument.
@@ -1462,26 +1574,16 @@ int showBuffers(Datum *pRtnVal, int n, Datum **args) {
 		const char *descrip;
 		} *pFlagInfo;
 	static struct FlagInfo flagTable[] = {
-		{SB_Active, text31},
-				// "Active"
-		{SB_Hidden, text400},
-				// "Hidden"
-		{SB_Command, text412},
-				// "User command"
-		{SB_Func, text485},
-				// "User function"
-		{SB_Preproc, text441},
-				// "Preprocessed"
-		{SB_Narrowed, text308},
-				// "Narrowed"
-		{SB_TermAttr, text442},
-				// "Terminal attributes enabled"
-		{SB_Background, text462},
-				// "Background (not being displayed)"
-		{SB_ReadOnly, text459},
-				// "Read only"
-		{SB_Changed, text439},
-				// "Changed"
+		{SB_Active, text31},			// "Active"
+		{SB_Hidden, text400},			// "Hidden"
+		{SB_Command, text412},			// "User command"
+		{SB_Func, text183},			// "User function"
+		{SB_Preproc, text441},			// "Preprocessed"
+		{SB_Narrowed, text308},			// "Narrowed"
+		{SB_TermAttr, text442},			// "Terminal attributes enabled"
+		{SB_Background, text462},		// "Background (not being displayed)"
+		{SB_ReadOnly, text459},			// "Read only"
+		{SB_Changed, text439},			// "Changed"
 		{'\0', NULL}};
 	static bool selCommand, selFunction, selHidden, selHomeDir, selVisible;
 	static Option options[] = {
@@ -1507,14 +1609,14 @@ int showBuffers(Datum *pRtnVal, int n, Datum **args) {
 		if(sess.opFlags & OpScript)
 			workBuf[0] = '\0';
 		else
-			sprintf(workBuf, "%s %ss", text482, text83);
+			sprintf(workBuf, "%s %ss", text250, text83);
 					// "Show", "buffer"
 
 		if(parseOpts(&optHdr, workBuf, args[0], &count) != Success || count == 0)
 			return sess.rtn.status;
 		setBoolOpts(options);
 		if(count == 1 && selHomeDir)
-			return sess.rtn.status;
+			selVisible = true;
 		}
 
 	// Get new buffer and fabrication object.
@@ -1548,7 +1650,7 @@ int showBuffers(Datum *pRtnVal, int n, Datum **args) {
 		else if(selHomeDir && sepLine(pageWidth, &rpt) != 0)
 			goto LibFail;
 
-		if(dputc('\n', &rpt) != 0)
+		if(dputc('\n', &rpt, 0) != 0)
 			goto LibFail;
 
 		// Output the buffer flag indicators.
@@ -1562,24 +1664,24 @@ int showBuffers(Datum *pRtnVal, int n, Datum **args) {
 				}
 			else if(!(pBuf->flags & pBufFlag->bufFlag))
 				c = ' ';
-			else if((c = pBufFlag->dispChar) == AttrSpecBegin && dputc(AttrSpecBegin, &rpt) != 0)
+			else if((c = pBufFlag->dispChar) == AttrSpecBegin && dputc(AttrSpecBegin, &rpt, 0) != 0)
 				goto LibFail;
-			if(dputc(c, &rpt) != 0)
+			if(dputc(c, &rpt, 0) != 0)
 				goto LibFail;
 			} while((++pBufFlag)->bufFlag != 0);
 
 #if (MMDebug & Debug_WindCount) && 0
-		dputf(&rpt, "%3hu", pBuf->windCount);
+		dputf(&rpt, 0, "%3hu", pBuf->windCount);
 #endif
 		// Output the buffer size, buffer name, and filename.
-		if(dputf(&rpt, "%s%*lu%s%-*s", space, colWidths[1].minWidth, bufLength(pBuf, NULL), space,
-		 colWidths[2].minWidth, pBuf->bufname) != 0 || (pBuf->filename != NULL && (dputs(space, &rpt) != 0 ||
-		 dputs(pBuf->filename, &rpt) != 0)))
+		if(dputf(&rpt, 0, "%s%*lu%s%-*s", space, colWidths[1].minWidth, bufLength(pBuf, NULL), space,
+		 colWidths[2].minWidth, pBuf->bufname) != 0 || (pBuf->filename != NULL && (dputs(space, &rpt, 0) != 0 ||
+		 dputs(pBuf->filename, &rpt, 0) != 0)))
 			goto LibFail;
 
 		// Output the home directory if requested and not NULL.
 		if(selHomeDir && pBuf->saveDir != NULL &&
-		 dputf(&rpt, "\n%*s%sCWD: %s", colWidths[0].minWidth, "", space, pBuf->saveDir) != 0)
+		 dputf(&rpt, 0, "\n%*s%sCWD: %s", colWidths[0].minWidth, "", space, pBuf->saveDir) != 0)
 			goto LibFail;
 		}
 
@@ -1588,19 +1690,19 @@ int showBuffers(Datum *pRtnVal, int n, Datum **args) {
 		goto LibFail;
 	pFlagInfo = flagTable;
 	do {
-		if(dputf(&rpt, "\n%c", (int) pFlagInfo->c) != 0 || (pFlagInfo->c == AttrSpecBegin && dputc(AttrSpecBegin,
-		 &rpt) != 0) || dputc(' ', &rpt) != 0 || dputs(pFlagInfo->descrip, &rpt) != 0)
+		if(dputf(&rpt, 0, "\n%c", (int) pFlagInfo->c) != 0 || (pFlagInfo->c == AttrSpecBegin && dputc(AttrSpecBegin,
+		 &rpt, 0) != 0) || dputc(' ', &rpt, 0) != 0 || dputs(pFlagInfo->descrip, &rpt, 0) != 0)
 			goto LibFail;
 		} while((++pFlagInfo)->descrip != NULL);
 
 	// Add the results to the buffer.
-	if(dclose(&rpt, Fab_String) != 0)
+	if(dclose(&rpt, FabStr) != 0)
 		goto LibFail;
 	if(bappend(pRptBuf, rpt.pDatum->str) != Success)
 		return sess.rtn.status;
 
 	// Display results.
-	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendReset);
+	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendRewind);
 LibFail:
 	return librsset(Failure);
 	}
@@ -1622,18 +1724,18 @@ int showColors(Datum *pRtnVal, int n, Datum **args) {
 	if(dopentrack(&rpt) != 0)
 		goto LibFail;
 
-	// Display color pairs in use if n <= 0; otherwise, color palette (paged).
+	// Display color pairs in use if n <= 0, otherwise color palette (paged).
 	if(n <= 0 && n != INT_MIN) {
 		short foreground, background;
 
-		if(dputs(text434, &rpt) != 0 || dputs("\n-----   -----------------", &rpt) != 0)
+		if(dputs(text434, &rpt, 0) != 0 || dputs("\n-----   -----------------", &rpt, 0) != 0)
 				// "COLOR PAIRS DEFINED\n\n~bPair#        Sample~B"
 			goto LibFail;
 		pair = 1;
 		do {
 			if(pair_content(pair, &foreground, &background) == OK &&
 			 (foreground != COLOR_BLACK || background != COLOR_BLACK)) {
-				if(dputf(&rpt, "\n%4hd    ~%hdc %-16s~C", pair, pair, text431) != 0)
+				if(dputf(&rpt, 0, "\n%4hd    ~%hdc %-16s~C", pair, pair, text431) != 0)
 										// "\"A text sample\""
 					goto LibFail;
 				}
@@ -1655,10 +1757,10 @@ int showColors(Datum *pRtnVal, int n, Datum **args) {
 			}
 
 		// Write first header line.
-		if(dputf(&rpt, text429, n, pages) != 0 || dputs(text430, &rpt) != 0 ||
+		if(dputf(&rpt, 0, text429, n, pages) != 0 || dputs(text430, &rpt, 0) != 0 ||
 			// "COLOR PALETTE - Page %d of %d\n\n"
 			//		"~bColor#         Foreground Samples                   Background Samples~B"
-		 dputs("\n------ ----------------- -----------------   ----------------- -----------------", &rpt) != 0)
+		 dputs("\n------ ----------------- -----------------   ----------------- -----------------", &rpt, 0) != 0)
 			goto LibFail;
 
 		// For all colors...
@@ -1669,7 +1771,7 @@ int showColors(Datum *pRtnVal, int n, Datum **args) {
 			(void) init_pair(pair - 1, c, COLOR_BLACK);
 			(void) init_pair(pair - 2, term.colorText, c);
 			(void) init_pair(pair - 3, COLOR_BLACK, c);
-			if((c > 0 && c % 8 == 0 && dputc('\n', &rpt) != 0) || dputf(&rpt,
+			if((c > 0 && c % 8 == 0 && dputc('\n', &rpt, 0) != 0) || dputf(&rpt, 0,
 			 "\n%4hd   ~%dc %-16s~C ~%dc %-16s~C   ~%dc %-16s~C ~%dc %-16s~C",
 			 c, (int) pair, text431, pair - 1, text431, pair - 2, text432, pair - 3, text433) != 0)
 					// "\"A text sample\"", "With white text", "With black text"
@@ -1681,7 +1783,7 @@ int showColors(Datum *pRtnVal, int n, Datum **args) {
 		}
 
 	// Add the results to the buffer.
-	if(dclose(&rpt, Fab_String) != 0)
+	if(dclose(&rpt, FabStr) != 0)
 LibFail:
 		return librsset(Failure);
 	if(bappend(pRptBuf, rpt.pDatum->str) != Success)
@@ -1731,7 +1833,7 @@ int showHooks(Datum *pRtnVal, int n, Datum **args) {
 	do {
 		if(pHookRec != hookTable && sepLine(pageWidth, &rpt) != 0)
 			goto LibFail;
-		if(dputf(&rpt, "\n%-*s%*s%-*s", (int) colWidths[0].minWidth, pHookRec->name, spacing, "",
+		if(dputf(&rpt, 0, "\n%-*s%*s%-*s", (int) colWidths[0].minWidth, pHookRec->name, spacing, "",
 		 (int) colWidths[1].minWidth, pHookRec->func.type == PtrNull ? "" : hookFuncName(&pHookRec->func)) != 0)
 			goto LibFail;
 		indent = spacing;
@@ -1739,15 +1841,15 @@ int showHooks(Datum *pRtnVal, int n, Datum **args) {
 		macArgsDesc = pHookRec->macArgsDesc;
 		indent1 = colWidths[0].minWidth + colWidths[1].minWidth + spacing + spacing;
 		for(;;) {
-			if(indent == indent1 && dputc('\n', &rpt) != 0)
+			if(indent == indent1 && dputc('\n', &rpt, 0) != 0)
 				goto LibFail;
 			nArgDesc = circumflex(nArgDesc0 = nArgDesc);
 			macArgsDesc = circumflex(macArgsDesc0 = macArgsDesc);
-			if(dputf(&rpt, "%*s%-*.*s", indent, "", (int) colWidths[2].minWidth + attrCount(nArgDesc0,
+			if(dputf(&rpt, 0, "%*s%-*.*s", indent, "", (int) colWidths[2].minWidth + attrCount(nArgDesc0,
 			 nArgDesc - nArgDesc0, INT_MAX), (int) (nArgDesc - nArgDesc0), nArgDesc0) != 0)
 				goto LibFail;
 			if(macArgsDesc != macArgsDesc0 &&
-			 dputf(&rpt, "%*s%.*s", spacing, "", (int) (macArgsDesc - macArgsDesc0), macArgsDesc0) != 0)
+			 dputf(&rpt, 0, "%*s%.*s", spacing, "", (int) (macArgsDesc - macArgsDesc0), macArgsDesc0) != 0)
 				goto LibFail;
 			if(*nArgDesc == '\0' && *macArgsDesc == '\0')
 				break;
@@ -1762,18 +1864,18 @@ int showHooks(Datum *pRtnVal, int n, Datum **args) {
 		} while((++pHookRec)->name != NULL);
 
 	// Add the results to the buffer.
-	if(dclose(&rpt, Fab_String) != 0)
+	if(dclose(&rpt, FabStr) != 0)
 LibFail:
 		return librsset(Failure);
 	if(bappend(pRptBuf, rpt.pDatum->str) != Success)
 		return sess.rtn.status;
 
 	// Display results.
-	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendReset);
+	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendRewind);
 	}
 
 // Describe the system or user command bound to a particular key.  Get single keystroke if n <= 0.  Display result on message
-// line if n >= 0; otherwise, in a pop-up window (default).  Return status.
+// line if n >= 0, otherwise in a pop-up window (default).  Return status.  *Interactive only*
 int showKey(Datum *pRtnVal, int n, Datum **args) {
 	ushort extKey;
 	KeyBind *pKeyBind;
@@ -1801,9 +1903,9 @@ int showKey(Datum *pRtnVal, int n, Datum **args) {
 				// "user command"
 			goto CmdPop;
 			}
-		if(pBuf->pCallInfo->argSyntax.type != dat_nil)
+		if(!disnil(&pBuf->pCallInfo->argSyntax))
 			argSyntax = pBuf->pCallInfo->argSyntax.str;
-		if(pBuf->pCallInfo->descrip.type != dat_nil)
+		if(!disnil(&pBuf->pCallInfo->descrip))
 			descrip = pBuf->pCallInfo->descrip.str;
 		}
 	else {
@@ -1871,34 +1973,34 @@ int showMarks(Datum *pRtnVal, int n, Datum **args) {
 		return sess.rtn.status;
 
 	// Loop through lines in current buffer, searching for mark matches.
-	pLine = sess.pCurBuf->pFirstLine;
+	pLine = sess.cur.pBuf->pFirstLine;
 	do {
-		pMark = &sess.pCurBuf->markHdr;
+		pMark = &sess.cur.pBuf->markHdr;
 		do {
 			if(pMark->id < '~' && pMark->point.pLine == pLine) {
-				if(dputf(&rpt, "\n %c %*d", pMark->id,
+				if(dputf(&rpt, 0, "\n %c %*d", pMark->id,
 				 (int)(colWidths[0].minWidth - 3 + spacing + colWidths[1].minWidth), pMark->point.offset) != 0)
 					goto LibFail;
 				if(pLine->next == NULL && pMark->point.offset == pLine->used) {
-					if(dputf(&rpt, "%s  (EOB)", space) != 0)
+					if(dputf(&rpt, 0, "%s  (EOB)", space) != 0)
 						goto LibFail;
 					}
-				else if(pLine->used > 0 && (dputs(space, &rpt) != 0 ||
-				 dputvizmem(pLine->text, pLine->used > max ? max : pLine->used, VizBaseDef, &rpt) != 0))
+				else if(pLine->used > 0 && (dputs(space, &rpt, 0) != 0 ||
+				 dputsubstr(pLine->text, pLine->used > max ? max : pLine->used, &rpt, DCvtVizChar) != 0))
 					goto LibFail;
 				}
 			} while((pMark = pMark->next) != NULL);
 		} while((pLine = pLine->next) != NULL);
 
 	// Add the report to the buffer.
-	if(dclose(&rpt, Fab_String) != 0)
+	if(dclose(&rpt, FabStr) != 0)
 LibFail:
 		return librsset(Failure);
 	if(bappend(pRptBuf, rpt.pDatum->str) != Success)
 		return sess.rtn.status;
 
 	// Display results.
-	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendReset);
+	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendRewind);
 	}
 
 // Build and pop up a buffer containing all the global and buffer modes.  Render buffer and return status.
@@ -1946,8 +2048,8 @@ int showModes(Datum *pRtnVal, int n, Datum **args) {
 		{'\0', 0, NULL}};
 
 #if MMDebug & Debug_ModeDump
-dumpModes(NULL, true, "showModes() BEGIN - global modes\n");
-dumpModes(sess.pCurBuf, true, "showModes() BEGIN - buffer modes\n");
+	dumpModes(NULL, true, "showModes() BEGIN - global modes\n");
+	dumpModes(sess.cur.pBuf, true, "showModes() BEGIN - buffer modes\n");
 #endif
 	// Get buffer for the mode list.
 	if(sysBuf(text363, &pRptBuf, BFTermAttr) != Success)
@@ -1961,10 +2063,10 @@ dumpModes(sess.pCurBuf, true, "showModes() BEGIN - buffer modes\n");
 	pModeHdr = modeHdrTable;
 	do {
 #if MMDebug & Debug_ModeDump
-fprintf(logfile, "*** Writing %s modes...\n", pModeHdr->mask == 0 ? "BUFFER" : "GLOBAL");
+		fprintf(logfile, "*** Writing %s modes...\n", pModeHdr->mask == 0 ? "BUFFER" : "GLOBAL");
 #endif
 		// Write headers.
-		if(pModeHdr->mask == 0 && dputs("\n\n", &rpt) != 0)
+		if(pModeHdr->mask == 0 && dputs("\n\n", &rpt, 0) != 0)
 			goto LibFail;
 		if(rptHdr(&rpt, pModeHdr->hdr, false, text437, colWidths, &pageWidth) != Success)
 				// "AUHL Name          Description"
@@ -1979,24 +2081,25 @@ fprintf(logfile, "*** Writing %s modes...\n", pModeHdr->mask == 0 ? "BUFFER" : "
 			if((pModeSpec->flags & MdGlobal) != pModeHdr->mask)
 				continue;
 			pFlagInfo = flagTable;
-			if(dputc('\n', &rpt) != 0)
+			if(dputc('\n', &rpt, 0) != 0)
 				goto LibFail;
 			do {
 				if(dputc((pFlagInfo->c != SM_Active || pModeHdr->mask) ? (pModeSpec->flags & pFlagInfo->flag ?
-				 pFlagInfo->c : ' ') : (isBufModeSet(sess.pCurBuf, pModeSpec) ? pFlagInfo->c : ' '), &rpt) != 0)
+				 pFlagInfo->c : ' ') : (isBufModeSet(sess.cur.pBuf, pModeSpec) ?
+				 pFlagInfo->c : ' '), &rpt, 0) != 0)
 					goto LibFail;
 				} while((++pFlagInfo)->descrip != NULL);
-			if(dputf(&rpt, "%s%-*s", space, colWidths[1].minWidth, pModeSpec->name) != 0 ||
-			 (pModeSpec->descrip != NULL && dputf(&rpt, "%s%s", space, pModeSpec->descrip) != 0))
+			if(dputf(&rpt, 0, "%s%-*s", space, colWidths[1].minWidth, pModeSpec->name) != 0 ||
+			 (pModeSpec->descrip != NULL && dputf(&rpt, 0, "%s%s", space, pModeSpec->descrip) != 0))
 				goto LibFail;
 			}
 		} while((++pModeHdr)->hdr != NULL);
 
 	// Write mode groups.
 #if MMDebug & Debug_ModeDump
-fputs("*** Writing mode groups...\n", logfile);
+	fputs("*** Writing mode groups...\n", logfile);
 #endif
-	if(dputs("\n\n", &rpt) != 0)
+	if(dputs("\n\n", &rpt, 0) != 0)
 		goto LibFail;
 	sprintf(workBuf, "%s%s", text437, text438);
 	if(rptHdr(&rpt, text401, false, workBuf, colWidthsMG, NULL) != Success)
@@ -2004,47 +2107,47 @@ fputs("*** Writing mode groups...\n", logfile);
 		return sess.rtn.status;
 	pModeGrp = modeInfo.grpHead;
 	do {
-		if(dputf(&rpt, "\n %c%*s%s%-*s", pModeGrp->flags & MdUser ? SM_User : ' ', colWidths[0].minWidth - 2, "", space,
-		 colWidths[1].minWidth, pModeGrp->name) != 0 ||
-		 (pModeGrp->descrip != NULL && dputf(&rpt, "%s%s", space, pModeGrp->descrip) != 0) ||
-		 dputf(&rpt, "\n%*s", colWidths[0].minWidth + colWidths[1].minWidth + spacing + spacing + 4, "") != 0)
+		if(dputf(&rpt, 0, "\n %c%*s%s%-*s", pModeGrp->flags & MdUser ? SM_User : ' ', colWidths[0].minWidth - 2, "",
+		 space, colWidths[1].minWidth, pModeGrp->name) != 0 ||
+		 (pModeGrp->descrip != NULL && dputf(&rpt, 0, "%s%s", space, pModeGrp->descrip) != 0) ||
+		 dputf(&rpt, 0, "\n%*s", colWidths[0].minWidth + colWidths[1].minWidth + spacing + spacing + 4, "") != 0)
 			goto LibFail;
 		str = "[";
 		pArray = &modeInfo.modeTable;
 		while((pArrayEl = aeach(&pArray)) != NULL) {
 			if((pModeSpec = modePtr(pArrayEl))->pModeGrp == pModeGrp) {
-				if(dputs(str, &rpt) != 0 || dputs(pModeSpec->name, &rpt) != 0)
+				if(dputs(str, &rpt, 0) != 0 || dputs(pModeSpec->name, &rpt, 0) != 0)
 					goto LibFail;
 				str = ", ";
 				}
 			}
-		if((*str == '[' && dputc('[', &rpt) != 0) || dputc(']', &rpt) != 0)
+		if((*str == '[' && dputc('[', &rpt, 0) != 0) || dputc(']', &rpt, 0) != 0)
 			goto LibFail;
 		} while((pModeGrp = pModeGrp->next) != NULL);
 
 #if MMDebug & Debug_ModeDump
-fputs("*** Writing footnote...\n", logfile);
+	fputs("*** Writing footnote...\n", logfile);
 #endif
 	// Write footnote.
 	if(sepLine(pageWidth, &rpt) != 0)
 		goto LibFail;
 	pFlagInfo = flagTable;
 	do {
-		if(dputf(&rpt, "\n%c ", (int) pFlagInfo->c) != 0 || dputs(pFlagInfo->descrip, &rpt) != 0)
+		if(dputf(&rpt, 0, "\n%c ", (int) pFlagInfo->c) != 0 || dputs(pFlagInfo->descrip, &rpt, 0) != 0)
 			goto LibFail;
 		} while((++pFlagInfo)->descrip != NULL);
 
 	// Add the report to the buffer.
-	if(dclose(&rpt, Fab_String) != 0)
+	if(dclose(&rpt, FabStr) != 0)
 		goto LibFail;
 	if(bappend(pRptBuf, rpt.pDatum->str) != Success)
 		return sess.rtn.status;
 
 #if MMDebug & Debug_ModeDump
-fputs("*** Done!\n", logfile);
+	fputs("*** Done!\n", logfile);
 #endif
 	// Display results.
-	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendReset);
+	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendRewind);
 LibFail:
 	return librsset(Failure);
 	}
@@ -2098,11 +2201,11 @@ int showRing(Datum *pRtnVal, int n, Datum **args) {
 
 		pEntry = pRing->pEntry;
 		do {
-			if(dputf(&rpt, "\n%*d %s", (int) colWidths[0].minWidth - 1, entryNum--, space) != 0)
+			if(dputf(&rpt, 0, "\n%*d %s", (int) colWidths[0].minWidth - 1, entryNum--, space) != 0)
 				goto LibFail;
-			if(pEntry->data.type != dat_nil && strlen(pEntry->data.str) > 0) {
-				if(dopentrack(&item) != 0 || esctosf(pEntry->data.str, &item) != 0 ||
-				 dclose(&item, Fab_String) != 0)
+			if(!disnil(&pEntry->data) && strlen(pEntry->data.str) > 0) {
+				if(dopentrack(&item) != 0 || esctofab(pEntry->data.str, &item) != 0 ||
+				 dclose(&item, FabStr) != 0)
 					goto LibFail;
 				pDatum = item.pDatum;
 				if((dispLen = strlen(pDatum->str)) > max)
@@ -2110,11 +2213,11 @@ int showRing(Datum *pRtnVal, int n, Datum **args) {
 				if(pRing == ringTable + RingIdxMacro) {
 					delim = strchr(pDatum->str + 1, *pDatum->str);
 					nameLen = delim - (pDatum->str + 1);
-					if(dputf(&rpt, "%c~b%.*s~B%.*s", *pDatum->str, nameLen, pDatum->str + 1,
+					if(dputf(&rpt, 0, "%c~b%.*s~B%.*s", *pDatum->str, nameLen, pDatum->str + 1,
 					 dispLen - nameLen, delim) != 0)
 						goto LibFail;
 					}
-				else if(dputvizmem(pDatum->str, dispLen, VizBaseDef, &rpt) != 0)
+				else if(dputsubstr(pDatum->str, dispLen, &rpt, DCvtVizChar) != 0)
 					goto LibFail;
 				}
 
@@ -2123,13 +2226,13 @@ int showRing(Datum *pRtnVal, int n, Datum **args) {
 		}
 
 	// Add the report to the buffer.
-	if(dclose(&rpt, Fab_String) != 0)
+	if(dclose(&rpt, FabStr) != 0)
 		goto LibFail;
 	if(bappend(pRptBuf, rpt.pDatum->str) != Success)
 		return sess.rtn.status;
 
 	// Display results.
-	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendReset);
+	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendRewind);
 LibFail:
 	return librsset(Failure);
 	}
@@ -2169,7 +2272,7 @@ int showScreens(Datum *pRtnVal, int n, Datum **args) {
 			goto LibFail;
 
 		// Store screen number and working directory.
-		if(dputf(&rpt, "\n~b%*hu~B  %sCWD: %s", colWidths[0].minWidth - 2, pScrn->num, space, pScrn->workDir) != 0)
+		if(dputf(&rpt, 0, "\n~b%*hu~B  %sCWD: %s", colWidths[0].minWidth - 2, pScrn->num, space, pScrn->workDir) != 0)
 			goto LibFail;
 
 		// List screen's window numbers and buffer names.
@@ -2178,22 +2281,22 @@ int showScreens(Datum *pRtnVal, int n, Datum **args) {
 		do {
 			Buffer *pBuf = pWind->pBuf;
 			++windNum;
-			if(dputf(&rpt, "\n%*s", colWidths[0].minWidth, "") != 0)
+			if(dputf(&rpt, 0, "\n%*s", colWidths[0].minWidth, "") != 0)
 				goto LibFail;
 
 			// Store window number and "changed" marker.
 			if(pBuf->flags & BFChanged)
 				chgBuf = true;
-			if(dputf(&rpt, "%s%*u  %.*s%c", space, colWidths[1].minWidth - 2, windNum, spacing - 1, space,
+			if(dputf(&rpt, 0, "%s%*u  %.*s%c", space, colWidths[1].minWidth - 2, windNum, spacing - 1, space,
 			 (pBuf->flags & BFChanged) ? '*' : ' ') != 0)
 				goto LibFail;
 
 			// Store buffer name and filename.
 			if(pBuf->filename != NULL) {
-				if(dputf(&rpt, "%-*s%s%s", colWidths[2].minWidth, pBuf->bufname, space, pBuf->filename) != 0)
+				if(dputf(&rpt, 0, "%-*s%s%s", colWidths[2].minWidth, pBuf->bufname, space, pBuf->filename) != 0)
 					goto LibFail;
 				}
-			else if(dputs(pBuf->bufname, &rpt) != 0)
+			else if(dputs(pBuf->bufname, &rpt, 0) != 0)
 				goto LibFail;
 
 			// On to the next window.
@@ -2204,20 +2307,20 @@ int showScreens(Datum *pRtnVal, int n, Datum **args) {
 
 	// Add footnote if applicable.
 	if(chgBuf) {
-		if(sepLine(pageWidth, &rpt) != 0 || dputs(text243, &rpt) != 0)
+		if(sepLine(pageWidth, &rpt) != 0 || dputs(text243, &rpt, 0) != 0)
 					// "\n* Changed buffer"
 			goto LibFail;
 		}
 
 	// Add the results to the buffer.
-	if(dclose(&rpt, Fab_String) != 0)
+	if(dclose(&rpt, FabStr) != 0)
 LibFail:
 		return librsset(Failure);
 	if(bappend(pRptBuf, rpt.pDatum->str) != Success)
 		return sess.rtn.status;
 
 	// Display results.
-	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendReset);
+	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendRewind);
 	}
 
 // Get next system variable name or description and store in report-control object.  If request is SHReqNext, set *pName to item
@@ -2261,12 +2364,13 @@ int nextSysVar(ShowCtrl *pShowCtrl, ushort request, const char **pName) {
 
 				if(dnewtrack(&pDatum) != 0)
 					goto LibFail;
-				if(getSysVar(pDatum, pSysVar) == Success && dputf(&pShowCtrl->rpt, "~#u%s~U", pDatum->str) != 0)
+				if(getSysVar(pDatum, pSysVar) == Success &&
+				 dputf(&pShowCtrl->rpt, 0, "~#u%s~U", pDatum->str) != 0)
 LibFail:
 					(void) librsset(Failure);
 				}
 			else
-				(void) svtosf(pSysVar, CvtTermAttr, &pShowCtrl->rpt);
+				(void) svtofab(pSysVar, true, &pShowCtrl->rpt);
 		}
 Retn:
 	return sess.rtn.status;
@@ -2306,9 +2410,8 @@ static int nextUserVar(ShowCtrl *pShowCtrl, ushort request, const char **pName, 
 			*pName = pUserVar1->name;
 			break;
 		default: // SHReqValue
-			if(dtosfchk(pUserVar1->pValue, NULL, CvtTermAttr | CvtExpr | CvtForceArray,
-			 &pShowCtrl->rpt) != Success)
-				return sess.rtn.status;
+			if(dtofabattr(pUserVar1->pValue, &pShowCtrl->rpt, NULL, DCvtLang) < 0)
+				return librsset(Failure);
 		}
 Retn:
 	return sess.rtn.status;
@@ -2409,9 +2512,9 @@ int showRegexp(Datum *pRtnVal, int n, Datum **args) {
 		goto LibFail;
 
 	makePat(patBuf, &searchCtrl.match);
-	if(dputf(&rpt, "Match flags: %.4x\n", searchCtrl.match.flags) != 0 ||
-	 dputf(&rpt, "%s %s /", text994, text999) != 0 || dputvizmem(patBuf, 0, VizBaseDef, &rpt) != 0 ||
-	 dputs("/\n", &rpt) != 0)
+	if(dputf(&rpt, 0, "Match flags: %.4x\n", searchCtrl.match.flags) != 0 ||
+	 dputf(&rpt, 0, "%s %s /", text994, text999) != 0 || dputs(patBuf, &rpt, DCvtVizChar) != 0 ||
+	 dputs("/\n", &rpt, 0) != 0)
 				// "SEARCH", "PATTERN"
 		goto LibFail;
 	if(searchCtrl.match.flags & SCpl_ForwardRE) {
@@ -2422,19 +2525,19 @@ int showRegexp(Datum *pRtnVal, int n, Datum **args) {
 		pRegInfo = regInfoTable;
 
 		do {
-			if(dputf(&rpt, "\n%s%s /", pRegInfo->hdr, text311) != 0 || dputvizmem(pRegInfo->pat, 0, VizBaseDef,
+			if(dputf(&rpt, 0, "\n%s%s /", pRegInfo->hdr, text311) != 0 || dputs(pRegInfo->pat, &rpt,
 						// " pattern"
-			 &rpt) != 0 || dputs("/\n", &rpt) != 0)
+			 DCvtVizChar) != 0 || dputs("/\n", &rpt, 0) != 0)
 				goto LibFail;
 			if((pRegInfo->pat == searchCtrl.match.pat || (searchCtrl.match.flags & SCpl_BackwardRE)) &&
-			 dputf(&rpt, "Group count: %lu\n", pRegInfo->compPat->re_nsub) != 0)
+			 dputf(&rpt, 0, "Group count: %lu\n", pRegInfo->compPat->re_nsub) != 0)
 				goto LibFail;
 			} while((++pRegInfo)->hdr != NULL);
 		}
 #if 0
 	// Construct the replacement header lines.
-	if(dputf(&rpt, "\n\n%s %s /", text995, text999) != 0 ||
-	 dputvizmem(searchCtrl.match.replPat, 0, VizBaseDef, &rpt) != 0 || dputs("/\n", &rpt) != 0)
+	if(dputf(&rpt, 0, "\n\n%s %s /", text995, text999) != 0 ||
+	 dputs(searchCtrl.match.replPat, &rpt, DCvtVizChar) != 0 || dputs("/\n", &rpt, 0) != 0)
 				// "REPLACE", "PATTERN"
 		goto LibFail;
 
@@ -2450,8 +2553,8 @@ int showRegexp(Datum *pRtnVal, int n, Datum **args) {
 					strcpy(str, "NIL");
 					break;
 				case RPE_LitString:
-					if(dputs(workBuf, &rpt) != 0 || dputf(&rpt, "%-14s'", "String") != 0 ||
-					 dputvizmem(pReplPat->u.replStr, 0, VizBaseDef, &rpt) != 0 || dputs("'\n", &rpt) != 0)
+					if(dputs(workBuf, &rpt, 0) != 0 || dputf(&rpt, 0, "%-14s'", "String") != 0 ||
+					 dputs(pReplPat->u.replStr, &rpt, DCvtVizChar) != 0 || dputs("'\n", &rpt, 0) != 0)
 						goto LibFail;
 					str = NULL;
 					break;
@@ -2460,7 +2563,7 @@ int showRegexp(Datum *pRtnVal, int n, Datum **args) {
 				}
 
 			// Add the line to the fabrication object.
-			if(str != NULL && (dputs(workBuf, &rpt) != 0 || dputc('\n', &rpt) != 0))
+			if(str != NULL && (dputs(workBuf, &rpt, 0) != 0 || dputc('\n', &rpt, 0) != 0))
 				goto LibFail;
 
 			// Onward to the next element.
@@ -2468,21 +2571,21 @@ int showRegexp(Datum *pRtnVal, int n, Datum **args) {
 		}
 #endif
 	// Add the results to the buffer.
-	if(dclose(&rpt, Fab_String) != 0)
+	if(dclose(&rpt, FabStr) != 0)
 LibFail:
 		return librsset(Failure);
 	if(bappend(pRegList, rpt.pDatum->str) != Success)
 		return sess.rtn.status;
 
 	// Display results.
-	return render(pRtnVal, n, pRegList, RendNewBuf | RendReset);
+	return render(pRtnVal, n, pRegList, RendNewBuf | RendRewind);
 	}
 #endif
 
 // Write a string to an open fabrication object, centered in the current terminal width.  Return status.
 static int center(DFab *rpt, const char *str) {
 	int indent = (term.cols - (strlen(str) - attrCount(str, -1, INT_MAX))) / 2;
-	if(dputc('\n', rpt) != 0 || (indent > 0 && dputf(rpt, "%*s", indent, "") != 0) || dputs(str, rpt) != 0)
+	if(dputc('\n', rpt, 0) != 0 || (indent > 0 && dputf(rpt, 0, "%*s", indent, "") != 0) || dputs(str, rpt, 0) != 0)
 		(void) librsset(Failure);
 	return sess.rtn.status;
 	}
@@ -2525,30 +2628,30 @@ int aboutMM(Datum *pRtnVal, int n, Datum **args) {
 	sprintf(footer1, "%s%s", Myself, ALit_Footer1);
 			// " runs on Unix and Linux platforms and is licensed under the"
 
-	if(dputs("\n\n", &rpt) != 0)					// Vertical space.
+	if(dputs("\n\n", &rpt, 0) != 0)					// Vertical space.
 		goto LibFail;
 	if(rptHdr(&rpt, Myself, false, footer1, NULL, NULL) != Success)	// Editor name in color.
 		return sess.rtn.status;
-	if(dputc('\n', &rpt) != 0)					// Blank line.
+	if(dputc('\n', &rpt, 0) != 0)					// Blank line.
 		goto LibFail;
 	sprintf(workBuf1, "%s %s", text185, Version);			// Build "version" line...
 			// "Version"
 	if(center(&rpt, workBuf1) != Success)				// and center it.
 		return sess.rtn.status;
-	if(dputc('\n', &rpt) != 0)					// Blank line.
+	if(dputc('\n', &rpt, 0) != 0)					// Blank line.
 		goto LibFail;
-	if(center(&rpt, ALit_Author) != Success)				// Copyright.
-			// "(c) Copyright 2020 Richard W. Marinelli <italian389@yahoo.com>"
+	if(center(&rpt, ALit_Author) != Success)			// Copyright.
+			// "(c) Copyright 2022 Richard W. Marinelli <italian389@yahoo.com>"
 		return sess.rtn.status;
 
 	// Construct the program limits' lines.
-	if(dputs("\n\n", &rpt) != 0)					// Blank lines.
+	if(dputs("\n\n", &rpt, 0) != 0)					// Blank lines.
 		goto LibFail;
 	sprintf(workBuf1, "~b%s~B", ALit_BuildInfo);			// Limits' header.
 		// "Build Information"
 	if(center(&rpt, workBuf1) != Success)
 		return sess.rtn.status;
-	if(dputc('\n', &rpt) != 0)					// Blank line.
+	if(dputc('\n', &rpt, 0) != 0)					// Blank line.
 		goto LibFail;
 
 	// Find longest limits' label and set len1 to indentation required to center it and its value.
@@ -2570,18 +2673,19 @@ int aboutMM(Datum *pRtnVal, int n, Datum **args) {
 		if(pLimitInfo->value >= 0)
 			sprintf(str, "%-*s%9d", maxLabelLen, pLimitInfo->label, pLimitInfo->value);
 		else {
-			strcpy(workBuf2, pLimitInfo->value == -1 ? cxlibvers() : xlibvers());
+			strcpy(workBuf2, pLimitInfo->value == -1 ? cxlvers() : xrevers());
 			strchr(workBuf2, '(')[-1] = '\0';
 			len2 = strlen(workBuf2);
 			sprintf(str, "%-*s%s", maxLabelLen + 9 - len2, pLimitInfo->label, workBuf2);
 			}
 		str[len1] = ':';
-		if((pLimitInfo->value == -1 && dputc('\n', &rpt) != 0) || dputc('\n', &rpt) != 0 || dputs(workBuf1, &rpt) != 0)
+		if((pLimitInfo->value == -1 && dputc('\n', &rpt, 0) != 0) || dputc('\n', &rpt, 0) != 0 ||
+		 dputs(workBuf1, &rpt, 0) != 0)
 			goto LibFail;
 		} while((++pLimitInfo)->label != NULL);
 
 	// Write platform, credit, and license blurb.
-	if(dputc('\n', &rpt) != 0)					// Blank line.
+	if(dputc('\n', &rpt, 0) != 0)					// Blank line.
 		goto LibFail;
 	if(center(&rpt, footer1) != Success || center(&rpt, ALit_Footer2) != Success || center(&rpt, ALit_Footer3) != Success)
 			// "GNU General Public License (GPLv3), which can be viewed at"
@@ -2589,13 +2693,13 @@ int aboutMM(Datum *pRtnVal, int n, Datum **args) {
 		return sess.rtn.status;
 
 	// Add the results to the buffer.
-	if(dclose(&rpt, Fab_String) != 0)
+	if(dclose(&rpt, FabStr) != 0)
 		goto LibFail;
 	if(bappend(pRptBuf, rpt.pDatum->str) != Success)
 		return sess.rtn.status;
 
 	// Display results.
-	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendReset);
+	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendRewind);
 LibFail:
 	return librsset(Failure);
 	}

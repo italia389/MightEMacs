@@ -12,7 +12,8 @@ windows.  It is also possible to create multiple screens; however, all screens
 are stacked on top of (overlay) each other so that only the frontmost one is
 visible at any time.  Lastly, a screen remembers the directory it was created in
 and will automatically switch back to it if needed whenever the screen is
-selected.
+selected.  It also maintains its own tab settings and wrap column and will
+change those as well.
 
 Windows display ~bbuffers~B, which are containers that hold the text you are
 editing.  Buffers are usually associated with files, but this is not required.
@@ -44,7 +45,7 @@ command has the same properties and can be written in MScript; hence, is a
 user-defined operative that cannot be bound or run interactively, and is
 intended for script use only.  Lastly, an ~balias~B is another name that can be
 created for a command or function, however it cannot be bound.  (An example of
-the last operative is "require", which is a built-in alias for the "xeqFile"
+the last operative is ~brequire~B, which is a built-in alias for the ~bxeqFile~B
 command.)
 
 

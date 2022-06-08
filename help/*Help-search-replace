@@ -52,16 +52,16 @@ replacement patterns.  Regular expression syntax and use are explained in detail
 in Advanced Help.  Simple searching and replacing using string patterns are
 explained here.
 
-To search for a string pattern, use the "searchForw" (~uC-s~U) or "searchBack" (~uC-r~U)
+To search for a string pattern, use the ~bsearchForw~B (~uC-s~U) or ~bsearchBack~B (~uC-r~U)
 command.  You will be prompted to enter the pattern.  (The pattern is delimited
 by ~uESC~U by default so that ~uRTN~U can be entered as part of the pattern.  This can
 be changed however, by setting the $searchDelim variable to ~uRTN~U or a different
-delimiter key.)  Once a pattern has been set, the "huntForw" (~uC-]~U) and
-"huntBack" (~uC-^~U) commands may be used in any combination to search for the next
-occurrence going forward or backward.  The search pattern is saved in the
-"search ring" and in the $searchPat variable.
+delimiter key.)  Once a pattern has been set, the ~bhuntForw~B (~uC-]~U) and ~bhuntBack~B
+(~uC-^~U) commands may be used in any combination to search for the next occurrence
+going forward or backward.  The search pattern is saved in the "search ring" and
+in the $searchPat variable.
 
-To find and replace text, use the "replace" (~#uESC r~U) or "queryReplace" (~#uESC q~U)
+To find and replace text, use the ~breplace~B (~#uESC r~U) or ~bqueryReplace~B (~#uESC q~U)
 command.  You will be prompted to enter the search and replacement patterns.
 The replacement pattern may contain any of the following escape sequences:
 
@@ -71,15 +71,16 @@ The replacement pattern may contain any of the following escape sequences:
     ~b\n~B      Newline.
     ~b\r~B      Carriage return.
     ~b\t~B      Tab character.
+    ~b\v~B      Vertical tab character.
 
-To replace a fixed number of occurrences of a pattern, specify a numeric prefix
-to either command.  For the "replace" command, the default action is to replace
-all occurrences from the point to the end of the buffer.  The "queryReplace"
-command works like "replace" but prompts for an action to take each time a match
-is found, and also after the last match is found.  You can enter ~u?~U at the prompt
-to get a list.  Actions include: skipping to the next occurrence, undoing the
-last replacement and reprompting at that location, restarting from the
-beginning, stopping and returning to the starting point, and replacing all
+To replace a fixed number of occurrences of a pattern, specify a positive
+numeric prefix for either command.  For the ~breplace~B command, the default action
+is to replace all occurrences from the point to the end of the buffer.  The
+~bqueryReplace~B command works like ~breplace~B but prompts for an action to take each
+time a match is found, and also after the last match is found.  You can enter ~u?~U
+at the prompt to get a list.  Actions include: skipping to the next occurrence,
+undoing the last replacement and reprompting at that location, restarting from
+the beginning, stopping and returning to the starting point, and replacing all
 remaining matches without prompting.  In all cases, either command will stop if
 a match is not found.  The replacement pattern is saved in the "replace ring"
 and in the $replacePat variable.

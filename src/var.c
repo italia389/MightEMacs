@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -18,7 +18,7 @@
 #include "search.h"
 #include "var.h"
 
-// Return true if a variable is an integer type, given descriptor; otherwise, false.
+// Return true if a variable is an integer type, given descriptor, otherwise false.
 bool isIntVar(VarDesc *pVarDesc) {
 	Datum *pDatum;
 
@@ -33,17 +33,17 @@ bool isIntVar(VarDesc *pVarDesc) {
 			{ushort argNum = pVarDesc->i.argNum;
 
 			// Get argument value.  $0 resolves to the user command/function "n" argument.
-			pDatum = (argNum == 0) ? pScriptRun->pNArg : wrapPtr(pVarDesc->p.pArgs)->pArray->elements[argNum - 1];
+			pDatum = (argNum == 0) ? pScriptRun->pNArg : pVarDesc->p.pArgs->u.pArray->elements[argNum - 1];
 			}
 			break;
 		default:	// VTyp_ArrayElRef
-			pDatum = aget(pVarDesc->p.pArray, pVarDesc->i.index, false);	// Should never return NULL.
+			pDatum = aget(pVarDesc->p.pArray, pVarDesc->i.index, 0);	// Should never return NULL.
 
 		}
 	return pDatum->type == dat_int;
 	}
 
-// Return true if c is a valid first character of an identifier; otherwise, false.
+// Return true if c is a valid first character of an identifier, otherwise false.
 bool isIdent1(short c) {
 
 	return is_letter(c) || c == '_';
@@ -111,11 +111,7 @@ int freeUserVars(UserVar *pVarStack) {
 		pUserVar = localVarRoot->next;
 
 		// Free value...
-#if DCaller
-		ddelete(localVarRoot->pValue, "freeUserVars");
-#else
-		ddelete(localVarRoot->pValue);
-#endif
+		dfree(localVarRoot->pValue);
 
 		// free variable...
 		free((void *) localVarRoot);
@@ -165,8 +161,8 @@ static int putLineText(const char *text) {
 		return sess.rtn.status;
 
 	// Delete any text on the current line.
-	if(sess.pCurWind->face.point.pLine->used > 0) {
-		sess.pCurWind->face.point.offset = 0;	// Start at the beginning of the line.
+	if(sess.cur.pFace->point.pLine->used > 0) {
+		sess.cur.pFace->point.offset = 0;	// Start at the beginning of the line.
 		if(kdcText(1, 0, NULL) != Success)	// Put it in the undelete buffer.
 			return sess.rtn.status;
 		}
@@ -183,17 +179,17 @@ int getSysVar(Datum *pRtnVal, SysVar *pSysVar) {
 
 	// Fetch the corresponding value.
 	switch(varId = pSysVar->id) {
-		case sv_ARGV:
+		case sv_ArgList:
 			if(pScriptRun == NULL)
 				dsetnil(pRtnVal);
-			else if(datcpy(pRtnVal, pScriptRun->pArgs) != 0)
+			else if(dcpy(pRtnVal, pScriptRun->pArgs) != 0)
 				goto LibFail;
 			break;
 		case sv_BufInpDelim:
-			str = sess.pCurBuf->inpDelim.u.delim;
+			str = sess.cur.pBuf->inpDelim.u.delim;
 			goto Kopy;
 		case sv_BufModes:
-			(void) getModes(pRtnVal, sess.pCurBuf);
+			(void) getModes(pRtnVal, sess.cur.pBuf);
 			break;
 		case sv_Date:
 			str = strTime();
@@ -202,14 +198,14 @@ int getSysVar(Datum *pRtnVal, SysVar *pSysVar) {
 			(void) getModes(pRtnVal, NULL);
 			break;
 		case sv_HorzScrollCol:
-			dsetint(modeSet(MdIdxHScrl, NULL) ? sess.pCurWind->face.firstCol : sess.pCurScrn->firstCol, pRtnVal);
+			dsetint(modeSet(MdIdxHScrl, NULL) ? sess.cur.pFace->firstCol : sess.cur.pScrn->firstCol, pRtnVal);
 			break;
 		case sv_LastKey:
 			dsetint((long)(keyEntry.lastKeySeq & (Prefix | Shift | FKey | 0x80) ? -1 :
 			 keyEntry.lastKeySeq & Ctrl ? ektoc(keyEntry.lastKeySeq, false) : keyEntry.lastKeySeq), pRtnVal);
 			break;
 		case sv_LineLen:
-			dsetint((long) sess.pCurWind->face.point.pLine->used, pRtnVal);
+			dsetint((long) sess.cur.pFace->point.pLine->used, pRtnVal);
 			break;
 		case sv_Match:
 			str = (pLastMatch == NULL) ? "" : pLastMatch->str;
@@ -250,28 +246,27 @@ int getSysVar(Datum *pRtnVal, SysVar *pSysVar) {
 
 			if((pArray = anew(2, NULL)) == NULL)
 				goto LibFail;
-			if(awWrap(pRtnVal, pArray) == Success) {
-				dsetint((long) term.cols, pArray->elements[0]);
-				dsetint((long) term.rows, pArray->elements[1]);
-				}
+			agStash(pRtnVal, pArray);
+			dsetint(term.cols, pArray->elements[0]);
+			dsetint(term.rows, pArray->elements[1]);
 			}
 			break;
 		case sv_WindCount:
-			dsetint((long) getWindCount(sess.pCurScrn, NULL), pRtnVal);
+			dsetint((long) getWindCount(sess.cur.pScrn, NULL), pRtnVal);
 			break;
 		case sv_autoSave:
 			dsetint((long) sess.autoSaveTrig, pRtnVal);
 			break;
 		case sv_bufFile:
-			if((str = sess.pCurBuf->filename) != NULL)
+			if((str = sess.cur.pBuf->filename) != NULL)
 				goto Kopy;
 			dsetnil(pRtnVal);
 			break;
 		case sv_bufLineNum:
-			dsetint(getLineNum(sess.pCurBuf, sess.pCurWind->face.point.pLine), pRtnVal);
+			dsetint(getLineNum(sess.cur.pBuf, sess.cur.pFace->point.pLine), pRtnVal);
 			break;
 		case sv_bufname:
-			str = sess.pCurBuf->bufname;
+			str = sess.cur.pBuf->bufname;
 			goto Kopy;
 		case sv_execPath:
 			str = execPath;
@@ -280,7 +275,7 @@ int getSysVar(Datum *pRtnVal, SysVar *pSysVar) {
 			dsetint((long) sess.fencePause, pRtnVal);
 			break;
 		case sv_hardTabSize:
-			dsetint((long) sess.hardTabSize, pRtnVal);
+			dsetint((long) sess.cur.pScrn->hardTabSize, pRtnVal);
 			break;
 		case sv_horzJump:
 			dsetint((long) vTerm.horzJumpPct, pRtnVal);
@@ -292,7 +287,7 @@ int getSysVar(Datum *pRtnVal, SysVar *pSysVar) {
 			ektos(keyEntry.lastKeySeq, str = workBuf, false);
 			goto Kopy;
 		case sv_lineChar:
-			{Point *pPoint = &sess.pCurWind->face.point;
+			{Point *pPoint = &sess.cur.pFace->point;
 			dsetint(bufEnd(pPoint) ? '\0' : pPoint->offset == pPoint->pLine->used ? '\n' :
 			 pPoint->pLine->text[pPoint->offset], pRtnVal);
 			}
@@ -301,16 +296,13 @@ int getSysVar(Datum *pRtnVal, SysVar *pSysVar) {
 			dsetint((long) getCol(NULL, false), pRtnVal);
 			break;
 		case sv_lineOffset:
-			dsetint((long) sess.pCurWind->face.point.offset, pRtnVal);
+			dsetint((long) sess.cur.pFace->point.offset, pRtnVal);
 			break;
 		case sv_lineText:
-			{Line *pLine = sess.pCurWind->face.point.pLine;
+			{Line *pLine = sess.cur.pFace->point.pLine;
 			if(dsetsubstr(pLine->text, pLine->used, pRtnVal) != 0)
 				goto LibFail;
 			}
-			break;
-		case sv_maxArrayDepth:
-			dsetint((long) maxArrayDepth, pRtnVal);
 			break;
 		case sv_maxCallDepth:
 			dsetint((long) maxCallDepth, pRtnVal);
@@ -327,14 +319,11 @@ int getSysVar(Datum *pRtnVal, SysVar *pSysVar) {
 		case sv_pageOverlap:
 			dsetint((long) sess.overlap, pRtnVal);
 			break;
-		case sv_randNumSeed:
-			dsetint(sess.randSeed & LONG_MAX, pRtnVal);
-			break;
 		case sv_replacePat:
 			str = searchCtrl.match.replPat;
 			goto Kopy;
 		case sv_screenNum:
-			dsetint((long) sess.pCurScrn->num, pRtnVal);
+			dsetint((long) sess.cur.pScrn->num, pRtnVal);
 			break;
 		case sv_searchDelim:
 			ektos(searchCtrl.inpDelim, str = workBuf, false);
@@ -347,7 +336,7 @@ int getSysVar(Datum *pRtnVal, SysVar *pSysVar) {
 			}
 			break;
 		case sv_softTabSize:
-			dsetint((long) sess.softTabSize, pRtnVal);
+			dsetint((long) sess.cur.pScrn->softTabSize, pRtnVal);
 			break;
 		case sv_travJump:
 			dsetint((long) sess.travJumpCols, pRtnVal);
@@ -356,19 +345,19 @@ int getSysVar(Datum *pRtnVal, SysVar *pSysVar) {
 			dsetint((long) vTerm.vertJumpPct, pRtnVal);
 			break;
 		case sv_windLineNum:
-			dsetint((long) getWindPos(sess.pCurWind), pRtnVal);
+			dsetint((long) getWindPos(sess.cur.pWind), pRtnVal);
 			break;
 		case sv_windNum:
-			dsetint((long) getWindNum(sess.pCurWind), pRtnVal);
+			dsetint((long) getWindNum(sess.cur.pWind), pRtnVal);
 			break;
 		case sv_windSize:
-			dsetint((long) sess.pCurWind->rows, pRtnVal);
+			dsetint((long) sess.cur.pWind->rows, pRtnVal);
 			break;
 		case sv_workDir:
-			str = (char *) sess.pCurScrn->workDir;
+			str = (char *) sess.cur.pScrn->workDir;
 			goto Kopy;
 		case sv_wrapCol:
-			dsetint((long) sess.wrapCol, pRtnVal);
+			dsetint((long) sess.cur.pScrn->wrapCol, pRtnVal);
 			break;
 		default:
 			// Never should get here.
@@ -387,9 +376,9 @@ Retn:
 // Copy a new value to a variable, checking if old value is an array in a global variable.
 static int copyNewVal(Datum *pDest, Datum *pSrc, VarDesc *pVarDesc) {
 
-	if(pDest->type == dat_blobRef && pVarDesc->type == VTyp_GlobalVar)
-		awGarbPush(pDest);
-	return datcpy(pDest, pSrc) != 0 ? librsset(Failure) : sess.rtn.status;
+	if(dtyparray(pDest) && pVarDesc->type == VTyp_GlobalVar)
+		agTrack(pDest);
+	return dcpy(pDest, pSrc) != 0 ? librsset(Failure) : sess.rtn.status;
 	}
 
 // Calculate horizontal jump columns from percentage.
@@ -400,7 +389,7 @@ void calcHorzJumpCols(void) {
 	}
 
 // Set a variable to given value.  Return status.
-int putVar(Datum *pDatum, VarDesc *pVarDesc) {
+int setVar(Datum *pDatum, VarDesc *pVarDesc) {
 	const char *str;
 	static const char myName[] = "putVar";
 
@@ -410,7 +399,7 @@ int putVar(Datum *pDatum, VarDesc *pVarDesc) {
 		// Set a user variable.
 		case VTyp_LocalVar:
 		case VTyp_GlobalVar:
-			{UserVar *pUserVar = pVarDesc->p.pUserVar;				// Grab pointer to old value.
+			{UserVar *pUserVar = pVarDesc->p.pUserVar;		// Grab pointer to old value.
 			(void) copyNewVal(pUserVar->pValue, pDatum, pVarDesc);
 			}
 			break;
@@ -437,12 +426,12 @@ int putVar(Datum *pDatum, VarDesc *pVarDesc) {
 				if(!isCharVal(pDatum))
 					goto BadTyp1;
 				}
-			else if(pDatum->type & DBoolMask) {
+			else if(dtypbool(pDatum)) {
 				str = text360;
 					// "Boolean"
 				goto BadTyp0;
 				}
-			else if(pDatum->type == dat_nil) {
+			else if(disnil(pDatum)) {
 				if(pSysVar->flags & V_Nil)
 					dsetnull(pDatum);
 				else {
@@ -466,7 +455,7 @@ BadTyp2:
 				if(dopentrack(&msg) != 0)
 					goto LibFail;
 				else if(escAttr(&msg) == Success) {
-					if(dputf(&msg, text334, str) != 0 || dclose(&msg, Fab_String) != 0)
+					if(dputf(&msg, 0, text334, str) != 0 || dclose(&msg, FabStr) != 0)
 							// ", setting variable '~b%s~B'"
 						goto LibFail;
 					(void) rsset(sess.rtn.status, RSForce | RSNoFormat | RSTermAttr, msg.pDatum->str);
@@ -519,7 +508,7 @@ BadTyp2:
 					str = "renameBuf $bufname, ";
 					goto XeqCmd;
 				case sv_execPath:
-					(void) setExecPath(pDatum->str, false);
+					(void) setExecPath(pDatum->str);
 					break;
 				case sv_fencePause:
 					if(pDatum->u.intNum < 0)
@@ -557,35 +546,28 @@ BadTyp2:
 						}
 					break;
 				case sv_lineChar:
-					// Replace character at point with an integer ASCII value.
+					// Replace character at point with an 8-bit integer value.
 					if(isCharVal(pDatum)) {
 						if(edelc(1, 0) != Success)
-							return rsset(Failure, 0, text142, sess.pCurBuf->bufname);
+							return rsset(Failure, 0, text142, sess.cur.pBuf->bufname);
 								// "Cannot change a character past end of buffer '%s'"
-						(void) (pDatum->u.intNum == 012 ? einsertNL() : einsertc(1, pDatum->u.intNum));
+						(void) einsertc(1, pDatum->u.intNum);
 						}
 					break;
 				case sv_lineCol:
 					(void) setPointCol(pDatum->u.intNum);
 					break;
 				case sv_lineOffset:
-					{int lineLen = sess.pCurWind->face.point.pLine->used;
+					{int lineLen = sess.cur.pFace->point.pLine->used;
 					int lineOffset = (pDatum->u.intNum < 0) ? lineLen + pDatum->u.intNum : pDatum->u.intNum;
 					if(lineOffset < 0 || lineOffset > lineLen)
 						return rsset(Failure, 0, text378, pDatum->u.intNum);
 							// "Line offset value %ld out of range"
-					sess.pCurWind->face.point.offset = lineOffset;
+					sess.cur.pFace->point.offset = lineOffset;
 					}
 					break;
 				case sv_lineText:
 					(void) putLineText(pDatum->str);
-					break;
-				case sv_maxArrayDepth:
-					if(pDatum->u.intNum < 0) {
-						i = 0;
-						goto ERange;
-						}
-					maxArrayDepth = pDatum->u.intNum;
 					break;
 				case sv_maxCallDepth:
 					if(pDatum->u.intNum < 0) {
@@ -622,12 +604,6 @@ ERange:
 						return rsset(Failure, 0, text184, pDatum->u.intNum, (int) (term.rows - 1) / 2);
 							// "Overlap %ld must be between 0 and %d"
 					sess.overlap = pDatum->u.intNum;
-					break;
-				case sv_randNumSeed:
-
-					// Generate new seed if zero.
-					if((sess.randSeed = (ulong) pDatum->u.intNum) == 0)
-						sess.randSeed = seedInit();
 					break;
 				case sv_replacePat:
 					(void) newReplPat(pDatum->str, &searchCtrl.match, true);
@@ -671,7 +647,7 @@ ERange:
 						vTerm.vertJumpPct = JumpMax;
 					break;
 				case sv_windLineNum:
-					(void) forwLine(pSink, pDatum->u.intNum - getWindPos(sess.pCurWind), NULL);
+					(void) forwLine(pSink, pDatum->u.intNum - getWindPos(sess.cur.pWind), NULL);
 					break;
 				case sv_windNum:
 					(void) gotoWind(pSink, pDatum->u.intNum, 0);
@@ -682,12 +658,10 @@ ERange:
 				case sv_workDir:
 					str = "chgDir";
 XeqCmd:
-					{DFab cmd;
-					(void) runCmd(pSink, &cmd, str, pDatum->str, true);
-					}
+					(void) runCmd(pSink, str, pDatum->str, NULL, RunQFull);
 					break;
 				case sv_wrapCol:
-					(void) setWrapCol(pDatum->u.intNum, false);
+					(void) setWrapCol(pDatum->u.intNum);
 					break;
 				default:
 					// Never should get here.
@@ -708,14 +682,16 @@ XeqCmd:
 				}
 			else
 				// User command or function argument assignment.  Get array argument and set new value.
-				(void) copyNewVal(wrapPtr(pVarDesc->p.pArgs)->pArray->elements[pVarDesc->i.argNum - 1], pDatum,
+				(void) copyNewVal(pVarDesc->p.pArgs->u.pArray->elements[pVarDesc->i.argNum - 1], pDatum,
 				 pVarDesc);
 			break;
 		default:	// VTyp_ArrayElRef
-			{Datum *pArrayEl = aget(pVarDesc->p.pArray, pVarDesc->i.index, false);
+			{Datum *pArrayEl = aget(pVarDesc->p.pArray, pVarDesc->i.index, 0);
 			if(pArrayEl == NULL)
 				goto LibFail;
-			(void) datcpy(pArrayEl, pDatum);
+			if(dtyparray(pArrayEl))
+				agTrack(pArrayEl);
+			(void) dcpy(pArrayEl, pDatum);
 			}
 			break;
 		}
@@ -765,7 +741,7 @@ static int newUserVar(const char *var, VarDesc *pVarDesc) {
 
 // Find a named variable's type and id.  If op is OpCreate: (1), create user variable if non-existent and either (a), variable
 // is global; or (b), variable is local and executing a buffer; and (2), return status.  If op is OpQuery: return true if
-// variable is found; otherwise, false.  If op is OpDelete: return status if variable is found; otherwise, error.  In all cases,
+// variable is found, otherwise false.  If op is OpDelete: return status if variable is found, otherwise error.  In all cases,
 // store results in *pVarDesc (if pVarDesc not NULL) and variable is found.
 int findVar(const char *name, VarDesc *pVarDesc, ushort op) {
 	UserVar *pUserVar;
@@ -787,7 +763,7 @@ int findVar(const char *name, VarDesc *pVarDesc, ushort op) {
 
 				// Yes, command or function running and number in range?
 				if(pScriptRun != NULL && ascToLong(name + 1, &longVal, true) &&
-				 longVal <= wrapPtr(pScriptRun->pArgs)->pArray->used) {
+				 longVal <= pScriptRun->pArgs->u.pArray->used) {
 
 					// Valid reference.  Set type and save argument number.
 					varDesc.type = VTyp_NumVar;
@@ -847,7 +823,7 @@ VarNotFound:
 					// "No such variable '%s'"
 	}
 
-// Derefence a variable, given descriptor, and save variable's value in pDatum.  Return status.
+// Derefence a variable, given descriptor, and save variable's value in *pDatum.  Return status.
 int vderefv(Datum *pDatum, VarDesc *pVarDesc) {
 	Datum *pValue;
 
@@ -862,19 +838,19 @@ int vderefv(Datum *pDatum, VarDesc *pVarDesc) {
 			{ushort argNum = pVarDesc->i.argNum;
 
 			// Get argument value.  $0 resolves to the user command or function "n" argument.
-			pValue = (argNum == 0) ? pScriptRun->pNArg : wrapPtr(pVarDesc->p.pArgs)->pArray->elements[argNum - 1];
+			pValue = (argNum == 0) ? pScriptRun->pNArg : pVarDesc->p.pArgs->u.pArray->elements[argNum - 1];
 			}
 			break;
 		default:	// VTyp_ArrayElRef
-			if((pValue = aget(pVarDesc->p.pArray, pVarDesc->i.index, false)) == NULL)
+			if((pValue = aget(pVarDesc->p.pArray, pVarDesc->i.index, 0)) == NULL)
 				return librsset(Failure);
 		}
 
 	// Copy value.
-	return datcpy(pDatum, pValue) != 0 ? librsset(Failure) : sess.rtn.status;
+	return dcpy(pDatum, pValue) != 0 ? librsset(Failure) : sess.rtn.status;
 	}
 
-// Derefence a variable, given name, and save variable's value in pDatum.  Return status.
+// Derefence a variable, given name, and save variable's value in *pDatum.  Return status.
 int vderefn(Datum *pDatum, const char *name) {
 	VarDesc varDesc;
 
@@ -885,14 +861,33 @@ int vderefn(Datum *pDatum, const char *name) {
 	return sess.rtn.status;
 	}
 
+// Simulate dputd() CXL library function with terminal attribute escaping; that is, put a datum to a fabrication object with
+// all AttrSpecBegin (~) characters doubled (~~).  Return same codes as dputd().
+int dtofabattr(const Datum *pDatum, DFab *pFab, const char *delim, ushort cflags) {
+	int rtnCode;
+	DFab fab;
+	char *str;
+
+	// Convert datum to a string first, then write result to pFab with AttrSpecBegin characters doubled up.
+	if(dopentrack(&fab) != 0 || (rtnCode = dputd(pDatum, &fab, delim, cflags)) < 0 || dclose(&fab, FabStr) != 0)
+		return -1;
+	str = fab.pDatum->str;
+	while(*str != '\0') {
+		if(dputc(*str, pFab, 0) != 0 || (*str == AttrSpecBegin && dputc(AttrSpecBegin, pFab, 0) != 0))
+			return -1;
+		++str;
+		}
+	return rtnCode;
+	}
+
 // Store the character value of a system variable in a fabrication object in "show" (?x) form.  Return status.
 static int ctosf(Datum *pDatum, DFab *pFab) {
 	short c = pDatum->u.intNum;
 
-	if(dputc('?', pFab) != 0)
+	if(dputc('?', pFab, 0) != 0)
 		goto LibFail;
 	if(c < '!' || c > '~') {
-		if(dputc('\\', pFab) != 0)
+		if(dputc('\\', pFab, 0) != 0)
 			goto LibFail;
 		switch(c) {
 			case '\t':	// Tab
@@ -908,22 +903,22 @@ static int ctosf(Datum *pDatum, DFab *pFab) {
 			case '\f':	// Form feed
 				c = 'f'; break;
 			default:
-				if(dputf(pFab, "x%.2hX", c) != 0)
+				if(dputf(pFab, 0, "x%.2hX", c) != 0)
 					goto LibFail;
 				return sess.rtn.status;
 			}
 		}
-	if(dputc(c, pFab) != 0)
+	if(dputc(c, pFab, 0) != 0)
 LibFail:
 		(void) librsset(Failure);
 	return sess.rtn.status;
 	}
 
-// Get the value of a system variable and store in a fabrication object in "show" form.  Pass flags to dtosfchk().  Return
-// status.
-int svtosf(SysVar *pSysVar, ushort flags, DFab *pFab) {
+// Get the value of a system variable and store in a fabrication object in "show" form.  Return status.
+int svtofab(SysVar *pSysVar, bool escTermAttr, DFab *pFab) {
+	int rtnCode;
 	Datum *pDatum;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	// Get value.  Return null for $RegionText if no region defined or empty; use single-quote form for $replacePat
 	// and $searchPat; use char-lit form for character variables.
@@ -937,8 +932,8 @@ int svtosf(SysVar *pSysVar, ushort flags, DFab *pFab) {
 				goto LibFail;
 			strcpy((char *) memstpcpy((void *) pDatum->str, (void *) (pPoint->pLine->text), term.cols * 2), "...");
 			}
-		else if(sess.pCurBuf->markHdr.point.pLine != pPoint->pLine ||
-		 sess.pCurBuf->markHdr.point.offset != pPoint->offset) {
+		else if(sess.cur.pBuf->markHdr.point.pLine != pPoint->pLine ||
+		 sess.cur.pBuf->markHdr.point.offset != pPoint->offset) {
 			Region region;
 			bool truncated = false;
 
@@ -962,14 +957,18 @@ int svtosf(SysVar *pSysVar, ushort flags, DFab *pFab) {
 		return sess.rtn.status;
 
 	// Have system variable value in *pDatum.  Convert it to display form.
-	return (pSysVar->flags & V_Char) ? ctosf(pDatum, pFab) : dtosfchk(pDatum, ",", flags |
-	 (pSysVar->id == sv_replacePat || pSysVar->id == sv_searchPat ? CvtShowNil | CvtVizStr | CvtQuote1 : CvtExpr), pFab);
+	if(pSysVar->flags & V_Char)
+		return ctosf(pDatum, pFab);
+	int (*func)(const Datum *, DFab *, const char *, ushort) = escTermAttr ? dtofabattr : dputd;
+	if((rtnCode = func(pDatum, pFab, ", ", pSysVar->id == sv_replacePat || pSysVar->id == sv_searchPat ?
+	 DCvtVizStr : DCvtLang)) >= 0)
+		return endless(rtnCode);
 LibFail:
 	return librsset(Failure);
 	}
 
-// Set a variable -- "let" command (interactively only).  Evaluate value as an expression if n argument.  Return status.
-int setVar(Datum *pRtnVal, int n, Datum **args) {
+// Set a variable interactively ("let" command).  Evaluate value as an expression if n argument.  *Interactive only*
+int let(Datum *pRtnVal, int n, Datum **args) {
 	VarDesc varDesc;			// Variable descriptor.
 	short delimChar;
 	uint argFlags, ctrlFlags;
@@ -980,7 +979,7 @@ int setVar(Datum *pRtnVal, int n, Datum **args) {
 	// First get the variable to set.
 	if(dnewtrack(&pDatum) != 0)
 		return librsset(Failure);
-	if(termInp(pDatum, text51, ArgNil1, Term_C_MutVar, NULL) != Success || pDatum->type == dat_nil)
+	if(termInp(pDatum, text51, ArgNil1, Term_C_MutVar, NULL) != Success || disnil(pDatum))
 			// "Assign variable"
 		goto Retn;
 
@@ -1006,38 +1005,38 @@ int setVar(Datum *pRtnVal, int n, Datum **args) {
 		argFlags = ArgNotNull1;
 		ctrlFlags = 0;
 		}
-	if(dopenwith(&fab, pRtnVal, FabClear) != 0 || dputs(text297, &fab) != 0)
+	if(dopenwith(&fab, pRtnVal, FabClear) != 0 || dputs(text297, &fab, 0) != 0)
 						// "Current value: "
 		goto LibFail;
 	if(varDesc.type == VTyp_SysVar) {
 		if(varDesc.p.pSysVar->flags & (V_GetKey | V_GetKeySeq)) {
 			if(getSysVar(pDatum, varDesc.p.pSysVar) != Success)
 				goto Retn;
-			if(dputf(&fab, "~#u%s~U", pDatum->str) != 0)
+			if(dputf(&fab, 0, "~#u%s~U", pDatum->str) != 0)
 				goto LibFail;
 			ctrlFlags |= Term_Attr;
 			}
-		else if(svtosf(varDesc.p.pSysVar, 0, &fab) != Success)
+		else if(svtofab(varDesc.p.pSysVar, false, &fab) != Success)
 			goto Retn;
 		}
-	else if(dtosfchk(varDesc.p.pUserVar->pValue, NULL, CvtExpr | CvtForceArray, &fab) != Success)
-		goto Retn;
+	else if(dputd(varDesc.p.pUserVar->pValue, &fab, NULL, DCvtLang) < 0)
+		goto LibFail;
 
 	// Add "new value" type to prompt.
-	if(dputs(text283, &fab) != 0)
+	if(dputs(text283, &fab, 0) != 0)
 			// ", new value"
 		goto LibFail;
 	if(n != INT_MIN) {
-		if(dputs(text301, &fab) != 0)
+		if(dputs(text301, &fab, 0) != 0)
 				// " (expression)"
 			goto LibFail;
 		}
 	else if(varDesc.type == VTyp_SysVar && (varDesc.p.pSysVar->flags & (V_Char | V_GetKey | V_GetKeySeq))) {
-		if(dputs(varDesc.p.pSysVar->flags & V_Char ? text349 : text76, &fab) != 0)
+		if(dputs(varDesc.p.pSysVar->flags & V_Char ? text349 : text76, &fab, 0) != 0)
 						// " (char)", " (key)"
 			goto LibFail;
 		}
-	if(dclose(&fab, Fab_String) != 0)
+	if(dclose(&fab, FabStr) != 0)
 LibFail:
 		return librsset(Failure);
 
@@ -1046,24 +1045,24 @@ LibFail:
 	if(termInp(pDatum, pRtnVal->str, argFlags, ctrlFlags, &termInpCtrl) != Success)
 		goto Retn;
 
-	// Evaluate result as an expression if requested.  Type checking is done in putVar() so no need to do it here.
+	// Evaluate result as an expression if requested.  Type checking is done in setVar() so no need to do it here.
 	if(n != INT_MIN) {
-		if(execExprStmt(pRtnVal, pDatum->str, TokC_Comment, NULL) != Success)
+		if(execExprStmt(pRtnVal, pDatum->str, 0, NULL) != Success)
 			goto Retn;
 		}
-	else if((pDatum->type & DStrMask) && (varDesc.type == VTyp_GlobalVar ||
+	else if(dtypstr(pDatum) && (varDesc.type == VTyp_GlobalVar ||
 	 (varDesc.type == VTyp_SysVar && (varDesc.p.pSysVar->flags & V_Int))) && ascToLong(pDatum->str, &longVal, true))
 		dsetint(longVal, pRtnVal);
 	else
-		datxfer(pRtnVal, pDatum);
+		dxfer(pRtnVal, pDatum);
 
 	// Set variable to value in pRtnVal and return.
 #if MMDebug & Debug_Datum
-	ddump(pRtnVal, "setVar(): Setting and returning value...");
-	(void) putVar(pRtnVal, &varDesc);
+	ddump(pRtnVal, "let(): Setting and returning value...");
+	(void) setVar(pRtnVal, &varDesc);
 	dumpVars();
 #else
-	(void) putVar(pRtnVal, &varDesc);
+	(void) setVar(pRtnVal, &varDesc);
 #endif
 Retn:
 	return sess.rtn.status;
@@ -1075,8 +1074,8 @@ int getArrayRef(ExprNode *pNode, VarDesc *pVarDesc, bool create) {
 
 	pVarDesc->type = VTyp_ArrayElRef;
 	pVarDesc->i.index = pNode->index;
-	pVarDesc->p.pArray = wrapPtr(pNode->pValue)->pArray;
-	if(aget(pVarDesc->p.pArray, pVarDesc->i.index, create) == NULL)
+	pVarDesc->p.pArray = pNode->pValue->u.pArray;
+	if(aget(pVarDesc->p.pArray, pVarDesc->i.index, create ? AOpGrow : 0) == NULL)
 		(void) librsset(Failure);
 	return sess.rtn.status;
 	}
@@ -1089,9 +1088,9 @@ int bumpVar(ExprNode *pNode, bool incr, bool pre) {
 	Datum *pDatum;
 
 	if(pNode->flags & EN_ArrayRef) {
-		if(getArrayRef(pNode, &varDesc, false) != Success)		// Get array element...
+		if(getArrayRef(pNode, &varDesc, false) != Success)	// Get array element...
 			return sess.rtn.status;
-		if(!isIntVar(&varDesc))				// and make sure it's an integer.
+		if(!isIntVar(&varDesc))					// and make sure it's an integer.
 			return rsset(Failure, 0, text370, varDesc.i.index);
 				// "Array element %d not an integer";
 		}
@@ -1107,9 +1106,9 @@ int bumpVar(ExprNode *pNode, bool incr, bool pre) {
 	if(vderefv(pDatum, &varDesc) != Success)			// Dereference variable...
 		return sess.rtn.status;
 	longVal = pDatum->u.intNum + (incr ? 1 : -1);			// compute new value of variable...
-	dsetint(pre ? longVal : pDatum->u.intNum, pNode->pValue);		// set result to pre or post value...
-	dsetint(longVal, pDatum);					// set new variable value in a pDatum object...
-	return putVar(pDatum, &varDesc);				// and update variable.
+	dsetint(pre ? longVal : pDatum->u.intNum, pNode->pValue);	// set result to pre or post value...
+	dsetint(longVal, pDatum);					// set new variable value in a Datum object...
+	return setVar(pDatum, &varDesc);				// and update variable.
 	}
 
 #if MMDebug & Debug_Datum

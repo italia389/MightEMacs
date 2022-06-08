@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -8,6 +8,7 @@
 #include "stdos.h"
 
 // CXL include files.
+#include "cxl/excep.h"
 #include "cxl/datum.h"
 #include "cxl/string.h"
 #include "cxl/array.h"
@@ -20,6 +21,8 @@
 #include <ncurses.h>
 
 // Program-logic (source code) debugging flags.
+#define SanityCheck	1		// Include "sanity check" code (things that should never happen).
+
 #define Debug_Logfile	0x00000001	// Open file SingleLogfile for debugging output.
 #define Debug_Endless	0x00000002	// Append debugging output to file MultiLogfile.
 #define Debug_ScrnDump	0x00000004	// Dump screens, windows, and buffers.
@@ -34,26 +37,29 @@
 #define Debug_Script	0x00000800	// Write script lines to log file.
 #define Debug_Expr	0x00001000	// Write expression-parsing info to log file.
 #define Debug_Preproc	0x00002000	// Dump script preprocessor blocks to log file and exit.
-#define Debug_Array	0x00004000	// Dump array heap-management info.
-#define Debug_Bind	0x00008000	// Dump binding table.
-#define Debug_Modes	0x00010000	// Write mode-processing info to log file.
-#define Debug_ModeDump	0x00020000	// Dump buffer modes or mode table.
-#define Debug_MsgLine	0x00040000	// Dump message-line input info.
-#define Debug_Wrap	0x00080000	// Write line-wrapping info to log file.
-#define Debug_PipeCmd	0x00100000	// Debug shell pipes and commands.
-#define Debug_NCurses	0x00200000	// Debug ncurses routines.
-#define Debug_Temp	0x40000000	// For ad-hoc use.
+#define Debug_ArrayLog	0x00004000	// Write array memory-management info to log file..
+#define Debug_ArrayBuf	0x00008000	// Write array memory-management info to a buffer.
+#define Debug_Bind	0x00010000	// Dump binding table.
+#define Debug_Modes	0x00020000	// Write mode-processing info to log file.
+#define Debug_ModeDump	0x00040000	// Dump buffer modes or mode table.
+#define Debug_MsgLine	0x00080000	// Dump message-line input info.
+#define Debug_Wrap	0x00100000	// Write line-wrapping info to log file.
+#define Debug_PipeCmd	0x00200000	// Debug shell pipes and commands.
+#define Debug_NCurses	0x00400000	// Debug ncurses routines.
+#define Debug_SrchRepl	0x00800000	// Debug search and replace routines.
+#define Debug_Regexp	0x01000000	// Debug regular expressions.
+#define Debug_Temp	0x80000000	// For ad-hoc use.
 
 #define MMDebug		0		// No debugging code.
 //#define MMDebug		Debug_Logfile
-//#define MMDebug		(Debug_Wrap | Debug_Logfile)
+//#define MMDebug		(Debug_SrchRepl | Debug_Logfile)
 //#define MMDebug		(Debug_NCurses | Debug_Logfile)
 //#define MMDebug		(Debug_PipeCmd | Debug_Logfile | Debug_Endless)
 //#define MMDebug		(Debug_MsgLine | Debug_Logfile)
 //#define MMDebug		(Debug_ModeDump | Debug_Logfile)
 //#define MMDebug		(Debug_Modes | Debug_ModeDump | Debug_Logfile)
 //#define MMDebug		(Debug_Narrow | Debug_Logfile)
-//#define MMDebug		(Debug_Array | Debug_Logfile)
+//#define MMDebug		(Debug_ArrayLog | Debug_Datum | Debug_Logfile)
 //#define MMDebug		(Debug_Script | Debug_Logfile)
 //#define MMDebug		(Debug_Script | Debug_Expr | Debug_Logfile)
 //#define MMDebug		(Debug_Script | Debug_Token | Debug_Logfile)
@@ -73,7 +79,7 @@
 
 // Program identification.
 #define ProgName	"MightEMacs"
-#define ProgVer		"9.5.1"
+#define ProgVer		"9.6.0"
 
 /***** BEGIN CUSTOMIZATIONS *****/
 
@@ -94,7 +100,7 @@
 #define ScriptExt	".ms"		// Script file extension.
 #define UserStartup	".memacs"	// User start-up file (in HOME directory).
 #define SiteStartup	"memacs.ms"	// Site start-up file.
-#define MMPath_Name	"MMPATH"	// Name of shell environmental variable containing custom search path.
+#define MMPath_Name	"MSPATH"	// Name of shell environmental variable containing custom search path.
 #define MMPath ":/usr/local/share/memacs/scripts"
 					// Standard search path for script files.
 
@@ -150,7 +156,7 @@
 #define LocalLogfile	"memacs.log"	// Local log file for debugging (overwritten).
 #define MultiLogfile	"/tmp/" LocalLogfile	// Multi-session log file for debugging (appended to).
 #define Scratch		"scratch"	// Prefix for scratch buffers.
-#define Buffer1		"untitled"	// First buffer created.
+#define Buffer1		"unnamed"	// First buffer created.
 #define WordChars	"A-Za-z0-9_"	// Characters in a word.
 
 // Internal constants.
@@ -181,17 +187,18 @@
 #define ColorPairISL	1		// Unreserved color pair (at high work end) to use for informational separator line.
 
 // Operation flags used at runtime (in "opFlags" member of "sess" global variable).
-#define OpVTermOpen	0x0001		// Virtual terminal open?
-#define OpEval		0x0002		// Evaluate expressions?
-#define OpHaveBold	0x0004		// Does terminal support bold attribute?
-#define OpHaveRev	0x0008		// Does terminal support reverse video attribute?
-#define OpHaveUL	0x0010		// Does terminal support underline attribute?
-#define OpHaveColor	0x0020		// Does terminal support color?
-#define OpStartup	0x0040		// In pre-edit-loop state or ignoring return messages?
-#define OpScript	0x0080		// Script execution in progress?
+#define OpVTermOpen	0x0001		// Virtual terminal open.
+#define OpEval		0x0002		// Evaluating expressions (in "true" state).
+#define OpHaveBold	0x0004		// Terminal supports bold attribute.
+#define OpHaveRev	0x0008		// Terminal supports reverse video attribute.
+#define OpHaveUL	0x0010		// Terminal supports underline attribute.
+#define OpHaveColor	0x0020		// Terminal supports color.
+#define OpStartup	0x0040		// In pre-edit-loop state.
+#define OpScript	0x0080		// Script or command-line execution in progress.
 #define OpParens	0x0100		// Command, function, or alias invoked in xxx() form.
 #define OpNoLoad	0x0200		// Do not load function arguments (non-command-line hook is running).
 #define OpScrnRedraw	0x0400		// Clear and redraw screen (in update() function).
+#define OpUserCmd	0x0800		// User command being executed (interactive mode).
 
 // Terminal attribute characters.
 #define AttrSpecBegin	'~'		// First character of a terminal attribute sequence.
@@ -215,19 +222,6 @@
 #define BO_BeginEnd	1		// Move to beginning or end of buffer.
 #define BO_GotoLine	2		// Go to to a line in the buffer.
 #define BO_ReadBuf	3		// Read line(s) from a buffer.
-
-// Flags used by catArgs(), dtosf(), and atosf() functions for controlling conversions to string.
-#define CvtExpr		0x0001		// Output as an expression; otherwise, as data.
-#define CvtShowNil	0x0002		// Use "nil" for nil; otherwise, null.
-#define CvtForceArray	0x0004		// If array contains itself, display with ellipsis; otherwise, return error.
-#define CvtTermAttr     0x0008          // Output strings with terminal attribute sequences escaped (~~).
-#define CvtVizStr	0x0010		// Output strings in visible form; otherwise, unmodified.
-#define CvtQuote1	0x0020		// Enclose strings in single (') quotes.
-#define CvtQuote2	0x0040		// Enclose strings in double (") quotes.
-
-#define CvtKeepNil	0x0080		// Keep nil arguments.
-#define CvtKeepNull	0x0100		// Keep null arguments.
-#define CvtKeepAll	(CvtKeepNil | CvtKeepNull)
 
 // Flags used by convertCase() for controlling case conversions.
 #define CaseWord	0x0001		// Convert word(s).
@@ -311,7 +305,6 @@ typedef struct {
 #define RSHigh		0x0010		// High priority Success message.  Overwrite any non-high one that wasn't forced.
 #define RSKeepMsg	0x0020		// Don't replace any existing message (just change severity).
 #define RSTermAttr	0x0040		// Enable terminal attributes in message.
-#define RSMsgSet	0x0080		// A new message was set by rsset().
 
 // Sample string buffer used for error reporting -- allocated at program launch depending on the terminal width.
 typedef struct {
@@ -337,7 +330,7 @@ typedef struct {
 #define MacRecord	2		// Recording.
 
 // Macro flags for searching.
-#define MF_Name		0x0001		// Search by name; otherwise, entry number.
+#define MF_Name		0x0001		// Search by name, otherwise entry number.
 #define MF_Required	0x0002		// Error if entry not found.
 
 // Text insertion style.
@@ -351,10 +344,14 @@ typedef struct {
 #define XP_GlobPat	0x0002		// Do glob search.
 #define XP_SkipNull	0x0004		// Skip null directories in $execPath.
 
+// Flags used by runCmd().
+#define RunQSimple	0x0001		// Simple quoting: wrap double quotes around argument.
+#define RunQFull	0x0002		// Full quoting: call quote() to quote argument.
+
 // Flags used by pipeCmd().
 #define PipeWrite	0x0001		// Write target buffer to pipe1 (pipeBuf).
 #define PipePopOnly	0x0002		// Pop command results only (shellCmd).
-#define PipeInsert	0x0004		// Insert pipe output into target buffer; otherwise, replace its contents (read).
+#define PipeInsert	0x0004		// Insert pipe output into target buffer; otherwise, replace its contents (readPipe).
 
 // Descriptor for display item colors and array indices into "colors" ETerm member.
 typedef struct {
@@ -410,11 +407,13 @@ typedef struct {
 	ItemColor itemColors[3];	// Array of color pairs for display items.
 	} ETerm;
 
-// Operation types.  These are mutually exclusive, however they are coded as bit masks so they can be combined with other flags.
+// Operation types.  All but the last of these are mutually exclusive, however they are coded as bit masks so they can be
+// combined with other flags.
 #define OpQuery		0x0001		// Find an item.
 #define OpCreate	0x0002		// Create an item.
 #define OpUpdate	0x0004		// Update an item.
 #define OpDelete	0x0008		// Delete an item.
+#define OpConfirm	0x0010		// Get user confirmation for item creation.
 
 // The editor holds text chunks in a double-linked list of buffers (e.g., the kill ring and search ring).  Chunks are stored in
 // a Datum object so that text (of unpredictable size) can be saved iteratively and bidirectionally.  This can also be used in
@@ -459,15 +458,15 @@ typedef struct {
 	} ModeSpec;
 
 // Macro for fetching ModeSpec pointer from Datum object in an Array element, given Datum pointer.
-#define modePtr(pDatum)	((ModeSpec *) (pDatum)->u.blob.mem)
+#define modePtr(pDatum)	((ModeSpec *) (pDatum)->u.mem.ptr)
 
 // Mode attribute and state flags.
 #define MdUser		0x0001		// User defined.  Mode or group may be deleted if set.
-#define MdGlobal	0x0002		// Global mode if set; otherwise, buffer mode.  Cannot be changed if MdLocked set.
+#define MdGlobal	0x0002		// Global mode if set, otherwise buffer mode.  Cannot be changed if MdLocked set.
 #define MdLocked	0x0004		// Scope cannot be changed if set (certain built-in modes).
 #define MdHidden	0x0010		// Don't display on mode line if set.
 #define MdInLine	0x0020		// Adds custom text to mode line (so update needed when changed).
-#define MdEnabled	0x0040		// Global mode is enabled if set; otherwise, N/A.
+#define MdEnabled	0x0040		// Global mode is enabled if set, otherwise N/A.
 
 // Cache indices for built-in modes.
 #define MdIdxASave	0
@@ -481,23 +480,20 @@ typedef struct {
 #define MdIdxHScrl	8
 #define MdIdxLine	9
 #define MdIdxOver	10
-#define MdIdxRegexp	11
-#define MdIdxRepl	12
-#define MdIdxRtnMsg	13
-#define MdIdxSafe	14
-#define MdIdxWkDir	15
-#define MdIdxWrap	16
-#define NumModes	17		// Length of mode cache array.
+#define MdIdxReadOnly	11
+#define MdIdxRegexp	12
+#define MdIdxRepl	13
+#define MdIdxRtnMsg	14
+#define MdIdxSafe	15
+#define MdIdxWkDir	16
+#define MdIdxWrap	17
+#define NumModes	18		// Length of mode cache array.
 
 // Mode information.
 typedef struct {
 	Array modeTable;		// Mode table: array of Datum objects containing pointers to ModeSpec records.
 	ModeSpec *cache[NumModes];	// Cache for built-in modes.
 	ModeGrp *grpHead;		// Mode group table: linked list of ModeGrp records.
-					// Built-in mode names.
-	const char *MdLitASave, *MdLitATerm, *MdLitBak, *MdLitClob, *MdLitCol, *MdLitExact, *MdLitFence1, *MdLitFence2,
-	 *MdLitHScrl, *MdLitLine, *MdLitOver, *MdLitRdOnly, *MdLitRegexp, *MdLitRepl, *MdLitRtnMsg, *MdLitSafe, *MdLitWkDir,
-	 *MdLitWrap;
 	} ModeInfo;
 
 // Position of point in a buffer.
@@ -509,17 +505,18 @@ typedef struct {
 // Message line print flags.
 #define MLHome		0x0001		// Move cursor to beginning of message line before display.
 #define MLTermAttr	0x0002		// Enable interpretation of terminal attribute sequences in message.
-#define MLWrap		0x0010		// Wrap message [like this].
-#define MLRaw		0x0020		// Output raw character; otherwise, convert to visible form if needed.
-#define MLNoEOL		0x0040		// Don't overwrite char at right edge of screen with LineExt ($) char.
-#define MLFlush		0x0080		// Flush output in mlputs() and mlprintf().
+#define MLWrap		0x0004		// Wrap message [like this].
+#define MLRaw		0x0008		// Output raw character; otherwise, convert to visible form if needed.
+#define MLNoEOL		0x0010		// Don't overwrite char at right edge of screen with LineExt ($) char.
+#define MLFlush		0x0020		// Flush output in mlputs() and mlprintf().
+#define MLForce		0x0040		// Force output to message line (when script is running).
 
 // Settings that determine a window's "face"; that is, the location of point in the buffer and in the window.
 typedef struct {
 	struct Line *pTopLine;		// Pointer to top line of window.
 	Point point;			// Point position.
 	int firstCol;			// First column displayed when horizontal scrolling is enabled.
-	} WindFace;
+	} Face;
 
 // There is a window structure allocated for every active display window.  The windows are kept in a list, in top to bottom
 // screen order.  The list is associated with one screen and the list head is stored in "windHead" whenever the screen is
@@ -529,7 +526,7 @@ typedef struct {
 typedef struct EWindow {
 	struct EWindow *next;		// Next window.
 	struct Buffer *pBuf;		// Buffer displayed in window.
-	WindFace face;			// Point position, etc.
+	Face face;			// Point position, etc.
 	ushort id;			// Unique window identifier (mark used to save face before it's buffer is narrowed).
 	ushort topRow;			// Origin 0 top row of window.
 	ushort rows;			// Number of rows in window, excluding mode line.
@@ -566,10 +563,14 @@ typedef struct EScreen {
 	EWindow *pCurWind;		// Current window in this screen.
 	struct Buffer *pLastBuf;	// Last buffer on screen that was exited from.
 	ushort num;			// Screen number (first is 1).
-	ushort flags;			// Flags.
+	ushort flags;			// Screen flags.
 	ushort rows;			// Height of screen.
 	ushort cols;			// Width of screen.
 	const char *workDir;		// Working directory associated with screen (absolute pathname in directory table).
+	int hardTabSize;		// Current hard tab size.
+	int softTabSize;		// Current soft tab size (0 -> use hard tabs).
+	int wrapCol;			// Current wrap column.
+	int prevWrapCol;		// Previous wrap column.
 	int cursorRow;			// Current cursor row on screen.
 	int cursorCol;			// Current cursor column on screen.
 	int firstCol;			// First display column of current line when horizontal scrolling is disabled.
@@ -580,8 +581,8 @@ typedef struct EScreen {
 
 // Flags for changing screens, windows, or buffers.
 #define SWB_Repeat	0x0001		// n argument is a repeat count.
-#define SWB_Forw	0x0002		// Repeat forward; otherwise, backward.
-#define SWB_ExitHook	0x0004		// Run "exitBuf" hook; otherwise, "enterBuf".
+#define SWB_Forw	0x0002		// Repeat forward, otherwise backward.
+#define SWB_ExitHook	0x0004		// Run "exitBuf" hook, otherwise "enterBuf".
 #define SWB_NoBufHooks	0x0008		// Don't run "exitBuf" or "enterBuf" hook.
 #define SWB_NoLastBuf	0x0010		// Don't update "last buffer" pointer in current screen.
 
@@ -630,17 +631,17 @@ typedef struct BufMode {
 // Text is kept in buffers.  A buffer header, described below, exists for every buffer in the system.  Buffers are kept in a
 // array sorted by buffer name to provide quick access to the next or previous buffer, to allow for quick binary searching by
 // name, and to eliminate the need to sort the list when doing buffer completions and creating the "showBuffers" listing.  There
-// is a safe store for a window's top line, point, and first display column (in the WindFace object) so that windows can be
-// cleanly restored to the same point in a buffer (if possible) when switching among them.  windCount is the number of windows
-// (on any screen) that a buffer is associated with.  Thus if the value is zero, the buffer is not being displayed anywhere.
-// The text for a buffer is kept in a circularly linked list of lines with a pointer to the first line in pFirstLine.  When a
-// buffer is first created or cleared, the first (and only) line will point to itself, both forward and backward.  The line will
-// also be empty indicating that the buffer is empty.  A buffer will always have a minimum of one line associated with it at all
-// times.  All lines except the last have an implicit newline delimiter; however, the last line never does.  Hence, files which
-// do not have a newline as their last character can be handled properly.  A buffer may be "inactive" which means the file
-// associated with it has not been read in yet.  The file is read at "use buffer" time.
+// is a safe store for a window's top line, point, and first display column (in the Face object) so that windows can be cleanly
+// restored to the same point in a buffer (if possible) when switching among them.  windCount is the number of windows (on any
+// screen) that a buffer is associated with.  Thus if the value is zero, the buffer is not being displayed anywhere.  The text
+// for a buffer is kept in a circularly linked list of lines with a pointer to the first line in pFirstLine.  When a buffer is
+// first created or cleared, the first (and only) line will point to itself, both forward and backward.  The line will also be
+// empty indicating that the buffer is empty.  A buffer will always have a minimum of one line associated with it at all times.
+// All lines except the last have an implicit newline delimiter; however, the last line never does.  Hence, files which do not
+// have a newline as their last character can be handled properly.  A buffer may be "inactive" which means the file associated
+// with it has not been read in yet.  The file is read at "use buffer" time.
 typedef struct Buffer {
-	WindFace face;			// Point position, etc. from last detached window.
+	Face face;			// Point position, etc. from last detached window.
 	struct Line *pFirstLine;	// Pointer to first line.
 	struct Line *pNarTopLine;	// Pointer to narrowed top text.
 	struct Line *pNarBotLine;	// Pointer to narrowed bottom text.
@@ -656,8 +657,8 @@ typedef struct Buffer {
 	char bufname[MaxBufname + 1];	// Buffer name.
 	} Buffer;
 
-// Macro for fetching Buffer pointer from Datum object in Array element, given Datum *.
-#define bufPtr(pDatum)	((Buffer *) (pDatum)->u.blob.mem)
+// Macro for fetching Buffer pointer from Datum object in Array element, given Datum pointer.
+#define bufPtr(pDatum)	((Buffer *) (pDatum)->u.mem.ptr)
 
 // Buffer flags and masks.
 #define BFActive	0x0001		// Active buffer (file was read).
@@ -677,7 +678,7 @@ typedef struct Buffer {
 #define BSysLead	'.'		// Leading character of system (internal) buffer.
 
 // Buffer traversal flags.
-#define BT_Backward	0x0001		// Traverse buffer list backward; otherwise, forward.
+#define BT_Backward	0x0001		// Traverse buffer list backward, otherwise forward.
 #define BT_Hidden	0x0002		// Include hidden, non-user-routine buffers.
 #define BT_HomeDir	0x0004		// Select buffers having same home directory as current buffer only.
 #define BT_Delete	0x0008		// Delete current buffer after switch.
@@ -689,6 +690,7 @@ typedef struct Buffer {
 #define BS_Force	0x0004		// Force-create buffer with unique name.
 #define BS_Derive	0x0008		// Derive buffer name from filename.
 #define BS_CreateHook	0x0010		// Execute "createBuf" hook if a buffer is created.
+#define BS_Confirm	0x0020		// Get user confirmation if creating buffer.
 
 // Buffer clearing flags.
 #define BC_IgnChgd	0x0001		// Ignore BFChanged (buffer changed) flag.
@@ -697,8 +699,18 @@ typedef struct Buffer {
 #define BC_Confirm	0x0008		// Always ask for confirmation (when interactive).
 #define BC_ShowName	0x0010		// Show buffer name in confirmation prompt.
 
+// Buffer deleting flags.
+#define BD_Visible	0x0001		// Select visible buffers.
+#define BD_Unchanged	0x0002		// Select unchanged buffers.
+#define BD_Homed	0x0004		// Select "homed" buffers.
+#define BD_Inactive	0x0008		// Select inactive buffers.
+#define BD_Displayed	0x0010		// Include displayed buffers.
+#define BD_Hidden	0x0020		// Include hidden buffers.
+#define BD_Confirm	0x0040		// Confirm deletion.
+#define BD_Force	0x0080		// Force-delete all selected buffers (ignore changes).
+
 // Buffer saving flags.
-#define BS_All		0x0001		// Saving all buffers; otherwise, just current one.
+#define BS_All		0x0001		// Saving all buffers, otherwise just current one.
 #define BS_MultiDir	0x0002		// Multiple working directories exist (in screens).
 #define BS_QuickExit	0x0004		// Called from quickExit command.
 
@@ -707,7 +719,7 @@ typedef struct Buffer {
 #define BR_Current	0x0002		// Rename current buffer (interactively).
 
 // Buffer rendering flags.
-#define RendReset	0x0001		// Move point to beginning of buffer and unhide it if buffer is not deleted.
+#define RendRewind	0x0001		// Move point to beginning of buffer and unhide it if buffer is not deleted.
 #define RendAltML	0x0002		// Use alternate (simple) mode line when popping buffer.
 #define RendWait	0x0004		// Wait for user to press a key before returning from pop-up window.
 #define	RendShift	0x0008		// Shift display left if needed to prevent line truncation in pop-up window.
@@ -722,11 +734,11 @@ typedef struct Buffer {
 #define RWStats		0x0010		// Return message containing I/O statistics.
 
 // Flags for strIndex() function.
-#define Idx_Char	0x0001		// Find a character; otherwise, a pattern.
-#define Idx_Last	0x0002		// Find last occurrence; otherwise, first.
+#define Idx_Char	0x0001		// Find a character, otherwise a pattern.
+#define Idx_Last	0x0002		// Find last occurrence, otherwise first.
 
 // Region descriptor: starting location, size in characters, and number of lines.  If size is negative, region extends backward
-// from point; otherwise, forward.
+// from point, otherwise forward.
 typedef struct {
 	Point point;			// Origin point location.
 	long size;			// Length in characters.
@@ -756,7 +768,7 @@ typedef struct Line {
 // Editing flags.
 #define EditKill	0x0001		// Kill operation (save text in kill ring).
 #define EditDel		0x0002		// Delete operation (save text in delete ring).
-#define EditSpace	0x0004		// Insert space character; otherwise, newline.
+#define EditSpace	0x0004		// Insert space character, otherwise newline.
 #define EditWrap	0x0008		// Do word wrap, if applicable.
 #define EditHoldPoint	0x0010		// Hold (don't move) point.
 
@@ -765,9 +777,9 @@ typedef struct Line {
 //  2. ArgIntN and ArgArrayN may not both be set.
 //  3. If CFAddlArg or CFNoArgs set, maxArgs must be greater than zero.
 //  4. If no argument type flag (ArgNilN, ArgBoolN, ArgIntN, or ArgArrayN) is set, the corresponding Nth argument must be
-//     string; otherwise, if ArgIntN or ArgArrayN is set, the Nth argument must be (or may be if ArgMay set) that type;
+//     string; otherwise, if ArgIntN or ArgArrayN is set, the Nth argument must be (or may be if ArgMay set) integer or array;
 //     otherwise, the Nth argument must be string, nil (if ArgNilN set), or Boolean (if ArgBoolN set).
-//  5. If ArgNISN is set, the Nth argument may be any type except array unless ArgArrayN is also set.
+//  5. If ArgNISN is set, the Nth argument may be nil, integer, or string, and may also be array if ArgArrayN is set.
 typedef struct {
 	const char *name;		// Name of command or function.
 	ushort attrFlags;		// Attribute flags.
@@ -797,7 +809,7 @@ typedef struct {
 #define CFShortLoad	0x4000		// Load one fewer argument than usual in execCmdFunc().
 #define CFNoLoad	0x8000		// Load no arguments in execCmdFunc().
 
-#define CFMaxArgs	3		// Maximum number of arguments that could be loaded by execCmdFunc() for any command or
+#define CFMaxArgs	4		// Maximum number of arguments that could be loaded by execCmdFunc() for any command or
 					// function; that is, maximum value of maxArgs in cmdFuncTable where CFNoLoad is not set
 					// and maxArgs > 0.
 
@@ -813,8 +825,8 @@ typedef struct {
 		} u;
 	} UnivPtr;
 
-// Macro for fetching UnivPtr pointer from Datum object in hash record, given 'HashRec *'.
-#define univPtr(pHashRec)	((UnivPtr *) (pHashRec)->pValue->u.blob.mem)
+// Macro for fetching UnivPtr pointer from Datum object in hash record, given HashRec pointer.
+#define univPtr(pHashRec)	((UnivPtr *) (pHashRec)->pValue->u.mem.ptr)
 
 // Pointer types.  Set to different bits so that can be used as selector masks in function calls.
 #define PtrNull		0x0000		// NULL pointer.
@@ -867,38 +879,39 @@ typedef struct {
 #define HkWrap		10		// Word wrap hook.
 #define HkWrite		11		// Write file hook.
 
-// Command-function ids.
+// Command-function IDs.
 typedef enum {
-	cf_abort, cf_about, cf_abs, cf_alias, cf_appendFile, cf_apropos, cf_array, cf_backChar, cf_backLine, cf_backPage,
-	cf_backPageNext, cf_backPagePrev, cf_backTab, cf_backWord, cf_backspace, cf_basename, cf_beep, cf_beginBuf,
-	cf_beginLine, cf_beginMacro, cf_beginText, cf_beginWhite, cf_bemptyQ, cf_bgets, cf_bindKey, cf_binding, cf_bprint,
-	cf_bprintf, cf_bufAttrQ, cf_bufBoundQ, cf_bufInfo, cf_bufWind, cf_chgBufAttr, cf_chgDir, cf_chgMode, cf_chr,
-	cf_clearBuf, cf_clearHook, cf_clearMsgLine, cf_clone, cf_copyFencedRegion, cf_copyLine, cf_copyRegion, cf_copyToBreak,
-	cf_copyWord,
+	cf_abort, cf_about, cf_abs, cf_aclone, cf_acompact, cf_adelete, cf_adeleteif, cf_afill,	cf_aincludeQ, cf_aindex,
+	cf_ainsert, cf_alias, cf_apop, cf_appendFile, cf_apropos, cf_apush, cf_array,
+	cf_ashift, cf_aunshift, cf_backChar, cf_backLine, cf_backPage, cf_backPageNext, cf_backPagePrev, cf_backTab,
+	cf_backWord, cf_backspace, cf_basename, cf_beep, cf_beginBuf, cf_beginLine, cf_beginMacro, cf_beginText, cf_beginWhite,
+	cf_bemptyQ, cf_bgets, cf_bindKey, cf_binding, cf_bprint, cf_bprintf, cf_bufAttrQ, cf_bufBoundQ, cf_bufInfo, cf_bufWind,
+	cf_chgBufAttr, cf_chgDir, cf_chgMode, cf_chr, cf_clearBuf, cf_clearHook, cf_clearMsgLine, cf_copyFencedRegion,
+	cf_copyLine, cf_copyRegion, cf_copyToBreak, cf_copyWord,
 #if WordCount
 	cf_countWords,
 #endif
 	cf_cycleRing, cf_definedQ, cf_delAlias, cf_delBackChar, cf_delBackTab, cf_delBlankLines, cf_delBuf, cf_delFencedRegion,
-	cf_delForwChar, cf_delForwTab, cf_delLine, cf_delMark, cf_delRegion, cf_delRingEntry, cf_delRoutine, cf_delScreen,
-	cf_delToBreak, cf_delWhite, cf_delWind, cf_delWord, cf_detabLine, cf_dirname, cf_dupLine, cf_editMode, cf_editModeGroup,
-	cf_emptyQ, cf_endBuf, cf_endLine, cf_endMacro, cf_endWhite, cf_endWord, cf_entabLine, cf_env, cf_eval, cf_exit,
-	cf_expandPath, cf_findFile, cf_forwChar, cf_forwLine, cf_forwPage, cf_forwPageNext, cf_forwPagePrev, cf_forwTab,
-	cf_forwWord, cf_getInfo, cf_getKey, cf_getWord, cf_glob, cf_gotoFence, cf_gotoLine, cf_gotoMark, cf_groupModeQ,
-	cf_growWind, cf_huntBack, cf_huntForw, cf_includeQ, cf_indentRegion, cf_index, cf_insert, cf_insertBuf, cf_insertFile,
-	cf_insertPipe, cf_insertSpace, cf_inserti, cf_interactiveQ, cf_join, cf_joinLines, cf_joinWind, cf_keyPendingQ, cf_kill,
-	cf_killFencedRegion, cf_killLine, cf_killRegion, cf_killToBreak, cf_killWord, cf_lastBuf, cf_length, cf_let,
-	cf_lowerCaseLine, cf_lowerCaseRegion, cf_lowerCaseStr, cf_lowerCaseWord, cf_manageMacro, cf_markBuf, cf_match,
-	cf_message, cf_metaPrefix, cf_modeQ, cf_moveWindDown, cf_moveWindUp, cf_narrowBuf, cf_negativeArg, cf_newline,
-	cf_newlineI, cf_nextBuf, cf_nextScreen, cf_nextWind, cf_nilQ, cf_nullQ, cf_numericQ, cf_onlyWind, cf_openLine,
-	cf_openLineI, cf_ord, cf_outdentRegion, cf_overwrite, cf_pathname, cf_pause, cf_pipeBuf, cf_pop, cf_popBuf, cf_popFile,
-	cf_prefix1, cf_prefix2, cf_prefix3, cf_prevBuf, cf_prevScreen, cf_prevWind, cf_print, cf_printf, cf_prompt, cf_push,
-	cf_queryReplace, cf_quickExit, cf_quote, cf_quoteChar, cf_rand, cf_readFile, cf_readPipe, cf_reframeWind, cf_renameBuf,
-	cf_renameMacro, cf_replace, cf_replaceText, cf_resetTerm, cf_resizeWind, cf_restoreBuf, cf_restoreScreen,
-	cf_restoreWind, cf_revertYank, cf_ringSize, cf_run, cf_saveBuf, cf_saveFile, cf_saveScreen, cf_saveWind, cf_scratchBuf,
-	cf_searchBack, cf_searchForw, cf_selectBuf, cf_selectLine, cf_selectScreen, cf_selectWind, cf_setBufFile,
-	cf_setColorPair, cf_setDispColor, cf_setHook, cf_setMark, cf_setWrapCol, cf_seti, cf_shQuote, cf_shell, cf_shellCmd,
-	cf_shift, cf_showAliases, cf_showBuffers, cf_showColors, cf_showCommands, cf_showDir, cf_showFence, cf_showFunctions,
-	cf_showHooks, cf_showKey, cf_showMarks, cf_showModes, cf_showPoint,
+	cf_delFile, cf_delForwChar, cf_delForwTab, cf_delLine, cf_delMark, cf_delRegion, cf_delRingEntry, cf_delRoutine,
+	cf_delScreen, cf_delToBreak, cf_delWhite, cf_delWind, cf_delWord, cf_detabLine, cf_dirname, cf_dupLine, cf_editMode,
+	cf_editModeGroup, cf_emptyQ, cf_endBuf, cf_endLine, cf_endMacro, cf_endWhite, cf_endWord, cf_entabLine, cf_env, cf_eval,
+	cf_exit, cf_expandPath, cf_findFile, cf_forwChar, cf_forwLine, cf_forwPage, cf_forwPageNext, cf_forwPagePrev,
+	cf_forwTab, cf_forwWord, cf_getInfo, cf_getKey, cf_getWord, cf_glob, cf_gotoFence, cf_gotoLine, cf_gotoMark,
+	cf_groupModeQ, cf_growWind, cf_huntBack, cf_huntForw, cf_indentRegion, cf_index, cf_insert, cf_insertBuf, cf_insertFile,
+	cf_insertPipe, cf_insertSpace, cf_insertf, cf_inserti, cf_interactiveQ, cf_isClassQ, cf_join, cf_joinLines, cf_joinWind,
+	cf_keyPendingQ, cf_kill, cf_killFencedRegion, cf_killLine, cf_killRegion, cf_killToBreak, cf_killWord, cf_lastBuf,
+	cf_length, cf_let, cf_linkFile, cf_lowerCaseLine, cf_lowerCaseRegion, cf_lowerCaseStr, cf_lowerCaseWord, cf_manageMacro,
+	cf_markBuf, cf_match, cf_message, cf_metaPrefix, cf_modeQ, cf_moveWindDown, cf_moveWindUp, cf_narrowBuf, cf_negativeArg,
+	cf_newline, cf_newlineI, cf_nextBuf, cf_nextScreen, cf_nextWind, cf_nilQ, cf_nullQ, cf_numericQ, cf_onlyWind,
+	cf_openLine, cf_openLineI, cf_ord, cf_outdentRegion, cf_overwriteChar, cf_overwriteCol, cf_pathname, cf_pause,
+	cf_pipeBuf, cf_popBuf, cf_popFile, cf_prefix1, cf_prefix2, cf_prefix3, cf_prevBuf, cf_prevScreen, cf_prevWind, cf_print,
+	cf_printf, cf_prompt, cf_queryReplace, cf_quickExit, cf_quote, cf_quoteChar, cf_rand, cf_readFile, cf_readPipe,
+	cf_reframeWind, cf_renameBuf, cf_renameFile, cf_renameMacro, cf_replace, cf_resetTerm, cf_resizeWind, cf_restoreBuf,
+	cf_restoreScreen, cf_restoreWind, cf_revertYank, cf_ringSize, cf_run, cf_saveBuf, cf_saveFile, cf_saveScreen,
+	cf_saveWind, cf_scratchBuf, cf_searchBack, cf_searchForw, cf_selectBuf, cf_selectLine, cf_selectScreen, cf_selectWind,
+	cf_setBufFile, cf_setColorPair, cf_setDefault, cf_setDispColor, cf_setHook, cf_setMark, cf_setWrapCol, cf_seti,
+	cf_shQuote, cf_shell, cf_shellCmd, cf_showAliases, cf_showBuffers, cf_showColors, cf_showCommands, cf_showDir,
+	cf_showFence, cf_showFunctions, cf_showHooks, cf_showKey, cf_showMarks, cf_showModes, cf_showPoint,
 #if MMDebug & Debug_ShowRE
 	cf_showRegexp,
 #endif
@@ -906,9 +919,9 @@ typedef enum {
 	cf_sprintf, cf_statQ, cf_strFit, cf_strPop, cf_strPush, cf_strShift, cf_strUnshift, cf_strip, cf_sub, cf_subline,
 	cf_substr, cf_suspend, cf_swapMark, cf_tab, cf_titleCaseLine, cf_titleCaseRegion, cf_titleCaseStr, cf_titleCaseWord,
 	cf_toInt, cf_toStr, cf_tr, cf_traverseLine, cf_trimLine, cf_truncBuf, cf_typeQ, cf_unbindKey, cf_undelete,
-	cf_undeleteCycle, cf_universalArg, cf_unshift, cf_updateScreen, cf_upperCaseLine, cf_upperCaseRegion, cf_upperCaseStr,
-	cf_upperCaseWord, cf_viewFile, cf_widenBuf, cf_wordCharQ, cf_wrapLine, cf_wrapWord, cf_writeBuf, cf_writeFile,
-	cf_xPathname, cf_xeqBuf, cf_xeqFile, cf_xeqMacro, cf_yank, cf_yankCycle
+	cf_undeleteCycle, cf_universalArg, cf_updateScreen, cf_upperCaseLine, cf_upperCaseRegion, cf_upperCaseStr,
+	cf_upperCaseWord, cf_viewFile, cf_widenBuf, cf_wrapLine, cf_wrapWord, cf_writeBuf, cf_writeFile, cf_xPathname,
+	cf_xeqBuf, cf_xeqFile, cf_xeqMacro, cf_yank, cf_yankCycle
 	} CmdFuncId;
 
 // Object for core keys bound to special commands (like "abort").  These are maintained in global variable "coreKeys" in
@@ -947,26 +960,32 @@ typedef struct {
 #define ArgNotNull1	0x00000001	// First argument may not be null.
 #define ArgNotNull2	0x00000002	// Second argument may not be null.
 #define ArgNotNull3	0x00000004	// Third argument may not be null.
-#define ArgNil1		0x00000008	// First argument may be nil.
-#define ArgNil2		0x00000010	// Second argument may be nil.
-#define ArgNil3		0x00000020	// Third argument may be nil.
-#define ArgBool1	0x00000040	// First argument may be Boolean (true or false).
-#define ArgBool2	0x00000080	// Second argument may be Boolean (true or false).
-#define ArgBool3	0x00000100	// Third argument may be Boolean (true or false).
-#define ArgInt1		0x00000200	// First argument must be integer.
-#define ArgInt2		0x00000400	// Second argument must be integer.
-#define ArgInt3		0x00000800	// Third argument must be integer.
-#define ArgArray1	0x00001000	// First argument must be array (or "may" be if ArgNIS1 or ArgMay also set).
-#define ArgArray2	0x00002000	// Second argument must be array (or "may" be if ArgNIS2 or ArgMay also set).
-#define ArgArray3	0x00004000	// Third argument must be array (or "may" be if ArgNIS3 or ArgMay also set).
-#define ArgNIS1		0x00008000	// First argument can be nil, integer, or string.
-#define ArgNIS2		0x00010000	// Second argument can be nil, integer, or string.
-#define ArgNIS3		0x00020000	// Third argument can be nil, integer, or string.
-#define ArgMay		0x00040000	// ArgIntN or ArgArrayN "may" be instead of "must" be.
+#define ArgNotNull4	0x00000008	// Fourth argument may not be null.
+#define ArgNil1		0x00000010	// First argument may be nil.
+#define ArgNil2		0x00000020	// Second argument may be nil.
+#define ArgNil3		0x00000040	// Third argument may be nil.
+#define ArgNil4		0x00000080	// Fourth argument may be nil.
+#define ArgBool1	0x00000100	// First argument may be Boolean (true or false).
+#define ArgBool2	0x00000200	// Second argument may be Boolean (true or false).
+#define ArgBool3	0x00000400	// Third argument may be Boolean (true or false).
+#define ArgBool4	0x00000800	// Fourth argument may be Boolean (true or false).
+#define ArgInt1		0x00001000	// First argument must be integer.
+#define ArgInt2		0x00002000	// Second argument must be integer.
+#define ArgInt3		0x00004000	// Third argument must be integer.
+#define ArgInt4		0x00008000	// Fourth argument must be integer.
+#define ArgArray1	0x00010000	// First argument must be array (or "may" be if ArgNIS1 or ArgMay also set).
+#define ArgArray2	0x00020000	// Second argument must be array (or "may" be if ArgNIS2 or ArgMay also set).
+#define ArgArray3	0x00040000	// Third argument must be array (or "may" be if ArgNIS3 or ArgMay also set).
+#define ArgArray4	0x00080000	// Fourth argument must be array (or "may" be if ArgNIS3 or ArgMay also set).
+#define ArgNIS1		0x00100000	// First argument can be nil, integer, or string.
+#define ArgNIS2		0x00200000	// Second argument can be nil, integer, or string.
+#define ArgNIS3		0x00400000	// Third argument can be nil, integer, or string.
+#define ArgNIS4		0x00800000	// Fourth argument can be nil, integer, or string.
+#define ArgMay		0x01000000	// ArgIntN or ArgArrayN "may" be instead of "must" be.
 
-// Command argument control flags.  May be combined with Arg* validation flags or Md* mode flags so higher bits are used.
-#define ArgFirst	0x01000000	// First argument (so no preceding comma).
-#define ArgPath		0x02000000	// Argument is a file pathname to be expanded if string type.  (Applies to first
+// Command argument control flags.  May be combined with Arg* flags, Md* mode flags, or Term_* flags so higher bits are used.
+#define ArgFirst	0x10000000	// First argument (so no preceding comma).
+#define ArgPath		0x20000000	// Argument is a file pathname to be expanded if string type.  (Applies to first
 					// argument only if set in cmdFuncTable, per code in execCmdFunc() function.)
 
 // Terminal completion/prompt flags.  These are combined with Ptr* selector flags for certain function calls so higher bits
@@ -1000,29 +1019,31 @@ typedef struct {
 	const char *termName;		// Value of TERM environmental variable.
 	} VTermCtrl;
 
+// Buffer display and editing parameters.
+typedef struct {
+	Buffer *pBuf;			// Current buffer to display or edit.
+	Face *pFace;			// Current window face to display or edit.
+	EWindow *pWind;			// Current window to display or edit.
+	EScreen *pScrn;			// Current screen to display or edit.
+	} BufCtrl;
+
 // Session control parameters.
 typedef struct {
-	Buffer *pCurBuf;		// Current buffer.
-	EScreen *pCurScrn;		// Current screen.
-	EWindow *pCurWind;		// Current window.
+	BufCtrl cur;			// Current display pointers.
+	BufCtrl edit;			// Current edit pointers.
 	DirPath *dirHead;		// Head of directory list.
 	int fencePause;			// Centiseconds to pause for fence matching.
 	int autoSaveCount;		// Auto-save counter (for all buffers).
 	int autoSaveTrig;		// Auto-save trigger count.
-	int hardTabSize;		// Current hard tab size.
 	uint myPID;			// Unix PID (for temporary filenames).
 	ushort opFlags;			// Operation flags.
 	int overlap;			// Number of lines to overlap when paging on a screen.
-	ulong randSeed;			// Random number seed.
 	Buffer *pSavedBuf;		// Saved buffer pointer ("saveBuf" function).
 	EScreen *pSavedScrn;		// Saved screen pointer ("saveScreen" function).
 	EWindow *pSavedWind;		// Saved window pointer ("saveWind" function).
 	EScreen *scrnHead;		// Head of screen list.
 	EWindow *windHead;		// Head of window list in current screen.
-	int softTabSize;		// Current soft tab size (0 -> use hard tabs).
 	int travJumpCols;		// Line-traversal jump size.
-	int wrapCol;			// Current wrap column.
-	int prevWrapCol;		// Previous wrap column.
 	int exitNArg;			// n argument given for "exit" or "quickExit" command.
 	RtnStatus rtn;			// Current return parameters from a command or function.
 	RtnStatus scriptRtn;		// Return parameters from a script (for $ReturnMsg).
@@ -1065,9 +1086,8 @@ extern void bufFaceToWindFace(Buffer *pBuf, EWindow *pWind);
 extern int bgets(Datum *pRtnVal, int n, Datum **args);
 extern bool binSearch(const char *key, const void *table, ssize_t n, int (*cmp)(const char *str1, const char *str2),
  const char *(*fetch)(const void *table, ssize_t i), ssize_t *pIndex);
-extern bool bufClearModes(Buffer *pBuf);
+extern int bnuke(ushort dflags, const char *workDir, int *pCount);
 extern int bpop(Buffer *pBuf, ushort flags);
-extern int bprint(Datum *pRtnVal, int n, Datum **args);
 extern int brename(Datum *pRtnVal, ushort flags, Buffer *pTargBuf);
 extern int bscratch(Buffer **ppBuf);
 extern int bsort(Buffer *pBuf, Point *pPoint, int n, ushort flags);
@@ -1075,6 +1095,7 @@ extern Buffer *bsrch(const char *bufname, ssize_t *index);
 extern int bswitch(Buffer *pBuf, ushort flags);
 extern int bufAttrQ(Datum *pRtnVal, int n, Datum **args);
 extern bool bufBegin(Point *pPoint);
+extern bool bufClearModes(Buffer *pBuf);
 extern bool bufEnd(Point *pPoint);
 extern int bufInfo(Datum *pRtnVal, int n, Datum **args);
 extern long bufLength(Buffer *pBuf, int *pLineCount);
@@ -1086,7 +1107,6 @@ extern int chgBufAttr(Datum *pRtnVal, int n, Datum **args);
 extern int chgdir(const char *dir);
 extern int chgMode(Datum *pRtnVal, int n, Datum **args);
 extern int chgMode1(const char *name, int action, Buffer *pBuf, long *formerStatep, ModeSpec **result);
-extern int chgText(Datum *pRtnVal, int n, ushort style, Buffer *pBuf);
 extern int chgWindSize(Datum *pRtnVal, int n, int how);
 extern int chgWorkDir(Datum *pRtnVal, int n, Datum **args);
 extern int clearBuf(Datum *pRtnVal, int n, Datum **args);
@@ -1112,7 +1132,8 @@ extern int delWind(Datum *pRtnVal, int n, Datum **args);
 extern int delTab(int n, bool force);
 extern void deselectOpts(Option *pOpt);
 extern int detabLine(Datum *pRtnVal, int n, Datum **args);
-extern int doIncl(Datum *pRtnVal, int n, Datum **args);
+extern void dgPop(Datum *pDatum);
+extern int doFill(Datum *pRtnVal, Datum **args);
 extern int doPop(Datum *pRtnVal, int n, bool popBuf);
 #if MMDebug & (Debug_ScrnDump | Debug_Narrow | Debug_Temp)
 extern void dumpBuffer(const char *label, Buffer *pBuf, bool withData);
@@ -1138,24 +1159,23 @@ extern int entabLine(Datum *pRtnVal, int n, Datum **args);
 extern int eopendir(const char *fileSpec, char **pFilePath);
 extern int ereaddir(void);
 extern int escAttr(DFab *pFab);
-extern int esctosf(const char *str, DFab *pFab);
+extern int esctofab(const char *str, DFab *pFab);
 extern int execFind(const char *name, ushort op, uint selector, UnivPtr *pUniv);
 extern int execNew(const char *name, UnivPtr *pUniv);
 extern int expandPath(Datum *pDest, Datum *pSrc);
-extern void faceInit(WindFace *pWindFace, Line *pLine, Buffer *pBuf);
+extern void faceInit(Face *pFace, Line *pLine, Buffer *pBuf);
 extern int fenceMatch(short fence, bool doBeep);
 extern Buffer *findBuf(Datum *pBufname);
 extern int findBufMark(ushort id, Mark **ppMark, ushort flags);
 extern int fIndex(Datum *pRtnVal, int n, Datum **args);
 extern Ring *findRing(Datum *pName);
-extern EWindow *findWind(Buffer *pBuf);
+extern EWindow *findWind(Buffer *pBuf, EScreen **ppScrn);
 extern void fixBufFace(Buffer *pBuf, int offset, int n, Line *pLine1, Line *pLine2);
-extern void fixWindFace(int offset, int n, Line *pLine1, Line *pLine2);
+extern void fixFace(int offset, int n, Line *pLine1, Line *pLine2);
 extern int forwChar(Datum *pRtnVal, int n, Datum **args);
 extern int forwLine(Datum *pRtnVal, int n, Datum **args);
 extern int forwPage(Datum *pRtnVal, int n, Datum **args);
 extern int forwWord(Datum *pRtnVal, int n, Datum **args);
-extern void garbPop(Datum *pDatum);
 extern int getBufname(Datum *pRtnVal, const char *prompt, const char *defName, uint flags, Buffer **ppBuf, bool *created);
 extern int getCol(Point *pPoint, bool termAttr);
 extern int getCFA(const char *prompt, uint selector, UnivPtr *pUniv, const char *errorMsg);
@@ -1193,6 +1213,7 @@ extern void initInfoColors(void);
 extern int insertBuf(Datum *pRtnVal, int n, Datum **args);
 extern int inserti(Datum *pRtnVal, int n, Datum **args);
 extern int insertNLSpace(int n, ushort flags);
+extern bool interactive(void);
 extern bool inWord(void);
 extern int iorStr(const char *src, int n, ushort style, Ring *pRing);
 extern int iorText(const char *src, int n, ushort style, Buffer *pBuf);
@@ -1212,6 +1233,7 @@ extern int kdcLine(int n, int kdc);
 extern int kdcText(int n, int kdc, Region *pRegion);
 extern int killPrep(int kill);
 extern int lalloc(int used, Line **ppLine);
+#define libpanic()	(cxlExcep.flags & ExcepMem)
 extern int librsset(int status);
 extern void llink(Line *pLine1, Buffer *pBuf, Line *pLine2);
 extern bool lineInWind(EWindow *pWind, Line *pLine);
@@ -1226,7 +1248,7 @@ extern int message(Datum *pRtnVal, int n, Datum **args);
 extern int mgcreate(const char *name, ModeGrp *prior, const char *desc, ModeGrp **result);
 extern bool mgsrch(const char *name, ModeGrp **slot, ModeGrp **ppModeGrp);
 extern void mleraseEOL(void);
-extern int mlerase(void);
+extern int mlerase(ushort flags);
 extern int mlflush(void);
 extern int mlmove(int col);
 extern int mlprintf(ushort flags, const char *fmt, ...);
@@ -1257,7 +1279,7 @@ extern char *pad(char *s, uint len);
 extern int parseOpts(OptHdr *pOptHdr, const char *basePrompt, Datum *pOptions, int *count);
 extern int pathSearch(const char *name, ushort flags, void *result, const char *funcName);
 extern int pipeCmd(Datum *pRtnVal, int n, const char *prompt, ushort flags);
-extern int prevNextBuf(Datum *pRtnVal, int n, ushort flags);
+extern int prevNextBuf(Datum *pRtnVal, ushort flags);
 extern int prevWind(Datum *pRtnVal, int n, Datum **args);
 extern bool pointInWind(void);
 extern char *putAttrStr(const char *str, const char *strEnd, ushort *flags, void *targ);
@@ -1281,9 +1303,9 @@ extern void rspush(short *pStatus, ushort *pFlags);
 extern int rssave(void);
 extern int rsset(int status, ushort flags, const char *fmt, ...);
 extern void rsunfail(void);
-extern void rtop(Ring *pRing, RingEntry *entry);
+extern void rtop(Ring *pRing, RingEntry *pEntry);
 extern int runBufHook(Datum **ppRtnVal, ushort flags);
-extern int runCmd(Datum *pSink, DFab *cmd, const char *cmdName, const char *arg, bool fullQuote);
+extern int runCmd(Datum *pRtnVal, const char *cmdPrefix, const char *arg, const char *cmdSuffix, ushort flags);
 extern int scratchBuf(Datum *pRtnVal, int n, Datum **args);
 extern int scrnCount(void);
 extern int selectBuf(Datum *pRtnVal, int n, Datum **args);
@@ -1294,9 +1316,10 @@ extern int sepLine(int len, DFab *pFab);
 extern void setBoolOpts(Option *pOpt);
 extern int setBufMode(Buffer *pBuf, ModeSpec *pModeSpec, bool clear, bool *pWasSet);
 extern int setColorPair(Datum *pRtnVal, int n, Datum **args);
+extern int setDefault(Datum *pRtnVal, int n, Datum **args);
 extern int setDispColor(Datum *pRtnVal, int n, Datum **args);
-extern int setExecPath(const char *path, bool prepend);
-extern int setFilename(Buffer *pBuf, const char *filename, bool updBufDir);
+extern int setExecPath(const char *path);
+extern int setFilename(Buffer *pBuf, const char *filename, ushort flags);
 extern void setGlobalMode(ModeSpec *pModeSpec);
 extern int seti(Datum *pRtnVal, int n, Datum **args);
 extern int setMark(Datum *pRtnVal, int n, Datum **args);
@@ -1347,6 +1370,7 @@ extern int typahead(int *pCount);
 extern void ungetkey(ushort extKey);
 extern int update(int n);
 extern int updateScrn(Datum *pRtnVal, int n, Datum **args);
+extern long urand(long upperBound);
 extern int userPrompt(Datum *pRtnVal, int n, Datum **args);
 extern bool validMark(Datum *pDatum);
 extern int vtinit(void);
@@ -1363,7 +1387,6 @@ extern int wscroll(Datum *pRtnVal, int n, int (*windFunc)(Datum *pRtnVal, int n,
 extern int wsplit(int n, EWindow **ppWind);
 extern int wswitch(EWindow *pWind, ushort flags);
 extern int wupd_reframe(EWindow *pWind);
-extern long xorShift64Star(long max);
 extern int ycycle(Datum *pRtnVal, int n, Ring *pRing, ushort flag, ushort cmd);
 extern int yrevert(ushort flags);
 
@@ -1385,11 +1408,17 @@ Option bufAttrTable[] = {		// Buffer attribute table.
 	{"^ReadOnly", "^RdO", 0, BFReadOnly},
 	{"^TermAttr", "^TAttr", 0, BFTermAttr},
 	{NULL, NULL, 0, 0}};
-char buffer1[] = Buffer1;		// Name of first buffer ("untitled").
+char buffer1[] = Buffer1;		// Name of first buffer ("unnamed").
 Array bufTable;				// Buffer table (array).
-char *Copyright = "(c) Copyright 2020 Richard W. Marinelli";
+char *Copyright = "(c) Copyright 2022 Richard W. Marinelli";
 Macro curMacro = {
 	.size = 0, NULL, NULL, NULL, MacStop, 0};	// Macro control variables.
+Option defOptions[] = {
+	{"HardTabSize", NULL, 0, 0},
+	{"SoftTabSize", NULL, 0, 0},
+	{"WrapCol", NULL, 0, 0},
+	{NULL, NULL, 0, 0}};
+int defParams[] = {-1, -1, -1};		// Default screen parameters.
 HookRec hookTable[] = {			// Hook table.
 	{"chgDir", HLitN_chgDir, HLitArg_none, 0, false, {PtrNull, NULL}},
 	{"createBuf", HLitN_defn, HLitArg_createBuf, 1, false, {PtrNull, NULL}},
@@ -1411,10 +1440,7 @@ FILE *logfile;				// Log file for debugging.
 #endif
 char lowCase[256];			// Upper-to-lower translation table.
 char macroDelims[] = MacroDelims;	// Possible macro delimiters (not allowed in the name).
-ModeInfo modeInfo = {			// Mode information record.
-	.grpHead = NULL, "ASave", "ATerm", "Bak", "Clob", "Col", "Exact", "Fence1", "Fence2", "HScrl", "Line", "Over", "RdOnly",
-	"Regexp", "Repl", "RtnMsg", "Safe", "WkDir", "Wrap"
-	};
+ModeInfo modeInfo;			// Mode information record.
 char Myself[] = ProgName;		// Common name of program.
 Ring ringTable[] = {
 	{NULL, 0, DelRingSize, NULL, NULL},
@@ -1422,11 +1448,12 @@ Ring ringTable[] = {
 	{NULL, 0, MacroRingSize, NULL, ""},
 	{NULL, 0, ReplRingSize, NULL, NULL},
 	{NULL, 0, SearchRingSize, NULL, NULL}};
-ushort ringTableSize = sizeof(ringTable) / sizeof(*ringTable);
+ushort ringTableSize = elementsof(ringTable);
 SampBuf sampBuf;			// "Sample" string buffer.
+uint scratchBufNum = 0;			// Unique suffix number for scratch buffers.
 SessionCtrl sess = {			// Session parameters.
-	NULL, NULL, NULL, NULL, FencePause, AutoSaveTrig, AutoSaveTrig, 8, 0U, OpEval | OpStartup | OpScrnRedraw, PageOverlap,
-	1, NULL, NULL, NULL, NULL, NULL, 0, TravJump, 76, -1, 0, {Success, 0}, {Success, 0}
+	{NULL, NULL, NULL, NULL}, {NULL, NULL, NULL, NULL}, NULL, FencePause, AutoSaveTrig, AutoSaveTrig, 0,
+	OpEval | OpStartup | OpScrnRedraw, PageOverlap, NULL, NULL, NULL, NULL, NULL, TravJump, 0, {Success, 0}, {Success, 0}
 	};
 ETerm term = {
 	TTY_MaxCols,			// Maximum number of columns.
@@ -1469,6 +1496,8 @@ extern Option bufAttrTable[];
 extern char buffer1[];
 extern Array bufTable;
 extern Macro curMacro;
+extern Option defOptions[];
+extern int defParams[];
 extern HookRec hookTable[];
 extern IVar iVar;
 #if MMDebug
@@ -1481,6 +1510,7 @@ extern char Myself[];
 extern Ring ringTable[];
 extern ushort ringTableSize;
 extern SampBuf sampBuf;
+extern uint scratchBufNum;
 extern SessionCtrl sess;
 extern ETerm term;
 extern char upCase[];

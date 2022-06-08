@@ -13,7 +13,7 @@ characters are shown in ~bbold~B and parameters are ~uunderlined~U:
      [~b{~B [~barguments:~B ~ustring~U] [~b,~B] [~bdescription:~B ~ustring~U] ~b}~B]
         Begin a command or function definition.  If ~bfunction~B is specified, the
         routine may not be bound to a key or run interactively, and will not be
-        listed in the "showFunctions" display by default unless it includes
+        listed in the ~bshowFunctions~B display by default unless it includes
         either the ~barguments~B or ~bdescription~B parameter, or is bound to a hook.
         If ~bcommand~B is specified, the routine may be bound to a key or run
         interactively, but may not be bound to a hook.
@@ -26,7 +26,7 @@ characters are shown in ~bbold~B and parameters are ~uunderlined~U:
         is specified followed by a comma, the routine may be called with
         ~umin-arg-count~U arguments or more.  Lastly, if neither argument count is
         specified, the routine may be called with any number of arguments
-        (including none).
+        (including zero).
 
         If the ~barguments~B or ~bdescription~B parameter is specified, the expression
         must evaluate to a non-null string.  Neither, one, or both may be
@@ -37,9 +37,22 @@ characters are shown in ~bbold~B and parameters are ~uunderlined~U:
             command fenceWord(1) {arguments: 'char', description: 'Wrap a pair\
              of fences around [-]n word(s)'}
 
+        The text in the ~bdescription~B parameter may contain tabs and/or newlines
+        to create indentation and/or line breaks when the text is displayed.
+        Tab stops are preset to every four columns.  Each tab causes the left
+        margin to be moved to the next tab stop so that all text that follows is
+        aligned on that column.  Tabs may also be embedded in the text to create
+        multiple text columns.  A newline begins a new line and resets the left
+        margin to zero.
+
+        Additionally, both the ~barguments~B and ~bdescription~B parameters may contain
+        terminal attribute sequences to add special formatting such as bolding
+        and underlining.  See the "Terminal Attributes" topic in Advanced Help
+        for details.
+
         The ~barguments~B and ~bdescription~B text values are shown with the command or
-        function name in the help text produced by the "apropos" (~#uESC a~U),
-        "showCommands" (~#uC-h c~U), and "showFunctions" (~#uC-h f~U) commands.
+        function name in the help text produced by the ~bapropos~B (~#uESC a~U),
+        ~bshowCommands~B (~#uC-h c~U), and ~bshowFunctions~B (~#uC-h f~U) commands.
 
     ~bendroutine~B
     	End the definition of the most recent command or function being defined,

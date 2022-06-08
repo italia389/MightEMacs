@@ -29,4 +29,4 @@ user.
 
 Note that any arguments specified on the command line are available to the
 script as $1, $2, ..., etc.  And when the script starts, the current buffer is
-"untitled".
+"unnamed".

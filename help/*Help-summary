@@ -57,10 +57,10 @@ Beginning of buffer ............ ~#uESC <~U    End of buffer .................. 
 ================================================================================
                       ~bDELETING, INSERTING, AND FORMATTING~B
 "Copy" and "kill" commands save text in the kill ring for later yanking,
-"deletes" do not.  However, deleted text can be restored with the "undelete" and
-"undeleteCycle" commands.  In general, copy commands have a ~uC-c~U (copy) prefix,
+"deletes" do not.  However, deleted text can be restored with the ~bundelete~B and
+~bundeleteCycle~B commands.  In general, copy commands have a ~uC-c~U (copy) prefix,
 kill commands have a ~uC-h~U (homicide) prefix, and delete commands have no prefix.
-To yank older kills, "yank" first, then immediately "yankCycle" one or more
+To yank older kills, ~byank~B first, then immediately ~byankCycle~B one or more
 times.  You may also specify a negative numeric prefix to yank older kills. Most
 of the following commands will operate on multiple items forward or backward if
 given a + or - numeric prefix.

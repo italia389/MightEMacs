@@ -1,13 +1,14 @@
 ~bScreens~B
 
 In addition to windows, MightEMacs provides the option of creating multiple
-screens to manage buffers.  A screen is the entire display, containing all
-visible windows.  Multiple screens directly overlap each other (so only one may
-be viewed at a time) and are numbered, beginning at 1.  If multiple screens
-exist, the number of the current (frontmost) one is displayed in the mode line
-of the bottom-most window.  Also, each screen maintains its own working
-directory.  Whenever a screen is selected, the current directory will
-automatically be changed if needed.
+screens to manage buffers and directories.  A screen is the entire display,
+containing all visible windows.  Multiple screens directly overlap each other
+(so only one may be viewed at a time) and are numbered, beginning at 1.  If
+multiple screens exist, the number of the current (frontmost) one is displayed
+in the mode line of the bottom-most window.  Also, each screen maintains its own
+working directory, tab settings, and wrap column.  Whenever a screen is
+selected, the current directory, tab settings, and wrap column will be changed
+automatically if different than the previous screen.
 
 For example, let's say you typed the following command to start the editor:
 
@@ -18,17 +19,40 @@ number 1.  Now say you entered ~#uC-x 2~U to create another window, then pressed
 to move the point so the windows had different "looks" (on the same buffer).  If
 you then typed ~#uESC s~U and entered zero at the prompt to create another screen,
 you would see that a second screen is created with just one window, and the
-window's mode line would contain "S2", identifying the screen.
+window's mode line would contain "S2/2", indicating "screen 2 of 2".
 
 Now say you pressed ~#uC-c D~U and changed the current directory to "..", then
 pressed ~#uC-x C-f~U to find a file and entered filename "Notes.txt".  Screen 2 would
-be displaying buffer "Notes" in the parent directory at this point.  If you used
-"selectScreen" (~#uESC s~U), "nextScreen" (~#uESC ]~U) or "prevScreen" (~#uESC [~U) to switch
+be displaying buffer "Notes.txt" in the parent directory at this point.  If you
+used ~bselectScreen~B (~#uESC s~U), ~bnextScreen~B (~#uESC ]~U) or ~bprevScreen~B (~#uESC [~U) to switch
 back to screen 1, you would notice that the first screen looks exactly as it did
 before and the original working directory would be displayed on the message
 line, indicating that it is now the current directory.  This technique is very
 useful for keeping your places in various windows, buffers, and directories and
 quickly switching among them.  You can create as many screens as you like.
+
+Whenever a screen is created, the current directory is associated with the
+screen, and the hard tab size, soft tab size, and wrap column are set to user-
+defined default values (regardless of what they were set to in the previous
+screen).  If no default values are defined, the hard tab size, soft tab size,
+and wrap column are set to 8, 0, and "screen width - 4", respectively.  You can
+change any of these defaults in a script with the ~bsetDefaults~B function.  You can
+also obtain the current default settings in a script via "getInfo 'Defaults'",
+which returns the values in an array.  See the ~bshowFunctions~B (~#uC-h f~U) display for
+details.
+
+Note that when a file is read into a buffer, the current directory is associated
+with that buffer and remembered.  The directory is considered to be the buffer's
+"home" directory.  The buffer is also associated with the current screen as well
+because the screen has the same home directory.  This homing feature allows for
+multiple files to be opened in the same directory (in the same screen) and be
+associated with each other.  Moreover, you can switch to the next or previous
+home buffer by using a positive numeric prefix with the ~bnextBuf~B (~#uC-x [~U) and
+~bprevBuf~B (~#uC-x [~U) commands, and also delete all of the buffers as a group when you
+are done working on them.  The deletion can be done by specifying the "Homed"
+option to the ~bdelBuf~B (~#uC-x C-b~U) command, or can be done at the same time the
+screen is deleted by using a negative numeric prefix with the ~bdelScreen~B (~#uESC
+C-d~U) command (described below).
 
 The complete list of screen commands follows:
 
@@ -38,7 +62,9 @@ The complete list of screen commands follows:
                                and switch to it.
     delScreen       ~#uESC C-d~U    Delete a screen by number (which may be the
                                current screen) and renumber any other higher
-                               numbered screens to "fill the hole".
+                               numbered screens to "fill the hole".  If n < 0,
+                               all buffers "homed" to the screen are also
+                               deleted.
     nextScreen      ~#uESC ]~U      Switch to the next (sequentially higher numbered)
                                screen n times.
     prevScreen      ~#uESC [~U      Switch to the previous (sequentially lower
@@ -49,9 +75,9 @@ The complete list of screen commands follows:
                                shown before the buffer name if the buffer has
                                been modified.
 
-See the individual command descriptions in the "showKey" (~#uC-h ?~U) or
-"showCommands" (~#uC-h c~U) help displays for more details.
+See the individual command descriptions in the ~bshowKey~B (~#uC-h ?~U) or
+~bshowCommands~B (~#uC-h c~U) help displays for more details.
 
-There is also a command called "getFile" (~#uC-x C-g~U) available that finds a file
+There is also a command called ~bgetFile~B (~#uC-x C-g~U) available that finds a file
 and opens it in a new screen in one step.  It also will set the file's buffer to
 read-only if n <= 0.

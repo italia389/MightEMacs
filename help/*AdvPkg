@@ -8,10 +8,10 @@ all other commands, note the following:
   * The word processing commands are activated if the $EndSentence variable is
     set to a non-empty value in "site.ms".
   * The block-processing and macro packages can be loaded by uncommenting the
-    appropriate line(s) in "site.ms" or by adding "require" statements to the
+    appropriate line(s) in "site.ms" or by adding ~brequire~B statements to the
     user startup file ".memacs".
 
-See the "showCommands" (~#uC-h c~U) or "showKey" (~#uC-h ?~U) displays for details.  A
+See the ~bshowCommands~B (~#uC-h c~U) or ~bshowKey~B (~#uC-h ?~U) displays for details.  A
 brief description of each command is presented here.
 
 --------------------------------------------------------------------------------
@@ -19,8 +19,6 @@ brief description of each command is presented here.
 
 chgIndent           ~#uC-c TAB~U     Change indentation at beginning of current
                                 line without moving point.
-delFile             ~#uC-x D~U       Delete a file on disk or a buffer and its
-                                associated file.
 enumLine            ~#uESC #~U       Insert sequential numbers at beginning of all
                                 lines in a block.
 fenceWord           ~#uESC "~U       Wrap a pair of fence characters around one or
@@ -34,11 +32,14 @@ outdentLine         ~#uC-c (~U       Indent or outdent a block of lines.
 joinLines0          ~#uC-x C-j~U     Join lines with no spacing in between.
 nextGrepBuf         ~#uC-c ]~U
 prevGrepBuf         ~#uC-c [~U       Switch to next or previous buffer from result of
-                                most recent "findFiles" invocation n times.
+                                most recent ~bfindFiles~B invocation.  If n < 0,
+                                also delete buffer that was exited from.
+nextHomeBuf         ~#uC-h ]~U
+prevHomeBuf         ~#uC-h [~U       Switch to next or previous "homed" buffer.  If
+				n < 0, also delete buffer that was exited from.
 popFileList         ~#uC-h l~U       Display a directory listing in a pop-up window.
-queryReplaceAll     ~#uESC C-q~U     Invoke the "queryReplace" command on multiple
+queryReplaceAll     ~#uESC C-q~U     Invoke the ~bqueryReplace~B command on multiple
                                 buffers in succession.
-renameFile          ~#uC-x R~U       Rename a file.
 showBindings        ~#uC-h n~U       Display all possible key bindings and what they
                                 are bound to in a pop-up window.
 showVar             ~#uC-h =~U       Display a variable name and its value on the

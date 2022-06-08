@@ -40,7 +40,7 @@ the "dot mark", which is initially placed at the end of a buffer.  Marks are
 visible characters which are used to mark point positions in a buffer.  Mark '.'
 is special in that it always exists (cannot be deleted), and is used to
 delineate a region.  To set mark '.' at the current point position, you use the
-"setMark" (~uC-SPC~U) command.
+~bsetMark~B (~uC-SPC~U) command.
 
 
 <home>    <exit>

@@ -1,9 +1,9 @@
-# (c) Copyright 2020 Richard W. Marinelli
+# (c) Copyright 2022 Richard W. Marinelli
 #
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# lang.ms		Ver. 9.5.0
+# lang.ms		Ver. 9.6.0
 #	MightEMacs startup file for managing programming language libraries.
 
 ##### Initialization #####
@@ -45,8 +45,8 @@
 # Notes:
 #  1. Mode description (element 2) is not included in the array that is stored in $LangModes.
 #  2. If a trigger array allows multiple types of values, all characters must be specified first, then strings, then keywords.
-#  3. Items of type 'string' in the newline trigger arrays are considered keywords if they begin with a word character;
-#     otherwise, strings.
+#  3. Items of type 'string' in the newline trigger arrays are considered keywords if they begin with a word character,
+#     otherwise strings.
 #  4. All trigger arrays except the first are converted to form [trigger-chars, [items]] to speed up processing at runtime,
 #     where first element is all unique characters at beginning or end (as appropriate) of each string or keyword item in string
 #     form.
@@ -95,7 +95,7 @@ for initFile in 1 => xPathname('*Init.ms', 'Glob, SkipNull')
 	# Load array in script.  Library name, extensions array, and binary array may be nil.
 	libName, modeName, modeDesc, macPrefix, fileExts, binNames, fenceMode, preKeyTrigs, nlTrigs = xeqFile(initFile)
 	1 => editMode modeName, 'Buffer: true', 'Description: %s' % modeDesc, 'Group: %s' % $langParams[0]
-	push $LangModes, [[false, nil?(libName) ? modeName : libName, modeName, macPrefix, fileExts, binNames, fenceMode, nil,\
+	apush $LangModes, [[false, nil?(libName) ? modeName : libName, modeName, macPrefix, fileExts, binNames, fenceMode, nil,\
 	 nil], preKeyTrigs, nlTrigs]
 endloop
 
@@ -115,7 +115,7 @@ function langWrapPrep(4)
 	openLine
 	insert $2, 'if ', $3				# Insert "[#]if 0" or "[#]if 1".
 	(lineCt + 1) => endLine
-	insert sprintf("\n%s%s", $2, $4)			# Insert "[#]else" or "[#]endif".
+	insertf "\n%s%s", $2, $4			# Insert "[#]else" or "[#]endif".
 	1 => bufBound? ? -1 => newline : forwChar
 endroutine
 
@@ -159,7 +159,7 @@ endroutine
 
 # Find a routine name (argument is true) or class name (argument is false) and render buffer according to n argument if found.
 # User is prompted for directory to search and the routine or class name.  If directory is not specified (nil or null), current
-# buffer (only) is searched; otherwise, files in specified directory.  In the latter case, the first file found that contains
+# buffer (only) is searched, otherwise files in specified directory.  In the latter case, the first file found that contains
 # the routine name is selected.  A three-element array of search parameters for the current programming mode is obtained from
 # the mode header array.  Array element 2 (initially nil) is updated by this routine and used as default for subseqent calls.
 function langFindObj(1)
@@ -167,13 +167,13 @@ function langFindObj(1)
 	prmt, re, template = searchParams[$1 ? 0 : 1]
 
 	# Get directory to search.
-	dir = 1 => prompt('Directory to search', lastDir, 'Type: File')
+	dir = prompt('Directory to search', 'Type: File', lastDir)
 	if !empty?(dir) && substr(dir, -1, 1) == '/' && length(dir) > 1
 		dir = substr(dir, 0, -1)
 	endif
 
 	# Get routine name.
-	routineName = prompt('%s name' % prmt)
+	routineName = prompt('%s name' % prmt, 'Type: SearchRing')
 	if empty?(routineName)
 		return false
 	endif
@@ -240,16 +240,16 @@ endroutine
 # If two arguments specified:
 #	Activate or deactivate a library, given (1), mode descriptor array; and (2), Boolean action.
 function libUtil(1, 2)
-	if length($ARGV) == 1
+	if length($ArgList) == 1
 
 		# Check if a language mode is active.
 		for modeInfo in $LangModes
-			if include? $1, modeInfo[0][2]
+			if ainclude? $1, modeInfo[0][2]
 				return modeInfo
 			endif
 		endloop
 		nil
-	elsif length($ARGV) == 2
+	elsif length($ArgList) == 2
 		modeHdr = $1[0]
 
 		# Load library if needed.
@@ -325,24 +325,24 @@ endroutine
 
 ##### Library Helper Routines -- general.
 
-# Return true if all white space before point on current line; otherwise, false.
+# Return true if all white space before point on current line, otherwise false.
 function libBlankPrefix(0)
 	offset = $lineOffset
 	beginText
 	$lineOffset == offset
 endroutine
 
-# Return true if current line is null or blank; otherwise, false.
+# Return true if current line is null or blank, otherwise false.
 function libBlankLine(0)
 	beginText
 	$lineOffset == $LineLen
 endroutine
 
-# Search backward for first non-blank line and get its indentation.  If n argument, begin search at current line; otherwise,
+# Search backward for first non-blank line and get its indentation.  If n argument, begin search at current line, otherwise
 # previous one.  A two-element array is returned containing the indentation (or nil if not found), and the number of tabs to add
 # to the indentation when it is inserted into the buffer.  The second value is determined as follows: if the line from which the
 # indentation was taken (1), contains a right fence character by itself; (2), the character exists in the EOL outdenting
-# "newline" trigger array; and (3), 'RFIndt' global mode is disabled; one is returned; otherwise, zero.
+# "newline" trigger array; and (3), 'RFIndt' global mode is disabled; one is returned, otherwise zero.
 function libGetIndent(0)
 	beginLine
 	n = ($0 == defn) ? 0 : 1
@@ -351,8 +351,8 @@ function libGetIndent(0)
 			break
 		endif
 		if not libBlankLine
-			extraTabs = (!nil?(trigAry = $langParams[1][2][1]) && $lineText =~ '^\s*([}\])])$' &&\
-			 index(trigAry[0], match 1) != nil && !(1 => mode? nil, 'RFIndt', 'Ignore')) ? 1 : 0
+			extraTabs = !nil?(trigAry = $langParams[1][2][1]) && $lineText =~ '^\s*([}\])])$' &&\
+			 index(trigAry[0], match 1) != nil && !mode?('RFIndt') ? 1 : 0
 
 			# Get indentation and remove any trailing spaces from it if hard tabs in effect.
 			if !null?(indent = subline(-$lineOffset, $lineOffset)) && $softTabSize == 0 &&\
@@ -416,7 +416,7 @@ function pkIndentRFence(0)
 			beginLine
 			delWhite
 			insert indent
-			1 => mode?(nil, 'RFIndt', 'Ignore') and tab
+			mode?('RFIndt') and tab
 			return
 		endif
 	endif
@@ -447,14 +447,14 @@ endroutine
 
 # Examine keys entered by the user and indent as appropriate if a programming language mode is active and certain conditions are
 # met.
-function hkPreKey(0) {description: 'Examine keys that are entered and do auto-indentation as appropriate if a programming\
- language mode is active.  Returns: nil.'}
+function hkPreKey(0) {description: "Examine keys that are entered and do auto-indentation as appropriate if a programming\
+ language mode is active.\n\nReturns: nil."}
 	if $LastKey >= 0 && $lineOffset == $LineLen && !nil?(activeLang = $langParams[1])
 		1 => setMark ??
 		trigArys = activeLang[1]
 		loop
 			# Left justify character?
-			if !nil?(trigAry = trigArys[0]) && include?(trigAry, $LastKey)
+			if !nil?(trigAry = trigArys[0]) && ainclude?(trigAry, $LastKey)
 				pkLeftJustChar
 				break
 			endif
@@ -519,7 +519,7 @@ setHook 'preKey', hkPreKey
 ##### Library Helper Routines -- newline command.
 
 # Check characters and strings at end of current line and indent or outdent next line accordingly, given newline triggers
-# (array).  Point is assumed to be at end of line.  Returns: true if formatting was done; otherwise, false.
+# (array).  Point is assumed to be at end of line.  Returns: true if formatting was done, otherwise false.
 function nlChStrCheckEOL(1)
 	backChar
 	c = $lineChar
@@ -537,7 +537,7 @@ function nlChStrCheckEOL(1)
 							return false
 						endif
 					endif
-				elsif wordChar?(ord item)
+				elsif isClass?('word', ord item)
 					break
 				else
 					len = length(item) - 1
@@ -553,7 +553,7 @@ function nlChStrCheckEOL(1)
 endroutine
 
 # Check keywords at end of current line and indent or outdent next line accordingly, given newline triggers (array).  Point is
-# assumed to be on last character of line.  Returns: true if formatting was done; otherwise, false.
+# assumed to be on last character of line.  Returns: true if formatting was done, otherwise false.
 function nlKWCheckEOL(1)
 	c = $lineChar
 	if (lineWord = getWord)
@@ -572,7 +572,7 @@ function nlKWCheckEOL(1)
 endroutine
 
 # Check keywords at beginning of current line and indent or outdent next line accordingly, given newline triggers (array).
-# Returns: true if formatting was done; otherwise, false.
+# Returns: true if formatting was done, otherwise false.
 function nlKWCheckBOL(1)
 	beginText
 	c = $lineChar
@@ -593,8 +593,8 @@ endroutine
 
 # Do auto-indentation if applicable, after a newline has been typed.  Bound to the "newline" command when a language mode is
 # active.
-command langNewline(0) {description: 'Do auto-indentation as appropriate if a programming language mode is active and a newline\
- was typed.  Returns: nil'}
+command langNewline(0) {description: "Do auto-indentation as appropriate if a programming language mode is active and a newline\
+ was typed."}
 	$0 == defn and $0 = 1
 
 	# If n is negative, just insert newlines.
@@ -638,7 +638,7 @@ command langNewline(0) {description: 'Do auto-indentation as appropriate if a pr
 					if !nil?(trigAry = nlTrigs[2]) && !nil?(1 => index trigAry[0], c, 'Char')
 						for item in trigAry[1]
 							if type?(item) == 'string'
-								if wordChar?(ord item)
+								if isClass?('word', ord item)
 									break
 								endif
 								if subline(0, length item) == item
@@ -728,7 +728,7 @@ endroutine
 setHook 'enterBuf', hkEnterBuf
 
 # Do initialization tasks for buffer language mode.  Called whenever a mode is changed (via 'mode' hook), given (1) buffer name
-# if a buffer mode was changed; otherwise, nil; and (2), prior buffer or global modes.
+# if a buffer mode was changed, otherwise nil; and (2), prior buffer or global modes.
 function hkMode(2) {description: 'Do initialization tasks for buffer language mode.'}
 
 	# Nothing to do unless a mode has changed in the current buffer.
@@ -737,7 +737,7 @@ function hkMode(2) {description: 'Do initialization tasks for buffer language mo
 
 		# Do library initialization and/or activation if a language mode has changed.
 		for modeInfo in $LangModes
-			if include?($2, modeInfo[0][2]) != mode?($bufname, modeInfo[0][2])
+			if ainclude?($2, modeInfo[0][2]) != mode?(modeInfo[0][2])
 
 				# Deactivate prior mode library, if needed.
 				(modeDesc = libUtil($2)) and libUtil modeDesc, false
@@ -819,10 +819,10 @@ endroutine
 setHook 'filename', hkFilename
 
 # Set language mode from shebang line when a file is read info a buffer, given (1), buffer name; and (2), filename.
-function hkRead(2) {arguments: 'buf-name, filename', description: 'Set language mode when a file is read into a buffer.'}
+function hkRead(2) {arguments: 'bufname, filename', description: 'Set language mode when a file is read into a buffer.'}
 
 	# Language mode already set in buffer?
-	if not groupMode? $1, $langParams[0]
+	if not groupMode?($langParams[0], $1)
 
 		# No, check first line of buffer (file) for shebang.
 		if line1 = bgets($1)

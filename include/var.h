@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -8,15 +8,14 @@
 // Definition of system variables.
 typedef enum {
 	// Immutables.
-	sv_ARGV, sv_BufInpDelim, sv_BufModes, sv_Date, sv_GlobalModes, sv_HorzScrollCol, sv_LastKey, sv_LineLen, sv_Match,
+	sv_ArgList, sv_BufInpDelim, sv_BufModes, sv_Date, sv_GlobalModes, sv_HorzScrollCol, sv_LastKey, sv_LineLen, sv_Match,
 	sv_RegionText, sv_ReturnMsg, sv_RingNames, sv_RunFile, sv_RunName, sv_ScreenCount, sv_TermSize, sv_WindCount,
 
 	// Mutables.
 	sv_autoSave, sv_bufFile, sv_bufLineNum, sv_bufname, sv_execPath, sv_fencePause, sv_hardTabSize, sv_horzJump,
-	sv_inpDelim, sv_lastKeySeq, sv_lineChar, sv_lineCol, sv_lineOffset, sv_lineText, sv_maxArrayDepth, sv_maxCallDepth,
-	sv_maxLoop, sv_maxPromptPct, sv_otpDelim, sv_pageOverlap, sv_randNumSeed, sv_replacePat, sv_screenNum, sv_searchDelim,
-	sv_searchPat, sv_softTabSize, sv_travJump, sv_vertJump, sv_windLineNum, sv_windNum, sv_windSize, sv_workDir,
-	sv_wrapCol
+	sv_inpDelim, sv_lastKeySeq, sv_lineChar, sv_lineCol, sv_lineOffset, sv_lineText, sv_maxCallDepth, sv_maxLoop,
+	sv_maxPromptPct, sv_otpDelim, sv_pageOverlap, sv_replacePat, sv_screenNum, sv_searchDelim, sv_searchPat, sv_softTabSize,
+	sv_travJump, sv_vertJump, sv_windLineNum, sv_windNum, sv_windSize, sv_workDir, sv_wrapCol
 	} SysVarId;
 
 // User variable record.
@@ -34,7 +33,7 @@ typedef struct {
 	ushort flags;			// Variable flags.
 	const char *descrip;		// Short description.
 #if 0
-	union {				// Value if a constant; otherwise, NULL.
+	union {				// Value if a constant, otherwise NULL.
 		const char *strVal;	// String value;
 		long intVal;		// Integer value;
 		} u;
@@ -77,7 +76,9 @@ typedef struct {
 
 // External function declarations.
 extern int bumpVar(ExprNode *pNode, bool incr, bool pre);
+extern int dtofabattr(const Datum *pDatum, DFab *pFab, const char *delim, ushort cflags);
 #if MMDebug & Debug_Datum
+extern void ddump(const Datum *pDatum, const char *tag);
 extern void dumpVars(void);
 #endif
 extern UserVar *findUserVar(const char *var);
@@ -87,12 +88,12 @@ extern int getArrayRef(ExprNode *pNode, VarDesc *pVarDesc, bool create);
 extern int getSysVar(Datum *pRtnVal, SysVar *pSysVar);
 extern bool isIntVar(VarDesc *pVarDesc);
 extern bool isIdent1(short c);
-extern int putVar(Datum *pDatum, VarDesc *pVarDesc);
+extern int let(Datum *pRtnVal, int n, Datum **args);
 extern int ringNames(Datum *pRtnVal);
 extern ulong seedInit(void);
-extern int setVar(Datum *pRtnVal, int n, Datum **args);
+extern int setVar(Datum *pDatum, VarDesc *pVarDesc);
 extern int showVariables(Datum *pRtnVal, int n, Datum **args);
-extern int svtosf(SysVar *pSysVar, ushort flags, DFab *pFab);
+extern int svtofab(SysVar *pSysVar, bool escTermAttr, DFab *pFab);
 extern uint varCount(uint ctrlFlags);
 extern void varSort(const char *varList[], uint count, uint ctrlFlags);
 extern int vderefn(Datum *pDatum, const char *name);
@@ -109,7 +110,7 @@ Datum *pLastMatch = NULL;		// Last search pattern match.
 
 // Table of system variables.  Ones that begin with a capital letter are read-only.
 SysVar sysVars[] = {
-	{"$ARGV",		sv_ARGV,		V_RdOnly | V_Array,	VLit_ARGV},
+	{"$ArgList",		sv_ArgList,		V_RdOnly | V_Array,	VLit_ArgList},
 	{"$BufInpDelim",	sv_BufInpDelim,		V_RdOnly,		VLit_BufInpDelim},
 	{"$BufModes",		sv_BufModes,		V_RdOnly | V_Array,	VLit_BufModes},
 	{"$Date",		sv_Date,		V_RdOnly,		VLit_Date},
@@ -141,13 +142,11 @@ SysVar sysVars[] = {
 	{"$lineCol",		sv_lineCol,		V_Int,			VLit_lineCol},
 	{"$lineOffset",		sv_lineOffset,		V_Int,			VLit_lineOffset},
 	{"$lineText",		sv_lineText,		V_Nil,			VLit_lineText},
-	{"$maxArrayDepth",	sv_maxArrayDepth,	V_Int,			VLit_maxArrayDepth},
 	{"$maxCallDepth",	sv_maxCallDepth,	V_Int,			VLit_maxCallDepth},
 	{"$maxLoop",		sv_maxLoop,		V_Int,			VLit_maxLoop},
 	{"$maxPromptPct",	sv_maxPromptPct,	V_Int,			VLit_maxPromptPct},
 	{"$otpDelim",		sv_otpDelim,		V_Nil | V_EscDelim,	VLit_otpDelim},
 	{"$pageOverlap",	sv_pageOverlap,		V_Int,			VLit_pageOverlap},
-	{"$randNumSeed",	sv_randNumSeed,		V_Int,			VLit_randNumSeed},
 	{"$replacePat",		sv_replacePat,		V_Nil | V_EscDelim,	VLit_replacePat},
 	{"$screenNum",		sv_screenNum,		V_Int,			VLit_screenNum},
 	{"$searchDelim",	sv_searchDelim,		V_GetKey,		VLit_searchDelim},

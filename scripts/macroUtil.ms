@@ -1,9 +1,9 @@
-# (c) Copyright 2019 Richard W. Marinelli
+# (c) Copyright 2022 Richard W. Marinelli
 #
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# macroUtil.ms		Ver. 9.5.0
+# macroUtil.ms		Ver. 9.6.0
 #	Macro management routines, including ones for saving and restoring macros from a file in the HOME directory.
 
 # Don't load this file if it has already been done so.
@@ -87,7 +87,7 @@ command saveMacros(0) {description: "Save macro ring to disk (in file ~~#{$Macro
 		endloop
 
 		# Save to disk and delete buffer.
-		insert "MACROS\n\n"
+		insert "MIGHTEMACS MACROS\n\n"
 		oldMsgState = 1 => chgMode nil, 'RtnMsg'
 		saveFile
 		oldMsgState => chgMode nil, 'RtnMsg'

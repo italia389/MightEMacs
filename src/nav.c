@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -27,7 +27,7 @@ typedef struct {
 	Point origPoint;		// Original point position.
 	} FenceMatch;
 
-// Return true if given point position is at a boundary (beginning or end of buffer); otherwise, false.
+// Return true if given point position is at a boundary (beginning or end of buffer), otherwise false.
 int boundary(Point *pPoint, int dir) {
 
 	return (dir == Forward) ? bufEnd(pPoint) : bufBegin(pPoint);
@@ -35,16 +35,16 @@ int boundary(Point *pPoint, int dir) {
 
 // Return true if the character at point is a character that is considered to be part of a word.
 bool inWord(void) {
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 	return wordChar[(pPoint->offset == pPoint->pLine->used ? '\n' : pPoint->pLine->text[pPoint->offset])];
 	}
 
-// Move point forward (+n) or backward (-n) by abs(n) characters.  Return NotFound (bypassing rsset()) if move would go out of
-// the buffer.  Set the move flag if point moves to a different line.  Return status.
+// Move point forward (+n) or backward (-n) by abs(n) characters in current edit buffer.  Return NotFound (bypassing rsset()) if
+// move would go out of the buffer.  Set the move flag if point moves to a different line.  Return status.
 int moveChar(int n) {
 
 	if(n != 0) {
-		Point *pPoint = &sess.pCurWind->face.point;
+		Point *pPoint = &sess.edit.pFace->point;
 
 		if(n > 0) {
 			do {
@@ -53,7 +53,8 @@ int moveChar(int n) {
 						return NotFound;
 					pPoint->pLine = pPoint->pLine->next;
 					pPoint->offset = 0;
-					sess.pCurWind->flags |= WFMove;
+					if(sess.edit.pWind != NULL)
+						sess.edit.pWind->flags |= WFMove;
 					}
 				else
 					++pPoint->offset;
@@ -63,11 +64,12 @@ int moveChar(int n) {
 		else {
 			do {
 				if(pPoint->offset == 0) {
-					if(pPoint->pLine == sess.pCurBuf->pFirstLine)
+					if(pPoint->pLine == sess.edit.pBuf->pFirstLine)
 						return NotFound;
 					pPoint->pLine = pPoint->pLine->prev;
 					pPoint->offset = pPoint->pLine->used;
-					sess.pCurWind->flags |= WFMove;
+					if(sess.edit.pWind != NULL)
+						sess.edit.pWind->flags |= WFMove;
 					}
 				else
 					--pPoint->offset;
@@ -153,7 +155,7 @@ int moveWord(int n) {
 // Move point forward one word on current line.  Return NotFound (bypassing rsset()) if move would go past end of line;
 // otherwise, return status.
 static int forwWord0(void) {
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	// Scan through the current word.
 	while(inWord())
@@ -171,7 +173,7 @@ static int forwWord0(void) {
 // Move point backward one word on current line.  Return NotFound (bypassing rsset()) if move would go past beginning of line;
 // otherwise, return status.
 static int backWord0(void) {
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	if(pPoint->offset == 0)
 		return NotFound;
@@ -197,7 +199,7 @@ static int backWord0(void) {
 	}
 
 // Move point forward by n words.  All of the motion is performed by moveChar().  Set pRtnVal to false if move would go out of
-// the buffer; otherwise, true.  Return status.
+// the buffer, otherwise true.  Return status.
 int forwWord(Datum *pRtnVal, int n, Datum **args) {
 
 	if(n == INT_MIN)
@@ -210,7 +212,7 @@ int forwWord(Datum *pRtnVal, int n, Datum **args) {
 	}
 
 // Move point backward by n words.  All of the motion is performed by the moveChar() routine.  Set pRtnVal to false if move
-// would go out of the buffer; otherwise, true.  Return status.
+// would go out of the buffer, otherwise true.  Return status.
 int backWord(Datum *pRtnVal, int n, Datum **args) {
 
 	if(n == INT_MIN)
@@ -222,7 +224,7 @@ int backWord(Datum *pRtnVal, int n, Datum **args) {
 	return sess.rtn.status;
 	}
 
-// Move forward to the end of the nth next word.  Set pRtnVal to false if move would go out of the buffer; otherwise, true.
+// Move forward to the end of the nth next word.  Set pRtnVal to false if move would go out of the buffer, otherwise true.
 // Return status.
 int endWord(Datum *pRtnVal, int n, Datum **args) {
 	bool b = true;
@@ -256,7 +258,7 @@ Retn:
 
 // Get a word from current line (or possibly an adjacent line) and return it, or nil if not found.  Return status.
 int getWord(Datum *pRtnVal, int n, Datum **args) {
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 	int offset = pPoint->offset;						// Save current offset in case of error.
 
 	if(n == INT_MIN)
@@ -363,7 +365,7 @@ int moveLine(int n) {
 
 	if(n != 0) {
 		Line *pLine;
-		Point *pPoint = &sess.pCurWind->face.point;
+		Point *pPoint = &sess.cur.pFace->point;
 
 		if(n > 0) {
 			// If we are on the last line as we start, move point to end of line and fail the command.
@@ -392,7 +394,7 @@ int moveLine(int n) {
 			}
 		else {
 			// If we are on the first line as we start, move point to beginning of line and fail the command.
-			if(pPoint->pLine == sess.pCurBuf->pFirstLine) {
+			if(pPoint->pLine == sess.cur.pBuf->pFirstLine) {
 				pPoint->offset = 0;
 				return NotFound;
 				}
@@ -407,7 +409,7 @@ int moveLine(int n) {
 			// and move point up.
 			pLine = pPoint->pLine;
 			do {
-				if(pLine == sess.pCurBuf->pFirstLine) {
+				if(pLine == sess.cur.pBuf->pFirstLine) {
 					status = NotFound;
 					pPoint->offset = 0;
 					goto BufBound;
@@ -420,7 +422,7 @@ int moveLine(int n) {
 		pPoint->offset = getGoal(pLine, targCol);
 BufBound:
 		pPoint->pLine = pLine;
-		sess.pCurWind->flags |= WFMove;
+		sess.cur.pWind->flags |= WFMove;
 		}
 
 	return status;
@@ -474,7 +476,7 @@ int beginTxt(void) {
 	Point *pPoint;
 	Line *pLine;
 
-	used = (pLine = (pPoint = &sess.pCurWind->face.point)->pLine)->used;
+	used = (pLine = (pPoint = &sess.cur.pFace->point)->pLine)->used;
 	for(offset = 0; offset < used; ++offset) {
 		c = pLine->text[offset];
 		if(c != ' ' && c != '\t')
@@ -501,7 +503,7 @@ int spanWhite(bool end) {
 	Point *pPoint;
 	Line *pLine;
 
-	pLine = (pPoint = &sess.pCurWind->face.point)->pLine;
+	pLine = (pPoint = &sess.cur.pFace->point)->pLine;
 	offset = pPoint->offset;
 	if(end) {
 		while(offset < pLine->used && (isspace(c = pLine->text[offset]) || c == '\0'))
@@ -522,7 +524,7 @@ int beginEndLine(Datum *pRtnVal, int n, bool end) {
 
 	if(moveToLine(pRtnVal, n) == NotFound)
 		return NotFound;
-	sess.pCurWind->face.point.offset = end ? sess.pCurWind->face.point.pLine->used : 0;
+	sess.cur.pFace->point.offset = end ? sess.cur.pFace->point.pLine->used : 0;
 	return sess.rtn.status;
 	}
 
@@ -540,8 +542,8 @@ int goLine(Datum *pDatum, int n, int line) {
 		// ", in"
 	}
 
-// Move to a particular line, or end of buffer if line number is zero.  If n argument given, move point in specified buffer;
-// otherwise, current one.  Return status.
+// Move to a particular line, or end of buffer if line number is zero.  If n argument given, move point in specified buffer,
+// otherwise current one.  Return status.
 int gotoLine(Datum *pRtnVal, int n, Datum **args) {
 	Datum *pDatum;
 
@@ -556,7 +558,7 @@ int gotoLine(Datum *pRtnVal, int n, Datum **args) {
 		char workBuf[strlen(text7) + strlen(text205) + 2];
 		sprintf(workBuf, "%s %s", text7, text205);
 				// "Go to", "line"
-		if(termInp(pDatum, workBuf, ArgNil1, 0, NULL) != Success || pDatum->type == dat_nil || toInt(pDatum) != Success)
+		if(termInp(pDatum, workBuf, ArgNil1, 0, NULL) != Success || disnil(pDatum) || toInt(pDatum) != Success)
 			return sess.rtn.status;
 		}
 	return goLine(pDatum, n, pDatum->u.intNum);
@@ -567,20 +569,20 @@ int traverseLine(Datum *pRtnVal, int n, Datum **args) {
 	static bool lastWasForw;		// true if last invocation was forward motion.
 	int newCol;
 	bool moveForw = true;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	if(pPoint->pLine->used > 0) {					// If not blank line...
 		if(n == 0) {						// zero argument?
 			newCol = term.cols - 2;			// Yes, move to right edge of unshifted display.
 			if(modeSet(MdIdxHScrl, NULL)) {
-				if(sess.pCurWind->face.firstCol > 0) {
-					sess.pCurWind->face.firstCol = 0;
-					sess.pCurWind->flags |= (WFHard | WFMode);
+				if(sess.cur.pFace->firstCol > 0) {
+					sess.cur.pFace->firstCol = 0;
+					sess.cur.pWind->flags |= (WFHard | WFMode);
 					}
 				}
-			else if(sess.pCurScrn->firstCol > 0) {
-				sess.pCurScrn->firstCol = 0;
-				sess.pCurWind->flags |= (WFHard | WFMode);
+			else if(sess.cur.pScrn->firstCol > 0) {
+				sess.cur.pScrn->firstCol = 0;
+				sess.cur.pWind->flags |= (WFHard | WFMode);
 				}
 			}
 		else {							// No, save point offset and get column positions.
@@ -629,7 +631,7 @@ int traverseLine(Datum *pRtnVal, int n, Datum **args) {
 static int backForwPage(Datum *pRtnVal, int n, int direc) {
 
 	if(n != 0) {
-		WindFace *pWindFace = &sess.pCurWind->face;
+		Face *pFace = &sess.cur.pWind->face;
 		bool fullPage = true;
 		int pageSize = 1;				// Full page.
 		if(n == INT_MIN)
@@ -639,16 +641,16 @@ static int backForwPage(Datum *pRtnVal, int n, int direc) {
 			n = 1;
 			fullPage = false;
 			}
-		pageSize = sess.pCurWind->rows / pageSize - sess.overlap;	// Default number of rows per page to scroll.
+		pageSize = sess.cur.pWind->rows / pageSize - sess.overlap;	// Default number of rows per page to scroll.
 		if(pageSize <= 0)				// Tiny window or large sess.overlap.
 			pageSize = 1;
 		n *= pageSize * direc;
-		windNewTop(sess.pCurWind, NULL, n);
-		if(fullPage || !pointInWind()) {			// If scrolled full page or point no longer in window...
-			pWindFace->point.pLine = pWindFace->pTopLine;	// set point to top line.
-			pWindFace->point.offset = 0;
+		windNewTop(sess.cur.pWind, NULL, n);
+		if(fullPage || !pointInWind()) {		// If scrolled full page or point no longer in window...
+			pFace->point.pLine = pFace->pTopLine;	// set point to top line.
+			pFace->point.offset = 0;
 			}
-		sess.pCurWind->flags |= WFMove;
+		sess.cur.pWind->flags |= WFMove;
 		}
 
 	return sess.rtn.status;
@@ -668,9 +670,9 @@ int backPage(Datum *pRtnVal, int n, Datum **args) {
 
 // Move point to given position in current window and set "move" flag if needed.
 void movePoint(Point *pPoint) {
-	Point *pPoint1 = &sess.pCurWind->face.point;
+	Point *pPoint1 = &sess.cur.pFace->point;
 	if(pPoint->pLine != pPoint1->pLine)
-		sess.pCurWind->flags |= WFMove;
+		sess.cur.pWind->flags |= WFMove;
 	*pPoint1 = *pPoint;
 	}
 
@@ -678,11 +680,11 @@ void movePoint(Point *pPoint) {
 int getWindPos(EWindow *pWind) {
 	Line *pLine;
 	int row = 1;
-	WindFace *pWindFace = &pWind->face;
+	Face *pFace = &pWind->face;
 
 	// Search down to the line we want...
-	pLine = pWindFace->pTopLine;
-	while(pLine != pWindFace->point.pLine)
+	pLine = pFace->pTopLine;
+	while(pLine != pFace->point.pLine)
 		if(row++ == pWind->rows || (pLine = pLine->next) == NULL)
 			return 0;
 
@@ -697,7 +699,7 @@ int getWindPos(EWindow *pWind) {
 // return an error.  Return status.
 int findBufMark(ushort id, Mark **ppMark, ushort flags) {
 	Mark *pMark0 = NULL;
-	Mark *pMark1 = &sess.pCurBuf->markHdr;
+	Mark *pMark1 = &sess.cur.pBuf->markHdr;
 	do {
 		if(pMark1->id == id) {
 
@@ -780,15 +782,16 @@ static int getMark(const char *basePrompt, int n, ushort flags, Mark **ppMark) {
 			char workBuf[5];
 
 			// Build prompt with existing marks in parentheses.
-			if(dopentrack(&prompt) != 0 || dputf(&prompt, text346, basePrompt) != 0 || dputc(' ', &prompt) != 0)
+			if(dopentrack(&prompt) != 0 || dputf(&prompt, 0, text346, basePrompt) != 0 ||
 									// "%s mark"
+			 dputc(' ', &prompt, 0) != 0)
 				goto LibFail;
 			strcpy(delim = workBuf, "(~#u");
-			pMark = &sess.pCurBuf->markHdr;
+			pMark = &sess.cur.pBuf->markHdr;
 			do {
 				if(pMark->id < '~' && (pMark->point.offset >= 0 || (flags & MKExist)) &&
 				 (pMark->id != RegionMark || !(flags & MKExist))) {
-					if(dputs(delim, &prompt) != 0 || dputc(pMark->id, &prompt) != 0)
+					if(dputs(delim, &prompt, 0) != 0 || dputc(pMark->id, &prompt, 0) != 0)
 						goto LibFail;
 					delim = " ";
 					}
@@ -799,7 +802,7 @@ static int getMark(const char *basePrompt, int n, ushort flags, Mark **ppMark) {
 				return rsset(Failure, RSNoFormat, text361);
 					// "No mark found to delete"
 
-			if(dputs("~U)", &prompt) != 0 || dclose(&prompt, Fab_String) != 0)
+			if(dputs("~U)", &prompt, 0) != 0 || dclose(&prompt, FabStr) != 0)
 				goto LibFail;
 
 			// Fit the prompt in roughly 90% of the terminal width.
@@ -812,7 +815,7 @@ static int getMark(const char *basePrompt, int n, ushort flags, Mark **ppMark) {
 			}
 		if(termInp(pDatum, promptBuf, ArgNotNull1 | ArgNil1, Term_OneChar | Term_Attr, NULL) != Success)
 			return sess.rtn.status;
-		if(pDatum->type == dat_nil) {
+		if(disnil(pDatum)) {
 			*ppMark = NULL;
 			return sess.rtn.status;
 			}
@@ -828,8 +831,8 @@ LibFail:
 	return librsset(Failure);
 	}
 
-// Set a mark in the current buffer to point.  If default n, use RegionMark; otherwise, get a mark with no default.  Return
-// status.
+// Set a mark in the current buffer to point and return status.  If default n, use RegionMark; otherwise, get a mark with no
+// default.
 int setMark(Datum *pRtnVal, int n, Datum **args) {
 	Mark *pMark;
 
@@ -839,7 +842,7 @@ int setMark(Datum *pRtnVal, int n, Datum **args) {
 		return sess.rtn.status;
 
 	// Set mark to point and return.
-	setWindMark(pMark, sess.pCurWind);
+	setWindMark(pMark, sess.cur.pWind);
 	return rsset(Success, RSTermAttr, "%s~u%c~U %s", text9, pMark->id, text350);
 		// "Mark ", "set"
 	}
@@ -852,7 +855,7 @@ static int delMark1(Mark *pMark) {
 			// "Cannot delete mark ~u%c~U"
 
 	// It's a go... delete it.
-	Mark *pMark0 = &sess.pCurBuf->markHdr;
+	Mark *pMark0 = &sess.cur.pBuf->markHdr;
 	ushort id = pMark->id;
 	for(;;) {
 		if(pMark0->next == pMark)
@@ -861,7 +864,7 @@ static int delMark1(Mark *pMark) {
 		}
 	pMark0->next = pMark->next;
 	free((void *) pMark);
-	return rsset(Success, RSTermAttr, "%s~u%c~U %s", text9, id, text10);
+	return rsset(Success, RSHigh | RSTermAttr, "%s~u%c~U %s", text9, id, text10);
 							// "Mark ", "deleted"
 	}
 
@@ -870,8 +873,8 @@ int delMark(Datum *pRtnVal, int n, Datum **args) {
 
 	// Delete all?
 	if(n != INT_MIN) {
-		delBufMarks(sess.pCurBuf, 0);
-		(void) rsset(Success, RSNoFormat, text351);
+		delBufMarks(sess.cur.pBuf, 0);
+		(void) rsset(Success, RSHigh | RSNoFormat, text351);
 			// "All marks deleted"
 		}
 	else {
@@ -889,25 +892,25 @@ int delMark(Datum *pRtnVal, int n, Datum **args) {
 
 // Go to given mark in current buffer, but don't force reframe if mark is already in the window unless forceReframe is true.
 static void goMark(Mark *pMark, bool forceReframe) {
-	Line *pLine = sess.pCurWind->face.point.pLine;		// Remember current line.
-	sess.pCurWind->face.point = pMark->point;		// Set point to mark.
+	Line *pLine = sess.cur.pFace->point.pLine;		// Remember current line.
+	sess.cur.pFace->point = pMark->point;		// Set point to mark.
 	if(forceReframe)
 		goto Reframe;
 	if(pMark->point.pLine != pLine) {				// If still on same line, do nothing else.
-		if(lineInWind(sess.pCurWind, pMark->point.pLine))	// Otherwise, set minimal window-update flag.
-			sess.pCurWind->flags |= WFMove;
+		if(lineInWind(sess.cur.pWind, pMark->point.pLine))	// Otherwise, set minimal window-update flag.
+			sess.cur.pWind->flags |= WFMove;
 		else {
 Reframe:
-			sess.pCurWind->reframeRow = pMark->reframeRow;
-			sess.pCurWind->flags |= WFReframe;
+			sess.cur.pWind->reframeRow = pMark->reframeRow;
+			sess.cur.pWind->flags |= WFReframe;
 			}
 		}
 	}
 
 // Swap a mark with point, given mark pointer.  Force a window reframe if forceReframe is true.  Return status.
 static int swapMrk(Mark *pMark, bool forceReframe) {
-	Point oldPoint = sess.pCurWind->face.point;
-	short oldRow = getWindPos(sess.pCurWind);
+	Point oldPoint = sess.cur.pFace->point;
+	short oldRow = getWindPos(sess.cur.pWind);
 	goMark(pMark, forceReframe);
 	pMark->point = oldPoint;
 	pMark->reframeRow = oldRow;
@@ -968,9 +971,9 @@ int markBuf(Datum *pRtnVal, int n, Datum **args) {
 		return sess.rtn.status;
 
 	// Mark whole buffer.  If RegionMark was specified for saving point, user is out of luck (it will be overwritten).
-	setWindMark(pMark, sess.pCurWind);					// Preserve current position.
+	setWindMark(pMark, sess.cur.pWind);					// Preserve current position.
 	(void) execCmdFunc(pRtnVal, INT_MIN, cmdFuncTable + cf_beginBuf, 0, 0);	// Move to beginning of buffer.
-	setWindMark(&sess.pCurBuf->markHdr, sess.pCurWind);			// Set to mark RegionMark.
+	setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);			// Set to mark RegionMark.
 	(void) execCmdFunc(pRtnVal, INT_MIN, cmdFuncTable + cf_endBuf, 0, 0);	// Move to end of buffer.
 	if(sess.rtn.status == Success)
 		rsclear(0);
@@ -981,7 +984,7 @@ int markBuf(Datum *pRtnVal, int n, Datum **args) {
 // Prepare for an "other fence" scan, given source fence character and pointer to FenceMatch object.  If valid source fence
 // found, set object parameters and return current point pointer (Point *); otherwise, return NULL.
 static Point *fencePrep(short fence, FenceMatch *pFenceMatch) {
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	// Get the source fence character.
 	if(fence == 0) {
@@ -1082,7 +1085,7 @@ int otherFence(short fence, Region *pRegion) {
 			pRegion->lineCount = 0;
 			}
 		else
-			sess.pCurWind->flags |= WFMove;
+			sess.cur.pWind->flags |= WFMove;
 		return sess.rtn.status;
 		}
 
@@ -1090,7 +1093,7 @@ int otherFence(short fence, Region *pRegion) {
 	*pPoint = fenceMatch.origPoint;
 Bust:
 	// Beep if interactive.
-	if(!(sess.opFlags & OpScript))
+	if(interactive())
 		tbeep();
 	return rsset(Failure, 0, NULL);
 	}
@@ -1112,8 +1115,8 @@ int fenceMatch(short fence, bool doBeep) {
 	// Set up control variables.
 	if((pPoint = fencePrep(fence, &fenceMatch)) == NULL)
 		goto Bust;
-	row = getWindPos(sess.pCurWind);		// Row in window containing point.
-	rows = sess.pCurWind->rows;		// Number of rows in window.
+	row = getWindPos(sess.cur.pWind);		// Row in window containing point.
+	rows = sess.cur.pWind->rows;		// Number of rows in window.
 	fenceLevel = 1;
 	n = (fenceMatch.scanDirec == Forward) ? 1 : -1;
 
@@ -1138,7 +1141,7 @@ int fenceMatch(short fence, bool doBeep) {
 
 	// If fenceLevel is zero, we have a match -- display the sucker.
 	if(fenceLevel == 0) {
-		moveFlag = sess.pCurWind->flags & WFMove;
+		moveFlag = sess.cur.pWind->flags & WFMove;
 		if(update(INT_MIN) != Success)
 			return sess.rtn.status;
 		centiPause(sess.fencePause);
@@ -1147,12 +1150,12 @@ int fenceMatch(short fence, bool doBeep) {
 	// Restore the previous position.
 	*pPoint = fenceMatch.origPoint;
 	if(moveFlag)
-		sess.pCurWind->flags |= WFMove;
+		sess.cur.pWind->flags |= WFMove;
 	if(fenceLevel == 0)
 		return sess.rtn.status;
 Bust:
 	// Beep if interactive.
-	if(doBeep && !(sess.opFlags & OpScript))
+	if(doBeep && interactive())
 		tbeep();
 	return rsset(Failure, 0, NULL);
 	}
@@ -1168,7 +1171,7 @@ static int getFence(Datum *pRtnVal, int n, Datum **args, short *fence) {
 			return sess.rtn.status;
 		*fence = args[0]->u.intNum;
 		}
-	else if(termInp(pRtnVal, text179, ArgNotNull1 | ArgNil1, Term_OneChar, NULL) == Success && pRtnVal->type != dat_nil)
+	else if(termInp(pRtnVal, text179, ArgNotNull1 | ArgNil1, Term_OneChar, NULL) == Success && !disnil(pRtnVal))
 			// "Fence char"
 		*fence = pRtnVal->u.intNum;
 
@@ -1209,17 +1212,17 @@ int showFence(Datum *pRtnVal, int n, Datum **args) {
 	return fenceMatch(fence, true);
 	}
 
-// Move point backward or forward n tab stops.  Return -1 if invalid move; otherwise, new offset in current line.
+// Move point backward or forward n tab stops.  Return -1 if invalid move, otherwise new offset in current line.
 int tabStop(int n) {
 	int offset, len, col, tabSize, curStop, targStop;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	// Check for "do nothing" cases.
 	if(n == 0 || (len = pPoint->pLine->used) == 0 || ((offset = pPoint->offset) == 0 && n < 0) || (offset == len && n > 0))
 		return -1;
 
 	// Calculate target tab stop column.
-	tabSize = (sess.softTabSize == 0) ? sess.hardTabSize : sess.softTabSize;
+	tabSize = (sess.cur.pScrn->softTabSize == 0) ? sess.cur.pScrn->hardTabSize : sess.cur.pScrn->softTabSize;
 	curStop = (col = getCol(NULL, false)) / tabSize;
 	if(col % tabSize != 0 && n < 0)
 		++curStop;

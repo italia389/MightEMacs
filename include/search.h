@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -7,7 +7,7 @@
 
 #include "xre.h"
 
-#define ProgressLoopCt	100000		// Number of search loops which triggers display of progress message.
+#define CharScanCount	50000000	// Number of scanned regexp characters which triggers display of progress message.
 #define Metacharacters	"^$([{.*+?|\\"	// Metacharacters in a regular expression.
 
 // Metacharacters.
@@ -37,11 +37,6 @@
 
 #define MC_BOW		'<'		// Beginning of word.
 #define MC_EOW		'>'		// End of word.
-#define MC_Tab		't'		// Tab character (\t).
-#define MC_CR		'r'		// Carriage return (\r).
-#define MC_NL		'n'		// Newline (\n).
-#define MC_FF		'f'		// Form feed (\f).
-#define MC_Esc		'e'		// Escape (\e).
 
 // Element types in a replacement pattern.
 #define RPE_LitString	1		// Literal string.
@@ -177,10 +172,10 @@ extern char *makePat(char *dest, Match *pMatch);
 extern int newReplPat(const char *pat, Match *pMatch, bool addToRing);
 extern int newSearchPat(char *pat, Match *pMatch, ushort *flags, bool addToRing);
 extern int regcmp(Datum *pSrc, int scanOffset, Match *pMatch, regmatch_t *result);
-extern int regScan(int n, ushort direct, long *pMatchLen);
+extern int regScan(int n, int *pLineBreakLimit, ushort direct, long *pMatchLen);
 extern int replStr(Datum *pRtnVal, int n, Datum **args, bool qRepl);
 extern int saveMatch(Match *pMatch, MatchLoc *pMatchLoc, RegMatch *pRegMatch);
-extern int scan(int n, ushort direct, long *pMatchLen);
+extern int scan(int n, int *pLineBreakLimit, ushort direct, long *pMatchLen);
 extern int searchBack(Datum *pRtnVal, int n, Datum **args);
 extern int searchForw(Datum *pRtnVal, int n, Datum **args);
 #if MMDebug & Debug_ShowRE

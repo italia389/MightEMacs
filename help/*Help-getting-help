@@ -25,7 +25,7 @@ displays the following in a pop-up window:
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r=* (Exact) == untitled ============================ MightEMacs 9.5.0 ~R|
+    |~r=* (Exact) == unnamed ============================= MightEMacs 9.6.0 ~R|
     | End: ~b_~B                                                              |
      ---------------------------------------------------------------------
 
@@ -33,11 +33,11 @@ displays the following in a pop-up window:
 we used earlier in the ~bIntroduction~B section.  Now type ~#uC-u C-u C-h ? C-h~U.  You
 will see the following on the ~bmessage line~B instead:
 
-    |~r=* (Exact) == untitled ============================ MightEMacs 9.5.0 ~R|
+    |~r=* (Exact) == unnamed ============================= MightEMacs 9.6.0 ~R|
     |~uC-h~U -> ~bprefix3~B - Begin prefix 3 key sequence.                        |
      ---------------------------------------------------------------------
 
-If you supply a zero or negative numeric prefix to the "showKey" command, it
+If you supply a zero or negative numeric prefix to the ~bshowKey~B command, it
 reads a single keystroke from the keyboard, as in this case where it displayed
 the binding for a prefix key.  It also will display the key description on the
 message line instead of in a pop-up window if the numeric prefix is zero or
@@ -53,8 +53,8 @@ notice that there are several other "show" commands as well, which you may want
 to try.
 
 There is one additional command in the "show" family which combines the output
-from the "showCommands" (~#uC-h c~U), "showFunctions" (~#uC-h f~U), "showAliases" (~#uC-h a~U),
-and "showVariables" (~#uC-h v~U) commands:
+from the ~bshowCommands~B (~#uC-h c~U), ~bshowFunctions~B (~#uC-h f~U), ~bshowAliases~B (~#uC-h a~U),
+and ~bshowVariables~B (~#uC-h v~U) commands:
 
     apropos     ~#uESC a~U
 
@@ -62,7 +62,7 @@ This command prompts for a search string, scans the names from all the
 aforementioned commands, and displays all the items that contain the string you
 entered, ignoring case.  If the string entered is null, all output is displayed:
 
-    |~r=* (Exact) == untitled ============================ MightEMacs 9.5.0 ~R|
+    |~r=* (Exact) == unnamed ============================= MightEMacs 9.6.0 ~R|
     |Apropos name: ~b_~B                                                      |
      ---------------------------------------------------------------------
 
@@ -70,7 +70,7 @@ You can also enter a search pattern instead of a string to perform case-
 sensitive or regular expression matching.  (Searching with patterns is explained
 later in the ~bSearching and Replacing~B section.)
 
-Lastly, each of the "show" commands called by "apropos" has a built-in "apropos"
+Lastly, each of the "show" commands called by ~bapropos~B has a built-in "apropos"
 function.  To use this feature, simply enter a search pattern at the "Apropos"
 prompt.  For example, to find all the "show" commands, enter ~#uC-h c~U and type
 "show" or "^show:r" at the prompt.

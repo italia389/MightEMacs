@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -86,8 +86,8 @@ static void vteeol() {
 		(void) clrtoeol();
 	}
 
-// Process a terminal attribute specification in a string.  If TA_ScanOnly flag is set, 'targ' is assumed to be of type 'int *';
-// otherwise, 'WINDOW *'.  If valid spec found, write attribute or AttrSpecBegin character to ncurses window in 'targ', update
+// Process a terminal attribute specification in a string.  If TA_ScanOnly flag is set, 'targ' is assumed to be of type 'int *',
+// otherwise 'WINDOW *'.  If valid spec found, write attribute or AttrSpecBegin character to ncurses window in 'targ', update
 // TA_AltUL flag in *flags if applicable, and return updated 'str' pointer; otherwise, return updated 'str' pointer so that the
 // invalid spec is skipped over.  In either case, set 'targ' to the number of invisible characters in the sequence if
 // TA_ScanOnly flag is set; that is, number of characters which will not be displayed (usually its length).  'str' is assumed to
@@ -194,9 +194,9 @@ Retn:
 	return (char *) str;
 	}
 
-// Scan a string for terminal attribute sequences and return the total number of characters found that are not visible when the
-// string is displayed (zero if none).  Invalid sequences or any that would begin at or past "maxOffset" are ignored.  If len <
-// 0, string is assumed to be null terminated.
+// Scan a string for terminal attribute sequences and return the total number of characters found that are not visible when
+// the string is displayed (zero if none).  Invalid sequences or any that would begin at or past "maxOffset" are ignored.  If
+// len < 0, string is assumed to be null terminated.
 int attrCount(const char *str, int len, int maxOffset) {
 	const char *strEnd;
 	int count;
@@ -378,7 +378,7 @@ static void vtputln(Line *pLine, bool doAttr) {
 			// Output hardware tab as the right number of spaces.
 			do {
 				vtputc(' ');
-				} while(c == '\t' && (videoCtrl.col + videoCtrl.tabOffset) % sess.hardTabSize != 0);
+				} while(c == '\t' && (videoCtrl.col + videoCtrl.tabOffset) % sess.cur.pScrn->hardTabSize != 0);
 			if(doAttr && (flags & TA_AltUL))
 				(void) attron(A_UNDERLINE);
 			continue;
@@ -400,7 +400,7 @@ static int vupd_wind(EWindow *pWind) {
 	int endRow;		// Last row in current window + 1.
 	bool attrOn = (pWind->pBuf->flags & BFTermAttr) && (!modeSet(MdIdxHScrl, pWind->pBuf) ||
 	 pWind->face.firstCol == 0);
-	Line *pCurLine = (pWind == sess.pCurWind) ? pWind->face.point.pLine : NULL;
+	Line *pCurLine = (pWind == sess.cur.pWind) ? pWind->face.point.pLine : NULL;
 
 	// Loop through the lines in the window, updating the corresponding rows in the virtual screen.
 	pLine = pWind->face.pTopLine;
@@ -408,7 +408,7 @@ static int vupd_wind(EWindow *pWind) {
 	do {
 		// Update the virtual line.
 		videoCtrl.tabOffset = modeSet(MdIdxHScrl, pWind->pBuf) ? pWind->face.firstCol :
-		 pLine == pCurLine ? sess.pCurScrn->firstCol : 0;
+		 pLine == pCurLine ? sess.cur.pScrn->firstCol : 0;
 		if(vtmove(row, -videoCtrl.tabOffset) != Success)
 			break;
 		if(videoCtrl.tabOffset == 0)
@@ -417,9 +417,15 @@ static int vupd_wind(EWindow *pWind) {
 		// If we are not at the end...
 		if(pLine != NULL) {
 #if VTDebug && 0
-if(!all) { char workBuf[32]; sprintf(workBuf, "%.*s", pLine->used < 20 ? pLine->used : 20, pLine->text);
-ushort u; mlprintf(MLHome | MLFlush, "Calling vtputln(%s...) from vupd_wind(): row %d, videoCtrl.tabOffset %d, v_flags %d... ",
-workBuf, row, videoCtrl.tabOffset, (int) *videoCtrl.pFlags); getkey(true, &u, false);}
+			if(!all) {
+				ushort u;
+				char workBuf[32];
+				sprintf(workBuf, "%.*s", pLine->used < 20 ? pLine->used : 20, pLine->text);
+				mlprintf(MLHome | MLFlush,
+				 "Calling vtputln(%s...) from vupd_wind(): row %d, videoCtrl.tabOffset %d, v_flags %d... ",
+				 workBuf, row, videoCtrl.tabOffset, (int) *videoCtrl.pFlags);
+				getkey(true, &u, false);
+				}
 #endif
 			vtputln(pLine, attrOn && pLine != pCurLine);
 			pLine = pLine->next;
@@ -470,12 +476,15 @@ static int supd_dextend(void) {
 				return sess.rtn.status;
 
 			// Update virtual line if it's currently extended (shifted) or is a point line that may need rendering.
-			if((pWind != sess.pCurWind || pLine != pWind->face.point.pLine) && ((*videoCtrl.pFlags & VFExt) ||
+			if((pWind != sess.cur.pWind || pLine != pWind->face.point.pLine) && ((*videoCtrl.pFlags & VFExt) ||
 			 ((*videoCtrl.pFlags & VFPoint) && attrOn))) {
 				if(pLine != NULL) {
 #if VTDebug && 0
-ushort u; char workBuf[32]; sprintf(workBuf, "%.*s", pLine->used < 20 ? pLine->used : 20, pLine->text);
-mlprintf(MLHome | MLFlush, "supd_dextend(): De-extending line '%s'...", workBuf); getkey(true, &u, false);
+					ushort u;
+					char workBuf[32];
+					sprintf(workBuf, "%.*s", pLine->used < 20 ? pLine->used : 20, pLine->text);
+					mlprintf(MLHome | MLFlush, "supd_dextend(): De-extending line '%s'...", workBuf);
+					getkey(true, &u, false);
 #endif
 					videoCtrl.tabOffset = 0;
 					vtputln(pLine, attrOn);
@@ -508,10 +517,10 @@ static int vupd_dotLine(EWindow *pWind) {
 		}
 
 	// and update the virtual line.
-	videoCtrl.tabOffset = modeSet(MdIdxHScrl, pWind->pBuf) ? pWind->face.firstCol : (pWind == sess.pCurWind) ?
-	 sess.pCurScrn->firstCol : 0;
+	videoCtrl.tabOffset = modeSet(MdIdxHScrl, pWind->pBuf) ? pWind->face.firstCol : (pWind == sess.cur.pWind) ?
+	 sess.cur.pScrn->firstCol : 0;
 	if(vtmove(row, -videoCtrl.tabOffset) == Success) {
-		vtputln(pLine, pWind != sess.pCurWind && (pWind->pBuf->flags & BFTermAttr) &&
+		vtputln(pLine, pWind != sess.cur.pWind && (pWind->pBuf->flags & BFTermAttr) &&
 		 (!modeSet(MdIdxHScrl, pWind->pBuf) || pWind->face.firstCol == 0));
 		vteeol();
 		videoCtrl.tabOffset = 0;
@@ -568,11 +577,11 @@ static int vupd_modeLine(EWindow *pWind, Buffer *popBuf) {
 	n = pWind->topRow + pWind->rows;		// Row location.
 	if(vtmove(n, 0) != Success)			// Seek to right line on virtual screen.
 		return sess.rtn.status;
-	if(colorML)			// Use color mode line if possible; otherwise, reverse video.
+	if(colorML)			// Use color mode line if possible, otherwise reverse video.
 		(void) attron(COLOR_PAIR(term.maxPair - ColorPairML));
 	else
 		trev(false, true);
-	if(pWind == sess.pCurWind)				// Make the current window's mode line stand out.
+	if(pWind == sess.cur.pWind)				// Make the current window's mode line stand out.
 		lineChar = '=';
 	else if(sess.opFlags & OpHaveRev)
 		lineChar = ' ';
@@ -637,8 +646,13 @@ static int vupd_modeLine(EWindow *pWind, Buffer *popBuf) {
 				}
 
 			// Display the screen number if there's more than one screen.
+#if 0
 			if(scrnCount() > 1) {
-				sprintf(workBuf, "S%hu ", sess.pCurScrn->num);
+				sprintf(workBuf, "S%hu ", sess.cur.pScrn->num);
+#else
+			if((c = scrnCount()) > 1) {
+				sprintf(workBuf, "S%hu/%hd ", sess.cur.pScrn->num, c);
+#endif
 				n += vtputs(workBuf);
 				}
 			}
@@ -743,14 +757,14 @@ static int vupd_modeLine(EWindow *pWind, Buffer *popBuf) {
 
 	// If it's the current window, not a pop-up, "WkDir" mode, and room still available, display the working directory as
 	// well.
-	if(pWind == sess.pCurWind && popBuf == NULL &&
+	if(pWind == sess.cur.pWind && popBuf == NULL &&
 	 (modeInfo.cache[MdIdxWkDir]->flags & MdEnabled) && (term.cols - n) > 12) {
 		char workBuf[TTY_MaxCols];
 
 		n += vttab(lineChar);
 		n += vtputs(text274);
 			// "WD: "
-		n += vtputs(strfit(workBuf, term.cols - n - 1, sess.pCurScrn->workDir, 0)) + 1;
+		n += vtputs(strfit(workBuf, term.cols - n - 1, sess.cur.pScrn->workDir, 0)) + 1;
 		vtputc(' ');
 		}
 
@@ -792,86 +806,88 @@ static int vupd_modeLine(EWindow *pWind, Buffer *popBuf) {
 static int vupd_cursor(void) {
 	Line *pLine;
 	int i, lastRow, *firstCol;
-	WindFace *pWindFace = &sess.pCurWind->face;
+	Face *pFace = &sess.cur.pWind->face;
 	ushort windFlag = modeSet(MdIdxHScrl, NULL) || modeSet(MdIdxLine, NULL) || modeSet(MdIdxCol, NULL) ? WFMode : 0;
 	ushort *pFlags;
 
 	// Find the current row.
-	pLine = pWindFace->pTopLine;
-	lastRow = sess.pCurScrn->cursorRow;
-	sess.pCurScrn->cursorRow = sess.pCurWind->topRow;
-	while(pLine != pWindFace->point.pLine) {
-		++sess.pCurScrn->cursorRow;
+	pLine = pFace->pTopLine;
+	lastRow = sess.cur.pScrn->cursorRow;
+	sess.cur.pScrn->cursorRow = sess.cur.pWind->topRow;
+	while(pLine != pFace->point.pLine) {
+		++sess.cur.pScrn->cursorRow;
 		pLine = pLine->next;
 		}
 
 	// Find the current column of point, ignoring terminal width.
-	sess.pCurScrn->cursorCol = i = 0;
-	while(i < pWindFace->point.offset)
-		sess.pCurScrn->cursorCol = newCol(pLine->text[i++], sess.pCurScrn->cursorCol);
+	sess.cur.pScrn->cursorCol = i = 0;
+	while(i < pFace->point.offset)
+		sess.cur.pScrn->cursorCol = newCol(pLine->text[i++], sess.cur.pScrn->cursorCol);
 
 	// Adjust cursor column by the current first column position of window (which is active when horizontal scrolling is
 	// enabled) or line (if still on same terminal row as when this routine was last called).
 	if(modeSet(MdIdxHScrl, NULL))
-		sess.pCurScrn->cursorCol -= *(firstCol = &pWindFace->firstCol);
+		sess.cur.pScrn->cursorCol -= *(firstCol = &pFace->firstCol);
 	else {
-		if(sess.pCurScrn->cursorRow == lastRow)
-			sess.pCurScrn->cursorCol -= sess.pCurScrn->firstCol;
+		if(sess.cur.pScrn->cursorRow == lastRow)
+			sess.cur.pScrn->cursorCol -= sess.cur.pScrn->firstCol;
 		else
-			sess.pCurScrn->firstCol = 0;
-		firstCol = &sess.pCurScrn->firstCol;
+			sess.cur.pScrn->firstCol = 0;
+		firstCol = &sess.cur.pScrn->firstCol;
 		}
 
 	// Make sure it is not off the left edge of the screen or on a LineExt ($) character at the left edge.
-	while(sess.pCurScrn->cursorCol < 0 || (sess.pCurScrn->cursorCol == 0 && sess.pCurScrn->firstCol > 0)) {
+	while(sess.cur.pScrn->cursorCol < 0 || (sess.cur.pScrn->cursorCol == 0 && sess.cur.pScrn->firstCol > 0)) {
 		if(*firstCol >= vTerm.horzJumpCols) {
-			sess.pCurScrn->cursorCol += vTerm.horzJumpCols;
+			sess.cur.pScrn->cursorCol += vTerm.horzJumpCols;
 			*firstCol -= vTerm.horzJumpCols;
 			}
 		else {
-			sess.pCurScrn->cursorCol += *firstCol;
+			sess.cur.pScrn->cursorCol += *firstCol;
 			*firstCol = 0;
 			}
-		sess.pCurWind->flags |= (WFHard | windFlag);
+		sess.cur.pWind->flags |= (WFHard | windFlag);
 		}
 
 	// Calculate window or line shift if needed.
-	while(sess.pCurScrn->cursorCol >= term.cols - 1) {
-		sess.pCurScrn->cursorCol -= vTerm.horzJumpCols;
+	while(sess.cur.pScrn->cursorCol >= term.cols - 1) {
+		sess.cur.pScrn->cursorCol -= vTerm.horzJumpCols;
 		*firstCol += vTerm.horzJumpCols;
-		sess.pCurWind->flags |= (WFHard | windFlag);
+		sess.cur.pWind->flags |= (WFHard | windFlag);
 		}
 
 	// Mark line as a "point" line and flag it if extended so that it can be re-rendered and/or de-extended by
 	// supd_dextendt() in a future update() cycle.
-	pFlags = &lineFlagTable[sess.pCurScrn->cursorRow];
+	pFlags = &lineFlagTable[sess.cur.pScrn->cursorRow];
 	if(*firstCol > 0 && !modeSet(MdIdxHScrl, NULL))
 		*pFlags |= (VFPoint | VFExt);
 	else
 		*pFlags = *pFlags & ~VFExt | VFPoint;
 
 	// Update the virtual screen if current line or left shift was changed, or terminal attributes are "live".
-	if(sess.pCurWind->flags & WFHard) {
+	if(sess.cur.pWind->flags & WFHard) {
 #if VTDebug && 0
-ushort u; mlprintf(MLHome | MLFlush,
- "Calling vupd_wind() from vupd_cursor(): firstCol %d, pCurScrn->firstCol %d, pCurScrn->cursorCol %d...",
- pWindFace->firstCol, sess.pCurScrn->firstCol, sess.pCurScrn->cursorCol); getkey(true, &u, false);
+		ushort u;
+		mlprintf(MLHome | MLFlush,
+		 "Calling vupd_wind() from vupd_cursor(): firstCol %d, pCurScrn->firstCol %d, pCurScrn->cursorCol %d...",
+		 pFace->firstCol, sess.cur.pScrn->firstCol, sess.cur.pScrn->cursorCol);
+		getkey(true, &u, false);
 #endif
-		if(vupd_wind(sess.pCurWind) != Success)
+		if(vupd_wind(sess.cur.pWind) != Success)
 			return sess.rtn.status;
 		}
-	else if((sess.pCurWind->flags & WFEdit) && vupd_dotLine(sess.pCurWind) != Success)
+	else if((sess.cur.pWind->flags & WFEdit) && vupd_dotLine(sess.cur.pWind) != Success)
 		return sess.rtn.status;
 
 	// Update mode line if (1), mode flag set; or (2), "Col" buffer mode set (point movement assumed); or (3), "Line"
 	// buffer mode set and any window flag set.
-	if((sess.pCurWind->flags & WFMode) || modeSet(MdIdxCol, NULL) || (sess.pCurWind->flags && modeSet(MdIdxLine, NULL)))
-		vupd_modeLine(sess.pCurWind, NULL);
-	sess.pCurWind->flags = 0;
+	if((sess.cur.pWind->flags & WFMode) || modeSet(MdIdxCol, NULL) || (sess.cur.pWind->flags && modeSet(MdIdxLine, NULL)))
+		vupd_modeLine(sess.cur.pWind, NULL);
+	sess.cur.pWind->flags = 0;
 
 	// If horizontal scrolling mode not enabled and line is shifted, put a '$' in column 0.
-	if(!modeSet(MdIdxHScrl, NULL) && sess.pCurScrn->firstCol > 0)
-		(void) mvaddch(sess.pCurScrn->cursorRow, 0, LineExt);
+	if(!modeSet(MdIdxHScrl, NULL) && sess.cur.pScrn->firstCol > 0)
+		(void) mvaddch(sess.cur.pScrn->cursorRow, 0, LineExt);
 	return sess.rtn.status;
 	}
 
@@ -900,28 +916,28 @@ int update(int n) {
 		}
 
 	// Current screen dimensions wrong?
-	if(sess.pCurScrn->flags) {			// EScrnResize set?
+	if(sess.cur.pScrn->flags) {			// EScrnResize set?
 		EWindow *lastWind, *nextWind;
 		int rows;
 
 		// Loop until vertical size of all windows matches terminal rows.
 		do {
 			// Does current screen need to grow vertically?
-			if(term.rows > sess.pCurScrn->rows) {
+			if(term.rows > sess.cur.pScrn->rows) {
 
 				// Yes, go to the last window...
 				pWind = windNextIs(NULL);
 
 				// and enlarge it as needed.
-				pWind->rows = (sess.pCurScrn->rows = term.rows) - pWind->topRow - 2;
+				pWind->rows = (sess.cur.pScrn->rows = term.rows) - pWind->topRow - 2;
 				pWind->flags |= (WFHard | WFMode);
 				}
 
 			// Does current screen need to shrink vertically?
-			else if(term.rows < sess.pCurScrn->rows) {
+			else if(term.rows < sess.cur.pScrn->rows) {
 
 				// Rebuild the window structure.
-				nextWind = sess.pCurScrn->windHead;
+				nextWind = sess.cur.pScrn->windHead;
 				lastWind = NULL;
 				rows = 0;
 				do {
@@ -935,8 +951,8 @@ int update(int n) {
 						--pWind->pBuf->windCount;
 						windFaceToBufFace(pWind, pWind->pBuf);
 
-						// Update sess.pCurWind and lastWind if needed.
-						if(pWind == sess.pCurWind) {
+						// Update sess.cur.pWind and lastWind if needed.
+						if(pWind == sess.cur.pWind) {
 
 							// Defer any non-fatal error.
 							if(wswitch(sess.windHead, 0) <= FatalError)
@@ -960,19 +976,19 @@ int update(int n) {
 
 					lastWind = pWind;
 					} while(nextWind != NULL);
-				sess.pCurScrn->rows = rows;
+				sess.cur.pScrn->rows = rows;
 				}
-			} while(sess.pCurScrn->rows != term.rows);
+			} while(sess.cur.pScrn->rows != term.rows);
 
 		// Update screen controls and mark screen for a redraw.
-		sess.pCurScrn->cols = term.cols;
-		sess.pCurScrn->flags = 0;
+		sess.cur.pScrn->cols = term.cols;
+		sess.cur.pScrn->flags = 0;
 		sess.opFlags |= OpScrnRedraw;
 		}
 
 	// If physical screen is garbage and redraw not being suppressed, force a redraw.
 	if((sess.opFlags & OpScrnRedraw) && (n == INT_MIN || n > 0)) {
-		if(mlerase() != Success)				// Clear the message line.
+		if(mlerase(MLForce) != Success)				// Clear the message line.
 			return sess.rtn.status;
 		supd_windFlags(NULL, WFHard | WFMode);			// Force all windows to update.
 		sess.opFlags &= ~OpScrnRedraw;				// Clear redraw flag.
@@ -992,7 +1008,7 @@ int update(int n) {
 				pWind->flags |= WFHard;
 
 			// Skip remaining tasks for current window.  These will be done by vupd_cursor().
-			if(pWind != sess.pCurWind) {
+			if(pWind != sess.cur.pWind) {
 				if((pWind->flags & ~WFMode) == WFEdit) {
 					if(vupd_dotLine(pWind) != Success)	// Update current (edited) line only.
 						return sess.rtn.status;
@@ -1022,7 +1038,7 @@ int update(int n) {
 	if(n == INT_MIN || n > 0) {
 
 		// update the cursor position and flush the buffers.
-		if(tmove(sess.pCurScrn->cursorRow, sess.pCurScrn->cursorCol) == Success)
+		if(tmove(sess.cur.pScrn->cursorRow, sess.cur.pScrn->cursorCol) == Success)
 			(void) tflush();
 		}
 
@@ -1043,7 +1059,7 @@ int updateScrn(Datum *pRtnVal, int n, Datum **args) {
 			// "function option"
 
 	// Get options and validate them.
-	if(n != INT_MIN) {
+	if(args[0] != NULL) {
 		if(parseOpts(&optHdr, NULL, args[0], NULL) != Success)
 			return sess.rtn.status;
 		if(options[0].ctrlFlags & OptSelected) {		// Force?
@@ -1096,7 +1112,7 @@ static int findHelpKeys(int (*func)(Datum *pRtnVal, int n, Datum **args), DFab *
 
 			// Found one.  Skip if prefixed or function key.
 			if(!(pKeyBind->code & (Prefix | FKey))) {
-				if(dputf(prompt, "%c~u%s~U", c, ektos(pKeyBind->code, workBuf, false)) != 0)
+				if(dputf(prompt, 0, "%c~u%s~U", c, ektos(pKeyBind->code, workBuf, false)) != 0)
 					return -1;
 				c = '|';
 				found = true;
@@ -1109,7 +1125,7 @@ static int findHelpKeys(int (*func)(Datum *pRtnVal, int n, Datum **args), DFab *
 		return 0;
 
 	// One or more keys found.  Finish up command.
-	return dputf(prompt, " ~b%c%s~B,", cmd0, cmd);
+	return dputf(prompt, 0, " ~b%c%s~B,", cmd0, cmd);
 	}
 
 // Display a buffer in a pop-up window and page it for the user.  If RendAltML flag is set, display buffer name and filename
@@ -1260,9 +1276,9 @@ int bpop(Buffer *pBuf, ushort flags) {
 			}
 
 		// Display prompt.
-		if(mlputs(MLHome | MLFlush, helpPrompt != NULL ? helpPrompt : pLineMax == NULL || pLine1 == pLineMax ? text201 :
-		 ": ") != Success || mlflush() != Success)
-													// "End: "
+		if(mlputs(MLHome | MLFlush | MLForce, helpPrompt != NULL ? helpPrompt :
+		 pLineMax == NULL || pLine1 == pLineMax ? text201 : ": ") != Success)
+							// "End: "
 			return sess.rtn.status;
 
 		// Get response.
@@ -1339,15 +1355,15 @@ int bpop(Buffer *pBuf, ushort flags) {
 
 				// Build prompt and display it:
 			// SPC f C-v +pg, b C-z -pg, d +half, u -half, C-n +ln, C-p -ln, g top, G bot, ESC q quit, ? help:
-				if(dopentrack(&prompt) != 0 || dputs("~uSPC~U|~uf~U", &prompt) != 0 ||
-				 findHelpKeys(forwPage, &prompt) != 0 || dputs(" ~ub~U", &prompt) != 0 ||
+				if(dopentrack(&prompt) != 0 || dputs("~uSPC~U|~uf~U", &prompt, 0) != 0 ||
+				 findHelpKeys(forwPage, &prompt) != 0 || dputs(" ~ub~U", &prompt, 0) != 0 ||
 				 findHelpKeys(backPage, &prompt) != 0 || dputs(" ~ud~U ~b+half~B, ~uu~U ~b-half~B,",
-				 &prompt) != 0 || findHelpKeys(forwLine, &prompt) != 0 ||
+				 &prompt, 0) != 0 || findHelpKeys(forwLine, &prompt) != 0 ||
 				 findHelpKeys(backLine, &prompt) != 0 ||
 				 dputs(" ~ug~U ~btop~B, ~uG~U ~bbot~B, ~uESC~U|~uq~U ~bquit~B, ~u?~U ~bhelp~B: ",
-				 &prompt) != 0 || dclose(&prompt, Fab_String) != 0)
+				 &prompt, 0) != 0 || dclose(&prompt, FabStr) != 0)
 		 			return librsset(Failure);
-				if(mlputs(MLHome | MLTermAttr | MLFlush, prompt.pDatum->str) != Success)
+				if(mlputs(MLHome | MLTermAttr | MLFlush | MLForce, prompt.pDatum->str) != Success)
 					return sess.rtn.status;
 				}
 			else {
@@ -1361,7 +1377,7 @@ Retn:
 	// Force virtual screen refresh.
 	supd_windFlags(NULL, WFHard | WFMode);
 	if(flags & RendWait)
-		(void) mlerase();
+		(void) mlerase(MLForce);
 
 	return sess.rtn.status;
 	}

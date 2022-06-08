@@ -14,28 +14,27 @@ For a standard installation of MightEMacs, perform the following steps:
 	$ cd MightEMacs-master
 
  2. Note that if you already have MightEMacs installed (in /usr/local), the
-    installers will save any existing site.ms file in /usr/local/lib/memacs or
-    /usr/local/share/memacs/scripts as
-    /usr/local/share/memacs/scripts/site.ms.bak.
+    installers will save any existing site.ms file in the scripts directory
+    as /usr/local/share/memacs/scripts/site.ms.bak.
 
     If you are installing on a Linux platform, go to the next step; otherwise,
     go to step 5.
 
- 3. The Linux installer is memacs-9.5.1.sh, which includes a 64-bit binary built
+ 3. The Linux installer is memacs-9.6.0.sh, which includes a 64-bit binary built
     on a CentOS vers. 6 machine.  To run the installer, type the following
     commands:
 
 	$ su root
-	# ./memacs-9.5.1.sh
+	# ./memacs-9.6.0.sh
 	# exit
 
  4. Go to step 6.
 
- 5. The macOS installer is memacs-9.5.1.pkg, which includes a 64-bit binary
-    built for macOS vers. 10.10 (Yosemite) and later.  Open the installer
+ 5. The macOS installer is memacs-9.6.0.pkg, which includes a 64-bit binary
+    built for macOS vers. 10.12 (Sierra) and later.  Open the installer
     package with the following command:
 
-	$ open memacs-9.5.1.pkg
+	$ open memacs-9.6.0.pkg
 
     and run the installer.
 
@@ -62,11 +61,11 @@ For a standard installation of MightEMacs, perform the following steps:
     MightEMacs looks for its startup files in directory
     /usr/local/share/memacs/scripts by default.  If you want to create your own
     scripts in another directory (for example, "$HOME/scripts"), you can include
-    it in the MMPATH environmental variable so that MightEMacs will search that
+    it in the MSPATH environmental variable so that MightEMacs will search that
     directory also.  To accomplish this, add this line to the startup file you
     modified above:
 
-	export MMPATH=":/usr/local/share/memacs/scripts:$HOME/scripts"
+	export MSPATH=":/usr/local/share/memacs/scripts:$HOME/scripts"
 
  8. Review and/or edit file /usr/local/share/memacs/scripts/site.ms to customize
     site-wide defaults for the editor, such as scrolling options, the search

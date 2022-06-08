@@ -1,7 +1,7 @@
 ~bLine Blocks and Line Commands~B
 
 As discussed in the ~bEssential Editing Commands~B section, a numeric prefix may
-be used for the "copyLine", "killLine", and "delLine" commands to select a block
+be used for the ~bcopyLine~B, ~bkillLine~B, and ~bdelLine~B commands to select a block
 of contiguous lines to operate on.  This method of selecting lines is used by
 several other commands as well which operate on line blocks.  Each of these
 commands use the numeric prefix to select one or more adjacent lines as follows:
@@ -35,6 +35,6 @@ The commands that operate on line blocks are:
     upperCaseLine   ~#uC-x C-u~U     Convert text in line block to upper case.
     wrapLine        ~#uESC RTN~U     Rewrap lines in line block.
 
-Additionally, the "wpJoinLines" (~#uC-c C-j~U) and "wpWrapLine" (~#uC-c RTN~U) user commands,
+Additionally, the ~bwpJoinLines~B (~#uC-c C-j~U) and ~bwpWrapLine~B (~#uC-c RTN~U) user commands,
 which provide additional features, also operate on line blocks.  See the user
-section of the "showCommands" (~#uC-h @~U) help display for details.
+section of the ~bshowCommands~B (~#uC-h @~U) help display for details.

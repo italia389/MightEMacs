@@ -13,8 +13,8 @@ The commands for undeleting text and managing the delete ring are:
     delDelEntry         ~#uC-x d~U
     showDelRing         ~#uC-h d~U
 
-The "undelete" (~#uESC u~U) command is equivalent to the "yank" (~uC-y~U) command and the
-"undeleteCycle" (~#uESC U~U) command is equivalent to the "yankCycle" (~#uESC C-y~U)
+The ~bundelete~B (~#uESC u~U) command is equivalent to the ~byank~B (~uC-y~U) command and the
+~bundeleteCycle~B (~#uESC U~U) command is equivalent to the ~byankCycle~B (~#uESC C-y~U)
 command.  The only difference is that text is retrieved from the delete ring
 instead of the kill ring.
 
@@ -27,6 +27,6 @@ ring.  You also can cancel the whole undelete process by pressing ~#uC-x C-y~U
 done when the keys are entered after a yank command.
 
 The maximum size of the delete ring is initially 30 entries, and is controlled
-with the "ringSize" (~#uESC R~U) command.  To change the size, execute the command
+with the ~bringSize~B (~#uESC R~U) command.  To change the size, execute the command
 with a numeric prefix, enter "delete" for the ring name, and enter a new integer
 value.  To set it to an unlimited size, enter zero for the size.

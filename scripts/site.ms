@@ -1,9 +1,9 @@
-# (c) Copyright 2019 Richard W. Marinelli
+# (c) Copyright 2022 Richard W. Marinelli
 #
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# site.ms	Ver. 9.5.0
+# site.ms	Ver. 9.6.0
 #	MightEMacs user-customizable site-wide startup file.
 
 # This file is loaded by the "memacs.ms" main startup file.  It contains site-wide settings which may be customized by the user.
@@ -33,7 +33,10 @@ $EndSentence = '.?!'		# End-of-sentence characters.  Set to '' if extra space no
 #$horzJump = 0			# Set horizontal smooth scrolling (default 15% of window width).
 #$vertJump = 0			# Set vertical smooth scrolling (default 20% of window height).
 #$searchDelim = 'RTN'		# Use "return" to terminate search strings interactively (default ESC).
-setWrapCol $TermSize[0]		# Set wrap column to full terminal width (default 76, 0 to disable).
+
+# Wrap column.  Uncomment the following line to set wrap column to full terminal width on first screen
+# and any subsequent screens.  Default wrap column is "terminal width - 4".  Set to zero to disable.
+#setDefault 'WrapCol', setWrapCol($TermSize[0])
 
 # Global modes.  Uncomment any of the following lines to change the default.
 #1 => chgMode nil, 'ASave'	# Auto-save files.
@@ -41,6 +44,11 @@ setWrapCol $TermSize[0]		# Set wrap column to full terminal width (default 76, 0
 #-1 => chgMode nil, 'HScrl'	# Do NOT horizontally scroll all window lines simultaneously.
 #1 => chgMode nil, 'Safe'	# Copy buffer to temporary file when saving.
 #1 => chgMode nil, 'Clob'	# Allow (silent) overwrite of a user command or function buffer.
+
+# Uncomment the following lines to make 'ATerm' a global mode and enable it.
+# This ensures that all files end with a newline when saved.
+#editMode 'ATerm', 'Global: true', 'Hidden: true'
+#1 => chgMode nil, 'ATerm'
 
 # Optional packages.  Uncomment any of the following lines to load.
 require 'blockFormat'		# Package for formatting comment blocks and numbered item lists.

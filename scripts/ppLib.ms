@@ -1,9 +1,9 @@
-# (c) Copyright 2019 Richard W. Marinelli
+# (c) Copyright 2022 Richard W. Marinelli
 #
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# ppLib.ms		Ver. 9.5.0
+# ppLib.ms		Ver. 9.6.0
 #	Shared MightEMacs preprocessor library for C and C-like source-file editing.
 
 # Don't load this file if it has already been done so.
@@ -33,7 +33,7 @@ endroutine
 # Prompt for preprocessor macro name.
 function ppNamePrompt(0)
 	defined?('Name', '$cWrapName') && !null?($cWrapName) or $cWrapName = nil
-	$cWrapName = 1 => prompt('Macro name', $cWrapName)
+	$cWrapName = prompt('Macro name', nil, $cWrapName)
 endroutine
 
 # Wrap "#if !<name>" and "#endif" around a block of lines.
@@ -101,10 +101,10 @@ endroutine
 
 # Go to matching #if... or #endif if current line begins with one of the two keywords.  Save current position in mark '.', set
 # mark 'T' to #if... line, mark 'E' to #else (if it exists), and mark 'B' to #endif.  If $0 == 0, be silent about errors.
-# Return true if successful; otherwise, false.
+# Return true if successful, otherwise false.
 command ppGotoIfEndif(0) {description: "Go to ~u#if...~U or ~u#endif~U paired with one in current line and set marks '.'\
- (previous position), 'T' (top macro line), 'E' (#else macro line, if any), and 'B' (bottom macro line).  Returns: true if\
- successful; otherwise, false."}
+ (previous position), 'T' (top macro line), 'E' (#else macro line, if any), and 'B' (bottom macro line).\n\nReturns: true if\
+ successful, otherwise false."}
 
 	# Current line begin with #if... or #endif?
 	x = subline(-$lineOffset, 6)
@@ -224,17 +224,17 @@ endroutine
 
 # Scan multiple buffers (files) and remove conditional preprocessor lines.  #if lines must be in form "#if MACRO" or
 # "#if !MACRO".
-command ppDeletePPLines(0) {description: 'Remove conditional preprocessor lines from all visible buffers, or just those that\
+command ppDeletePPLines(0) {description: "Remove conditional preprocessor lines from all visible buffers, or just those that\
  matched the most recent ~bfindFiles~B invocation if n <= 0.  ~u#if~U lines must be in form ~u#if~U MACRO or ~#u#if !~UMACRO. \
- The user is prompted for the preprocessor macro name and given the option to continue or quit after each buffer is scanned. \
- Returns: false if error occurs; otherwise, true.'}
+ The user is prompted for the preprocessor macro name and given the option to continue or quit after each buffer is scanned.\
+\n\nReturns: false if error occurs, otherwise true."}
 
 	# Get list of buffers to search: either all visible buffers or only those also in $grepList.
 	if (searchList = $0 => getBufList) == false
 		return false
 	endif
-	whichBufs = shift(searchList) ? 'all' : 'selected'
-	searchList = shift(searchList)
+	whichBufs = ashift(searchList) ? 'all' : 'selected'
+	searchList = ashift(searchList)
 
 	# Prompt for Boolean-qualified macro name.
 	macName = prompt("In #{whichBufs} buffers, keep lines for macro name (!NAME or NAME)")

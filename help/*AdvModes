@@ -27,6 +27,9 @@ GLOBAL MODES
                 window is greater than the terminal width and the point is moved
                 past the right edge of the screen, scroll all lines in the
                 window simultaneously; otherwise, scroll just the current line.
+    ~bReadOnly~B    Open all files in read-only mode.  When enabled, forces the
+                read-only buffer attribute to be set on any buffer created for
+                an input file.
     ~bRegexp~B      Perform regular expression buffer searches by default.  This
                 can be overridden by appending the "p" (plain) option character
                 to the search pattern.
@@ -69,8 +72,8 @@ BUILT-IN BUFFER MODES
                 n is the line number.
     ~bOver~B        Overwrite columns when typing.  Hard tabs are replaced only
                 when the point is at a column immediately preceding a tab stop.
-    ~bRepl~B        Replace characters when typing.  Hard tabs are replaced just
-                like any other character.
+    ~bRepl~B        Replace characters when typing.  Hard tabs are treated as
+                ordinary characters and replaced just like any other character.
     ~bWrap~B        Wrap words to the next line automatically as you type.  (See the
                 ~bLine Wrapping~B section for details.)
 
@@ -106,7 +109,7 @@ determines the group's type.
 
 Both modes and mode groups have ~battributes~B, which set various aspects of them;
 for example, whether a mode is shown on the mode line.  Attributes are edited
-with the "editMode" (~#uC-x m~U) command for modes and the "editModeGroup" (~#uC-x g~U)
+with the ~beditMode~B (~#uC-x m~U) command for modes and the ~beditModeGroup~B (~#uC-x g~U)
 command for mode groups.  These commands are also used to create and delete
 modes and groups.  Both commands accept a mode or group name followed by zero or
 more string arguments in form "keyword: value" where "keyword" is one of the
@@ -124,7 +127,7 @@ MODE ATTRIBUTES
     ~bbuffer~B          Boolean         Designate mode as a "buffer" mode if true;
                                     otherwise, "global".
     ~bdescription~B     String          Set mode description, which is shown in the
-                                    "showModes" display.
+                                    ~bshowModes~B display.
     ~bglobal~B          Boolean         Designate mode as a "global" mode if true;
                                     otherwise, "buffer".
     ~bgroup~B           String or nil   Make mode a member of given group if string
@@ -139,7 +142,7 @@ MODE ATTRIBUTES
 GROUP ATTRIBUTES
 
     ~bdescription~B     String          Set mode group description, which is shown
-                                    in "showModes" display.
+                                    in ~bshowModes~B display.
     ~bmodes~B           String or nil   Comma-separated list of modes to add to
                                     group if string; otherwise, remove all modes
                                     from group if nil.
@@ -152,7 +155,7 @@ that is, it may not be changed from a global mode to a buffer mode or vice versa
 (because it would make no sense to do so).  User modes on the other hand, have
 no such restriction.  Additionally, user modes and groups may be deleted at any
 time; whereas, built-in ones may not.  All mode and group attributes, including
-scope-lock, are shown in the "showModes" display.
+scope-lock, are shown in the ~bshowModes~B display.
 
 Changing the scope of a mode can be useful at times.  For example, if you were
 editing several files at once and wanted to make backups of each when they were

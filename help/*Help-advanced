@@ -7,10 +7,10 @@ If you have read all the help topics on the home page in the recommended order
 and would like to get more detailed information about the editor's commands and
 features, you can use the Advanced Help System.  This system uses menus and
 pop-up windows for all help pages so that you can view information and return
-to your editing session quickly.  The ~#uC-h C-h~U key sequence is not used (and not
+to your editing session quickly.  The ~#uC-h g~U key sequence is not used (and not
 bound).
 
-To enter the Advanced Help System, simply enter a numeric prefix to the "help"
+To enter the Advanced Help System, simply enter a numeric prefix to the ~bhelp~B
 command, for example, ~#uC-u ESC ?~U.
 
 

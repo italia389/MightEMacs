@@ -1,9 +1,9 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 //
-// exec.c	Routines dealing with execution of commands, command lines, buffers, and command files for MightEMacs.
+// exec.c	Routines dealing with execution of commands, command lines, buffers, and files for MightEMacs.
 
 #include "std.h"
 #include <stdarg.h>
@@ -22,20 +22,20 @@
 // Control data for if/loop execution levels.
 typedef struct {
 	VarDesc varDesc;		// Loop variable descriptor.
-	Array *pArray;		// Loop array.
-	ArraySize index;	// Index of next element to process.
+	Array *pArray;			// Loop array.
+	ArraySize index;		// Index of next element to process.
 	} ForLoopHdr;
 typedef struct ExecLevel {
 	struct ExecLevel *prev, *next;
 #if MMDebug & (Debug_Script | Debug_Preproc)
-	uint level;		// Execution level, beginning at zero.
+	uint level;			// Execution level, beginning at zero.
 #endif
-	bool live;		// True if executing this level.
-	bool loopSpawn;		// True if level spawned by any loop statement.
-	int loopCount;		// Number of times through the loop.
-	ForLoopHdr *pForHdr;	// Control information for "for" loop.
-	bool ifWasTrue;		// True if (possibly compound) "if" statement was ever true.
-	bool elseSeen;		// True if "else" clause has been processed at this level.
+	bool live;			// True if executing this level.
+	bool loopSpawn;			// True if level spawned by any loop statement.
+	int loopCount;			// Number of times through the loop.
+	ForLoopHdr *pForHdr;		// Control information for "for" loop.
+	bool ifWasTrue;			// True if (possibly compound) "if" statement was ever true.
+	bool elseSeen;			// True if "else" clause has been processed at this level.
 	} ExecLevel;
 
 #define StmtKeywordMax	10		// Length of longest statement keyword name.
@@ -50,11 +50,11 @@ static char *showFlags(Parse *pNewParse) {
 	if(pLastParse == NULL)
 		str = stpcpy(str, " NULL");
 	else {
-		sprintf(str, "->flags %.4hX", pLastParse->flags);
+		sprintf(str, "->flags %.4hx", pLastParse->flags);
 		str = strchr(str, '\0');
 		}
 	if(pNewParse != NULL)
-		sprintf(str, ", newParse.flags %.4hX", pNewParse->flags);
+		sprintf(str, ", newParse.flags %.4hx", pNewParse->flags);
 	return workBuf;
 	}
 #endif
@@ -197,41 +197,30 @@ Retn:
 
 // Disable a hook that went awry.  Return status.
 static int disableHook(HookRec *pHookRec) {
-	DFab msg;
-	int rtnCode = 0;
 
-	// Hook execution failed, let the user know what's up.
+	// Hook execution failed -- let the user know what's up.
 	pHookRec->running = false;
 	if(sess.rtn.status > FatalError) {
-		if((rtnCode = dopentrack(&msg)) == 0 && escAttr(&msg) == Success) {
-			if(disempty(&msg))
-				rtnCode = dputf(&msg, text176, hookFuncName(&pHookRec->func));
-						 // "Function '~b%s~B' failed"
-#if MMDebug & Debug_Datum
-			if(rtnCode == 0) {
-				fprintf(logfile, "disableHook(): calling dputf(...,%s,%s)...\n", text161, pHookRec->name);
-				rtnCode = dputf(&msg, text161, pHookRec->name);
-				ddump(msg.pDatum, "disableHook(): post dputf()...");
-				}
-			if(rtnCode == 0) {
-				rtnCode = dclose(&msg, Fab_String);
-				fprintf(logfile, "disableHook(): dclose() returned sess.rtn.msg '%s', status %d.\n",
-				 sess.rtn.msg.str, sess.rtn.status);
-#else
-			if(rtnCode == 0 && (rtnCode = dputf(&msg, text161, pHookRec->name)) == 0 &&
-							// " (disabled '%s' hook)"
-			 (rtnCode = dclose(&msg, Fab_String)) == 0) {
+		DFab msg;
+
+		if(dopenwith(&msg, &sess.rtn.msg, FabAppend) != 0)
+			goto LibFail;
+		if(dfabempty(&msg) && dputf(&msg, 0, text176, hookFuncName(&pHookRec->func)) != 0)
+					 // "Function '~b%s~B' failed"
+			goto LibFail;
+		if(dputf(&msg, 0, text161, pHookRec->name) != 0 || dclose(&msg, FabStr) != 0)
+				// " (disabled '%s' hook)"
+			goto LibFail;
+#if MMDebug & Debug_MsgLine
+		fprintf(logfile, "disableHook(): set new return message '%s'\n", sess.rtn.msg.str);
 #endif
-				(void) rsset(sess.rtn.status, RSForce | RSNoFormat | RSTermAttr, msg.pDatum->str);
-				}
-			}
 		}
 
-	// disable the hook...
+	// Disable the hook and return (error) status.
 	eraseHook(pHookRec);
-
-	// and set library error if needed.
-	return (rtnCode == 0) ? sess.rtn.status : librsset(Failure);
+	return sess.rtn.status;
+LibFail:
+	return librsset(Failure);
 	}
 
 // Execute a function bound to a hook with pRtnVal (if not NULL) and n.  If argInfo == 0, invoke the function directly;
@@ -251,73 +240,77 @@ int execHook(Datum *pRtnVal, int n, HookRec *pHookRec, uint argInfo, ...) {
 
 	// Build command line if requested.
 	if(argInfo != 0) {
+		int rtnCode;
 		va_list varArgList;
 		DFab cmd;
 		char *str;
+		ushort oldOpFlag;
 		short delimChar = ' ';
 		uint argCount = argInfo & 0xF;
 
 		// Concatenate function name with arguments...
-		if(dopentrack(&cmd) != 0 || (n != INT_MIN && dputf(&cmd, "%d => ", n) != 0) ||
-		 dputs(hookFuncName(&pHookRec->func), &cmd) != 0)
+		if(dopentrack(&cmd) != 0 || (n != INT_MIN && dputf(&cmd, 0, "%d => ", n) != 0) ||
+		 dputs(hookFuncName(&pHookRec->func), &cmd, 0) != 0)
 			goto LibFail;
 		va_start(varArgList, argInfo);
 		argInfo >>= 4;
 		do {
-			if(dputc(delimChar, &cmd) != 0)
+			if(dputc(delimChar, &cmd, 0) != 0)
 				goto LibFail;
 			switch(argInfo & 3) {
 				case 0:			// string argument.
 					if((str = va_arg(varArgList, char *)) == NULL) {
-						if(dputs(viz_nil, &cmd) != 0)
+						if(dputs(viz_nil, &cmd, 0) != 0)
 							goto LibFail;
 						}
-					else if(quote(&cmd, str, true) != Success)
-						goto Fail;
+					else if(dputs(str, &cmd, DCvtLang) != 0)
+						goto LibFail;
 					break;
 				case 1:			// long argument.
-					if(dputf(&cmd, "%ld", va_arg(varArgList, long)) != 0)
+					if(dputf(&cmd, 0, "%ld", va_arg(varArgList, long)) != 0)
 						goto LibFail;
 					break;
 				default:		// Datum *
-					if(dtosfchk(va_arg(varArgList, Datum *), NULL, CvtExpr, &cmd) != Success)
+					if((rtnCode = dputd(va_arg(varArgList, Datum *), &cmd, NULL, DCvtLang)) < 0)
+						goto LibFail;
+					if(endless(rtnCode) != Success)
 						goto Fail;
 				}
 			argInfo >>= 2;
 			delimChar = ',';
 			} while(--argCount > 0);
 		va_end(varArgList);
-
-		// and execute result.
-		if(dclose(&cmd, Fab_String) != 0)
+		if(dclose(&cmd, FabStr) != 0)
 			goto LibFail;
+
+		// save and clear OpUserCmd flag...
+		oldOpFlag = sess.opFlags & OpUserCmd;
+		sess.opFlags &= ~OpUserCmd;
+
+		// execute command...
 		pHookRec->running = true;
 #if MMDebug & Debug_Datum
 		fprintf(logfile, "execHook(): calling execExprStmt(%s)...\n", cmd.pDatum->str);
-		(void) execExprStmt(pRtnVal, cmd.pDatum->str, TokC_Comment, NULL);
+		(void) execExprStmt(pRtnVal, cmd.pDatum->str, 0, NULL);
 		fprintf(logfile, "execHook(): execExprStmt() returned sess.rtn.msg '%s', status %d.\n",
 		 sess.rtn.msg.str, sess.rtn.status);
 		if(sess.rtn.status != Success)
 #else
-		if(execExprStmt(pRtnVal, cmd.pDatum->str, TokC_Comment, NULL) != Success)
+		if(execExprStmt(pRtnVal, cmd.pDatum->str, 0, NULL) != Success)
 #endif
 			goto Fail;
+
+		// and restore OpUserCmd flag.
+		sess.opFlags |= oldOpFlag;
 		}
 	else {
 		short oldStatus;
 		ushort oldFlags;
-		uint oldNoLoad = sess.opFlags & OpNoLoad;
+		ushort oldNoLoad = sess.opFlags & OpNoLoad;
 
 		// Save and restore status if running "exit" hook so that execBuf() or execCmdFunc() will run.
-		if(pHookRec == hookTable + HkExit) {
-#if 0
-			oldFlags = sess.rtn.flags;
-			oldStatus = sess.rtn.status;
-			rsclear(RSKeepMsg);
-#else
+		if(pHookRec == hookTable + HkExit)
 			rspush(&oldStatus, &oldFlags);
-#endif
-			}
 		sess.opFlags |= OpNoLoad;
 		pHookRec->running = true;
 		if(pHookRec->func.type == PtrUserFunc)
@@ -325,14 +318,8 @@ int execHook(Datum *pRtnVal, int n, HookRec *pHookRec, uint argInfo, ...) {
 		else
 			(void) execCmdFunc(pRtnVal, n, pHookRec->func.u.pCmdFunc, 0, 0);
 		sess.opFlags = (sess.opFlags & ~OpNoLoad) | oldNoLoad;
-		if(pHookRec == hookTable + HkExit) {
-#if 0
-			sess.rtn.flags = oldFlags;
-			sess.rtn.status = oldStatus;
-#else
+		if(pHookRec == hookTable + HkExit)
 			rspop(oldStatus, oldFlags);
-#endif
-			}
 		else if(sess.rtn.status != Success)
 			goto Fail;
 		}
@@ -395,9 +382,12 @@ int run(Datum *pRtnVal, int n, Datum **args) {
 	// Execute it.
 	if(univ.type & PtrAlias)
 		univ = univ.u.pAlias->targ;
-	if(univ.type == PtrUserCmd)
+	if(univ.type == PtrUserCmd) {
+		sess.opFlags |= OpUserCmd;
 		(void) execBuf(pRtnVal, n, univ.u.pBuf, NULL,
 		 sess.opFlags & OpParens ? ArgFirst | SRun_Parens : ArgFirst);		// Call the user command.
+		sess.opFlags &= ~OpUserCmd;
+		}
 	else {
 		CmdFunc *pCmdFunc = univ.u.pCmdFunc;
 		if(n != 0 || !(pCmdFunc->attrFlags & CFNCount))
@@ -427,14 +417,14 @@ int eval(Datum *pRtnVal, int n, Datum **args) {
 		if(catArgs(pDatum, 1, NULL, 0) != Success)
 			return sess.rtn.status;
 		}
-	else if(termInp(pDatum, ": ", ArgNotNull1 | ArgNil1, 0, NULL) != Success || pDatum->type == dat_nil)
+	else if(termInp(pDatum, ": ", ArgNotNull1 | ArgNil1, 0, NULL) != Success || disnil(pDatum))
 		return sess.rtn.status;
 
 	// Execute command line.
 #if MMDebug & Debug_Script
 	fprintf(logfile, "eval(): Calling execExprStmt(\"%s\")...\n", pDatum->str);
 #endif
-	return execExprStmt(pRtnVal, pDatum->str, TokC_Comment, NULL);
+	return execExprStmt(pRtnVal, pDatum->str, ParseStmtEnd, NULL);
 	}
 
 #if MMDebug & Debug_CallArg
@@ -444,7 +434,8 @@ static int argDump(int n, Buffer *pBuf, Datum *pDatum) {
 
 	fprintf(logfile, "-----\nargDump(): n: %d, pBuf: '%s'\n", n, pBuf->bufname);
 	dinit(&argList);
-	(void) quoteVal(&argList, pDatum, CvtExpr);
+	if(dtos(&argList, pDatum, NULL, DCvtLang) < 0)
+		return librsset(Failure);
 	fprintf(logfile, "User command/function argument list: %s\n", argList.str);
 	dclear(&argList);
 	return sess.rtn.status;
@@ -462,7 +453,7 @@ static int argLoad(Buffer *pBuf, Datum *pArgV, uint flags) {
 	Array *pArray;
 
 #if MMDebug & Debug_CallArg
-	fprintf(logfile, "*argLoad(%d,%s,%.8X)...\n", n, pBuf->bufname, flags);
+	fprintf(logfile, "*argLoad(%d,%s,%.8x)...\n", n, pBuf->bufname, flags);
 #endif
 	// Create array for argument list (which may remain empty).
 	if(makeArray(pArgV, 0, &pArray) != Success)
@@ -512,7 +503,7 @@ static int argLoad(Buffer *pBuf, Datum *pArgV, uint flags) {
 				argFlags = ArgBool1 | ArgArray1 | ArgNIS1;
 
 				// Got an argument... add it to array and count it.
-				if(apush(pArray, pArg, true) != 0)
+				if(apush(pArray, pArg, AOpCopy) != 0)
 					goto LibFail;
 				++argCount;
 				}
@@ -536,41 +527,37 @@ LibFail:
 	return librsset(Failure);
 	}
 
-#if MMDebug & (Debug_Expr | Debug_Token)
+#if MMDebug & (Debug_Datum | Debug_Expr | Debug_Token)
 // Write parsing state to log file.
 static void printInstance(bool begin) {
 
 	if(pLastParse != NULL) {
 		fputs(begin ? "parseBegin(): new instance" : "parseEnd(): old instance restored", logfile);
-		fprintf(logfile, ": src \"%s\", tok \"%s\", sym %.4X.", pLastParse->src, pLastParse->tok.str, pLastParse->sym);
+		fprintf(logfile, " %.8x: src \"%s\", tok \"%s\", sym %.4x.",
+		 (uint) pLastParse, pLastParse->src, pLastParse->tok.str, pLastParse->sym);
 		fputs(begin ? "..\n" : "\n", logfile);
 		}
 	}
 #endif
 
 // Initialize "pLastParse" global variable for new command line and get first symbol.  Return status.
-static int parseBegin(Parse **ppOldParse, Parse *pNewParse, char *cmdLine, short termChar) {
+static int parseBegin(Parse **ppOldParse, Parse *pNewParse, char *cmdLine, ushort flags) {
 
 	// Save current parsing state and initialize new one.
 	*ppOldParse = pLastParse;
 	pLastParse = pNewParse;
 	pLastParse->src = cmdLine;
-	pLastParse->termChar = termChar;
 	pLastParse->sym = s_any;
-#if DCaller
-	dinit(&pLastParse->tok, "parsebegin");
-#else
 	dinit(&pLastParse->tok);
-#endif
-#if MMDebug & (Debug_Expr | Debug_Token)
+#if MMDebug & (Debug_Datum | Debug_Expr | Debug_Token)
 	printInstance(true);
 #endif
 	pLastParse->garbHead = datGarbHead;
 #if MMDebug & Debug_Datum
-	fprintf(logfile, "parseBegin(): saved garbage pointer %.8X\n", (uint) datGarbHead);
+	fprintf(logfile, "parseBegin(): saved datum garbage pointer %.8x\n", (uint) datGarbHead);
 #endif
 	// Save old "script mode" flag and enable it.
-	pLastParse->flags = sess.opFlags & OpScript;
+	pLastParse->flags = (sess.opFlags & OpScript) | flags;
 	sess.opFlags = (sess.opFlags & ~OpParens) | OpScript;
 
 	// Get first symbol and return.
@@ -581,11 +568,14 @@ static int parseBegin(Parse **ppOldParse, Parse *pNewParse, char *cmdLine, short
 // End a parsing instance and restore previous one.
 static void parseEnd(Parse *pOldParse) {
 
-	garbPop(pLastParse->garbHead);
+#if MMDebug & Debug_Datum
+	fprintf(logfile, "parseEnd(): old instance %.8x: calling dgPop()...\n", (uint) pLastParse);
+#endif
+	dgPop(pLastParse->garbHead);
 	dclear(&pLastParse->tok);
-	sess.opFlags = (sess.opFlags & ~OpScript) | pLastParse->flags;
+	sess.opFlags = (sess.opFlags & ~OpScript) | (pLastParse->flags & OpScript);
 	pLastParse = pOldParse;
-#if MMDebug & (Debug_Expr | Debug_Token)
+#if MMDebug & (Debug_Datum | Debug_Expr | Debug_Token)
 	printInstance(false);
 #endif
 	}		
@@ -595,23 +585,37 @@ static void parseEnd(Parse *pOldParse) {
 static int xstmt(Datum *pRtnVal) {
 	ExprNode node;
 
-	// Set up the default command values.
-	keyEntry.prevFlags = keyEntry.curFlags;
-	keyEntry.curFlags = 0;
+	// Loop through expressions separated by a semicolon (TokC_StmtEnd), if applicable.
+	for(;;) {
+		// Set up the default command values.
+		keyEntry.prevFlags = keyEntry.curFlags;
+		keyEntry.curFlags = 0;
 
-	// Evaluate the string (as an expression).
-	nodeInit(&node, pRtnVal, true);
+		// Evaluate the string (as an expression).
+		nodeInit(&node, pRtnVal, true);
 #if MMDebug & (Debug_Expr | Debug_Script)
-	fprintf(logfile, "xstmt() BEGIN: calling ge_andOr() on token '%s', line '%s'...\n", pLastParse->tok.str,
-	 pLastParse->src);
+		fprintf(logfile, "xstmt() BEGIN: calling ge_andOr() on token '%s', line '%s'...\n", pLastParse->tok.str,
+		 pLastParse->src);
 #endif
-	if(ge_andOr(&node) == Success)
-		if(!extraSym()) {				// Error if extra symbol(s).
-			if(pLastParse->termChar == TokC_ExprEnd &&	// Check if parsing "#{}" and right brace missing.
-			 *pLastParse->src != TokC_ExprEnd)
+		if(ge_andOr(&node) != Success)
+			break;
+
+		// If parsing stopped at a semicolon, skip past it and evaluate next expression.
+		if(*pLastParse->src == TokC_StmtEnd) {
+			++pLastParse->src;
+			(void) getSym();
+			continue;
+			}
+
+		// Error if extra symbol(s) or if parsing "#{...}" and right brace missing.
+		if(!extraSym()) {
+			if((pLastParse->flags & ParseExprEnd) && *pLastParse->src != TokC_ExprEnd)
 				(void) rsset(Failure, 0, text173, TokC_Expr, TokC_ExprBegin, TokC_ExprEnd);
 						// "Unbalanced %c%c%c string parameter"
 			}
+		break;
+		}
+
 #if MMDebug & (Debug_Script | Debug_Expr)
 	fprintf(logfile, "xstmt(): Returning status %hd \"%s\"\n", sess.rtn.status, sess.rtn.msg.str);
 #endif
@@ -622,14 +626,14 @@ static int xstmt(Datum *pRtnVal) {
 // optional pointer in which to return updated string pointer.  This function is called anytime a string needs to be executed as
 // a "statement" (without a leading statement keyword); for example, by xbuf(), xeqCmdLine(), "#{...}", or the -e switch at
 // startup.
-int execExprStmt(Datum *pRtnVal, char *cmdLine, short termChar, char **pCmdLine) {
+int execExprStmt(Datum *pRtnVal, char *cmdLine, ushort flags, char **pCmdLine) {
 	Parse *pOldLast, newLast;
 
 #if MMDebug & (Debug_Datum | Debug_Script)
-	fprintf(logfile, "execExprStmt(%.8X,\"%s\",%.4hX,%.8X)...\n", (uint) pRtnVal, cmdLine, termChar, (uint) pCmdLine);
+	fprintf(logfile, "execExprStmt(%.8x, \"%s\", %.4hx, %.8x)...\n", (uint) pRtnVal, cmdLine, flags, (uint) pCmdLine);
 #endif
 	// Begin new command line parsing instance.
-	if(parseBegin(&pOldLast, &newLast, cmdLine, termChar) == Success) {
+	if(parseBegin(&pOldLast, &newLast, cmdLine, flags) == Success) {
 
 		// Evaluate the line (as an expression).
 		(void) xstmt(pRtnVal);
@@ -755,7 +759,7 @@ int alias(Datum *pRtnVal, int n, Datum **args) {
 		if(dsetstr(pLastParse->tok.str, pName) != 0)
 			goto LibFail;
 		}
-	else if(termInp(pName, text215, ArgNotNull1 | ArgNil1, 0, NULL) != Success || pName->type == dat_nil)
+	else if(termInp(pName, text215, ArgNotNull1 | ArgNil1, 0, NULL) != Success || disnil(pName))
 			// "Create alias "
 		return sess.rtn.status;
 
@@ -855,7 +859,7 @@ Fail:
 	if((sess.opFlags & OpEval) && disnull(&sess.rtn.msg))
 		dsetint((long) count, pRtnVal);
 	if(count == 1)
-		(void) rsset(Success, 0, "%s %s", type, text10);
+		(void) rsset(Success, RSHigh, "%s %s", type, text10);
 						// "deleted"
 	return sess.rtn.status;
 	}
@@ -879,7 +883,7 @@ int xeqBuf(Datum *pRtnVal, int n, Datum **args) {
 	Buffer *pBuf;		// Pointer to buffer to execute.
 
 	// Find out what buffer the user wants to execute...
-	if(getBufname(pRtnVal, text117, sess.pCurBuf->bufname, OpDelete, &pBuf, NULL) != Success || pBuf == NULL)
+	if(getBufname(pRtnVal, text117, sess.cur.pBuf->bufname, ArgFirst | OpDelete, &pBuf, NULL) != Success || pBuf == NULL)
 			// "Execute"
 		return sess.rtn.status;
 
@@ -891,21 +895,21 @@ int xeqBuf(Datum *pRtnVal, int n, Datum **args) {
 #endif
 	}
 
-// Skip white space in a fixed-length string, given pointer to source pointer and length.  Update pointer to point to the first
+// Skip white space in a fixed-length string, given indirect source pointer and length.  Update pointer to point to the first
 // non-white character (or end of string if none) and return number of bytes remaining.
-static int skipWhite(char **pStr, int len) {
-	char *str = *pStr;
+static int skipWhite(char **pSrc, int len) {
+	char *src = *pSrc;
 
-	while(len > 0 && (*str == ' ' || *str == '\t')) {
-		++str;
+	while(len > 0 && (*src == ' ' || *src == '\t')) {
+		++src;
 		--len;
 		}
-	*pStr = str;
+	*pSrc = src;
 	return len;
 	}
 
 // Look up a statement keyword, given indirect pointer to beginning of command line and length.  Update *pCmdLine and return
-// symbol id if found; otherwise, s_nil.
+// symbol id if found, otherwise s_nil.
 static Symbol findStmtKeyword(char **pCmdLine, int len) {
 	char *cmdLine = *pCmdLine;
 
@@ -927,11 +931,10 @@ static Symbol findStmtKeyword(char **pCmdLine, int len) {
 	return s_nil;
 	}
 
-// Build an error message for a user command/function execution which includes the buffer name and line currently being
+// Build an error message for a user command or function execution which includes the buffer name and line currently being
 // executed, and set via rsset().  If errorMsg0 is NULL, use sess.rtn.msg as the initial portion; if sess.rtn.msg is null, use a
 // generic error message.  Return status.
 static int userExecError(const char *errorMsg0, const char *errorMsg1, Buffer *pBuf, Line *pLine, uint flags) {
-	int rtnCode;
 	DFab msg;
 	const char *name, *label;
 	short delimChar;
@@ -951,25 +954,25 @@ static int userExecError(const char *errorMsg0, const char *errorMsg1, Buffer *p
 
 	// Build error message line.  errorMsg0 may be long and may be truncated when displayed on message line, but so be it.
 	// The first portion of the message is the most important to see.
-	if((rtnCode = dopentrack(&msg)) == 0) {
+	if(dopentrack(&msg) != 0)
+		goto LibFail;
 
-		// Prepend errorMsg0 and errorMsg1.
-		if(errorMsg0 == NULL && errorMsg1 == NULL && !disnull(&sess.rtn.msg)) {
-			if(escAttr(&msg) != Success)
-				return sess.rtn.status;
-			}
-		else
-			rtnCode = (errorMsg1 == NULL) ? dputs(errorMsg0 != NULL ? errorMsg0 : text219, &msg) :
-									// "Script failed"
-			 dputf(&msg, errorMsg0, errorMsg1);
-		if(rtnCode == 0 &&
-		 (rtnCode = dputf(&msg, "%s %s %c%s%c %s %ld", text229, label, delimChar, name, delimChar, text230,
-							// ", in",				"at line"
-		 getLineNum(pBuf, pLine))) == 0 && (rtnCode = dclose(&msg, Fab_String)) == 0)
-			(void) rsset(ScriptError, RSForce | RSNoFormat | RSTermAttr, msg.pDatum->str);
+	// Prepend errorMsg0 and errorMsg1.
+	if(errorMsg0 == NULL && errorMsg1 == NULL && !disnull(&sess.rtn.msg)) {
+		if(escAttr(&msg) != Success)
+			return sess.rtn.status;
 		}
-
-	return (rtnCode == 0) ? sess.rtn.status : librsset(Failure);
+	else if((errorMsg1 == NULL ? dputs(errorMsg0 != NULL ? errorMsg0 : text219, &msg, 0) :
+								// "Script failed"
+	 dputf(&msg, 0, errorMsg0, errorMsg1)) != 0)
+		goto LibFail;
+	if(dputf(&msg, 0, "%s %s %c%s%c %s %ld", text229, label, delimChar, name, delimChar, text230,
+					// ", in",				"at line"
+	 getLineNum(pBuf, pLine)) != 0 || dclose(&msg, FabStr) != 0)
+		goto LibFail;
+	return rsset(ScriptError, RSForce | RSNoFormat | RSTermAttr, msg.pDatum->str);
+LibFail:
+	return librsset(Failure);
 	}
 
 // Free a list of loop block pointers, given head of list.
@@ -999,7 +1002,7 @@ void preprocFree(Buffer *pBuf) {
 #if MMDebug & Debug_Preproc
 static void lbdump(Line *pLine, const char *label) {
 
-	fprintf(logfile, "%s: [%.8X] ", label, (uint) pLine);
+	fprintf(logfile, "%s: [%.8x] ", label, (uint) pLine);
 	if(pLine == NULL)
 		fputs("NULL\n", logfile);
 	else {
@@ -1035,7 +1038,7 @@ static int preprocBuf(Buffer *pBuf, uint flags) {
 		lineText = pLine->text;
 		len = pLine->used;
 #if MMDebug & Debug_Preproc
-		fprintf(logfile, "%.8X >> %.*s\n", (uint) pLine, len, lineText);
+		fprintf(logfile, "%.8x >> %.*s\n", (uint) pLine, len, lineText);
 #endif
 		// Skip line if last line was a continuation line.
 		skipLine = lastWasCL;
@@ -1050,7 +1053,7 @@ static int preprocBuf(Buffer *pBuf, uint flags) {
 		// Check for a statement keyword.
 		if((keywordId = findStmtKeyword(&lineText, len)) != s_nil) {
 #if MMDebug & Debug_Preproc
-		fprintf(logfile, "  found keywordId %.8X\n", keywordId);
+		fprintf(logfile, "  found keywordId %.8x\n", keywordId);
 #endif
 			switch(keywordId) {
 				case kw_command:
@@ -1219,7 +1222,7 @@ NextFix:;
 				str = "UNKNOWN";
 				break;
 			}
-		fprintf(logfile, "-----\n Type: %.4X %s\n", pTempBlock->type, str);
+		fprintf(logfile, "-----\n Type: %.4x %s\n", pTempBlock->type, str);
 		lbdump(pTempBlock->pMarkLine, " Mark");
 		lbdump(pTempBlock->pJumpLine, " Jump");
 		lbdump(pTempBlock->pBreakLine, "Break");
@@ -1301,11 +1304,12 @@ static int prevLevel(ExecLevel **ppLevel) {
 	ExecLevel *pLevel = *ppLevel;
 
 	for(;;) {
+#if SanityCheck
 		if(pLevel->prev == NULL)
 
 			// Huh?  Loop level not found! (This is a bug.)
-			return rsset(Failure, RSNoFormat, text114);
-				// "Prior loop execution level not found while rewinding stack" 
+			return rsset(Failure, RSNoFormat, "Prior loop execution level not found while rewinding stack");
+#endif
 		if(pLevel->loopSpawn)
 			break;
 		pLevel = pLevel->prev;
@@ -1406,7 +1410,7 @@ static int getCmdFunc(Datum *pRtnVal, Buffer **ppCallBuf, ushort bufFlags) {
 					if(getSym() < NotFound || (!haveSym(s_rightParen, false) &&
 					 funcArg(pDatum2, ArgFirst | ArgInt1) != Success))
 						return sess.rtn.status;
-					if(pDatum2->type != dat_nil)
+					if(!disnil(pDatum2))
 						if((maxArgs = pDatum2->u.intNum) < 0) {
 							minArgs = maxArgs;
 Err:
@@ -1459,9 +1463,9 @@ Err:
 	pCallInfo->minArgs = minArgs;
 	pCallInfo->maxArgs = maxArgs;
 	if(haveText1)
-		datxfer(haveText1 == 1 ? &pCallInfo->argSyntax : &pCallInfo->descrip, pDatum1);
+		dxfer(haveText1 == 1 ? &pCallInfo->argSyntax : &pCallInfo->descrip, pDatum1);
 	if(haveText2)
-		datxfer(haveText2 == 1 ? &pCallInfo->argSyntax : &pCallInfo->descrip, pDatum2);
+		dxfer(haveText2 == 1 ? &pCallInfo->argSyntax : &pCallInfo->descrip, pDatum2);
 	pCmdFuncName[-1] = ' ';
 
 	return sess.rtn.status;
@@ -1492,7 +1496,7 @@ static int initFor(ForLoopHdr **ppForHdr, Datum *pDatum) {
 		return sess.rtn.status;
 
 	// Finish up.
-	pForHdr->pArray = wrapPtr(pDatum)->pArray;
+	pForHdr->pArray = pDatum->u.pArray;
 	pForHdr->index = 0;
 	return sess.rtn.status;
 	}
@@ -1505,14 +1509,14 @@ static int nextForEl(ForLoopHdr *pForHdr) {
 		pForHdr->index = -1;	// Invalidate control object.
 		return NotFound;
 		}
-	if((pDatum = aget(pForHdr->pArray, pForHdr->index++, false)) == NULL)
+	if((pDatum = aget(pForHdr->pArray, pForHdr->index++, 0)) == NULL)
 		return librsset(Failure);
-	return putVar(pDatum, &pForHdr->varDesc);
+	return setVar(pDatum, &pForHdr->varDesc);
 	}
 
 // Execute a compiled buffer, save result in pRtnVal, and return status.
 static int xbuf(Datum *pRtnVal, Buffer *pBuf, uint flags) {
-	Line *pBeginLine, *ppEndLine;	// Pointers to beginning and ending line(s) to execute, allowing for continuation lines.
+	Line *pBeginLine, *pEndLine;	// Pointers to beginning and ending line(s) to execute, allowing for continuation lines.
 	bool force;			// "force" statement?
 	Symbol keywordId;		// Keyword index.
 	int len;			// Line length.
@@ -1526,7 +1530,7 @@ static int xbuf(Datum *pRtnVal, Buffer *pBuf, uint flags) {
 	ExecLevel *pLevel;		// Current level.
 	LoopBlock *pBlock;
 	Buffer *pCallBuf = NULL;	// "cmd" or "func" buffer pointer.
-	Datum *pDatum;			// Work pDatum object.
+	Datum *pDatum;			// Work Datum object.
 	Datum *pFullLine;		// Null-terminated buffer line (Datum object).
 	char *lineText;			// Work pointer.
 	char *exprText;			// Beginning of expression statement (past any statement keyword).
@@ -1552,13 +1556,13 @@ static int xbuf(Datum *pRtnVal, Buffer *pBuf, uint flags) {
 	uint myInstance = ++instance;
 	fprintf(logfile, "*** BEGIN xbuf(%u,%s): %s...\n", myInstance, pBuf->bufname, showFlags(&newLast));
 #endif
-	pBeginLine = ppEndLine = pBuf->pFirstLine;
+	pBeginLine = pEndLine = pBuf->pFirstLine;
 	do {
-		// Skip blank lines and comments unless "salting" a user command or function.
-		lineText = ppEndLine->text;
-		len = ppEndLine->used;
+		// Skip blank lines and comments unless last line was a continuation line or "salting" a user routine.
+		lineText = pEndLine->text;
+		len = pEndLine->used;
 #if MMDebug & (Debug_Script | Debug_Preproc)
-		fprintf(logfile, "%.8X [level %u.%u] >> %.*s\n", (uint) ppEndLine, myInstance, pLevel->level, len, lineText);
+		fprintf(logfile, "%.8x [level %u.%u] >> %.*s\n", (uint) pEndLine, myInstance, pLevel->level, len, lineText);
 #endif
 		isWhiteLine = false;
 		if((len = skipWhite(&lineText, len)) == 0 || *lineText == TokC_Comment) {
@@ -1572,12 +1576,12 @@ static int xbuf(Datum *pRtnVal, Buffer *pBuf, uint flags) {
 			}
 		else {
 			if(lastWasCL) {
-				// Undo skipWhite().
-				lineText = ppEndLine->text;
-				len = ppEndLine->used;
+				// Undo skipWhite() so that leading white space in a multi-line string literal is preserved.
+				lineText = pEndLine->text;
+				len = pEndLine->used;
 				}
 			if((thisIsCL = (lineText[len - 1] == '\\')))
-				if(ppEndLine->next == NULL) {
+				if(pEndLine->next == NULL) {
 					(void) rsset(Failure, 0, text405, len, lineText);
 						// "Incomplete line \"%.*s\""
 					goto RCExit;
@@ -1587,24 +1591,34 @@ static int xbuf(Datum *pRtnVal, Buffer *pBuf, uint flags) {
 		// Allocate lineText as a Datum object, null terminated, so that it can be parsed properly by getSym().
 		if(!lastWasCL) {
 			if(dsetsubstr(lineText, thisIsCL ? len - 1 : len, pFullLine) != 0)
-				goto DErr;
-			pBeginLine = ppEndLine;
+				goto LibFail;
+			pBeginLine = pEndLine;		// Process as if all continued lines were prepended to this line.
 			}
 		else if(!isWhiteLine) {
 			DFab fab;
 
 			// Append current line to pFullLine.
 			if(dopenwith(&fab, pFullLine, FabAppend) != 0 || dputmem((void *) lineText, thisIsCL ? len - 1 : len,
-			 &fab) != 0 || dclose(&fab, Fab_String) != 0) {
-DErr:
+			 &fab, 0) != 0 || dclose(&fab, FabStr) != 0) {
+LibFail:
 				(void) librsset(Failure);
 				goto RCExit;
 				}
 			}
 
 		// Check for "endroutine" keyword now so that "salting" can be turned off if needed; otherwise, check for
-		// statement keywords only if current line is not a continuation line.
-		lineText = exprText = pFullLine->str;
+		// statement keywords only if current line is not a continuation line.  Skip past any leading /#...#/ comment
+		// first.
+		if((lineText = nonWhite(pFullLine->str, true)) == NULL)
+			goto RCExit;
+		if(*lineText == '\0') {
+			// Have /#...#/ comment on a "line" by itself (which includes any prior continuation lines).  Salt it if
+			// needed; otherwise, skip it.
+			if(!lastWasCL && !thisIsCL && pCallBuf != NULL)
+				goto Salt0;
+			goto NextLn;
+			}
+		exprText = lineText;
 		if((keywordId = findStmtKeyword(&exprText, strlen(exprText))) != s_nil) {
 			if(thisIsCL) {
 				if(keywordId == kw_endroutine && pLevel->live) {
@@ -1616,7 +1630,7 @@ DErr:
 				// Have complete line in pFullLine.  Process any "command", "function", or "endroutine"
 				// statements.
 				bufFlags = 0;
-				if(parseBegin(&pOldLast, &newLast, exprText, TokC_Comment) != Success)
+				if(parseBegin(&pOldLast, &newLast, exprText, 0) != Success)
 					goto RCExit;
 				switch(keywordId) {
 					case kw_command:
@@ -1642,14 +1656,10 @@ DoCmdFunc:
 						if(extraSym())
 							goto RCExit;
 
-						// Check execution level.
-						if(pLevel->live) {
-
-							// Turn off command/function storing.
+						// Turn off command/function storing if live.
+						if(pLevel->live)
 							pCallBuf = NULL;
-							goto NextLn;
-							}
-						break;
+						goto NextLn;
 					default:
 						;	// Do nothing.
 					}
@@ -1661,8 +1671,8 @@ DoCmdFunc:
 			Line *pLine;
 Salt0:
 			// Save line verbatim (as a debugging aid) but skip any leading tab, if possible.
-			lineText = ppEndLine->text;
-			if((len = ppEndLine->used) > 0 && !lastWasCL && *lineText == '\t') {
+			lineText = pEndLine->text;
+			if((len = pEndLine->used) > 0 && !lastWasCL && *lineText == '\t') {
 				++lineText;
 				--len;
 				}
@@ -1875,7 +1885,7 @@ JumpDown:
 							// If this is a "break" or "next", set the line pointer to the "endloop"
 							// line so that the "endloop" is executed; otherwise, set it to the line
 							// after the "endloop" line so that the "endloop" is bypassed.
-							ppEndLine = (keywordId & SBreakType) ? pBlock->pJumpLine :
+							pEndLine = (keywordId & SBreakType) ? pBlock->pJumpLine :
 							 pBlock->pJumpLine->next;
 
 							// Return to the most recent loop level (bypassing "if" levels) if this
@@ -1887,11 +1897,9 @@ JumpDown:
 
 							goto Onward;
 							}
-BugExit:
+
 					// Huh?  "endloop" line not found! (This is a bug.)
-					(void) rsset(Failure, RSNoFormat, text126);
-						// "Script loop boundary line not found"
-					goto RCExit;
+					goto LoopBugExit;
 
 				case kw_endloop:	// "endloop" keyword.
 
@@ -1941,7 +1949,7 @@ Misplaced:
 									// "Too many break levels (%d short) from inner 'break'"
 										goto RCExit;
 										}
-									ppEndLine = pBlock->pBreakLine;
+									pEndLine = pBlock->pBreakLine;
 
 									// Return to the most recent loop level before this one.
 									pLevel = pLevel->prev;
@@ -1949,18 +1957,19 @@ Misplaced:
 										goto RCExit;
 									}
 								else {
-									ppEndLine = ppEndLine->next;
+									pEndLine = pEndLine->next;
 									pLevel = pLevel->prev;
 									}
 								pLevel->loopCount = 0;	// Reset the loop counter.
 								}
 							else
-								ppEndLine = pBlock->pMarkLine;
+								pEndLine = pBlock->pMarkLine;
 							goto Onward;
 							}
-
+LoopBugExit:
 					// Huh?  "while", "until", "for", or "loop" line not found! (This is a bug.)
-					goto BugExit;
+					(void) rsset(Failure, RSNoFormat, "Script loop boundary line not found");
+					goto RCExit;
 
 				case kw_return:	// "return" keyword.
 
@@ -1990,14 +1999,32 @@ Misplaced:
 						goto RCExit;
 					force = true;
 					break;
-				default:	// "force" keyword.
-					;	// Fall through.
+				default:
+#if SanityCheck
+					// Huh?  Unknown keyword! (This is a bug.)
+					(void) rsset(Failure, 0, "xbuf(): Error: Unknown keyword '%.*s'",
+					 (int) (exprText - lineText), lineText);
+					goto RCExit;
+#else
+					;
+#endif
+
 				}
 			} // End statement keyword execution.
 
 		// A "force" or not a statement keyword.  Execute the line as an expression statement if "true" state.
 		if(pLevel->live) {
-			(void) (newLast.src == NULL ? execExprStmt(pRtnVal, exprText, TokC_Comment, NULL) : xstmt(pRtnVal));
+			if(newLast.src == NULL) {
+
+				// No statement keyword -- need to call parseBegin().
+				(void) execExprStmt(pRtnVal, exprText, ParseStmtEnd, NULL);
+				}
+			else {
+				// Force -- parseBegin() already called.  Set ParseStmtEnd flag so that all expressions on
+				// script line are forced; e.g., "force ...; ...".
+				pLastParse->flags |= ParseStmtEnd;
+				(void) xstmt(pRtnVal);
+				}
 
 			// Check for exit or a command error.
 			if(sess.rtn.status <= MinExit)
@@ -2029,14 +2056,14 @@ Misplaced:
 				}
 			} // End statement execution.
 NextLn:
-		ppEndLine = ppEndLine->next;
+		pEndLine = pEndLine->next;
 Onward:
 		// On to the next line.  lineText and len point to the original line.
 		if(!(lastWasCL = thisIsCL) && newLast.src != NULL) {
 			parseEnd(pOldLast);
 			newLast.src = NULL;
 			}
-		} while(ppEndLine != NULL);		// End buffer execution.
+		} while(pEndLine != NULL);		// End buffer execution.
 
 	// "if" and "endif" match?
 	if(pLevel == levelTable)
@@ -2078,7 +2105,7 @@ int execBuf(Datum *pRtnVal, int n, Buffer *pBuf, char *runPath, uint flags) {
 			return sess.rtn.status;
 
 		// Get call arguments.
-		dinit(&args);		// No need to dclear() this later because it will always contain a dat_blobRef.
+		dinit(&args);		// No need to dclear() this later because it will always contain an array.
 #if MMDebug & Debug_CallArg
 		if(argLoad(n, pBuf, &args, flags) == Success) {
 #else
@@ -2115,11 +2142,7 @@ int execBuf(Datum *pRtnVal, int n, Buffer *pBuf, char *runPath, uint flags) {
 
 				// Clean up.
 				--pBuf->pCallInfo->execCount;
-#if DCaller
-				ddelete(pScriptRun->pNArg, "execBuf");
-#else
-				ddelete(pScriptRun->pNArg);
-#endif
+				dfree(pScriptRun->pNArg);
 				if(pScriptRun->msgFlag)
 					setGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
 				pScriptRun = pOldRun;
@@ -2134,7 +2157,7 @@ int execBuf(Datum *pRtnVal, int n, Buffer *pBuf, char *runPath, uint flags) {
 // Call execBuf() with debugging.
 int debug_execBuf(Datum *pRtnVal, int n, Buffer *pBuf, char *runPath, uint flags, const char *caller) {
 
-	fprintf(logfile, "*execBuf() called by %s() with args: n %d, bufname %s, runPath '%s', flags %.8X, %s...\n",
+	fprintf(logfile, "*execBuf() called by %s() with args: n %d, bufname %s, runPath '%s', flags %.8x, %s...\n",
 	 caller, n, pBuf->bufname, runPath, flags, showFlags(NULL));
 	(void) execBuf(pRtnVal, n, pBuf, runPath, flags);
 	fprintf(logfile, "execBuf(%s) from %s() returned %s result and status %d \"%s\".\n",
@@ -2182,7 +2205,7 @@ int xeqFile(Datum *pRtnVal, int n, Datum **args) {
 
 		if(termInp(pRtnVal, text129, ArgNotNull1 | ArgNil1, Term_C_Filename, &termInpCtrl) != Success ||
 				// "Execute script file"
-		 pRtnVal->type == dat_nil)
+		 disnil(pRtnVal))
 			return sess.rtn.status;
 		}
 	else if(funcArg(pRtnVal, ArgFirst | ArgNotNull1 | ArgPath) != Success)

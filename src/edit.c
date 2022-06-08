@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -50,12 +50,12 @@ void bchange(Buffer *pBuf, ushort flags) {
 	}
 
 // Link line pLine1 into given buffer.  If pLine2 is NULL, link line at end of buffer; otherwise, link line before pLine2.  If
-// pBuf is NULL, use current buffer.
+// pBuf is NULL, use current edit buffer.
 void llink(Line *pLine1, Buffer *pBuf, Line *pLine2) {
 	Line *pLine0;
 
 	if(pBuf == NULL)
-		pBuf = sess.pCurBuf;
+		pBuf = sess.edit.pBuf;
 	if(pLine2 == NULL) {
 		pLine2 = pBuf->pFirstLine->prev;
 		pLine1->next = NULL;
@@ -82,7 +82,7 @@ void llink(Line *pLine1, Buffer *pBuf, Line *pLine2) {
 void lunlink(Line *pLine, Buffer *pBuf) {
 
 	if(pBuf == NULL)
-		pBuf = sess.pCurBuf;
+		pBuf = sess.cur.pBuf;
 	if(pLine == pBuf->pFirstLine)
 
 		// Deleting first line of buffer.
@@ -99,11 +99,11 @@ void lunlink(Line *pLine, Buffer *pBuf) {
 	free((void *) pLine);
 	}
 
-// Replace line pLine1 in given buffer with pLine2 and free pLine1.  If pBuf is NULL, use current buffer.
+// Replace line pLine1 in given buffer with pLine2 and free pLine1.  If pBuf is NULL, use current edit buffer.
 void lreplace1(Line *pLine1, Buffer *pBuf, Line *pLine2) {
 
 	if(pBuf == NULL)
-		pBuf = sess.pCurBuf;
+		pBuf = sess.edit.pBuf;
 	pLine2->next = pLine1->next;
 	if(pLine1 == pBuf->pFirstLine) {
 
@@ -131,14 +131,14 @@ void lreplace1(Line *pLine1, Buffer *pBuf, Line *pLine2) {
 	free((void *) pLine1);
 	}
 
-// Replace lines pLine1 and pLine2 in the current buffer with pLine3 and free the first two.
+// Replace lines pLine1 and pLine2 in the current edit buffer with pLine3 and free the first two.
 static void lreplace2(Line *pLine1, Line *pLine2, Line *pLine3) {
 
 	pLine3->next = pLine2->next;
-	if(pLine1 == sess.pCurBuf->pFirstLine) {
+	if(pLine1 == sess.edit.pBuf->pFirstLine) {
 
 		// pLine1 is first line of buffer.
-		sess.pCurBuf->pFirstLine = pLine3;
+		sess.edit.pBuf->pFirstLine = pLine3;
 		if(pLine2->next == NULL)
 
 			// pLine2 is last line of buffer.
@@ -154,7 +154,7 @@ static void lreplace2(Line *pLine1, Line *pLine2, Line *pLine3) {
 		if(pLine2->next == NULL)
 
 			// pLine2 is last line of buffer.
-			sess.pCurBuf->pFirstLine->prev = pLine3;
+			sess.edit.pBuf->pFirstLine->prev = pLine3;
 		else
 			pLine2->next->prev = pLine3;
 		}
@@ -163,23 +163,23 @@ static void lreplace2(Line *pLine1, Line *pLine2, Line *pLine3) {
 	}
 
 // Fix "window face" line pointers and point offset after insert.
-static void fixInsert(int offset, int n, WindFace *pWindFace, Line *pLine1, Line *pLine2) {
+static void fixInsert(int offset, int n, Face *pFace, Line *pLine1, Line *pLine2) {
 
-	if(pWindFace->pTopLine == pLine1)
-		pWindFace->pTopLine = pLine2;
-	if(pWindFace->point.pLine == pLine1) {
-		pWindFace->point.pLine = pLine2;
-		if(pWindFace->point.offset >= offset)
-			pWindFace->point.offset += n;
+	if(pFace->pTopLine == pLine1)
+		pFace->pTopLine = pLine2;
+	if(pFace->point.pLine == pLine1) {
+		pFace->point.pLine = pLine2;
+		if(pFace->point.offset >= offset)
+			pFace->point.offset += n;
 		}
 	}
 
 // Scan all screens and windows and fix window pointers.
-void fixWindFace(int offset, int n, Line *pLine1, Line *pLine2) {
+void fixFace(int offset, int n, Line *pLine1, Line *pLine2) {
 	EScreen *pScrn;
 	EWindow *pWind;
 
-	//  In all screens...
+	// In all screens...
 	pScrn = sess.scrnHead;
 	do {
 		// In all windows...
@@ -208,11 +208,11 @@ void fixBufFace(Buffer *pBuf, int offset, int n, Line *pLine1, Line *pLine2) {
 		} while((pMark = pMark->next) != NULL);
 	}
 
-// Insert "n" copies of the character "c" into the current buffer at point.  In the easy case, all that happens is the
-// character(s) are stored in the line.  In the hard case, the line has to be reallocated.  When the window list is updated,
-// need to (1), always update point in the current window; and (2), update mark and point in other windows if their buffer
-// position is past the place where the insert was done.  Note that no validity checking is done, so if "c" is a newline, it
-// will be inserted as a literal character.  Return status.
+// Insert "n" copies of the character "c" into the current edit buffer at point and return status.  In the easy case, all that
+// happens is the character(s) are stored in the line.  In the hard case, the line has to be reallocated.  After insertion, need
+// to (1), always update point in the current edit window if not NULL; and (2), update mark and point in other windows if their
+// buffer position is past the place where the insert was done.  Note that no validity checking is done, so if "c" is a newline,
+// it will be inserted as a literal character.
 int einsertc(int n, short c) {
 	char *str1, *str2;
 	Line *pLine1, *pLine2;
@@ -229,8 +229,8 @@ int einsertc(int n, short c) {
 			// "%s (%d) must be %d or greater", "Repeat count"
 
 	// n > 0.  Get current line and determine the type of insert.
-	pLine1 = sess.pCurWind->face.point.pLine;
-	offset = sess.pCurWind->face.point.offset;
+	pLine1 = sess.edit.pFace->point.pLine;
+	offset = sess.edit.pFace->point.offset;
 	if(pLine1->used + n > pLine1->size) {			// Not enough room left in line: reallocate.
 		if(lalloc(BlockSize(pLine1->used + n), &pLine2) != Success)
 			return sess.rtn.status;			// Fatal error.
@@ -258,29 +258,31 @@ int einsertc(int n, short c) {
 		*str1++ = c;
 		while(--i > 0);
 
-	// Set the "line change" flag in the current window and update "face" settings.
-	bchange(sess.pCurBuf, WFEdit);
-	fixWindFace(offset, n, pLine1, pLine2);
-	fixBufFace(sess.pCurBuf, offset, n, pLine1, pLine2);
+	// Set the "line change" flag in the current window and update face settings.  Note that pLine1 may have been freed by
+	// lreplace1(), but the pointer address is still valid for comparison purposes.
+	bchange(sess.edit.pBuf, WFEdit);
+	if(sess.edit.pScrn != NULL)
+		fixFace(offset, n, pLine1, pLine2);
+	fixBufFace(sess.edit.pBuf, offset, n, pLine1, pLine2);
 
 	return sess.rtn.status;
 	}
 
 // Fix "window face" line pointers and point offset after newline was inserted.
-static void fixInsertNL(int offset, WindFace *pWindFace, Line *pLine1, Line *pLine2) {
+static void fixInsertNL(int offset, Face *pFace, Line *pLine1, Line *pLine2) {
 
-	if(pWindFace->pTopLine == pLine1)
-		pWindFace->pTopLine = pLine2;
-	if(pWindFace->point.pLine == pLine1) {
-		if(pWindFace->point.offset < offset)
-			pWindFace->point.pLine = pLine2;
+	if(pFace->pTopLine == pLine1)
+		pFace->pTopLine = pLine2;
+	if(pFace->point.pLine == pLine1) {
+		if(pFace->point.offset < offset)
+			pFace->point.pLine = pLine2;
 		else
-			pWindFace->point.offset -= offset;
+			pFace->point.offset -= offset;
 		}
 	}
 
-// Insert a newline into the current buffer at point.  Return status.  The funny ass-backward way this is done is not a botch;
-// it just makes the last line in the buffer not a special case.
+// Insert a newline into the current edit buffer at point.  Return status.  The funny ass-backward way this is done is not a
+// botch; it just makes the last line in the buffer not a special case.
 int einsertNL(void) {
 	char *str1, *str2;
 	Line *pLine1, *pLine2;
@@ -292,9 +294,9 @@ int einsertNL(void) {
 	if(allowEdit(true) != Success)			// Don't allow if read-only buffer.
 		return sess.rtn.status;
 
-	bchange(sess.pCurBuf, WFHard);
-	pLine1 = sess.pCurWind->face.point.pLine;	// Get the address and offset of point.
-	offset = sess.pCurWind->face.point.offset;
+	bchange(sess.edit.pBuf, WFHard);
+	pLine1 = sess.edit.pFace->point.pLine;		// Get line pointer and offset of point.
+	offset = sess.edit.pFace->point.offset;
 	if(lalloc(offset, &pLine2) != Success)		// New first half line.
 		return sess.rtn.status;			// Fatal error.
 	str1 = pLine1->text;				// Shuffle text around.
@@ -307,19 +309,22 @@ int einsertNL(void) {
 	pLine1->used -= offset;
 	llink(pLine2, NULL, pLine1);
 
-	// In all screens...
-	pScrn = sess.scrnHead;
-	do {
-		// In all windows...
-		pWind = pScrn->windHead;
+	if(sess.edit.pScrn != NULL) {
+
+		// In all screens...
+		pScrn = sess.scrnHead;
 		do {
-			fixInsertNL(offset, &pWind->face, pLine1, pLine2);
-			} while((pWind = pWind->next) != NULL);
-		} while((pScrn = pScrn->next) != NULL);
+			// In all windows...
+			pWind = pScrn->windHead;
+			do {
+				fixInsertNL(offset, &pWind->face, pLine1, pLine2);
+				} while((pWind = pWind->next) != NULL);
+			} while((pScrn = pScrn->next) != NULL);
+		}
 
 	// In current buffer...
-	fixInsertNL(offset, &sess.pCurBuf->face, pLine1, pLine2);
-	pMark = &sess.pCurBuf->markHdr;
+	fixInsertNL(offset, &sess.edit.pBuf->face, pLine1, pLine2);
+	pMark = &sess.edit.pBuf->markHdr;
 	do {
 		if(pMark->point.pLine == pLine1) {
 			if(pMark->point.offset < offset)
@@ -349,31 +354,31 @@ int einserts(const char *str) {
 	}
 
 // Fix "window face" line pointers and point offset after a newline was deleted without line reallocation.
-static void fixDelNL1(WindFace *pWindFace, Line *pLine1, Line *pLine2) {
+static void fixDelNL1(Face *pFace, Line *pLine1, Line *pLine2) {
 
-	if(pWindFace->pTopLine == pLine2)
-		pWindFace->pTopLine = pLine1;
-	if(pWindFace->point.pLine == pLine2) {
-		pWindFace->point.pLine = pLine1;
-		pWindFace->point.offset += pLine1->used;
+	if(pFace->pTopLine == pLine2)
+		pFace->pTopLine = pLine1;
+	if(pFace->point.pLine == pLine2) {
+		pFace->point.pLine = pLine1;
+		pFace->point.offset += pLine1->used;
 		}
 	}
 
 // Fix "window face" line pointers and point offset after a newline was deleted and a new line was allocated.
-static void fixDelNL2(WindFace *pWindFace, Line *pLine1, Line *pLine2, Line *pLine3) {
+static void fixDelNL2(Face *pFace, Line *pLine1, Line *pLine2, Line *pLine3) {
 
-	if(pWindFace->pTopLine == pLine1 || pWindFace->pTopLine == pLine2)
-		pWindFace->pTopLine = pLine3;
-	if(pWindFace->point.pLine == pLine1)
-		pWindFace->point.pLine = pLine3;
-	else if(pWindFace->point.pLine == pLine2) {
-		pWindFace->point.pLine = pLine3;
-		pWindFace->point.offset += pLine1->used;
+	if(pFace->pTopLine == pLine1 || pFace->pTopLine == pLine2)
+		pFace->pTopLine = pLine3;
+	if(pFace->point.pLine == pLine1)
+		pFace->point.pLine = pLine3;
+	else if(pFace->point.pLine == pLine2) {
+		pFace->point.pLine = pLine3;
+		pFace->point.offset += pLine1->used;
 		}
 	}
 
-// Delete a newline from current buffer -- join the current line with the next line.  Easy cases can be done by shuffling data
-// around.  Hard cases require that lines be moved about in memory.  Called by edelc() only.  It is assumed that there will
+// Delete a newline from current edit buffer -- join the current line with the next line.  Easy cases can be done by shuffling
+// data around.  Hard cases require that lines be moved about in memory.  Called by edelc() only.  It is assumed that there will
 // always be at least two lines in the current buffer when this routine is called and the current line will never be the last
 // line of the buffer (which does not have a newline delimiter).
 static int edelNL(void) {
@@ -383,7 +388,7 @@ static int edelNL(void) {
 	EWindow *pWind;
 	Mark *pMark;
 
-	pLine1 = sess.pCurWind->face.point.pLine;
+	pLine1 = sess.edit.pFace->point.pLine;
 	pLine2 = pLine1->next;
 
 	// Do simple join if room in current line for next line.
@@ -393,19 +398,22 @@ static int edelNL(void) {
 		while(str2 != pLine2->text + pLine2->used)
 			*str1++ = *str2++;
 
-		// In all screens...
-		pScrn = sess.scrnHead;
-		do {
-			// In all windows...
-			pWind = pScrn->windHead;
+		if(sess.edit.pScrn != NULL) {
+
+			// In all screens...
+			pScrn = sess.scrnHead;
 			do {
-				fixDelNL1(&pWind->face, pLine1, pLine2);
-				} while((pWind = pWind->next) != NULL);
-			} while((pScrn = pScrn->next) != NULL);
+				// In all windows...
+				pWind = pScrn->windHead;
+				do {
+					fixDelNL1(&pWind->face, pLine1, pLine2);
+					} while((pWind = pWind->next) != NULL);
+				} while((pScrn = pScrn->next) != NULL);
+			}
 
 		// In current buffer...
-		fixDelNL1(&sess.pCurBuf->face, pLine1, pLine2);
-		pMark = &sess.pCurBuf->markHdr;
+		fixDelNL1(&sess.edit.pBuf->face, pLine1, pLine2);
+		pMark = &sess.edit.pBuf->markHdr;
 		do {
 			if(pMark->point.pLine == pLine2) {
 				pMark->point.pLine = pLine1;
@@ -432,19 +440,22 @@ static int edelNL(void) {
 	// Replace pLine1 and pLine2 with pLine3.
 	lreplace2(pLine1, pLine2, pLine3);
 
-	// In all screens...
-	pScrn = sess.scrnHead;
-	do {
-		// In all windows...
-		pWind = pScrn->windHead;
+	if(sess.edit.pScrn != NULL) {
+
+		// In all screens...
+		pScrn = sess.scrnHead;
 		do {
-			fixDelNL2(&pWind->face, pLine1, pLine2, pLine3);
-			} while((pWind = pWind->next) != NULL);
-		} while((pScrn = pScrn->next) != NULL);
+			// In all windows...
+			pWind = pScrn->windHead;
+			do {
+				fixDelNL2(&pWind->face, pLine1, pLine2, pLine3);
+				} while((pWind = pWind->next) != NULL);
+			} while((pScrn = pScrn->next) != NULL);
+		}
 
 	// In current buffer...
-	fixDelNL2(&sess.pCurBuf->face, pLine1, pLine2, pLine3);
-	pMark = &sess.pCurBuf->markHdr;
+	fixDelNL2(&sess.edit.pBuf->face, pLine1, pLine2, pLine3);
+	pMark = &sess.edit.pBuf->markHdr;
 	do {
 		if(pMark->point.pLine == pLine1)
 			pMark->point.pLine = pLine3;
@@ -479,32 +490,35 @@ static void fixDotDel(Line *pLine, int offset, int chunk) {
 	EWindow *pWind;
 	Mark *pMark;
 
-	// In all screens...
-	pScrn = sess.scrnHead;
-	do {
-		// In all windows...
-		pWind = pScrn->windHead;
+	if(sess.edit.pScrn != NULL) {
+
+		// In all screens...
+		pScrn = sess.scrnHead;
 		do {
-			if(pWind->face.point.pLine == pLine)
-				fixDotDel1(offset, chunk, &pWind->face.point);
-			} while((pWind = pWind->next) != NULL);
-		} while((pScrn = pScrn->next) != NULL);
+			// In all windows...
+			pWind = pScrn->windHead;
+			do {
+				if(pWind->face.point.pLine == pLine)
+					fixDotDel1(offset, chunk, &pWind->face.point);
+				} while((pWind = pWind->next) != NULL);
+			} while((pScrn = pScrn->next) != NULL);
+		}
 
 	// In current buffer...
-	if(sess.pCurBuf->face.point.pLine == pLine)
-		fixDotDel1(offset, chunk, &sess.pCurBuf->face.point);
-	pMark = &sess.pCurBuf->markHdr;
+	if(sess.edit.pBuf->face.point.pLine == pLine)
+		fixDotDel1(offset, chunk, &sess.edit.pBuf->face.point);
+	pMark = &sess.edit.pBuf->markHdr;
 	do {
 		if(pMark->point.pLine == pLine)
 			fixDotDel1(offset, chunk, &pMark->point);
 		} while((pMark = pMark->next) != NULL);
 	}
 
-// This function deletes up to n characters from the current buffer, starting at point.  The text that is deleted may include
-// newlines.  Positive n deletes forward; negative n deletes backward.  Returns current status if all of the characters were
-// deleted, NotFound (bypassing rsset()) if they were not (because point ran into a buffer boundary), or the appropriate status
-// if an error occurred.  The deleted text is put in the kill ring if the EditKill flag is set, the delete ring if the EditDel
-// flag is set, otherwise discarded.
+// This function deletes up to n characters from the current edit buffer, starting at point.  The text that is deleted may
+// include newlines.  Positive n deletes forward; negative n deletes backward.  Returns current status if all of the characters
+// were deleted, NotFound (bypassing rsset()) if they were not (because point ran into a buffer boundary), or the appropriate
+// status if an error occurred.  The deleted text is put in the kill ring if the EditKill flag is set, the delete ring if the
+// EditDel flag is set, otherwise discarded.
 int edelc(long n, ushort flags) {
 
 	if(n == 0 || allowEdit(true) != Success)	// Don't allow if read-only buffer.
@@ -516,7 +530,7 @@ int edelc(long n, ushort flags) {
 	int offset, chunk;
 	RingEntry *pEntry;
 	DFab fab;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.edit.pFace->point;
 	bool hitEOB = false;
 
 	// Set kill buffer pointer.
@@ -547,7 +561,7 @@ int edelc(long n, ushort flags) {
 				windFlags |= WFHard;
 				if(edelNL() != Success)
 					return sess.rtn.status;
-				if(pEntry != NULL && dputc('\n', &fab) != 0)
+				if(pEntry != NULL && dputc('\n', &fab, 0) != 0)
 					goto LibFail;
 				--n;
 				continue;
@@ -561,7 +575,7 @@ int edelc(long n, ushort flags) {
 			str2 = str1 + chunk;
 
 			// Save the text to the kill buffer.
-			if(pEntry != NULL && chunk > 0 && dputmem((void *) str1, chunk, &fab) != 0)
+			if(pEntry != NULL && chunk > 0 && dputmem((void *) str1, chunk, &fab, 0) != 0)
 				goto LibFail;
 
 			// Shift what remains on the line leftward.
@@ -592,7 +606,7 @@ int edelc(long n, ushort flags) {
 			if(chunk == 0) {
 
 				// Can't delete past beginning of buffer.
-				if(pLine == sess.pCurBuf->pFirstLine)
+				if(pLine == sess.edit.pBuf->pFirstLine)
 					goto EOB;
 
 				// Flag that we are making a hard change and delete the newline.
@@ -600,7 +614,7 @@ int edelc(long n, ushort flags) {
 				(void) moveChar(-1);
 				if(edelNL() != Success)
 					return sess.rtn.status;
-				if(pEntry != NULL && dputc('\n', &fab) != 0)
+				if(pEntry != NULL && dputc('\n', &fab, 0) != 0)
 					goto LibFail;
 				++n;
 				continue;
@@ -614,7 +628,7 @@ int edelc(long n, ushort flags) {
 			str2 = str1 - chunk;
 
 			// Save the text to the kill buffer.
-			if(pEntry != NULL && dputmem((void *) str2, chunk, &fab) != 0)
+			if(pEntry != NULL && dputmem((void *) str2, chunk, &fab, 0) != 0)
 				goto LibFail;
 
 			// Shift what remains on the line leftward.
@@ -634,10 +648,10 @@ int edelc(long n, ushort flags) {
 EOB:
 	hitEOB = true;
 Retn:
-	if(pEntry != NULL && dclose(&fab, Fab_String) != 0)
+	if(pEntry != NULL && dclose(&fab, FabStr) != 0)
 		goto LibFail;
 	if(windFlags)
-		bchange(sess.pCurBuf, windFlags);
+		bchange(sess.edit.pBuf, windFlags);
 	return hitEOB ? NotFound : sess.rtn.status;
 LibFail:
 	return librsset(Failure);
@@ -653,7 +667,7 @@ int quoteChar(Datum *pRtnVal, int n, Datum **args) {
 
 	// Move cursor from message line back to buffer if interactive.
 	if(!(sess.opFlags & OpScript))
-		if(tmove(sess.pCurScrn->cursorRow, sess.pCurScrn->cursorCol) != Success || tflush() != Success)
+		if(tmove(sess.cur.pScrn->cursorRow, sess.cur.pScrn->cursorCol) != Success || tflush() != Success)
 			return sess.rtn.status;
 
 	// Set real value of n.
@@ -700,21 +714,21 @@ int edInsertTab(int n) {
 		(void) setTabSize(abs(n), false);
 
 	// Positive n.  Insert hard tab or spaces n times.
-	else if(sess.softTabSize == 0)
+	else if(sess.cur.pScrn->softTabSize == 0)
 		(void) einsertc(n, '\t');
 	else {
 		// Scan forward from point to next non-space character.
-		Point workPoint = sess.pCurWind->face.point;
+		Point workPoint = sess.cur.pFace->point;
 		int len = workPoint.pLine->used;
 		while(workPoint.offset < len && workPoint.pLine->text[workPoint.offset] == ' ')
 			++workPoint.offset;
 
 		// Set len to size of first tab and loop n times.
-		len = sess.softTabSize - getCol(&workPoint, false) % sess.softTabSize;
+		len = sess.cur.pScrn->softTabSize - getCol(&workPoint, false) % sess.cur.pScrn->softTabSize;
 		do {
 			if(einsertc(len, ' ') != Success)
 				break;
-			len = sess.softTabSize;
+			len = sess.cur.pScrn->softTabSize;
 			} while(--n > 0);
 		}
 
@@ -731,21 +745,21 @@ static int lineMsg(ushort flags, int lineCount, const char *action) {
 // Finish a routine that modifies a block of lines.
 static int finishLineChange(Point *pOldPoint, bool backward, int count) {
 	Mark *pMark;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	keyEntry.curFlags &= ~SF_VertMove;		// Flag that this resets the goal column.
-	if(backward) {				// Set mark at beginning of line block and move point to end.
+	if(backward) {					// Set mark at beginning of line block and move point to end.
 		pPoint->offset = 0;
 		if(!bufBegin(pPoint))
 			(void) moveLine(1);
-		setWindMark(&sess.pCurBuf->markHdr, sess.pCurWind);
+		setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
 		*pPoint = *pOldPoint;
 		pPoint->offset = 0;
 		(void) moveLine(1);
 		}
 
 	// Scan marks in current buffer and adjust offset if needed.
-	pMark = &sess.pCurBuf->markHdr;
+	pMark = &sess.cur.pBuf->markHdr;
 	do {
 		pPoint = &pMark->point;
 		if(pPoint->offset > pPoint->pLine->used)
@@ -754,21 +768,21 @@ static int finishLineChange(Point *pOldPoint, bool backward, int count) {
 
 	// Set window flags and return.
 	if(count == 0)
-		sess.pCurWind->flags |= WFMove;
+		sess.cur.pWind->flags |= WFMove;
 	else
-		bchange(sess.pCurBuf, WFHard);	// Flag that a line other than the current one was changed.
+		bchange(sess.cur.pBuf, WFHard);	// Flag that a line other than the current one was changed.
 
 	return lineMsg(RSHigh, count, text260);
 			// "changed"
 	}
 
-// Get (hard) tab size into *pTabSize for detabLine() and entabLine().
+// Get hard tab size into *pTabSize for detabLine() and entabLine().
 static int getTabSize(Datum **args, int *pTabSize) {
 	int tabSize1;
 
 	if(sess.opFlags & OpScript) {
 		if((*args)->type == dat_nil) {
-			*pTabSize = sess.hardTabSize;
+			*pTabSize = sess.cur.pScrn->hardTabSize;
 			goto Retn;
 			}
 		tabSize1 = (*args)->u.intNum;
@@ -781,11 +795,11 @@ static int getTabSize(Datum **args, int *pTabSize) {
 
 		if(dnewtrack(&pDatum) != 0)
 			return librsset(Failure);
-		sprintf(workBuf, "%d", sess.hardTabSize);
+		sprintf(workBuf, "%d", sess.cur.pScrn->hardTabSize);
 		if(termInp(pDatum, text393, ArgNotNull1 | ArgNil1, 0, &termInpCtrl) != Success)
 				// "Tab size"
 			goto Retn;
-		if(pDatum->type == dat_nil)
+		if(disnil(pDatum))
 			return Cancelled;
 		if(ascToLong(pDatum->str, &longVal, false) != Success)
 			goto Retn;
@@ -803,7 +817,7 @@ int detabLine(Datum *pRtnVal, int n, Datum **args) {
 	int incr, len, tabSize1;
 	int count;
 	bool changed;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 	Point origPoint = *pPoint;		// Original point position.
 
 	// Get hard tab size.
@@ -824,7 +838,7 @@ int detabLine(Datum *pRtnVal, int n, Datum **args) {
 
 	pPoint->offset = 0;			// Start at the beginning.
 	if(n > 0)
-		setWindMark(&sess.pCurBuf->markHdr, sess.pCurWind);
+		setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
 
 	// Loop thru text, detabbing n lines.
 	keyEntry.prevFlags &= ~SF_VertMove;
@@ -836,7 +850,7 @@ int detabLine(Datum *pRtnVal, int n, Datum **args) {
 
 			// If we have a tab.
 			if(pPoint->pLine->text[pPoint->offset] == '\t') {
-				len = tabSize1 - (pPoint->offset % tabSize1);
+				len = tabSize1 - pPoint->offset % tabSize1;
 				if(edelc(1, 0) != Success || insertNLSpace(-len, EditSpace | EditHoldPoint) != Success)
 					return sess.rtn.status;
 				pPoint->offset += len;
@@ -868,7 +882,7 @@ int entabLine(Datum *pRtnVal, int n, Datum **args) {
 	int curCol;			// Current point column.
 	int tabSize1, len, count;
 	bool changed;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 	Point origPoint = *pPoint;		// Original point position.
 
 	// Get hard tab size.
@@ -889,7 +903,7 @@ int entabLine(Datum *pRtnVal, int n, Datum **args) {
 
 	pPoint->offset = 0;		// Start at the beginning.
 	if(n > 0)
-		setWindMark(&sess.pCurBuf->markHdr, sess.pCurWind);
+		setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
 
 	// Loop thru text, entabbing n lines.
 	keyEntry.prevFlags &= ~SF_VertMove;
@@ -970,7 +984,7 @@ static int getIndent(Datum **ppIndent, Line *pLine) {
 	return sess.rtn.status;
 	}
 
-// Insert newline or space character abs(n) times and return status.  If EditSpace flag set, insert space(s); otherwise,
+// Insert newline or space character abs(n) times and return status.  If EditSpace flag set, insert space(s), otherwise
 // newline(s).  If EditWrap flag set, do word wrapping if applicable.  If EditHoldPoint flag set, insert or replace character(s)
 // ahead of point.  If n < 0, ignore "Over" and "Repl" buffer modes (force insert).  Commands that call this routine (+
 // self-insert) and their actions per n argument are as follows:
@@ -992,8 +1006,8 @@ int insertNLSpace(int n, ushort flags) {
 		// If EditWrap flag, positive n, "Wrap" mode is enabled, "Over" and "Repl" modes are disabled, wrap
 		// column is defined, and we are now past wrap column, execute user-assigned wrap hook.
 		if((flags & EditWrap) && n > 0 && modeSet(MdIdxWrap, NULL) &&
-		 !isAnyBufModeSet(sess.pCurBuf, false, 2, modeInfo.cache[MdIdxOver], modeInfo.cache[MdIdxRepl]) &&
-		 sess.wrapCol > 0 && getCol(NULL, true) > sess.wrapCol)
+		 !isAnyBufModeSet(sess.cur.pBuf, false, 2, modeInfo.cache[MdIdxOver], modeInfo.cache[MdIdxRepl]) &&
+		 sess.cur.pScrn->wrapCol > 0 && getCol(NULL, true) > sess.cur.pScrn->wrapCol)
 			if(execHook(NULL, INT_MIN, hookTable + HkWrap, 0) != Success)
 				return sess.rtn.status;
 
@@ -1018,11 +1032,11 @@ int insertNLSpace(int n, ushort flags) {
 	return sess.rtn.status;
 	}
 
-// Trim trailing whitespace from current line.  Return 1 if any whitespace was found; otherwise, 0.
+// Trim trailing whitespace from current line.  Return 1 if any whitespace was found, otherwise 0.
 static int ltrim(void) {
 	char *str;
 	int len;
-	Line *pLine = sess.pCurWind->face.point.pLine;
+	Line *pLine = sess.cur.pFace->point.pLine;
 
 	for(str = pLine->text + pLine->used; str > pLine->text; --str) {
 		if(!isspace(str[-1]) && str[-1] != '\0')
@@ -1038,7 +1052,7 @@ static int ltrim(void) {
 // end of buffer.  Always leave point at end of line block.
 int trimLine(Datum *pRtnVal, int n, Datum **args) {
 	int incr, count;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 	Point origPoint = *pPoint;		// Original point position.
 
 	// Compute block size and set direction.
@@ -1055,7 +1069,7 @@ int trimLine(Datum *pRtnVal, int n, Datum **args) {
 
 	pPoint->offset = 0;			// Start at the beginning.
 	if(n > 0)
-		setWindMark(&sess.pCurBuf->markHdr, sess.pCurWind);
+		setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
 
 	// Loop through text, trimming n lines.
 	keyEntry.prevFlags &= ~SF_VertMove;
@@ -1153,13 +1167,13 @@ int inserti(Datum *pRtnVal, int n, Datum **args) {
 int delBlankLines(Datum *pRtnVal, int n, Datum **args) {
 	Line *pLine1, *pLine2;
 	long count;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	if(n == INT_MIN)
 		n = 0;
 
 	// Only one line in buffer?
-	if((pLine1 = sess.pCurBuf->pFirstLine)->next == NULL) {
+	if((pLine1 = sess.cur.pBuf->pFirstLine)->next == NULL) {
 		if(pLine1->used == 0 || !isWhite(pLine1, pLine1->used))
 			return sess.rtn.status;
 		count = pLine1->used;
@@ -1170,7 +1184,7 @@ int delBlankLines(Datum *pRtnVal, int n, Datum **args) {
 		if(n < 0 && !isWhite(pLine1, pLine1->used)) {
 
 			// True.  Nothing to do if current line is first line in buffer.
-			if(pLine1 == sess.pCurBuf->pFirstLine)
+			if(pLine1 == sess.cur.pBuf->pFirstLine)
 				return sess.rtn.status;
 
 			// Not on first line.  Back up one line.
@@ -1181,7 +1195,7 @@ int delBlankLines(Datum *pRtnVal, int n, Datum **args) {
 
 		// Find first non-blank line going backward.
 		while(isWhite(pLine1, pLine1->used)) {
-			if(pLine1 == sess.pCurBuf->pFirstLine)
+			if(pLine1 == sess.cur.pBuf->pFirstLine)
 				break;
 			pLine1 = pLine1->prev;
 			}
@@ -1222,12 +1236,12 @@ int delBlankLines(Datum *pRtnVal, int n, Datum **args) {
 	}
 
 // Insert a newline, then enough tabs and spaces to duplicate the indentation of the previous line.  Tabs are every
-// sess.hardTabSize characters.  Quite simple.  Figure out the indentation of the current line.  Insert a newline by calling the
-// standard routine.  Insert the indentation by inserting the right number of tabs and spaces.  Return status.  Normally bound
-// to ^J.
+// sess.cur.pScrn->hardTabSize characters.  Quite simple.  Figure out the indentation of the current line.  Insert a newline by
+// calling the standard routine.  Insert the indentation by inserting the right number of tabs and spaces.  Return status.
+// Normally bound to ^J.
 int newlineI(Datum *pRtnVal, int n, Datum **args) {
 	Datum *pIndent;
-	Line *pLine = sess.pCurWind->face.point.pLine;
+	Line *pLine = sess.cur.pFace->point.pLine;
 
 	if(n == INT_MIN)
 		n = 1;
@@ -1256,7 +1270,7 @@ int newlineI(Datum *pRtnVal, int n, Datum **args) {
 // each iteration.
 int delTab(int n, bool force) {
 	int offset, i, direc;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	// Check for "do nothing" cases.
 	if(n == INT_MIN)
@@ -1275,7 +1289,7 @@ int delTab(int n, bool force) {
 		}
 
 	// Do hard tabs first... simple.  Just delete up to n tab characters forward or backward.
-	if(sess.softTabSize == 0) {
+	if(sess.cur.pScrn->softTabSize == 0) {
 		n = abs(n);
 		while((offset = pPoint->offset + i) >= 0 && offset < pPoint->pLine->used && pPoint->pLine->text[offset] == '\t')
 			if(edelc(direc, 0) != Success || --n == 0)
@@ -1320,14 +1334,14 @@ int delTab(int n, bool force) {
 
 			// Get column position of non-space character (col2), calculate position of prior tab stop (col1), and
 			// calculate size of first "chunk" (distance from prior tab stop to non-space character).
-			col1 = ((col2 = getCol(NULL, false)) - 1) / sess.softTabSize * sess.softTabSize;
+			col1 = ((col2 = getCol(NULL, false)) - 1) / sess.cur.pScrn->softTabSize * sess.cur.pScrn->softTabSize;
 			chunk1 = col2 - col1;
 
 			// If deleting forward...
 			if(n > 0) {
 				// If prior tab stop is before point, stop here if non-space character is not a tab stop or
 				// point is not at BOL and the character just prior to point is a space.
-				if(col1 < dotCol && (col2 % sess.softTabSize != 0 ||
+				if(col1 < dotCol && (col2 % sess.cur.pScrn->softTabSize != 0 ||
 				 (offset > 0 && pPoint->pLine->text[offset - 1] == ' '))) {
 					pPoint->offset = offset;
 					break;
@@ -1342,13 +1356,13 @@ int delTab(int n, bool force) {
 			// Continue only if run (len) is not too short or point is at a tab stop.
 			len = offset - pPoint->offset;
 			pPoint->offset = offset;		// Restore original point position.
-			if(len >= chunk1 || (len > 0 && dotCol % sess.softTabSize == 0)) {
+			if(len >= chunk1 || (len > 0 && dotCol % sess.cur.pScrn->softTabSize == 0)) {
 Nuke:;
 				// Delete one or more soft tabs.  Determine number of spaces to delete and nuke 'em.
-				int max = (len - chunk1) / sess.softTabSize;
+				int max = (len - chunk1) / sess.cur.pScrn->softTabSize;
 				int m = abs(n) - 1;
 				m = (m > max ? max : m);
-				if(edelc(-(len < chunk1 ? len : (chunk1 + m * sess.softTabSize)), 0) != Success)
+				if(edelc(-(len < chunk1 ? len : (chunk1 + m * sess.cur.pScrn->softTabSize)), 0) != Success)
 					return sess.rtn.status;
 				if(n > 0)
 					pPoint->offset = offset;
@@ -1376,7 +1390,7 @@ Nuke1:
 // to getTextRegion().  Return status.
 int kdcText(int n, int kdc, Region *pRegion) {
 	Region region;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	// Process region elsewhere if specified.
 	if(pRegion != NULL) {
@@ -1421,7 +1435,7 @@ int kdcLine(int n, int kdc) {
 
 	// Nuke or copy line block (as a region) via kdcText().
 	if(kdc <= 0)
-		sess.pCurWind->face.point = region.point;
+		sess.cur.pFace->point = region.point;
 	return kdcText(0, kdc, &region) != Success || kdc <= 0 ? sess.rtn.status : lineMsg(RSForce, region.lineCount, text262);
 													// "copied"
 	}
@@ -1442,7 +1456,7 @@ int dupLine(Datum *pRtnVal, int n, Datum **args) {
 		}
 
 	// Move point to beginning of line block and insert it.
-	sess.pCurWind->face.point = region.point;
+	sess.cur.pFace->point = region.point;
 	if(einserts(workBuf) == Success)
 		(void) beginTxt();
 	return sess.rtn.status;
@@ -1455,7 +1469,7 @@ int selectLine(Datum *pRtnVal, int n, Datum **args) {
 
 	// Get region.
 	if(n > 0)
-		getTextRegion(&sess.pCurWind->face.point, args[0]->u.intNum, &region, RForceBegin);
+		getTextRegion(&sess.cur.pFace->point, args[0]->u.intNum, &region, RForceBegin);
 	else if(getLineRegion(args[0]->u.intNum, &region, n < 0 && n != INT_MIN ? REmptyOK | RLineSelect :
 	 RInclDelim | REmptyOK | RLineSelect) != Success)
 		return sess.rtn.status;
@@ -1464,8 +1478,8 @@ int selectLine(Datum *pRtnVal, int n, Datum **args) {
 	if(region.size > 0) {
 		movePoint(&region.point);
 		(void) moveChar(region.size);
-		setWindMark(&sess.pCurBuf->markHdr, sess.pCurWind);
-		sess.pCurWind->face.point = region.point;
+		setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
+		sess.cur.pFace->point = region.point;
 		}
 
 	// Return line count.
@@ -1476,7 +1490,7 @@ int selectLine(Datum *pRtnVal, int n, Datum **args) {
 // Delete white space at and forward from point (if any) on current line.  If n > 0, include non-word characters as well.
 static int nukeWhiteForw(int n) {
 	short c;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	for(;;) {
 		if(pPoint->offset == pPoint->pLine->used)
@@ -1495,7 +1509,7 @@ static int nukeWhiteForw(int n) {
 // If n > 0, include non-word characters as well.
 int nukeWhite(int n, bool prior) {
 	short c;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 	Line *pLine = pPoint->pLine;
 
 	if(pLine->used > 0 && (prior || pPoint->offset == pLine->used || isspace(c = pLine->text[pPoint->offset]) ||
@@ -1524,8 +1538,8 @@ Retn:
 // ends with any character specified in "pDelim".  Return status.
 static int ljoin(Datum *pRtnVal, int n, Datum *pDelim) {
 	int m, incr, newDot;
-	bool insSpace = (pDelim == NULL || pDelim->type != dat_nil);
-	Point *pPoint = &sess.pCurWind->face.point;
+	bool insSpace = (pDelim == NULL || !disnil(pDelim));
+	Point *pPoint = &sess.cur.pFace->point;
 
 	// Determine bounds of line block.
 	if(n == INT_MIN)
@@ -1549,7 +1563,7 @@ static int ljoin(Datum *pRtnVal, int n, Datum *pDelim) {
 		// Move to beginning of first line of pair if needed, trim white space, move to end, delete newline, delete
 		// white space, and if pDelim not nil and not at beginning or end of new line, insert one or two spaces.
 		if(incr == -1) {
-			if(pPoint->pLine == sess.pCurBuf->pFirstLine)
+			if(pPoint->pLine == sess.cur.pBuf->pFirstLine)
 				break;
 			pPoint->pLine = pPoint->pLine->prev;
 			}
@@ -1586,7 +1600,7 @@ int joinLines(Datum *pRtnVal, int n, Datum **args) {
 	}
 
 // Flags for sorting a block of lines.
-#define SortDescending	0x0001		// Sort in descending order; otherwise, ascending.
+#define SortDescending	0x0001		// Sort in descending order, otherwise ascending.
 #define SortIgnore	0x0002		// Ignore case in comparisons.
 
 // Swap two sequential lines in given buffer.  It is assumed that pLine1 and pLine2 are different lines and pLine2 immediately
@@ -1679,20 +1693,20 @@ int bsort(Buffer *pBuf, Point *pPoint, int n, ushort flags) {
 	// Get number of lines and set mark at starting point.
 	if(n == 0)
 		(void) bufLength(pBuf, &n);
-	if(pBuf == sess.pCurBuf) {
-		setWindMark(&pBuf->markHdr, sess.pCurWind);
-		pTopLine = sess.pCurWind->face.pTopLine;
+	if(pBuf == sess.cur.pBuf) {
+		setWindMark(&pBuf->markHdr, sess.cur.pWind);
+		pTopLine = sess.cur.pFace->pTopLine;
 		}
 
 	// Handle special cases where line count is 1 or 2.
 	if(n == 1) {
-		if(pBuf == sess.pCurBuf)
+		if(pBuf == sess.cur.pBuf)
 			goto MovePt;
 		}
 	else if(n == 2) {
 		int orderFlag = (flags & SortDescending) ? -1 : 1;
 		if(linecmp(pPoint->pLine, pPoint->pLine->next, flags) * orderFlag < 0) {
-			if(pBuf == sess.pCurBuf) {
+			if(pBuf == sess.cur.pBuf) {
 MovePt:
 				(void) moveLine(n);		// Can't fail.
 				supd_windFlags(pBuf, WFMove);
@@ -1700,11 +1714,11 @@ MovePt:
 			}
 		else {
 			lswap(pBuf, pPoint->pLine, pPoint->pLine->next);
-			if(pBuf == sess.pCurBuf) {
+			if(pBuf == sess.cur.pBuf) {
 				if(pPoint->pLine == pTopLine || pPoint->pLine->prev == pTopLine)
 					pTopLine = NULL;
 				(void) moveLine(-1);		// Can't fail.
-				setWindMark(&pBuf->markHdr, sess.pCurWind);
+				setWindMark(&pBuf->markHdr, sess.cur.pWind);
 				(void) moveLine(2);		// Can't fail.
 				bchange(pBuf, WFHard);
 				}
@@ -1752,10 +1766,10 @@ MovePt:
 			pLine->prev = firstPrev;
 			firstPrev->next = pLine;
 			}
-		if(pBuf == sess.pCurBuf) {
+		if(pBuf == sess.cur.pBuf) {
 			pPoint->pLine = pLine;
 			pPoint->offset = 0;
-			setWindMark(&pBuf->markHdr, sess.pCurWind);
+			setWindMark(&pBuf->markHdr, sess.cur.pWind);
 			}
 
 		// Graft last line of array back into buffer.
@@ -1769,7 +1783,7 @@ MovePt:
 			lastNext->prev = pLine;
 			}
 
-		if(pBuf == sess.pCurBuf) {
+		if(pBuf == sess.cur.pBuf) {
 			(void) moveLine(1);		// Can't fail.
 			bchange(pBuf, WFHard);
 			}
@@ -1778,10 +1792,10 @@ MovePt:
 		free((void *) ppLine0);
 		}
 
-	if(pBuf == sess.pCurBuf) {
+	if(pBuf == sess.cur.pBuf) {
 		if(pTopLine == NULL) {
-			sess.pCurWind->reframeRow = n + 1;
-			sess.pCurWind->flags |= WFReframe;
+			sess.cur.pWind->reframeRow = n + 1;
+			sess.cur.pWind->flags |= WFReframe;
 			}
 		(void) rsset(Success, 0, "%s %d %s%s%s", text475, n, text205, n == 1 ? "" : "s", text355);
 						// "Sorted", "line", " and marked as region"
@@ -1817,7 +1831,7 @@ int sortRegion(Datum *pRtnVal, int n, Datum **args) {
 	if(regionLines(&n) != Success)
 		return sess.rtn.status;
 	keyEntry.prevFlags &= ~SF_VertMove;			// Kill goal column.
-	return bsort(sess.pCurBuf, &sess.pCurWind->face.point, n, flags);
+	return bsort(sess.cur.pBuf, &sess.cur.pFace->point, n, flags);
 	}
 
 // Kill, delete, or copy fenced region if kdc is -1, 0, or 1, respectively.  Return status.
@@ -1829,27 +1843,6 @@ bool kdcFencedRegion(int kdc) {
 	return sess.rtn.status;
 	}
 
-// Write text to a named buffer.
-int bprint(Datum *pRtnVal, int n, Datum **args) {
-	Buffer *pBuf;
-
-	// Negative repeat count is an error.
-	if(n == INT_MIN)
-		n = 1;
-	else if(n < 0)
-		return rsset(Failure, 0, text39, text137, n, 0);
-			// "%s (%d) must be %d or greater", "Repeat count"
-
-	// Get the buffer name.
-	if((pBuf = bsrch(args[0]->str, NULL)) == NULL)
-		return rsset(Failure, 0, text118, args[0]->str);
-			// "No such buffer '%s'"
-	if(!needSym(s_comma, true))
-		return sess.rtn.status;
-
-	return chgText(pRtnVal, n, Txt_Insert, pBuf);
-	}
-
 // Write lines in region to a (different) buffer.  If n >= 0, write characters in region instead.  If n <= 0, also delete
 // selected text after write.  Return status.
 int writeBuf(Datum *pRtnVal, int n, Datum **args) {
@@ -1858,10 +1851,11 @@ int writeBuf(Datum *pRtnVal, int n, Datum **args) {
 
 	// Get the destination buffer name.  Make sure it's not the current buffer.
 	pBuf = bdefault();
-	if(getBufname(pRtnVal, text144, pBuf != NULL ? pBuf->bufname : NULL, OpCreate, &pBuf, NULL) != Success || pBuf == NULL)
-			// "Write to"
+	if(getBufname(pRtnVal, text144, pBuf != NULL ? pBuf->bufname : NULL, ArgFirst | OpCreate, &pBuf, NULL) != Success ||
+	 pBuf == NULL)
 		return sess.rtn.status;
-	if(pBuf == sess.pCurBuf)
+			// "Write to"
+	if(pBuf == sess.cur.pBuf)
 		return rsset(Failure, 0, text246);
 			// "Cannot write to current buffer"
 
@@ -1887,7 +1881,7 @@ int writeBuf(Datum *pRtnVal, int n, Datum **args) {
 
 	// If n <= 0, delete the region text.
 	if(n <= 0 && n != INT_MIN) {
-		sess.pCurWind->face.point = region.point;
+		sess.cur.pFace->point = region.point;
 		if(killPrep(0) == Success)
 			(void) edelc(region.size, EditDel);
 		}
@@ -1903,7 +1897,7 @@ int writeBuf(Datum *pRtnVal, int n, Datum **args) {
 int wrapWord(Datum *pRtnVal, int n, Datum **args) {
 	int wordLen;		// Length of word wrapped to next line.
 	int leftMargin, origOffset;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	// Determine left margin.
 	if(n == INT_MIN)
@@ -1953,9 +1947,9 @@ int wrapWord(Datum *pRtnVal, int n, Datum **args) {
 		(void) moveChar(wordLen);
 
 	// Make sure the display is not horizontally scrolled.
-	if(sess.pCurWind->face.firstCol > 0) {
-		sess.pCurWind->face.firstCol = 0;
-		sess.pCurWind->flags |= (WFHard | WFMode);
+	if(sess.cur.pFace->firstCol > 0) {
+		sess.cur.pFace->firstCol = 0;
+		sess.cur.pWind->flags |= (WFHard | WFMode);
 		}
 
 	return sess.rtn.status;
@@ -1973,13 +1967,13 @@ int wrapLine(Datum *pRtnVal, int n, Datum **args) {
 	int prefixLen = 0;
 
 	// Wrap column set?
-	if(sess.wrapCol == 0)
+	if(sess.cur.pScrn->wrapCol == 0)
 		return rsset(Failure, RSNoFormat, text98);
 			// "Wrap column not set"
 
 	// Get prefix and end-sentence delimiters if script mode.
 	if(sess.opFlags & OpScript) {
-		if(!isEmpty(args[0])) {
+		if(!isNN(args[0])) {
 			pPrefix = args[0];
 			if(*pPrefix->str == ' ' || *pPrefix->str == '\t')
 				return rsset(Failure, 0, text303, pPrefix->str);
@@ -1987,33 +1981,33 @@ int wrapLine(Datum *pRtnVal, int n, Datum **args) {
 			else
 				prefixLen = strlen(pPrefix->str);
 			}
-		if(!isEmpty(args[1]))
+		if(!isNN(args[1]))
 			pDelim = args[1];
 		}
 
 	// Determine bounds of line block.
-	pPoint = &sess.pCurWind->face.point;
+	pPoint = &sess.cur.pFace->point;
 	if(n == INT_MIN)
 		n = 1;
 	else if(n == 0 && regionLines(&n) != Success)			// Process all lines in region.
 		return sess.rtn.status;
 	else if(n < 0) {						// Back up to first line.
 		int count = 1;
-		while(pPoint->pLine != sess.pCurBuf->pFirstLine) {
+		while(pPoint->pLine != sess.cur.pBuf->pFirstLine) {
 			pPoint->pLine = pPoint->pLine->prev;
 			++count;
 			if(++n == 0)
 				break;
 			}
 		if((n = count) > 1)
-			sess.pCurWind->flags |= WFMove;
+			sess.cur.pWind->flags |= WFMove;
 		}
 	pPoint->offset = 0;						// Move to beginning of line.
 
 	// Point now at beginning of first line and n > 0.
 	(void) beginTxt();						// Move to beginning of text.
-	if((indentCol = getCol(NULL, false)) + prefixLen >= sess.wrapCol)	// Too much indentation?
-		return rsset(Failure, 0, text323, sess.wrapCol);
+	if((indentCol = getCol(NULL, false)) + prefixLen >= sess.cur.pScrn->wrapCol)	// Too much indentation?
+		return rsset(Failure, 0, text323, sess.cur.pScrn->wrapCol);
 			// "Indentation exceeds wrap column (%d)"
 	if(pPoint->offset > 0) {					// Save any indentation (from first line of block)...
 		if(dnewtrack(&pIndent) != 0 || dsetsubstr(pPoint->pLine->text, pPoint->offset, pIndent) != 0)
@@ -2084,7 +2078,8 @@ int wrapLine(Datum *pRtnVal, int n, Datum **args) {
 		fprintf(logfile, " ->  new col: %3d  new offset: %3d  new char: %c\n", col, pPoint->offset, c == 011 ? '*' : c);
 #endif
 				// If now past wrap column and not on a whitespace character, wrap line.
-				if(col > sess.wrapCol && (!isspace(c = pPoint->pLine->text[pPoint->offset]) && c != '\0')) {
+				if(col > sess.cur.pScrn->wrapCol &&
+				 (!isspace(c = pPoint->pLine->text[pPoint->offset]) && c != '\0')) {
 					if(wrapWord(pRtnVal, leftMargin, args) != Success)
 						return sess.rtn.status;
 					break;
@@ -2111,7 +2106,7 @@ static void chgTextCase(int wordCount, long charCount, const char *tranTable, bo
 	short c;
 	bool firstChar;
 	bool changed = false;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 	bool (*isCase)(short c) = (tranTable == NULL) ? NULL : (tranTable == upCase) ? isLowerCase : isUpperCase;
 
 	do {
@@ -2141,7 +2136,7 @@ Retn:
 	if(pWasChanged != NULL)
 		*pWasChanged = changed;
 	else if(changed)
-		bchange(sess.pCurBuf, WFHard);
+		bchange(sess.cur.pBuf, WFHard);
 	}
 
 // Convert a block of lines to lower, title, or upper case.  If n is zero, use lines in current region.  If tranTable is NULL,
@@ -2149,7 +2144,7 @@ Retn:
 static int chgLineCase(int n, const char *tranTable) {
 	bool changed;
 	int incr, count;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 	Point origPoint = *pPoint;		// Original point position.
 
 	// Compute block size.
@@ -2166,7 +2161,7 @@ static int chgLineCase(int n, const char *tranTable) {
 
 	pPoint->offset = 0;			// Start at the beginning.
 	if(n > 0)
-		setWindMark(&sess.pCurBuf->markHdr, sess.pCurWind);
+		setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
 
 	// Loop through buffer text, changing case of n lines.
 	keyEntry.prevFlags &= ~SF_VertMove;
@@ -2202,7 +2197,7 @@ int convertCase(int n, ushort flags) {
 		Region region;
 
 		if(getRegion(&region, RForceBegin) == Success && region.size > 0) {
-			Point *pPoint = &sess.pCurWind->face.point;
+			Point *pPoint = &sess.cur.pFace->point;
 
 			// Move point or mark so that (1), point is at beginning of region before case conversion; (2), point
 			// will be left at end of region after case conversion; and (3), region will still be marked.
@@ -2212,7 +2207,7 @@ int convertCase(int n, ushort flags) {
 				*pPoint = region.point;
 			else
 				// Mark is after point... set mark at point.
-				setWindMark(&sess.pCurBuf->markHdr, sess.pCurWind);
+				setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
 
 			chgTextCase(INT_MAX, region.size, tranTable, NULL);
 			(void) rsset(Success, 0, "%s %s", text222, text260);
@@ -2233,11 +2228,11 @@ int convertCase(int n, ushort flags) {
 		else if(n < 0) {
 			Region region;
 
-			setWindMark(&sess.pCurBuf->markHdr, sess.pCurWind);
+			setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
 			(void) moveWord(n);
 			if(getRegion(&region, RForceBegin) == Success && region.size > 0) {
 				chgTextCase(INT_MAX, region.size, tranTable, NULL);
-				sess.pCurWind->face.point = region.point;
+				sess.cur.pFace->point = region.point;
 				}
 			goto Retn;
 			}
@@ -2252,7 +2247,7 @@ Retn:
 int kdcForwWord(int n, int kdc) {
 	bool oneWord;
 	Region region;
-	Point *pPoint = &sess.pCurWind->face.point;
+	Point *pPoint = &sess.cur.pFace->point;
 
 	// Check if at end of buffer.
 	if(bufEnd(pPoint))
@@ -2382,7 +2377,7 @@ CopyNuke:
 		}
 
 	// Copy the word(s) backward.
-	region.point = sess.pCurWind->face.point;
+	region.point = sess.cur.pFace->point;
 	region.size = -size;
 	region.lineCount = 0;				// Not used.
 	return regionToKill(&region) != Success ? sess.rtn.status :

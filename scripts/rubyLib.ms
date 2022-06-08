@@ -1,9 +1,9 @@
-# (c) Copyright 2019 Richard W. Marinelli
+# (c) Copyright 2022 Richard W. Marinelli
 #
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# rubyLib.ms		Ver. 9.5.0
+# rubyLib.ms		Ver. 9.6.0
 #	MightEMacs library for Ruby script editing.
 
 ## Define regular expression that will match the first line of a method definition.  The rubyFindMethod command will replace the
@@ -52,8 +52,8 @@ command rubyFindCM(0) {description: "Prompt for a directory to search and the na
 	$0 => langFindObj false
 endroutine
 
-# If n < 0, return true if first or last symbol on line is a "begin block" symbol; otherwise, false.  If n == 0, return true if
-# null or comment line; otherwise, false.  If n > 0, return true if "end" (n == 1) or "else" (n > 1) line; otherwise, false.
+# If n < 0, return true if first or last symbol on line is a "begin block" symbol, otherwise false.  If n == 0, return true if
+# null or comment line, otherwise false.  If n > 0, return true if "end" (n == 1) or "else" (n > 1) line, otherwise false.
 function rubyIsLine?(0)
 	if $0 == 0
 		# Null or comment?
@@ -63,10 +63,10 @@ function rubyIsLine?(0)
 	if $0 < 0
 		beginSyms = ['begin', 'case', 'class', 'def', 'if', 'module', 'unless', 'until', 'while']
 		beginText
-		if wordChar? $lineChar
+		if isClass? 'word', $lineChar
 			setMark
 			endWord
-			if include?(beginSyms, $RegionText)
+			if ainclude?(beginSyms, $RegionText)
 				return true
 			endif
 		endif
@@ -74,7 +74,7 @@ function rubyIsLine?(0)
 
 	# Find end of line ... before any comment.  Assume "#{" is part of a double-quoted string.
 	beginLine
-	if (i = 1 => index($lineText, ?#,'Last, Char')) != nil && ++i < $LineLen && subline(i, 1) != '{'
+	if (i = index($lineText, ?#, 'Last, Char')) != nil && ++i < $LineLen && subline(i, 1) != '{'
 		$lineOffset = i = i - 2
 		beginWhite
 		$lineOffset == i && forwChar
@@ -85,14 +85,14 @@ function rubyIsLine?(0)
 
 	if $0 < 0
 		endSyms = ['|', 'do']
-		if include? endSyms, c
+		if ainclude? endSyms, c
 			result = true
-		elsif not wordChar?(ord c)
+		elsif not isClass?('word', c)
 			result = false
 		else
 			setMark
 			backWord
-			result = include?(endSyms, $RegionText)
+			result = ainclude?(endSyms, $RegionText)
 		endif
 	else
 		result = strip(subline -$lineOffset, $lineOffset) == ($0 == 1 ? 'end' : 'else')
@@ -104,8 +104,8 @@ endroutine
 # mark '.' to current position, mark 'T' to top line of the block, mark 'E' to "else" line (if any), and mark 'B' to the bottom
 # line.  If $0 == 0, be silent about errors.
 command rubyGotoBlockEnd(0) {description: "Go to block keyword paired with one in current line and set marks '.' (previous position),\
- 'T' (top line), 'E' (\"else\" line, if any), and 'B' (bottom line).  If n == 0, be silent about errors.  Returns: true if\
- successful; otherwise, false."}
+ 'T' (top line), 'E' (\"else\" line, if any), and 'B' (bottom line).  If n == 0, be silent about errors.\n\nReturns: true if\
+ successful, otherwise false."}
 	1 => setMark ??
 	found = false
 

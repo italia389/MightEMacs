@@ -8,21 +8,21 @@ may optionally specify one or more files to edit.  If a file is given, it is
 read into a "buffer" and displayed in a full-screen window, ready for you to
 begin editing it.  If the file does not exist, the window will be blank
 (allowing you to create a new file).  If a file is not specified, a new buffer
-called "untitled" is created with no associated filename.
+called "unnamed" is created with no associated filename.
 
 The line displayed in reverse video at the bottom of the screen is the "mode
 line".  It contains basic information about the editing session.  For example,
 let's say you typed:
 
-    $ mm myscript.ms
+    $ mm test.ms
 
 to start MightEMacs.  The mode line would then look something like this:
 
-  ~r== (Exact) [Memacs] == myscript == File: myscript.ms === MightEMacs 9.5.0 ~R
+  ~r== (Exact) [MScript] == test.ms == File: test.ms ======= MightEMacs 9.6.0 ~R
 
-This says that global mode "Exact" and buffer mode "Memacs" are enabled, the
-buffer name is "myscript" (derived from the filename), the file pathname is
-"myscript.ms", and we are running version 9.5.0 of the editor.  Global modes are
+This says that global mode "Exact" and buffer mode "MScript" are enabled, the
+buffer name is "test.ms" (derived from the filename), the file pathname is
+"test.ms", and we are running version 9.6.0 of the editor.  Global modes are
 shown in parentheses and buffer modes in brackets.
 
 If you typed some text into the buffer, you would notice that an asterisk
@@ -52,7 +52,7 @@ page and other help pages.
 
 Note also that a key is usually shown in the Help System with a command name
 following it, such as ~uC-f~U (forwChar).  This indicates (in this example) that the
-~uC-f~U key is "bound" to the "forwChar" command and the command is what is executed
+~uC-f~U key is "bound" to the ~bforwChar~B command and the command is what is executed
 when the key is pressed.  Key bindings and commands are explained in more detail
 in the next section.
 

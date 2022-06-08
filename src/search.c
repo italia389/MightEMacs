@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -21,8 +21,11 @@
 typedef struct {
 	Point point;			// Current line and offset in buffer during scan.
 	size_t offset;			// Current offset of scan point (>= 0) from starting position.
+	int lineBreakLimit;		// Number of line breaks which ends scan (or zero for no limit).
 	RegMatch regMatch;		// RE matching parameters.
 	ushort matchFlags;		// Flags from Match object.
+	uint scanCount;			// Number of characters scanned (for progress reporting).
+	bool progMsgShown;		// Progress message displayed?
 	} RegScan;
 
 // Check if given search pattern has trailing option characters and return results.  Flags in *flags are initially cleared,
@@ -318,7 +321,10 @@ int compileRE(Match *pMatch, ushort flags) {
 
 		// Compile new forward pattern and/or backward pattern.
 		if(flags & SCpl_ForwardRE) {
-//fprintf(logfile, "compileRE(): compiling pattern '%s' with compFlags %.8X...\n", pMatch->pat, compFlags);
+#if MMDebug & Debug_Regexp
+			fprintf(logfile, "compileRE(): compiling pattern '%s' with compFlags %.8x...\n",
+			 pMatch->pat, compFlags);
+#endif
 			if((r = xregcomp(&pMatch->regPat.compPat, pMatch->pat, compFlags)) == 0) {
 				pMatch->flags |= SCpl_ForwardRE;
 				pMatch->grpCount = pMatch->regPat.compPat.re_nsub;
@@ -326,7 +332,9 @@ int compileRE(Match *pMatch, ushort flags) {
 					return rsset(Panic, 0, text94, "compileRE");
 							// "%s(): Out of memory!"
 				(void) xregrev(pMatch->regPat.backPat, pMatch->pat, REG_ENHANCED);
-//fprintf(logfile, "  reversed pattern is '%s'.\n", pMatch->regPat.backPat);
+#if MMDebug & Debug_Regexp
+				fprintf(logfile, "  reversed pattern is '%s'.\n", pMatch->regPat.backPat);
+#endif
 				}
 			else
 				return regError(pMatch->pat, r);
@@ -471,7 +479,7 @@ int newSearchPat(char *pat, Match *pMatch, ushort *flags, bool addToRing) {
 		searchCtrl.forwDelta1[0] = -1;						// Clear delta tables.
 		if(addToRing) {
 			char patBuf[pMatch->patLen + OptCh_N + 1];
-			(void) rsave(ringTable + RingIdxSearch, makePat(patBuf, pMatch), false);	// Add pattern to search ring.
+			(void) rsave(ringTable + RingIdxSearch, makePat(patBuf, pMatch), false); // Add pattern to search ring.
 			}
 		}
 
@@ -489,12 +497,13 @@ int getPat(Datum **args, const char *prompt, bool searchPat) {
 
 	// Read a pattern.  Either we get one, or we just get the input delimiter and use the previous pattern.
 	if(sess.opFlags & OpScript)
-		datxfer(pPat, args[0]);
+		dxfer(pPat, args[0]);
 	else {
-		TermInpCtrl termInpCtrl = {NULL, searchCtrl.inpDelim, 0, searchPat ? ringTable + RingIdxSearch : ringTable + RingIdxRepl};
+		TermInpCtrl termInpCtrl = {NULL, searchCtrl.inpDelim, 0,
+		 searchPat ? ringTable + RingIdxSearch : ringTable + RingIdxRepl};
 		if(termInp(pPat, prompt, searchPat ? ArgNotNull1 | ArgNil1 : ArgNil1, 0, &termInpCtrl) != Success)
 			return sess.rtn.status;
-		if(pPat->type == dat_nil)
+		if(disnil(pPat))
 			dsetnull(pPat);
 		}
 
@@ -544,12 +553,19 @@ static int makeSearchTables(void) {
 // false is returned.
 static int hunt(Datum *pRtnVal, int n, ushort direct, const char *pat) {
 
-	if(n != 0) {			// Nothing to do if n is zero.
-		if(n == INT_MIN)
+	if(n != 0 || direct == Backward) {	// Nothing to do if n is zero and searching forward.
+		int lineBreakLimit;
+
+		if(n == INT_MIN) {
 			n = 1;
-		else if(n < 0)
-			return rsset(Failure, 0, text39, text137, n, 0);
-					// "%s (%d) must be %d or greater", "Repeat count"
+			lineBreakLimit = 0;
+			}
+		else if(n <= 0) {
+			lineBreakLimit = abs(n) + direct;
+			n = 1;
+			}
+		else
+			lineBreakLimit = 0;			
 
 		// Make sure a pattern exists, or that we didn't switch into Regexp mode after the pattern was entered.
 		if(pat[0] == '\0')
@@ -566,12 +582,14 @@ static int hunt(Datum *pRtnVal, int n, ushort direct, const char *pat) {
 				return sess.rtn.status;
 
 			// Perform appropriate search and return result.
-#if MMDebug & Debug_Temp
-fprintf(logfile, "hunt(): calling %s() with n %d, pat '%s'...\n", bufRegical ? "regScan" : "scan", n, pat);
+#if MMDebug & Debug_SrchRepl
+			fprintf(logfile, "hunt(): calling %s() with n %d, line break limit %d, pat '%s'...\n",
+			 bufRegical ? "regScan" : "scan", n, lineBreakLimit, pat);
 #endif
-			if((bufRegical ? regScan(n, direct, NULL) : scan(n, direct, NULL)) == NotFound)
+			if((bufRegical ? regScan(n, &lineBreakLimit, direct, NULL) :
+			  scan(n, &lineBreakLimit, direct, NULL)) == NotFound)
 				dsetbool(false, pRtnVal);
-			else if(datcpy(pRtnVal, searchCtrl.match.grpMatch.groups) != 0)
+			else if(dcpy(pRtnVal, searchCtrl.match.grpMatch.groups) != 0)
 				(void) librsset(Failure);
 			}
 		}
@@ -614,7 +632,7 @@ int huntBack(Datum *pRtnVal, int n, Datum **args) {
 int searchBack(Datum *pRtnVal, int n, Datum **args) {
 
 	// Get the pattern and perform the search up to n times.
-	if(getPat(args, text81, true) == Success && n != 0)
+	if(getPat(args, text81, true) == Success)
 			// "Reverse search"
 		(void) huntBack(pRtnVal, n, NULL);
 
@@ -639,15 +657,15 @@ static bool eq(ushort bufChar, ushort patChar, bool exact) {
 static short nextChar(Point *pPoint, ushort direct, bool update) {
 	short c;
 
-	if(direct == Forward) {					// Going forward?
-		if(bufEnd(pPoint))				// Yes.  At bottom of buffer?
-			c = -1;					// Yes, return -1;
+	if(direct == Forward) {						// Going forward?
+		if(bufEnd(pPoint))					// Yes.  At bottom of buffer?
+			c = -1;						// Yes, return -1;
 		else if(pPoint->offset == pPoint->pLine->used) {	// No.  At EOL?
-			if(update) {				// Yes, skip to next line...
+			if(update) {					// Yes, skip to next line...
 				pPoint->pLine = pPoint->pLine->next;
 				pPoint->offset = 0;
 				}
-			c = '\n';				// and return a <NL>.
+			c = '\n';					// and return a <NL>.
 			}
 		else {
 			c = pPoint->pLine->text[pPoint->offset];	// Otherwise, return current char.
@@ -655,15 +673,15 @@ static short nextChar(Point *pPoint, ushort direct, bool update) {
 				++pPoint->offset;
 			}
 		}
-	else if(pPoint->offset == 0) {				// Going backward.  At BOL?
-		if(pPoint->pLine == sess.pCurBuf->pFirstLine)		// Yes.  At top of buffer?
-			c = -1;					// Yes, return -1.
+	else if(pPoint->offset == 0) {					// Going backward.  At BOL?
+		if(pPoint->pLine == sess.cur.pBuf->pFirstLine)		// Yes.  At top of buffer?
+			c = -1;						// Yes, return -1.
 		else {
-			if(update) {				// No.  Skip to previous line...
+			if(update) {					// No.  Skip to previous line...
 				pPoint->pLine = pPoint->pLine->prev;
 				pPoint->offset = pPoint->pLine->used;
 				}
-			c = '\n';				// and return a <NL>.
+			c = '\n';					// and return a <NL>.
 			}
 		}
 	else {
@@ -677,9 +695,9 @@ static short nextChar(Point *pPoint, ushort direct, bool update) {
 	}
 
 // Move a buffer scanning point by jumpSize characters forward or backward.  If "pEnd" not NULL, set it to new position and
-// leave "pBegin" unchanged; otherwise, update "pBegin".  Return false if a boundary is hit (and we may therefore search no
-// further); otherwise, return true.
-static bool bufJump(Point *pBegin, int jumpSize, ushort direct, Point *pEnd) {
+// leave "pBegin" unchanged; otherwise, update "pBegin".  Return false if a boundary is hit or *pLineBreakLimit is reached (and
+// we may therefore search no further); otherwise, return true.
+static bool bufJump(Point *pBegin, int jumpSize, int *pLineBreakLimit, ushort direct, Point *pEnd) {
 	Point *pPoint;
 
 	if(pEnd == NULL)
@@ -694,6 +712,9 @@ static bool bufJump(Point *pBegin, int jumpSize, ushort direct, Point *pEnd) {
 			return false;						// Hit end of buffer.
 		pPoint->offset += jumpSize;
 		while(pPoint->offset > pPoint->pLine->used) {			// Skip to next line if overflow.
+			if(pLineBreakLimit != NULL && *pLineBreakLimit &&
+			 --*pLineBreakLimit == 0)
+				return false;					// Hit maximum number of line breaks.
 			pPoint->offset -= pPoint->pLine->used + 1;
 			if((pPoint->pLine = pPoint->pLine->next) == NULL)
 				return false;					// Hit end of buffer.
@@ -701,9 +722,12 @@ static bool bufJump(Point *pBegin, int jumpSize, ushort direct, Point *pEnd) {
 		}
 	else {									// Going backward.
 		pPoint->offset -= jumpSize;
-		while(pPoint->offset < 0) {						// Skip back a line.
-			if(pPoint->pLine == sess.pCurBuf->pFirstLine)
-				return false;					// Hit beginning of buffer.
+		while(pPoint->offset < 0) {					// Skip back a line.
+			if(pPoint->pLine == sess.cur.pBuf->pFirstLine ||
+			 (pLineBreakLimit != NULL && *pLineBreakLimit &&
+			 --*pLineBreakLimit == 0))
+				return false;					// Hit beginning of buffer or maximum number
+										// of line breaks.
 			pPoint->pLine = pPoint->pLine->prev;
 			pPoint->offset += pPoint->pLine->used + 1;
 			}
@@ -712,11 +736,13 @@ static bool bufJump(Point *pBegin, int jumpSize, ushort direct, Point *pEnd) {
 	return true;
 	}
 
-// Save the text that was matched in given Match record and return status.  If pMatchLoc not NULL, process plain text result;
-// otherwise, RE result (using pRegMatch).  Called for plain text and RE scanning in buffer or string.
+// Save the text that was matched in given Match record and return status.  If pMatchLoc not NULL, process plain text result,
+// otherwise RE result (using pRegMatch).  Called for plain text and RE scanning in buffer or string.
 int saveMatch(Match *pMatch, MatchLoc *pMatchLoc, RegMatch *pRegMatch) {
 
-//fprintf(logfile, "saveMatch(): grpMatch.size %hu...\n", pMatch->grpMatch.size); fflush(logfile);
+#if MMDebug & Debug_SrchRepl
+	fprintf(logfile, "saveMatch(): grpMatch.size %hu...\n", pMatch->grpMatch.size);
+#endif
 	// Free all groups and allocate new ones.
 	grpFree(pMatch);
 
@@ -747,8 +773,9 @@ int saveMatch(Match *pMatch, MatchLoc *pMatchLoc, RegMatch *pRegMatch) {
 		char *str, *strEnd;
 		int i = (pRegMatch->direct == Forward) ? 1 : -1;
 		regmatch_t *pGroup = pRegMatch->grpList;
-#if MMDebug & Debug_Temp
+#if MMDebug & Debug_SrchRepl
 		int grpNum = 0;
+		fputs("### saveMatch(): Beginning RE group save(s)...\n", logfile);
 #endif
 		if(pRegMatch->startPoint.type == ScanPt_Str)
 			strEnd = strchr(pRegMatch->startPoint.u.strPoint, '\0');
@@ -756,45 +783,54 @@ int saveMatch(Match *pMatch, MatchLoc *pMatchLoc, RegMatch *pRegMatch) {
 			goto Retn;
 		pDatumEnd = (pDatum = pMatch->grpMatch.groups) + pMatch->grpCount;
 
-//fprintf(logfile, "### saveMatch(): source str '%s' [%.8X], strEnd [%.8X], pat '%s'\n",
-// pRegMatch->startPoint.u.strPoint, (uint) pRegMatch->startPoint.u.strPoint, (uint) strEnd, pMatch->pat);
+#if MMDebug & Debug_SrchRepl
+		if(pRegMatch->startPoint.type == ScanPt_Str)
+			fprintf(logfile, "### saveMatch(): source str '%s' [%.8x], strEnd [%.8x], pat '%s'\n",
+			 pRegMatch->startPoint.u.strPoint, (uint) pRegMatch->startPoint.u.strPoint, (uint) strEnd, pMatch->pat);
+#endif
 		// Save the pattern match (group 0) and all the RE groups, if any.  The offsets will both be -1 if the group
 		// never matched.  Set the group to null in that case.
 		do {
-#if MMDebug & Debug_Temp
-fprintf(logfile, "### saveMatch(): saving group %d (rm_so %d, rm_eo %d) to pDatum of type %d...\n",
- grpNum, pGroup->rm_so, pGroup->rm_eo, (int) pDatum->type);
+#if MMDebug & Debug_SrchRepl
+			fprintf(logfile, "### saveMatch(): saving group %d (rm_so %d, rm_eo %d) to pDatum of type %d...\n",
+			 grpNum, pGroup->rm_so, pGroup->rm_eo, (int) pDatum->type);
 #endif
 			if(pGroup->rm_so < 0 || (len = pGroup->rm_eo - pGroup->rm_so) == 0) {
 				dsetnull(pDatum);
-#if MMDebug & Debug_Temp
-fputs("  set pDatum to null.\n", logfile);
+#if MMDebug & Debug_SrchRepl
+				fputs("  set pDatum to null.\n", logfile);
 #endif
 				}
 			else {
-//fprintf(logfile, "saveMatch(): Getting %ld bytes for group %d...\n", len + 1, grpNum);
+#if MMDebug & Debug_SrchRepl
+				fprintf(logfile, "### saveMatch(): Getting %ld bytes for group %d...\n", len + 1, grpNum);
+#endif
 				if(dsalloc(pDatum, len + 1) != 0)
 					goto LibFail;
 				if(pRegMatch->startPoint.type == ScanPt_Buf) {
-					bufJump(&pRegMatch->startPoint.u.bufPoint, pRegMatch->direct == Forward ?
-					 pGroup->rm_so : pGroup->rm_eo, pRegMatch->direct, &region.point);
+					(void) bufJump(&pRegMatch->startPoint.u.bufPoint, pRegMatch->direct == Forward ?
+					 pGroup->rm_so : pGroup->rm_eo, NULL, pRegMatch->direct, &region.point);
 					region.size = len;
 					regionToStr(pDatum->str, &region);
 					}
 				else {
 					str = (pRegMatch->direct == Forward) ? pRegMatch->startPoint.u.strPoint +
 					 pGroup->rm_so : strEnd - pGroup->rm_eo;
-//fprintf(logfile, "saveMatch(): group %d: copying from '%s' [%.8X]: offset %lu, len %ld\n", grpNum,
-// pRegMatch->startPoint.u.strPoint, (uint) pRegMatch->startPoint.u.strPoint, str - pRegMatch->startPoint.u.strPoint, len);
+#if MMDebug & Debug_SrchRepl
+					fprintf(logfile,
+					 "### saveMatch(): group %d: copying from '%s' [%.8x]: offset %lu, len %ld\n", grpNum,
+					 pRegMatch->startPoint.u.strPoint, (uint) pRegMatch->startPoint.u.strPoint,
+					 str - pRegMatch->startPoint.u.strPoint, len);
+#endif
 					stplcpy(pDatum->str, str, len + 1);
 					}
 				}
-#if MMDebug & Debug_Temp
-fprintf(logfile, "  set pDatum to str '%s'\n", pDatum->str);
+#if MMDebug & Debug_SrchRepl
+			fprintf(logfile, "  set pDatum to str '%s'\n", pDatum->str);
 #endif
 			if((pGroup += i) < pRegMatch->grpList)
 				pGroup = pRegMatch->grpList + pMatch->grpCount;
-#if MMDebug & Debug_Temp
+#if MMDebug & Debug_SrchRepl
 			++grpNum;
 #endif
 			} while(++pDatum <= pDatumEnd);
@@ -811,11 +847,12 @@ LibFail:
 
 #define SHOW_COMPARES	0
 
-// Search for a pattern in either direction.  If found, position point at the start or just after the match string and set
-// *pMatchLen to match length, if matchLen not NULL.  Fast version using code from Boyer and Moore, Software Practice and
-// Experience, vol. 10 (1980).  "n" is repeat count and "direct" is Forward or Backward.  Return NotFound (bypassing rsset()) if
-// search failure.
-int scan(int n, ushort direct, long *pMatchLen) {
+// Search current buffer for nth occurrence of text matching a fixed pattern in either direction.  (It is assumed that n > 0.)
+// If match is found, position point at beginning (if scanning backward) or end (if scanning forward) of the matched text and
+// set *pMatchLen to match length, if pMatchLen not NULL.  This is a fast algorithm using code from Boyer and Moore, Software
+// Practice and Experience, vol. 10 (1980).  "n" is repeat count, "pLineBreakLimit" is pointer to number of line breaks that
+// forces failure, and "direct" is Forward or Backward.  Return NotFound (bypassing rsset()) if search failure.
+int scan(int n, int *pLineBreakLimit, ushort direct, long *pMatchLen) {
 	Match *pMatch = &searchCtrl.match;
 	MatchLoc matchLoc;
 	short bufChar, patChar;		// Buffer char and pattern char.
@@ -826,7 +863,9 @@ int scan(int n, ushort direct, long *pMatchLen) {
 	ushort scanDirect;		// Scan direction.
 	int *delta1, *delta2;
 	int jumpSize;			// Next offset.
-	uint loopCount = 0;
+	uint scanCount = 0;		// Number of characters scanned (for progress reporting).
+	uint scanCountMax = CharScanCount * 6;
+	bool progMsgShown = false;	// Progress message displayed?
 	bool exact = pMatch->flags & SCpl_PlainExact;
 #if SHOW_COMPARES
 	int compares = 0;
@@ -849,7 +888,7 @@ int scan(int n, ushort direct, long *pMatchLen) {
 		}
 
 	// Set local scan variable to point.
-	point = sess.pCurWind->face.point;
+	point = sess.cur.pFace->point;
 
 	// Scan the buffer until we find the nth match or hit a buffer boundary.  The basic loop is to jump forward or backward
 	// in the buffer (so that comparisons are done in reverse), check for a match, get the next jump size (delta) on a
@@ -858,7 +897,9 @@ int scan(int n, ushort direct, long *pMatchLen) {
 	matchLoc.region.size = jumpSize = pMatch->patLen;
 	matchLoc.region.lineCount = 0;					// Not used.
 	patEnd = pattern + pMatch->patLen;
-	while(bufJump(&point, jumpSize, direct, NULL)) {
+	while(bufJump(&point, jumpSize, pLineBreakLimit, direct, NULL)) {
+		if(!progMsgShown)
+			scanCount += jumpSize;
 
 		// Save the current position in case we match the search string at this point.
 		matchLoc.region.point = point;
@@ -874,6 +915,11 @@ int scan(int n, ushort direct, long *pMatchLen) {
 			patChar = *pat;
 			--patIndex;
 			bufChar = nextChar(&point, scanDirect, true);
+
+			// Adjust line break limit if passing over a newline during comparison.
+			if(bufChar == '\n' && *pLineBreakLimit)
+				++*pLineBreakLimit;
+
 			if(!eq(patChar, bufChar, exact)) {
 
 				// No match.  Jump forward or backward in buffer as far as possible and try again.
@@ -894,14 +940,14 @@ int scan(int n, ushort direct, long *pMatchLen) {
 			return sess.rtn.status;
 
 		// Return if nth match found.
-		if(--n <= 0) {
+		if(--n == 0) {
 			if(pMatchLen != NULL)
 				*pMatchLen = pMatch->patLen;
 #if SHOW_COMPARES
 			return rsset(Success, 0, "%d comparisons", compares);
 #else
-			if(loopCount >= ProgressLoopCt)
-				(void) mlerase();
+			if(progMsgShown)
+				(void) mlerase(0);
 			return sess.rtn.status;
 #endif
 			}
@@ -910,11 +956,13 @@ int scan(int n, ushort direct, long *pMatchLen) {
 		jumpSize = pMatch->patLen * 2;
 Fail:
 		// If search is taking awhile, let user know.
-		if(loopCount <= ProgressLoopCt) {
-			if(loopCount++ == ProgressLoopCt)
+		if(!progMsgShown) {
+			if(scanCount >= scanCountMax) {
 				if(mlputs(MLHome | MLWrap | MLFlush, text203) != Success)
 						// "Searching..."
 					return sess.rtn.status;
+				progMsgShown = true;
+				}
 			}
 		}
 
@@ -929,16 +977,29 @@ Fail:
 	}
 
 // Get next input character -- callback routine for xreg[a]uexec().  Set *pChar to the value of the next character in buffer,
-// and set *pAdvBytes to number of bytes advanced.  Return true if end of buffer reached; otherwise, false.
+// and set *pAdvBytes to number of bytes advanced.  Return true if end of buffer or line break limit reached, otherwise false.
 static bool cbGetNext(xcint_t *pChar, int *pAdvBytes, void *context) {
 	RegScan *pRegScan = (RegScan *) context;
 	short c = nextChar(&pRegScan->point, pRegScan->regMatch.direct, true);
-//fprintf(logfile, "cbGetNext(): direct %hu, returned char %c (%.2hX)\n", pRegScan->regMatch.direct, isprint(c) ? c : '?', c);
+#if MMDebug & Debug_Regexp
+	fprintf(logfile, "cbGetNext(): direct %hu, returned char %c (%.2hx)\n",
+	 pRegScan->regMatch.direct, isprint(c) ? c : '?', c);
+#endif
 	*pChar = (xcint_t) c;
 	*pAdvBytes = 1;
-	if(c == -1)
+	if(c == -1 || (c == '\n' && pRegScan->lineBreakLimit && --pRegScan->lineBreakLimit == 0))
 		return true;
 	++pRegScan->offset;
+
+	// If search is taking awhile, let user know.
+	if(!pRegScan->progMsgShown) {
+		if(++pRegScan->scanCount >= CharScanCount) {
+			(void) mlputs(MLHome | MLWrap | MLFlush, text203);
+					// "Searching..."
+			pRegScan->progMsgShown = true;
+			}
+		}
+
 	return false;
 	}
 
@@ -946,8 +1007,10 @@ static bool cbGetNext(xcint_t *pChar, int *pAdvBytes, void *context) {
 // assumed that pos is never greater than the current scanning position.
 static void cbRewind(size_t pos, void *context) {
 	RegScan *pRegScan = (RegScan *) context;
-//fprintf(logfile, "cbRewind(%lu, ...)\n", pos);
-	bufJump(&pRegScan->point, pRegScan->offset - pos, pRegScan->regMatch.direct ^ 1, NULL);
+#if MMDebug & Debug_Regexp
+	fprintf(logfile, "cbRewind(%lu, ...)\n", pos);
+#endif
+	(void) bufJump(&pRegScan->point, pRegScan->offset - pos, NULL, pRegScan->regMatch.direct ^ 1, NULL);
 	pRegScan->offset = pos;
 	}
 
@@ -958,9 +1021,11 @@ static int cbCompare(size_t pos1, size_t pos2, size_t len, void *context) {
 	RegScan *pRegScan = (RegScan *) context;
 	Point point1;
 	Point point2;
-//fprintf(logfile, "cbCompare(%lu, %lu, %lu, ...)\n", pos1, pos2, len);
-	bufJump(&pRegScan->point, pRegScan->offset - pos1, pRegScan->regMatch.direct ^ 1, &point1);
-	bufJump(&pRegScan->point, pRegScan->offset - pos2, pRegScan->regMatch.direct ^ 1, &point2);
+#if MMDebug & Debug_Regexp
+	fprintf(logfile, "cbCompare(%lu, %lu, %lu, ...)\n", pos1, pos2, len);
+#endif
+	(void) bufJump(&pRegScan->point, pRegScan->offset - pos1, NULL, pRegScan->regMatch.direct ^ 1, &point1);
+	(void) bufJump(&pRegScan->point, pRegScan->offset - pos2, NULL, pRegScan->regMatch.direct ^ 1, &point2);
 
 	// Compare bytes in buffer.
 	short c1, c2;
@@ -1002,36 +1067,40 @@ static int getExecFlags(ushort direct, bool atBeginEnd, short c) {
 		if(wordChar[c])
 			execFlags |= wordFlag;
 		}
-//fprintf(logfile, "getExecFlags(%hu,%d,%hd): returning %.8X.\n", direct, atBeginEnd, c, execFlags);
+#if MMDebug & Debug_Regexp
+	fprintf(logfile, "getExecFlags(%hu,%d,%hd): returning %.8x.\n", direct, atBeginEnd, c, execFlags);
+#endif
 	return execFlags;
 	}
 
-// Search for text in buffer matching a regular expression in either direction.  If found, position point at the start (if
-// scanning backward) or just after (if scanning forward) the matched string and set *pMatchLen to string length (if matchLen
-// not NULL).  "n" is repeat count and "direct" is Forward or Backward.  Return NotFound (bypassing rsset()) if search failure.
-int regScan(int n, ushort direct, long *pMatchLen) {
+// Search current buffer for the nth occurrence of text matching a regular expression in either direction.  (It is assumed that
+// n > 0.)  If match found, position point at the beginning (if scanning backward) or end (if scanning forward) the matched text
+// and set *pMatchLen to text length (if matchLen not NULL).  "n" is repeat count, "pLineBreakLimit" is pointer to number of
+// line breaks that forces failure, and "direct" is Forward or Backward.  Return NotFound (bypassing rsset()) if search failure.
+int regScan(int n, int *pLineBreakLimit, ushort direct, long *pMatchLen) {
 	int r;
 	short c;
 	RegScan regScan;
 	Match *pMatch = &searchCtrl.match;
-	uint loopCount = 0;
 	regex_t *pRegex = (direct == Forward) ? &pMatch->regPat.compPat : &pMatch->regPat.compBackPat;
 	regmatch_t groups[pMatch->grpCount + 1];
 	regamatch_t approxMatch = {pMatch->grpCount + 1, groups};
 	regaparams_t params;
 	regusource_t strSource = {
 		cbGetNext, cbRewind, cbCompare, (void *) &regScan};
-#if MMDebug & Debug_Temp
+#if MMDebug & Debug_SrchRepl
 	char patBuf[pMatch->patLen + OptCh_N + 1];
 	makePat(patBuf, &searchCtrl.match);
-fprintf(logfile, "### regScan(): Scanning for /%s/...\n", patBuf);
+	fprintf(logfile, "### regScan(): Scanning for /%s/ with line break limit %d...\n", patBuf, *pLineBreakLimit);
 #endif
 
 	// Set local scan variable to point and initialize scanning parameters.
 	if(pMatch->flags & SOpt_Fuzzy)
 		xregainit(&params, 0);
-	regScan.point = sess.pCurWind->face.point;
-	regScan.offset = 0;
+	regScan.point = sess.cur.pFace->point;
+	regScan.offset = regScan.scanCount = 0;
+	regScan.progMsgShown = false;
+	regScan.lineBreakLimit = *pLineBreakLimit;
 	regScan.matchFlags = pMatch->flags;
 	regScan.regMatch.grpList = groups;
 	regScan.regMatch.direct = direct;
@@ -1042,16 +1111,17 @@ fprintf(logfile, "### regScan(): Scanning for /%s/...\n", patBuf);
 		// Save the current position (starting point) so we can find the exact match point and save group matches later
 		// if match is successful.
 		regScan.regMatch.startPoint.u.bufPoint = regScan.point;
-#if MMDebug & Debug_Temp
-fprintf(logfile, "*** regScan(): Calling xreg%suexec() with /%s/ at '%.*s'...\n", (pMatch->flags & SOpt_Fuzzy) ? "a" : "",
- pMatch->pat, (int)(regScan.point.pLine->used - regScan.point.offset), regScan.point.pLine->text + regScan.point.offset);
+#if MMDebug & Debug_SrchRepl
+		fprintf(logfile, "*** regScan(): Calling xreg%suexec() with /%s/ at '%.*s'...\n",
+		 (pMatch->flags & SOpt_Fuzzy) ? "a" : "", pMatch->pat, (int)(regScan.point.pLine->used - regScan.point.offset),
+		 regScan.point.pLine->text + regScan.point.offset);
 #endif
 		// Ready to roll... scan the buffer for a match.
 		if((c = nextChar(&regScan.point, direct ^ 1, false)) < 0)
 			c = '\0';
 		r = getExecFlags(direct, direct == Forward ? regScan.point.offset == 0 :
 		 regScan.point.offset == regScan.point.pLine->used, c);
-#if MMDebug & Debug_Temp
+#if MMDebug & Debug_SrchRepl
 		r = (pMatch->flags & SOpt_Fuzzy) ? xregauexec(pRegex, &strSource, &approxMatch, &params, r) :
 		 xreguexec(pRegex, &strSource, pMatch->grpCount + 1, groups, r);
 		fprintf(logfile, "  xreg%suexec() returned status %d\n", (pMatch->flags & SOpt_Fuzzy) ? "a" : "", r);
@@ -1061,21 +1131,22 @@ fprintf(logfile, "*** regScan(): Calling xreg%suexec() with /%s/ at '%.*s'...\n"
 		 xreguexec(pRegex, &strSource, pMatch->grpCount + 1, groups, r)) == 0) {
 #endif
 			// A SUCCESSFULL MATCH!  Flag that we have moved, update the point pointers, and save the match.
-			bufJump(&regScan.regMatch.startPoint.u.bufPoint, groups[0].rm_eo, direct, &regScan.point);
+			(void) bufJump(&regScan.regMatch.startPoint.u.bufPoint, groups[0].rm_eo, NULL, direct, &regScan.point);
 			movePoint(&regScan.point);				// Leave point at end of string.
 			if(saveMatch(&searchCtrl.match, NULL, &regScan.regMatch) != Success)
 				return sess.rtn.status;
 
-			// Return if nth match found.
-			if(--n <= 0) {
+			// Return results if nth match found.
+			if(--n == 0) {
 				if(pMatchLen != NULL)
 					*pMatchLen = groups[0].rm_eo - groups[0].rm_so;
-#if MMDebug & Debug_Temp
+				*pLineBreakLimit = regScan.lineBreakLimit;
+#if MMDebug & Debug_SrchRepl
 				return rsset(Success, 0, "Match length %d, group 0: '%s'",
 				 groups[0].rm_eo - groups[0].rm_so, pMatch->grpMatch.groups[0].str);
 #else
-				if(loopCount >= ProgressLoopCt)
-					(void) mlerase();
+				if(regScan.progMsgShown)
+					(void) mlerase(0);
 				return sess.rtn.status;
 #endif
 				}
@@ -1088,13 +1159,7 @@ fprintf(logfile, "*** regScan(): Calling xreg%suexec() with /%s/ at '%.*s'...\n"
 			// xreg[a]uexec() internal error.
 			return regError(direct == Forward ? pMatch->pat : pMatch->regPat.backPat, r);
 
-		// Found match, but not nth one.  If search is taking awhile, let user know.
-		if(loopCount <= ProgressLoopCt) {
-			if(loopCount++ == ProgressLoopCt)
-				if(mlputs(MLHome | MLWrap | MLFlush, text203) != Success)
-						// "Searching..."
-					return sess.rtn.status;
-			}
+		// Found match, but not nth one.  Continue searching.
 		}
 
 	// No match found.

@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -8,6 +8,19 @@
 // Flags for ioStat() function.
 #define IOS_OtpFile	0x0001		// Writing to a file.
 #define IOS_NoDelim	0x0002		// No delimiter at EOF.
+#define IOS_RSHigh	0x0004		// Set RSHigh flag in return message.
+
+// Flags for selected buffer and file operations, used by opConfirm() and setFilename() functions.
+#define BF_UpdBufDir	0x0001		// Update buffer directory.
+#define BF_WarnExists	0x0002		// Warn user if file exists.
+#define BF_Overwrite	0x0004		// Confirm file overwrite.
+#define BF_CreateBuf	0x0008		// Confirm buffer creation.
+
+// Flags for fileExists() function.
+#define FTypRegular	0x0001		// Regular file.
+#define FTypSymLink	0x0002		// Symbolic link.
+#define FTypDir		0x0004		// Directory.
+#define FTypOther	0x0008		// Other file type.
 
 // File information.  Any given file is opened, processed, and closed before the next file is dealt with; therefore, the file
 // handle (and control variables) can be shared among all files and I/O functions.  Note however, that userInpDelim and
@@ -48,28 +61,32 @@ typedef struct {
 // External function declarations.
 extern int absPathname(Datum *pRtnVal, int n, Datum **args);
 extern int appendWriteFile(Datum *pRtnVal, int n, const char *prompt, short mode);
+extern int delFile(Datum *pRtnVal, int n, Datum **args);
 extern char *fbasename(const char *name, bool withExt);
 extern char *fdirname(char *name, int n);
-extern int fileExist(const char *filename);
+extern uint fileExists(const char *filename);
 extern int findViewFile(Datum *pRtnVal, int n, bool view);
-extern int getFilename(Datum *pRtnVal, const char *prompt, const char *def, uint ctrlFlags);
+extern int getFilename(Datum *pRtnVal, const char *prompt, const char *def, uint flags);
 extern int getPath(char *filename, bool resolve, Datum *pPath);
 extern int globPat(Datum *pRtnVal, int n, Datum **args);
+extern int inpInit(int fileHandle);
 extern int insertData(int n, Buffer *pSrcBuf, DataInsert *pDataInsert);
 extern int insertFile(Datum *pRtnVal, int n, Datum **args);
-extern int insertLine(char *src, int len, bool hasDelim, Buffer *pBuf, Point *pPoint);
+extern int insertLine(const char *src, int len, bool hasDelim, Buffer *pBuf, Point *pPoint);
 extern int ioStat(DFab *rtnMsg, ushort flags, Datum *pBakName, int status, const char *filename, const char *action,
  uint lineCt);
+extern int linkFile(Datum *pRtnVal, int n, Datum **args);
+extern bool opConfirm(ushort flags);
+extern void otpInit(Buffer *pBuf, int fileHandle);
 extern int readFile(Datum *pRtnVal, int n, Datum **args);
 extern int readIn(Buffer *pBuf, const char *filename, ushort flags);
 extern int readPrep(Buffer *pBuf, ushort flags);
 #if USG
 extern int rename(const char *file1, const char *file2);
 #endif
-extern int inpInit(int fileHandle);
+extern int renameFile(Datum *pRtnVal, int n, Datum **args);
 extern int saveBufs(int n, ushort flags);
 extern int setBufFile(Datum *pRtnVal, int n, Datum **args);
-extern void otpInit(Buffer *pBuf, int fileHandle);
 extern int writeDiskPipe(Buffer *pBuf, uint *pLineCount);
 extern int xPathname(Datum *pRtnVal, int n, Datum **args);
 

@@ -14,7 +14,7 @@ either the entire name is shown, waiting for you to press ~ureturn~U to continue
 the entire name is displayed (briefly) and the operation is performed.
 
 For example, say you want to search for a file to edit.  You can use the
-"findFile" command and look around.  Enter ~#uC-x C-f~U.  At the prompt, type part of
+~bfindFile~B command and look around.  Enter ~#uC-x C-f~U.  At the prompt, type part of
 a file path and hit ~utab~U.  You should see matching filenames in a pop-up window.
 (If nothing matches the characters you entered however, the window will be blank
 and you will hear an audible beep.)  You can see all the files in the current

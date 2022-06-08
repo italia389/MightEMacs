@@ -1,9 +1,9 @@
-# (c) Copyright 2019 Richard W. Marinelli
+# (c) Copyright 2022 Richard W. Marinelli
 #
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# msLib.ms		Ver. 9.5.1
+# msLib.ms		Ver. 9.6.0
 #	MightEMacs library for MightEMacs script editing.
 
 # Array of parameters used for finding user commands and functions in script files.
@@ -43,9 +43,9 @@ command msFindRoutine(0) {description: "Prompt for a directory to search and the
 	$0 => langFindObj true
 endroutine
 
-# If n < 0, return true if first keyword on line is a "begin block" directive; otherwise, false.  If n == 0, return true if null
-# or comment line; otherwise, false.  If n > 0, return true if line begins with an "endXXX" (n == 1) or "else" (n > 1)
-# directive; otherwise, false.
+# If n < 0, return true if first keyword on line is a "begin block" directive, otherwise false.  If n == 0, return true if null
+# or comment line, otherwise false.  If n > 0, return true if line begins with an "endXXX" (n == 1) or "else" (n > 1)
+# directive, otherwise false.
 function msIsLine?(0)
 	if $0 == 0
 		# Null or comment?
@@ -76,8 +76,8 @@ endroutine
 # Go to matching block end point if current line begins with a block keyword.  Set mark '.' to current position, mark 'T' to
 # top line of the block, mark 'E' to "else" line (if any), and mark 'B' to the bottom line.  If $0 == 0, be silent about errors.
 command msGotoBlockEnd(0) {description: "Go to block keyword paired with one in current line and set marks '.' (previous\
- position), 'T' (top line), 'E' (\"else\" line, if any), and 'B' (bottom line).  If n == 0, be silent about errors.  Returns:\
- true if successful; otherwise, false."}
+ position), 'T' (top line), 'E' (\"else\" line, if any), and 'B' (bottom line).  If n == 0, be silent about errors.\n\nReturns:\
+ true if successful, otherwise false."}
 	1 => setMark ??
 	found = false
 

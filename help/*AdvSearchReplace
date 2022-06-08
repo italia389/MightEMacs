@@ -2,7 +2,7 @@
 
 MightEMacs provides several commands for searching through text in a buffer and
 also for replacing text that matches a pattern.  To search the current buffer
-for a string that matches a pattern, the "searchForw" (~uC-s~U) or "searchBack"
+for a string that matches a pattern, the ~bsearchForw~B (~uC-s~U) or ~bsearchBack~B
 (~uC-r~U) command is used.  You will be prompted to enter the pattern.  The pattern
 is delimited by ~uESC~U by default so that ~uRTN~U can be entered as part of the
 pattern.  This can be changed however, by setting the $searchDelim variable to
@@ -11,12 +11,12 @@ pattern.  This can be changed however, by setting the $searchDelim variable to
 ~#uC-q RTN~U would not work because ~uC-q~U quotes characters literally during input and
 thus, ~#uC-q RTN~U would generate a "\r" character, not "\n".)
 
-Once a pattern has been set, the "huntForw" (~uC-]~U) and "huntBack" (~uC-^~U) commands
+Once a pattern has been set, the ~bhuntForw~B (~uC-]~U) and ~bhuntBack~B (~uC-^~U) commands
 may be used in any combination to search for the next or previous occurrence.
 The search pattern is saved in the "search ring" (if different than any other
 entry) and in the $searchPat variable.
 
-To find and replace text, the "replace" (~#uESC r~U) or "queryReplace" (~#uESC q~U)
+To find and replace text, the ~breplace~B (~#uESC r~U) or ~bqueryReplace~B (~#uESC q~U)
 command is used.  You will be prompted to enter the search and replacement
 patterns.  The replacement pattern may contain any of the following escape
 sequences:
@@ -28,33 +28,63 @@ sequences:
     ~b\n~B      Newline.
     ~b\r~B      Carriage return.
     ~b\t~B      Tab character.
+    ~b\v~B      Vertical tab character.
 
-To replace a fixed number of occurrences of a pattern, specify a numeric prefix
-to either command.  For the "replace" command, the default action is to replace
-all occurrences from the point to the end of the buffer.  The "queryReplace"
-command works like "replace" but prompts for an action to take each time a match
-is found, and also after the last match is found.  You can enter ~u?~U at the prompt
-to get a list.  Actions include: skipping to the next occurrence, undoing the
-last replacement and reprompting at that location, restarting from the
-beginning, stopping and returning to the starting point, and replacing all
-remaining matches without prompting.  In all cases, either command will stop if
-a match is not found.  The replace pattern is saved in the "replace ring" and in
-the $replacePat variable.
+By default, the ~breplace~B and ~bqueryReplace~B commands replace all occurrences of the
+pattern from the point to the end of the buffer.  To replace a fixed or limited
+number of occurrences of a pattern instead, specify a numeric prefix to either
+command.  If the prefix (~un~U) is greater than zero, a maximum of ~un~U occurrences of
+the pattern will be replaced (from the point position to the end of the buffer).
+However if ~un~U < 0, then the search scope is restricted to a fixed number of
+lines.  This applies to both the search and replace commands and the search
+commands (~breplace~B, ~bqueryReplace~B, ~bsearchForw~B, ~bhuntForw~B, ~bsearchBack~B, and
+~bhuntBack~B).  Thus for all of these commands, the numeric prefix is used as
+follows:
+
+    If searching forward:
+        * if ~un~U < 0, search is restricted to abs(~un~U) lines forward, where -1 means
+          from point to end of current line (not including line delimiter), -2
+          means from point to end of next line, and so on.
+        * if ~un~U == 0, find "zero occurrences" of the pattern (no action is taken).
+        * if ~un~U > 0, replace or find ~un~U occurrences of the pattern.
+
+    If searching backward:
+        * if ~un~U < 0, search is restricted to abs(n) lines backward, where -1
+          means from point to beginning of previous line, -2 means from point to
+          beginning of line before that, and so on.
+        * if ~un~U == 0, search is restricted to text between point and beginning of
+          current line.
+        * if ~un~U > 0, find ~un~Uth occurrence of the pattern.
+
+Note that search and replace operations can only be performed in a forward
+direction.
+
+As stated previously, the default action of the ~breplace~B command is to replace
+all occurrences of the pattern from the point to the end of the buffer.  The
+~bqueryReplace~B command works like ~breplace~B but prompts for an action to take each
+time a match is found, and also after the last match is found.  You can enter ~u?~U
+at the prompt to get a list of actions.  They include: skipping to the next
+occurrence, undoing the last replacement and reprompting at that location,
+restarting from the beginning, stopping and returning to the starting point, and
+replacing all remaining matches without prompting.  In all cases, either command
+will stop if a match is not found.  The replace pattern is saved in the "replace
+ring" and in the $replacePat variable.
 
 Search and replace patterns are remembered when new ones are entered
 interactively or when patterns are set by assigning a value to the $searchPat or
 $replacePat variable.  The patterns are saved in the search and replace rings in
 the same manner as copied and killed text is saved in the kill ring, except that
 duplicate entries are not saved to mitigate clutter.  You can recall a previous
-pattern via the "cycleSearchRing" (~#uC-c s~U) and "cycleReplaceRing" (~#uC-c r~U)
-commands.  These work just like the  "cycleKillRing" command: positive n cycles
+pattern via the ~bcycleSearchRing~B (~#uC-c s~U) and ~bcycleReplaceRing~B (~#uC-c r~U)
+commands.  These work just like the  ~bcycleKillRing~B command: positive n cycles
 the ring forward n times (bringing the most recent pattern(s) to the top);
 negative n cyles the ring backward.  The pattern that ends up on top is then set
 as the current pattern.
+....+....1....+....2....+....3....+....4....+....5....+....6....+....7....+....8....+....9....+....0....+....1....+....2....+...
 
 You can also recall a previous pattern whenever you are being prompted to enter
-a pattern; that is, whenever you invoke the "searchForw", "searchBack",
-"replace", or "queryReplace" command interactively.  The input area on the
+a pattern; that is, whenever you invoke the ~bsearchForw~B, ~bsearchBack~B,
+~breplace~B, or ~bqueryReplace~B command interactively.  The input area on the
 message line will be empty initially.  To display the current pattern or a
 previous pattern, you enter ~uC-p~U or ~uup-arrow~U.  The first time you do this, the
 top ring entry (current pattern) is brought into the input buffer.  On each
@@ -67,43 +97,113 @@ usual to set the pattern and execute the command.
 
 You can view the search or replace ring at any time by entering ~#uC-h s~U
 (showSearchRing) or ~#uC-h r~U (showReplaceRing).  You can also delete any or all
-entries via the "delSearchEntry" (~#uC-x s~U) and "delReplaceEntry" (~#uC-x r~U) commands,
-which operate in the same manner as the "delKillEntry" (~#uC-x k~U) command.  See the
-"showKey" (~#uC-h ?~U) or "showCommands" (~#uC-h c~U) help descriptions for details.
+entries via the ~bdelSearchEntry~B (~#uC-x s~U) and ~bdelReplaceEntry~B (~#uC-x r~U) commands,
+which operate in the same manner as the ~bdelKillEntry~B (~#uC-x k~U) command.  See the
+~bshowKey~B (~#uC-h ?~U) or ~bshowCommands~B (~#uC-h c~U) help descriptions for details.
 
 The maximum sizes of the search and replace rings default to 40 and 20,
-respectively; however, they can be changed with the "ringSize" (~#uESC R~U) command.
+respectively; however, they can be changed with the ~bringSize~B (~#uESC R~U) command.
 If either size is set to zero, the ring is of unlimited size.  Note that you
 cannot set either ring (or any ring) to a value that is less than the current
 number of entries in the corresponding ring.  You must delete one or more
 entries first.
 
-There is one additional search and replace option: the "queryReplaceAll" command
-(~#uESC C-q~U).  This command performs a "queryReplace" on every visible buffer in
-the current editing session, pausing from one to the next to display results and
-give you the option to continue or quit.  It also can be preceded by the
-"findFiles" command (~#uC-x f~U) to open all files matching a shell glob pattern, or
-only those matching the shell pattern and also containing a plain text or
-regular expression pattern.  This gives you the ability to find files containing
-a pattern and then doing a mass search and replace on those files interactively.
-For the "findFiles" command, you simply append zero or more of the standard
-option characters to the pattern to control the type of "grep" filtering that is
-done; for example, you can append ":r" to perform an RE search (type ~#uC-h ? C-x f~U
-for details).  You may also use a negative numeric prefix or zero to skip the
-search pattern prompt, or leave the search pattern blank (by pressing ~uESC~U at the
-prompt) to bypass the "grep" filtering.  Additionally, when invoking the
-"queryReplaceAll" command, you may limit the buffers to search to just the ones
-found by "findFiles" by using a negative numeric prefix or zero.  (The
-"queryReplaceAll" and "findFiles" commands are loaded from the site startup file
-"memacs.ms".)
+There is one additional search and replace option: the ~bqueryReplaceAll~B command
+(~#uESC C-q~U), which gives you the ability for example, to find files containing a
+pattern and then do a mass search and replace on those files interactively.
+This command performs a ~bqueryReplace~B on every visible buffer in the current
+editing session (by default), pausing from one to the next to display results
+and give you the option to continue or quit.  It also can be preceded by the
+~bfindFiles~B command (~#uC-x f~U) to open specific file(s) on disk or find specific
+buffer(s) in the current editing session, and then be restricted to operating on
+only those buffers found by specifying a negative numeric prefix or zero to the
+command.  (The ~bqueryReplaceAll~B and ~bfindFiles~B commands are loaded from the site
+startup file "memacs.ms".)
 
-Note that pattern match and replacement operations may also be performed in
-MScript on buffer lines or arbitrary text.  The ~u=~~~U and ~u!~~~U operators do RE
-comparisons, the "index" function locates a character, a plain text pattern, or
-an RE pattern in a string, and the "sub" function performs search and replace on
-a string using the specified plain text or RE pattern.
+The "find files" feature provides several options for identifying and operating
+on multiple files or buffers at once.  The general steps are to invoke the
+~bfindFiles~B command first to select the files or buffers you want to view or edit,
+then optionally, invoke the ~bqueryReplaceAll~B command with ~un~U <= 0 to perform a
+search and replace operation on just the files or buffers that were selected.
+You also have the option of doing the pattern replacement on all of these files
+or buffers without prompting (explained below).
+
+By default, the ~bfindFiles~B command finds files on disk and thus, will prompt for
+a shell glob pattern and a text search pattern, the latter of which is optional
+(may be blank).  You can also specify a numeric prefix for the command.  In this
+case, you will be prompted for the following options:
+
+    FindBuffers     Find buffers in the current editing session instead of files
+                    on disk.
+    Exclude         Enter an "exclusion" pattern.
+    Push            Push the search parameters and results from the last
+                    invocation onto the "find files stack" before running the
+                    command.
+
+Any or all of these options may be selected.  The command then performs the
+following steps, whether or not you choose options:
+
+     1. If the "Push" option is selected, the results from the last ~bfindFiles~B
+        invocation are pushed onto an internal stack (one stack per screen)
+        before new search parameters are set.  The stack can be popped later to
+        restore the old paramters.
+     2. If the "FindBuffers" option is selected, you are prompted for a buffer
+        apropos pattern.  Existing buffers whose names match the pattern are
+        then selected for further processing.  Otherwise, you are prompted for a
+        shell glob pattern.  In this case, all files on disk matching the glob
+        pattern and opened in the background.
+     3. You are prompted for a text search pattern.  You may enter a pattern
+        or leave the pattern blank (by pressing ~uESC~U at the prompt).  If a
+        pattern is entered, the contents of each buffer selected in step 2 are
+        then searched for a match.  If no match is found, the buffer is omitted
+        from the results.
+     4. If the "Exclude" option is selected, you are prompted for another text
+        search pattern.  The contents of each buffer selected in step 3 are then
+        searched for a match.  If a match is found, the buffer is omitted
+        (excluded) from the results.
+
+Note that the search patterns entered in steps 3 and 4 can be any type (plain
+text or regular expression).  You can append zero or more of the standard option
+characters to the pattern to control the type of "grep" filtering that is done;
+for example, you can append ":r" to perform an RE search.
+
+At this point, the search pattern entered in step 3 is the current search
+pattern, and you have zero or more buffers selected for further processing of
+some kind.  Typically, you would either view each buffer, or perform a search
+and replace operation on each buffer.
+
+To view each buffer, you use the ~bnextListBuf~B (~#uC-c ]~U) and/or ~bprevListBuf~B (~#uC-c [~U)
+command.  These commands switch to the next or previous buffer in the selection
+list, respectively.  You can then use the ~bhuntForw~B or ~bhuntBack~B commands to
+locate the search pattern in each buffer (because the search pattern has already
+been set).
+
+To perform and search and replace operation on each buffer, you invoke the
+~bqueryReplaceAll~B command with a negative numeric prefix or zero (as mentioned
+previously).  This command steps through each selected buffer and runs the
+~bqueryReplace~B command on each one.  Similar to that command, it prompts for an
+action to take for each buffer.  You can enter ~u?~U at the prompt to get a list of
+actions.  They include: replacing all remaining occurrences of the search
+pattern in the current buffer and all remaining buffers, and stopping the
+replacement process and quitting the command.
+
+To manage the "find files stack", two commands are availble.  To view the
+stack(s) at any time press ~#uC-h F~U (~bshowFindStacks~B).  This displays both the most
+recent search parameters and any prior parameters that were pushed onto the
+stack.  Once stack is shown for each screen.
+
+To pop the stack, press ~#uC-c -~U (~bpopFindList~B).  The old search pattern will be
+displayed on the message line as a reminder of which ~bfindFiles~B results were
+popped.  Note that this pops the stack for the current screen only.  If you want
+to pop the stack for a different screen, you must switch to that screen first.
+
+Lastly, note that pattern match and replacement operations may also be performed
+in MScript on buffer lines or arbitrary text.  The ~u=~~~U and ~u!~~~U operators do RE
+comparisons, the ~bindex~B function locates a character, a plain text pattern, or an
+RE pattern in a string, and the ~bsub~B function performs search and replace on a
+string using the specified plain text or RE pattern.
 
 Note also that when pattern matching is performed with the ~u=~~~U operator, the
-"index" function, or any of the search and replace commands, the string and
-groups that are matched (whether in a buffer or a string) are available via the
-"match" function.
+~bindex~B function, or any of the search and replace commands, the string and
+groups that were matched (whether in a buffer or a string) are available via the
+~bmatch~B function.

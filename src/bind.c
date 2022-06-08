@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -32,19 +32,19 @@ static KeyLit keyLiterals[] = {
 
 // Convert extended key to ordinal character value.  Collapse the Ctrl flag back into the ASCII code.  If "extend" is true,
 // return function key values (94 possibilities) in range 128..(128+93), S-TAB as 128+94, and shifted function key values in
-// range (128+94+1)..(128+94+1+93); otherwise, 0..127 like other characters.
+// range (128+94+1)..(128+94+1+93), otherwise 0..127 like other characters.
 short ektoc(ushort extKey, bool extend) {
 
 	// Do special cases first.
 	if((extKey & (Ctrl | 0xFF)) == (Ctrl | ' '))
-		return 0;				// Null char.
+		return 0;					// Null char.
 	if((extKey & (Shift | Ctrl | 0xFF)) == (Shift | Ctrl | 'I'))
-		return 128 + 94;			// S-TAB.
+		return 128 + 94;				// S-TAB.
 
 	// Now do control keys and function keys.
 	short c = extKey & 0xFF;
 	if(extKey & Ctrl)
-		return c ^ 0x40;			// Actual control char.
+		return c ^ 0x40;				// Actual control char.
 	if((extKey & FKey) && extend)
 		c += (extKey & Shift) ? (128 + 94 + 1 - 33)	// FNx character in range ! .. ~.
 		 : (128 - 33);
@@ -147,7 +147,7 @@ static void newBind(ushort extKey, UnivPtr *pUniv) {
 	pKeyBind->targ = *pUniv;
 	}
 
-// Get binding of given extended key and return prefix flag if it's bound to a prefix command; otherwise, zero.
+// Get binding of given extended key and return prefix flag if it's bound to a prefix command, otherwise zero.
 static ushort findPrefix(ushort extKey) {
 	KeyBind *pKeyBind = getBind(extKey);
 	if(pKeyBind != NULL && pKeyBind->targ.type == PtrPseudo) {
@@ -160,8 +160,8 @@ static ushort findPrefix(ushort extKey) {
 	return 0;
 	}
 
-// Get one value from the coded string in *pKeyCode.  Store result in *pExtKey, update *pKeyCode, and return true if successful;
-// otherwise, false.
+// Get one value from the coded string in *pKeyCode.  Store result in *pExtKey, update *pKeyCode, and return true if successful,
+// otherwise false.
 static bool stoek1(const char **pKeyCode, ushort *pExtKey) {
 	ushort c;
 	ushort extKey = 0;
@@ -300,7 +300,7 @@ Vanilla:
 //	TAB	Tab key.
 // The M- prefix is valid only on the first value, and all literals except ESC are valid only on the last value.
 int stoek(const char *keyCode, ushort *result) {
-	ushort extKey1;			// One key.
+	ushort extKey1;				// One key.
 	ushort extKey = 0;			// Final extended key.
 	ushort keyCount = 0;
 	const char *keyCode1 = keyCode;
@@ -407,11 +407,12 @@ static void dumpExec(void) {
 	UnivPtr *pUniv;
 	HashRec **ppHashRec0, **ppHashRecEnd;
 	HashRec **ppHashRec = NULL;
+	fputs("\nEXEC TABLE\n", logfile);
 	(void) hsort(execTable, hcmp, &ppHashRec);
 	ppHashRecEnd = (ppHashRec0 = ppHashRec) + execTable->recCount;
 	do {
 		pUniv = univPtr(*ppHashRec);
-		fprintf(logfile, "%-20s%.4hX\n", (*ppHashRec)->key, pUniv->type);
+		fprintf(logfile, "%-20s%.4hx\n", (*ppHashRec)->key, pUniv->type);
 		} while(++ppHashRec < ppHashRecEnd);
 	free((void *) ppHashRec0);
 	}
@@ -467,7 +468,7 @@ int bindKey(Datum *pRtnVal, int n, Datum **args) {
 	UnivPtr univ;			// Pointer to the requested command.
 	KeyBind *pKey, *pCmd;
 	char keyBuf[16];
-	char workBuf[WorkBufSize + 1];
+	char workBuf[WorkBufSize];
 
 	// Get the key or key sequence to bind.
 	if(getKeyBind(text15, n, args, &extKey) != Success)
@@ -631,7 +632,7 @@ static char *ektos1(ushort extKey, char *dest, bool escTermAttr) {
 
 	// Print raw character, in encoded form if 8-bit.
 	if((c = extKey & 0xFF) & 0x80) {
-		sprintf(dest, "<%.2X>", c);
+		sprintf(dest, "<%.2hX>", c);
 		dest = strchr(dest, '\0');
 		}
 	else {
@@ -780,7 +781,7 @@ int binding(Datum *pRtnVal, int n, Datum **args) {
 
 				// Add the key sequence.
 				if(dsetstr(ektos(pKeyBind->code, keyBuf, false), &keyLit) != 0 ||
-				 apush(pArray, &keyLit, true) != 0)
+				 apush(pArray, &keyLit, AOpCopy) != 0)
 LibFail:
 					return librsset(Failure);
 				}
@@ -799,7 +800,7 @@ int execNew(const char *name, UnivPtr *pUniv) {
 	HashRec *pHashRec;
 
 	return (pHashRec = hset(execTable, name, NULL, false)) == NULL ||
-	 dsetblob((void *) pUniv, sizeof(UnivPtr), pHashRec->pValue) != 0 ? librsset(Failure) : sess.rtn.status;
+	 dsetmem((void *) pUniv, sizeof(UnivPtr), pHashRec->pValue) != 0 ? librsset(Failure) : sess.rtn.status;
 	}
 
 // Find an executable name (command, function, or alias) in the execution table and return status or Boolean result.
@@ -835,7 +836,7 @@ int execFind(const char *name, ushort op, uint selector, UnivPtr *pUniv) {
 			return true;
 			}
 		if(op == OpDelete)
-			ddelete(hdelete(execTable, name));		// Delete entry and free the storage.
+			dfree(hdelete(execTable, name));		// Delete entry and free the storage.
 		else if(op == OpUpdate)
 			*univPtr(pHashRec) = *pUniv;
 		return sess.rtn.status;
@@ -936,7 +937,7 @@ static int getMacroName(Datum *pRtnVal, const char *prefix, const char *defName,
 
 		if(disnull(pRtnVal))
 			promptType = NotNull;
-		else if(pRtnVal->type == dat_nil) {
+		else if(disnil(pRtnVal)) {
 			dsetnil(pRtnVal);
 			goto Retn;
 			}
@@ -984,7 +985,7 @@ CheckName:
 		}
 Retn:
 	if(!(sess.opFlags & OpScript))
-		(void) mlerase();
+		(void) mlerase(0);
 	if(ppEntry != NULL)
 		*ppEntry = pEntry;
 	if(slot != NULL)
@@ -1010,7 +1011,7 @@ static int encodeMacro(Datum *pDest) {
 		str = macroDelims;
 		workBuf[0] = '\t';
 		do {
-			if(curMacro.name.type != dat_nil && strchr(curMacro.name.str, *str) != NULL)
+			if(!disnil(&curMacro.name) && strchr(curMacro.name.str, *str) != NULL)
 				continue;
 			pKey = curMacro.pMacBuf;
 			do {
@@ -1025,16 +1026,16 @@ Next:;
 			} while(*++str != '\0');
 
 		// Loop through macro keys and translate each into fab with delimiter found in previous step.
-		if(dopenwith(&fab, pDest, FabClear) != 0 || (curMacro.name.type != dat_nil &&
-		 (dputc(workBuf[0], &fab) != 0 || dputs(curMacro.name.str, &fab) != 0)))
+		if(dopenwith(&fab, pDest, FabClear) != 0 || (!disnil(&curMacro.name) &&
+		 (dputc(workBuf[0], &fab, 0) != 0 || dputs(curMacro.name.str, &fab, 0) != 0)))
 			goto LibFail;
 		pKey = curMacro.pMacBuf;
 		do {
 			ektos(*pKey, workBuf + 1, false);
-			if(dputs(workBuf, &fab) != 0)
+			if(dputs(workBuf, &fab, 0) != 0)
 				goto LibFail;
 			} while(++pKey < curMacro.pMacEnd);
-		if(dclose(&fab, Fab_String) != 0)
+		if(dclose(&fab, FabStr) != 0)
 LibFail:
 			return librsset(Failure);
 		}
@@ -1195,7 +1196,7 @@ bool macBusy(bool strict, const char *fmt, ...) {
 
 	// Invalid macro state... reset it.
 	if(curMacro.state == MacRecord)
-		sess.pCurWind->flags |= WFMode;
+		sess.cur.pWind->flags |= WFMode;
 	curMacro.state = MacStop;
 	(void) macReset();
 
@@ -1219,6 +1220,7 @@ bool macBusy(bool strict, const char *fmt, ...) {
 	}
 
 // Begin recording a macro.  Error if not in the MacStopped state.  Set up control variables and return status.
+// *Interactive only*
 int beginMacro(Datum *pRtnVal, int n, Datum **args) {
 
 	if(macBusy(true, text105, text471))
@@ -1235,7 +1237,7 @@ int beginMacro(Datum *pRtnVal, int n, Datum **args) {
 
 // End macro recording.  Error if not in the MacRecord state.  Finalize control variables and return status.  The macro
 // name, other error checking, and ring update is done by the caller (execute() function) which has access to the command's key
-// binding -- needed to adjust the macro length.
+// binding -- needed to adjust the macro length.  *Interactive only*
 int endMacro(Datum *pRtnVal, int n, Datum **args) {
 
 	if(curMacro.state == MacStop)
@@ -1286,9 +1288,9 @@ int finishMacro(KeyBind *pKeyBind) {
 	if(getMacroName(&curMacro.name, text469, NULL, ArgFirst | ArgNotNull1, OpCreate | OpUpdate, &pEntry, &n) != Success)
 				// "Save to"
 		return sess.rtn.status;
-	if(curMacro.name.type == dat_nil) {
+	if(disnil(&curMacro.name)) {
 		(void) macReset();
-		return rsset(Success, 0, "%s %s", text471, text472);
+		return rsset(Success, RSHigh, "%s %s", text471, text472);
 					// "Macro", "discarded"
 		}
 
@@ -1312,8 +1314,8 @@ static void macLoad(RingEntry *pEntry) {
 // Perform macro operation per op keyword and return status.  Error if not in the MacStopped state.  Synopsis is:
 //   manageMacro 'get'[, opts]		  Get current macro.  Return nil if none, or macro in string form by default.  If n
 //					  argument, opts are: 'Split' -> [name, value], 'All' -> [[name, value], ...].
-//   manageMacro 'select', name		  Find named macro and load it.  Return true if found; otherwise, false.
-//   manageMacro 'set', {array | string}  Set a macro.  Return nil on success; otherwise, error message (either "duplicate
+//   manageMacro 'select', name		  Find named macro and load it.  Return true if found, otherwise false.
+//   manageMacro 'set', {array | string}  Set a macro.  Return nil on success, otherwise error message (either "duplicate
 //					  name..." or "duplicate value...").  Force overwrite or insert if n > 0.
 int manageMacro(Datum *pRtnVal, int n, Datum **args) {
 	static Option options[] = {
@@ -1349,8 +1351,7 @@ int manageMacro(Datum *pRtnVal, int n, Datum **args) {
 			all = options[0].ctrlFlags & OptSelected;
 			if((pArray0 = anew(all ? 0 : 2, NULL)) == NULL)
 				goto LibFail;
-			if(awWrap(pRtnVal, pArray0) != Success)
-				goto Retn;
+			agStash(pRtnVal, pArray0);
 
 			// Loop through all items in macro ring if "All" option; otherwise, do just one iteration.
 			pEntry = ringTable[RingIdxMacro].pEntry;
@@ -1358,10 +1359,9 @@ int manageMacro(Datum *pRtnVal, int n, Datum **args) {
 				value = macSplit(name, pEntry->data.str);
 				if(all) {
 					if((pArray1 = anew(2, NULL)) == NULL ||
-					 (pArrayEl = aget(pArray0, pArray0->used, true)) == NULL)
+					 (pArrayEl = aget(pArray0, pArray0->used, AOpGrow)) == NULL)
 						goto LibFail;
-					if(awWrap(pArrayEl, pArray1) != Success)
-						goto Retn;
+					agStash(pArrayEl, pArray1);
 					}
 				else
 					pArray1 = pArray0;
@@ -1388,8 +1388,8 @@ int manageMacro(Datum *pRtnVal, int n, Datum **args) {
 			goto LibFail;
 		if(funcArg(pDatum, ArgNotNull1 | ArgArray1 | ArgMay) != Success)
 			goto Retn;
-		if(pDatum->type == dat_blobRef) {	// Array
-			Array *pArray = wrapPtr(pDatum)->pArray;
+		if(dtyparray(pDatum)) {		// Array
+			Array *pArray = pDatum->u.pArray;
 			Datum **ppArrayEl = pArray->elements;
 			DFab fab;
 			if(pArray->used != 2)
@@ -1397,8 +1397,8 @@ int manageMacro(Datum *pRtnVal, int n, Datum **args) {
 						// "Invalid %s argument", "function";
 			if(!isStrVal(ppArrayEl[0]) || !isStrVal(ppArrayEl[1]))
 				goto Retn;
-			if(dopenwith(&fab, pDatum, FabClear) != 0 || dputf(&fab, "%c%s%s", *ppArrayEl[1]->str,
-			 ppArrayEl[0]->str, ppArrayEl[1]->str) != 0 || dclose(&fab, Fab_String) != 0)
+			if(dopenwith(&fab, pDatum, FabClear) != 0 || dputf(&fab, 0, "%c%s%s", *ppArrayEl[1]->str,
+			 ppArrayEl[0]->str, ppArrayEl[1]->str) != 0 || dclose(&fab, FabStr) != 0)
 				goto LibFail;
 			}
 
@@ -1466,7 +1466,7 @@ int xeqMacro(Datum *pRtnVal, int n, Datum **args) {
 
 		if(getMacroName(pRtnVal, text117, n == 0 ? curMacro.name.str : NULL, ArgFirst | ArgNotNull1, OpDelete, &pEntry,
 				// "Execute"
-		 NULL) != Success || pRtnVal->type == dat_nil)
+		 NULL) != Success || disnil(pRtnVal))
 			return sess.rtn.status;
 		dsetnil(pRtnVal);
 		macLoad(pEntry);
@@ -1493,13 +1493,12 @@ int renameMacro(Datum *pRtnVal, int n, Datum **args) {
 	// Get name of macro to rename.
 	if(dnew(&pDatum) != 0)
 		return librsset(Failure);
-	if(getMacroName(pDatum, text29, NULL, ArgFirst | ArgNotNull1, OpDelete, &pEntry, NULL) != Success ||
+	if(getMacroName(pDatum, text29, NULL, ArgFirst | ArgNotNull1, OpDelete, &pEntry, NULL) != Success || disnil(pDatum))
 			// "Rename"
-	 pDatum->type == dat_nil)
 		return sess.rtn.status;
 
 	// Get new name.
-	if(getMacroName(pRtnVal, text339, NULL, ArgNotNull1, OpCreate, NULL, NULL) != Success || pRtnVal->type == dat_nil)
+	if(getMacroName(pRtnVal, text339, NULL, ArgNotNull1, OpCreate, NULL, NULL) != Success || disnil(pRtnVal))
 			// "to"
 		return sess.rtn.status;
 
@@ -1530,7 +1529,7 @@ int delMacro(Datum *pRtnVal, Ring *pRing, int n) {
 	if(n == INT_MIN) {
 		if(getMacroName(pRtnVal, text26, curMacro.name.str, ArgNotNull1, OpDelete, NULL, &n) != Success ||
 				// "Delete"
-		 pRtnVal->type == dat_nil)
+		 disnil(pRtnVal))
 			return sess.rtn.status;
 		dsetnil(pRtnVal);
 		if(n == 0)

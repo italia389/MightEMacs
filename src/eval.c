@@ -1,4 +1,4 @@
-// (c) Copyright 2020 Richard W. Marinelli
+// (c) Copyright 2022 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -37,163 +37,64 @@ typedef struct {
 	ArraySize i;
 	} ArrayState;
 
-// Forwards.
-int dtosf(Datum *pDatum, const char *delim, uint flags, DFab *pFab);
+// Definitions for isClass? system function.  The isxxx() facilities may be macros, so wrap them into functions.
+bool isalnum_func(short c) { return isalnum(c); }
+bool isalpha_func(short c) { return isalpha(c); }
+bool isblank_func(short c) { return isblank(c); }
+bool iscntrl_func(short c) { return iscntrl(c); }
+bool isdigit_func(short c) { return isdigit(c); }
+bool isgraph_func(short c) { return isgraph(c); }
+bool islower_func(short c) { return islower(c); }
+bool isprint_func(short c) { return isprint(c); }
+bool ispunct_func(short c) { return ispunct(c); }
+bool isspace_func(short c) { return isspace(c); }
+bool isupper_func(short c) { return isupper(c); }
+bool isword_func(short c) { return wordChar[c]; }
+bool isxdigit_func(short c) { return isxdigit(c); }
 
-// Return a pDatum object as a logical (Boolean) value.
+struct CCMap {
+	const char *name;
+	bool (*func)(short);
+	} ccMap[] = {
+		{"alnum", &isalnum_func},
+		{"alpha", &isalpha_func},
+		{"blank", &isblank_func},
+		{"cntrl", &iscntrl_func},
+		{"digit", &isdigit_func},
+		{"graph", &isgraph_func},
+		{"lower", &islower_func},
+		{"print", &isprint_func},
+		{"punct", &ispunct_func},
+		{"space", &isspace_func},
+		{"upper", &isupper_func},
+		{"word", &isword_func},
+		{"xdigit", &isxdigit_func},
+		{NULL, NULL}};
+
+bool (*getCC(const char *name))(short) {
+	struct CCMap *item = ccMap;
+	do {
+		if(strcmp(name, item->name) == 0)
+			return item->func;
+		} while((++item)->name != NULL);
+	return NULL;
+	}
+
+// Return a Datum value as a logical (Boolean) value.
 bool toBool(Datum *pDatum) {
 
 	// Check for numeric truth (!= 0).
 	if(pDatum->type == dat_int)
 		return pDatum->u.intNum != 0;
 
-	// Check for logical false values (false and nil).  All other strings (including null strings) are true.
+	// Check for logical false values (false and nil).  All other datum types and values (including null strings) are true.
 	return pDatum->type != dat_false && pDatum->type != dat_nil;
 	}
 
-// Check if given pDatum object is nil or null and return Boolean result.
-bool isEmpty(Datum *pDatum) {
+// Check if given Datum object is nil or null and return Boolean result.
+bool isNN(Datum *pDatum) {
 
-	return pDatum->type == dat_nil || disnull(pDatum);
-	}
-
-// Write an array to pFab (an active fabrication object) via calls to dtosf() and return status.  If CvtExpr flag is set,
-// array is written in "[...]" form so that result can be subsequently evaluated as an expression; otherwise, it is written as
-// data.  In the latter case, elements are separated by "delim" delimiters if not NULL.  A nil argument is included in result if
-// CvtExpr or CvtKeepNil flag is set, and a null argument is included if CvtExpr or CvtKeepNull flag is set; otherwise, they are
-// skipped.  In all cases, if the array includes itself, recursion stops and "[...]" is written for array if CvtForceArray flag
-// is set; otherwise, an error is set.
-static int atosf(Datum *pDatum, const char *delim, uint flags, DFab *pFab) {
-	ArrayWrapper *pWrap = wrapPtr(pDatum);
-
-	// Array includes self?
-	if(pWrap->marked) {
-
-		// Yes.  Store an ellipsis or set an error.
-		if(!(flags & CvtForceArray))
-			(void) rsset(Failure, RSNoFormat, text195);
-				// "Endless recursion detected (array contains itself)"
-		else if(dputs("[...]", pFab) != 0)
-			goto LibFail;
-		}
-	else {
-		Datum *pDatum;
-		Array *pArray = pWrap->pArray;
-		Datum **ppArrayEl = pArray->elements;
-		ArraySize n = pArray->used;
-		bool first = true;
-		const char *realDelim = (flags & CvtExpr) ? ", " : delim;
-		pWrap->marked = true;
-		if(flags & CvtExpr) {
-			flags |= CvtKeepAll;
-			if(dputc('[', pFab) != 0)
-				goto LibFail;
-			}
-
-		while(n-- > 0) {
-			pDatum = *ppArrayEl++;
-
-			// Skip nil or null string if appropriate.
-			if(pDatum->type == dat_nil) {
-				if(!(flags & CvtKeepNil))
-					continue;
-				}
-			else if(disnull(pDatum) && !(flags & CvtKeepNull))
-				continue;
-
-			// Write optional delimiter and encoded value.
-			if(!first && realDelim != NULL && dputs(realDelim, pFab) != 0)
-				goto LibFail;
-			if(dtosf(pDatum, delim, flags, pFab) != Success)
-				return sess.rtn.status;
-			first = false;
-			}
-		if((flags & CvtExpr) && dputc(']', pFab) != 0)
-			goto LibFail;
-		}
-
-	return sess.rtn.status;
-LibFail:
-	return librsset(Failure);
-	}
-
-// Add an array to wrapper list, clear all "marked" flags, and call atosf().
-int atosfclr(Datum *pDatum, const char *delim, uint flags, DFab *pFab) {
-
-	awGarbPush(pDatum);
-	awClearMarks();
-	return atosf(pDatum, delim, flags, pFab);
-	}
-
-// Write a pDatum object to pFab (an active fabrication object) in string form and return status.  If CvtExpr flag is set,
-// quote strings and write nil values as keywords.  (Output is intended to be subsequently evaluated as an expression.)  If
-// CvtExpr flag is not set, write strings in encoded (visible) form if CvtVizStr flag is set, and enclose in single (') or
-// double (") quotes if CvtQuote1 or CvtQuote2 flag is set; otherwise, unmodified, and write nil values as a keyword if
-// CvtShowNil flag is set; otherwise, a null string.  In all cases, write Boolean values as keywords, and call atosf() with
-// delim and flag arguments to write arrays.
-int dtosf(Datum *pDatum, const char *delim, uint flags, DFab *pFab) {
-
-	// Determine type of pDatum object.
-	if(pDatum->type & DStrMask) {
-		Datum *pValue = pDatum;
-		if(flags & CvtTermAttr) {
-			DFab val;
-
-			if(dopentrack(&val) != 0 || esctosf(pDatum->str, &val) != 0 || dclose(&val, Fab_String) != 0)
-				return librsset(Failure);
-			pValue = val.pDatum;
-			}
-		if(flags & CvtExpr)
-			(void) quote(pFab, pValue->str, true);
-		else {
-			short qChar = flags & CvtQuote1 ? '\'' : flags & CvtQuote2 ? '"' : -1;
-			if((flags & (CvtQuote1 | CvtQuote2)) && dputc(qChar, pFab) != 0)
-				goto LibFail;
-			if(flags & CvtVizStr) {
-				if(dputvizmem(pValue->str, 0, VizBaseDef, pFab) != 0)
-					goto LibFail;
-				}
-			else if(dputs(pValue->str, pFab) != 0)
-				goto LibFail;
-			if((flags & (CvtQuote1 | CvtQuote2)) && dputc(qChar, pFab) != 0)
-				goto LibFail;
-			}
-		}
-	else {
-		const char *str;
-
-		switch(pDatum->type) {
-			case dat_int:
-				if(dputf(pFab, "%ld", pDatum->u.intNum) != 0)
-					goto LibFail;
-				break;
-			case dat_blobRef:	// Array
-				(void) atosf(pDatum, delim, flags, pFab);
-				break;
-			case dat_nil:
-				if(flags & (CvtExpr | CvtShowNil)) {
-					str = viz_nil;
-					goto Viz;
-					}
-				break;
-			default:		// Boolean
-				str = (pDatum->type == dat_false) ? viz_false : viz_true;
-Viz:
-				if(dputs(str, pFab) != 0)
-					goto LibFail;
-			}
-		}
-
-	return sess.rtn.status;
-LibFail:
-	return librsset(Failure);
-	}
-
-// Call atosfclr() if array so that "marked" flags in wrapper list are cleared first; otherwise, call dtosf().
-int dtosfchk(Datum *pDatum, const char *delim, uint flags, DFab *pFab) {
-	int (*func)(Datum *pDatum, const char *delim, uint flags, DFab *pFab) =
-	 (pDatum->type == dat_blobRef) ? atosfclr : dtosf;
-	return func(pDatum, delim, flags, pFab);
+	return disnil(pDatum) || disnull(pDatum);
 	}
 
 // Create an array in pRtnVal, given optional size and initializer.  Return status.
@@ -210,22 +111,12 @@ int array(Datum *pRtnVal, int n, Datum **args) {
 		}
 	if((pArray = anew(len, pInitializer)) == NULL)
 		return librsset(Failure);
-	if(awWrap(pRtnVal, pArray) != Success)
-		return sess.rtn.status;
-
-	// Create unique arrays if initializer is an array.
-	if(len > 0 && pInitializer != NULL && pInitializer->type == dat_blobRef) {
-		Datum **ppArrayEl = pArray->elements;
-		do {
-			if(arrayClone(*ppArrayEl++, pInitializer, 0) != Success)
-				return sess.rtn.status;
-			} while(--len > 0);
-		}
-
+	agStash(pRtnVal, pArray);
 	return sess.rtn.status;
 	}
 
-// Split a string into an array and save in pRtnVal, given delimiter and optional limit value.  Return status.
+// Split a string into an array and save in pRtnVal, given delimiter and optional limit value.  If n argument, strip all array
+// elements by passing n to stripStr().  Return status.
 int strSplit(Datum *pRtnVal, int n, Datum **args) {
 	Array *pArray;
 	short delimChar;
@@ -233,65 +124,29 @@ int strSplit(Datum *pRtnVal, int n, Datum **args) {
 	int limit = 0;
 
 	// Get delimiter, string, and optional limit.
-	if(!isCharVal(*args))
+	if(disnil(*args))
+		delimChar = '\0';
+	else if(!isCharVal(*args))
 		return sess.rtn.status;
-	if((delimChar = (*args++)->u.intNum) == '\0')
-		return rsset(Failure, 0, text187, text409);
-			// "%s cannot be null", "Delimiter"
-	str = (*args++)->str;
-	if(*args != NULL)
+	else
+		delimChar = (*args)->u.intNum;
+	str = (*++args)->str;
+	if(*++args != NULL)
 		limit = (*args)->u.intNum;
 
-	return (pArray = asplit(delimChar, str, limit)) == NULL ? librsset(Failure) : awWrap(pRtnVal, pArray);
-	}
+	if((pArray = asplit(delimChar, str, limit)) == NULL)
+		return librsset(Failure);
+	agStash(pRtnVal, pArray);
 
-// Copy string from src to pFab (an active fabrication object), adding a double quote (") at beginning and end (if full is
-// true) and escaping all control characters, backslashes, and characters that are escaped by parsesym().  Return status.
-int quote(DFab *pFab, const char *src, bool full) {
-        short c;
-	bool isChar;
-	char *str;
-	char workBuf[8];
+	// Strip the elements if requested.
+	if(n != INT_MIN) {
+		Array *pArray1 = pArray;
+		Datum *pDatum;
 
-	if(full) {
-		c = '"';
-		goto LitChar;
+		while((pDatum = aeach(&pArray1)) != NULL)
+			if(dsetstr(stripStr(pDatum->str, n), pDatum) != 0)
+				return librsset(Failure);
 		}
-
-	while((c = *src++) != '\0') {
-		isChar = false;
-		switch(c) {
-			case '"':				// Double quote
-				if(!full)
-					goto LitChar;
-				str = "\\\""; break;
-			case '\\':				// Backslash
-				str = "\\\\"; break;
-			case '\r':				// CR
-				str = "\\r"; break;
-			case '\n':				// NL
-				str = "\\n"; break;
-			case '\t':				// Tab
-				str = "\\t"; break;
-			case '\b':				// Backspace
-				str = "\\b"; break;
-			case '\f':				// Form feed
-				str = "\\f"; break;
-			case 033:				// Escape
-				str = "\\e"; break;
-			default:
-				if(c < ' ' || c >= 0x7F)	// Non-printable character.
-					sprintf(str = workBuf, "\\%.3o", c);
-				else				// Literal character.
-LitChar:
-					isChar = true;
-			}
-
-		if((isChar ? dputc(c, pFab) : dputs(str, pFab)) != 0)
-			return librsset(Failure);
-		}
-	if(full && dputc('"', pFab) != 0)
-		(void) librsset(Failure);
 
 	return sess.rtn.status;
 	}
@@ -319,9 +174,9 @@ int setTabSize(int size, bool hard) {
 
 		// Set new size.
 		if(hard)
-			sess.hardTabSize = size;
+			sess.cur.pScrn->hardTabSize = size;
 		else
-			sess.softTabSize = size;
+			sess.cur.pScrn->softTabSize = size;
 		(void) rsset(Success, 0, text332, hard ? text49 : text50, size);
 				// "%s tab size set to %d", "Hard", "Soft"
 		}
@@ -329,7 +184,7 @@ int setTabSize(int size, bool hard) {
 	return sess.rtn.status;
 	}
 
-// Strip whitespace off the beginning (op == -1), the end (op == 1), or both ends (op == 0) of a string.
+// Strip white space off the beginning (op == -1), the end (op == 1), or both ends (op == 0) of a string.
 char *stripStr(char *src, int op) {
 
 	// Trim beginning, if applicable...
@@ -355,16 +210,16 @@ static int replCopy(Match *pMatch, DFab *result) {
 	if(pMatch->flags & RRegical)
 		for(ReplPat *pReplPat = pMatch->compReplPat; pReplPat != NULL; pReplPat = pReplPat->next) {
 			if(dputs(pReplPat->type == RPE_LitString ? pReplPat->u.replStr :
-			 pMatch->grpMatch.groups[pReplPat->u.grpNum].str, result) != 0)
+			 pMatch->grpMatch.groups[pReplPat->u.grpNum].str, result, 0) != 0)
 				return -1;
 			}
-	else if(dputs(pMatch->replPat, result) != 0)
+	else if(dputs(pMatch->replPat, result, 0) != 0)
 		return -1;
 	return 0;
 	}
 
-// Substitute first occurrence (or all if n > 1) of subPat in pSrc with replacement pattern in 'pMatch' and store results in
-// pRtnVal.  Ignore case in comparisons if flag set in 'flags'.  Return status.
+// Substitute first occurrence (or all if n > 1) of "subPat" in "pSrc" with replacement pattern in "pMatch" and store results in
+// "pRtnVal".  Ignore case in comparisons if flag set in "flags".  Return status.
 static int strsub(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match *pMatch, ushort flags) {
 	DFab result;
 	char *(*strsrch)(const char *s1, const char *s2);
@@ -385,12 +240,12 @@ static int strsub(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match 
 			break;
 
 		// Compute offset and copy prefix.
-		if((srcLen = s - str) > 0 && dputmem((void *) str, srcLen, &result) != 0)
+		if((srcLen = s - str) > 0 && dputmem((void *) str, srcLen, &result, 0) != 0)
 			goto LibFail;
 		str = s + subPatLen;
 
 		// If RRegical flag set, then no metacharacters were found in the search pattern (because this routine was
-		// called), but at least one ampersand was found in the replacement pattern.  In this case, we need to set up
+		// called), but at least one backslash was found in the replacement pattern.  In this case, we need to set up
 		// the match in a MatchLoc object and save it so that replCopy() will do the replacement properly (from
 		// group 0).
 		if(pMatch->flags & RRegical) {
@@ -409,16 +264,16 @@ static int strsub(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match 
 		}
 
 	// Copy remainder, if any.
-	if((srcLen = strlen(str)) > 0 && dputmem((void *) str, srcLen, &result) != 0)
+	if((srcLen = strlen(str)) > 0 && dputmem((void *) str, srcLen, &result, 0) != 0)
 		goto LibFail;
-	if(dclose(&result, Fab_String) == 0)
+	if(dclose(&result, FabStr) == 0)
 		return sess.rtn.status;
 LibFail:
 	return librsset(Failure);
 	}
 
 // Perform RE substitution(s) in string 'pSrc' using search and replacement patterns in given Match object, and save result in
-// 'pRtnVal'.  Do all occurrences of the search pattern if n > 1; otherwise, first only.  Return status.  'subPat' argument
+// 'pRtnVal'.  Do all occurrences of the search pattern if n > 1, otherwise first only.  Return status.  'subPat' argument
 // (needed for plain text substitutions) is not used.
 static int regsub(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match *pMatch, ushort flags) {
 	DFab result;
@@ -449,7 +304,7 @@ static int regsub(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match 
 
 			// Copy any source text that is before the match location.
 			len = scanOffset + group0.rm_so;
-			if(len > 0 && dputmem((void *) pSrc->str, len, &result) != 0)
+			if(len > 0 && dputmem((void *) pSrc->str, len, &result, 0) != 0)
 				goto LibFail;
 
 			// Copy replacement pattern.
@@ -458,8 +313,8 @@ static int regsub(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match 
 
 			// Copy remaining source text to result if any, and close it.
 			if(((len = strlen(pSrc->str + scanOffset + group0.rm_eo)) > 0 &&
-			 dputs(pSrc->str + scanOffset + group0.rm_eo, &result) != 0) ||
-			 dclose(&result, Fab_String) != 0) {
+			 dputs(pSrc->str + scanOffset + group0.rm_eo, &result, 0) != 0) ||
+			 dclose(&result, FabStr) != 0) {
 LibFail:
 				(void) librsset(Failure);
 				break;
@@ -472,11 +327,11 @@ LibFail:
 			// In "find all" mode... keep going.
 			lastScanLen = strlen(pSrc->str) - scanOffset;
 			scanOffset = strlen(pRtnVal->str) - len;
-			datxfer(pSrc, pRtnVal);
+			dxfer(pSrc, pRtnVal);
 			}
 		else {
 			// No match found.  Transfer input to result and bail out.
-			datxfer(pRtnVal, pSrc);
+			dxfer(pRtnVal, pSrc);
 			break;
 			}
 		}
@@ -491,7 +346,7 @@ int substitute(Datum *pRtnVal, int n, Datum **args) {
 	if(disnull(args[0]))
 		dsetnull(pRtnVal);
 	else if(disnull(args[1]))
-		datxfer(pRtnVal, args[0]);
+		dxfer(pRtnVal, args[0]);
 	else {
 		ushort flags = 0;
 		int (*sub)(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match *pMatch, ushort flags);
@@ -515,7 +370,7 @@ int substitute(Datum *pRtnVal, int n, Datum **args) {
 		sub = strsub;
 PrepRepl:
 		// Save and compile replacement pattern.
-		if(newReplPat(args[2]->type == dat_nil ? "" : args[2]->str, &match, false) != Success)
+		if(newReplPat(disnil(args[2]) ? "" : args[2]->str, &match, false) != Success)
 			goto Retn;
 		if(compileRepl(&match) != Success)
 			goto RFree;
@@ -551,7 +406,7 @@ int strExpand(DFab *pFab, const char *src) {
 					return rsset(Failure, 0, text2, str - 1, src);
 						// "Invalid character range '%.3s' in string '%s'"
 				while(++c1 <= c2)
-					if(dputc(c1, pFab) != 0)
+					if(dputc(c1, pFab, 0) != 0)
 						goto LibFail;
 				++str;
 				break;
@@ -561,12 +416,12 @@ int strExpand(DFab *pFab, const char *src) {
 				// Fall through.
 			default:
 LitChar:
-				if(dputc(c1, pFab) != 0)
+				if(dputc(c1, pFab, 0) != 0)
 					goto LibFail;
 			}
 		} while(*++str != '\0');
 
-	if(dclose(pFab, Fab_String) != 0)
+	if(dclose(pFab, FabStr) != 0)
 LibFail:
 		(void) librsset(Failure);
 	return sess.rtn.status;
@@ -579,17 +434,17 @@ static int trPrep(Datum *pFrom, Datum *pTo) {
 	// Expand "from" string.
 	if(strExpand(&fab, pFrom->str) != Success)
 		return sess.rtn.status;
-	datxfer(pFrom, fab.pDatum);
+	dxfer(pFrom, fab.pDatum);
 
 	// Expand "to" string.
-	if(pTo->type == dat_nil)
+	if(disnil(pTo))
 		dsetnull(pTo);
 	else if(*pTo->str != '\0') {
 		int lenFrom, lenTo;
 
 		if(strExpand(&fab, pTo->str) != Success)
 			return sess.rtn.status;
-		datxfer(pTo, fab.pDatum);
+		dxfer(pTo, fab.pDatum);
 
 		if((lenFrom = strlen(pFrom->str)) > (lenTo = strlen(pTo->str))) {
 			short c = pTo->str[lenTo - 1];
@@ -598,10 +453,10 @@ static int trPrep(Datum *pFrom, Datum *pTo) {
 			if(dopenwith(&fab, pTo, FabAppend) != 0)
 				goto LibFail;
 			do {
-				if(dputc(c, &fab) != 0)
+				if(dputc(c, &fab, 0) != 0)
 					goto LibFail;
 				} while(--n > 0);
-			if(dclose(&fab, Fab_String) != 0)
+			if(dclose(&fab, FabStr) != 0)
 				goto LibFail;
 			}
 		}
@@ -636,41 +491,41 @@ static int tr(Datum *pRtnVal, Datum *pSrc, Datum *pFrom, Datum *pTo) {
 		fromStr = pFrom->str;
 		do {
 			if(*srcStr == *fromStr) {
-				if(lenTo > 0 && dputc(pTo->str[fromStr - pFrom->str], &result) != 0)
+				if(lenTo > 0 && dputc(pTo->str[fromStr - pFrom->str], &result, 0) != 0)
 					goto LibFail;
 				goto Next;
 				}
 			} while(*++fromStr != '\0');
 
 		// No match, copy the source char untranslated.
-		if(dputc(*srcStr, &result) != 0)
+		if(dputc(*srcStr, &result, 0) != 0)
 			goto LibFail;
 Next:
 		++srcStr;
 		}
 
 	// Terminate and return the result.
-	if(dclose(&result, Fab_String) != 0)
+	if(dclose(&result, FabStr) != 0)
 LibFail:
 		(void) librsset(Failure);
 	return sess.rtn.status;
 	}
 
-// Concatenate all function arguments into pRtnVal.  requiredCount is the number of required arguments.  ArgFirst flag is set on
-// first argument.  Null and nil arguments are included in result if CvtKeepNil and/or CvtKeepNull flags are set; otherwise,
-// they are skipped.  A nil argument is output as a keyword if CvtShowNil flag is set; otherwise, a null string.  Boolean
-// arguments are always output as "false" and "true" and arrays are processed (recursively) as if each element was specified as
-// an argument.  Return status.
-int catArgs(Datum *pRtnVal, int requiredCount, Datum *pDelim, uint flags) {
+// Concatenate all arguments on a script line into pRtnVal in string form and return status.  minRequired is the number of
+// required arguments.  ArgFirst flag is set on first argument.  Nil arguments are skipped if DCvtSkipNil flag is set;
+// otherwise, they are kept.  Boolean arguments are always output as "false" and "true" and arrays are processed (recursively)
+// as if each element was specified as an argument.
+int catArgs(Datum *pRtnVal, int minRequired, Datum *pDelim, ushort cflags) {
+	int rtnCode;
 	uint argFlags = ArgFirst | ArgBool1 | ArgArray1 | ArgNIS1;
 	DFab fab;
 	Datum *pDatum;		// For arguments.
 	bool firstWrite = true;
-	const char *delim = (pDelim != NULL && !isEmpty(pDelim)) ? pDelim->str : NULL;
+	const char *delim = (pDelim != NULL && !isNN(pDelim)) ? pDelim->str : NULL;
 
 	// Nothing to do if no arguments; for example, an "abort()" call.
 	if((sess.opFlags & (OpScript | OpParens)) == (OpScript | OpParens) && haveSym(s_rightParen, false) &&
-	 requiredCount == 0)
+	 minRequired == 0)
 		return sess.rtn.status;
 
 	if(dnewtrack(&pDatum) != 0 || dopenwith(&fab, pRtnVal, FabClear) != 0)
@@ -678,27 +533,25 @@ int catArgs(Datum *pRtnVal, int requiredCount, Datum *pDelim, uint flags) {
 
 	for(;;) {
 		if(argFlags & ArgFirst) {
-			if(!haveSym(s_any, requiredCount > 0))
+			if(!haveSym(s_any, minRequired > 0))
 				break;				// Error or no arguments.
 			}
 		else if(!haveSym(s_comma, false))
 			break;					// No arguments left.
 		if(funcArg(pDatum, argFlags) != Success)
 			return sess.rtn.status;
-		--requiredCount;
+		--minRequired;
 
-		// Skip nil or null string if appropriate.
-		if(pDatum->type == dat_nil) {
-			if(!(flags & CvtKeepNil))
-				goto Onward;
-			}
-		else if(disnull(pDatum) && !(flags & CvtKeepNull))
+		// Skip nil argument if appropriate.
+		if(disnil(pDatum) && (cflags & ACvtSkipNil))
 			goto Onward;
 
 		// Write optional delimiter and value.
-		if(delim != NULL && !firstWrite && dputs(delim, &fab) != 0)
+		if(delim != NULL && !firstWrite && dputs(delim, &fab, 0) != 0)
 			goto LibFail;
-		if(dtosfchk(pDatum, delim, flags, &fab) != Success)
+		if((rtnCode = dputd(pDatum, &fab, delim, 0)) < 0)
+			goto LibFail;
+		if(endless(rtnCode) != Success)
 			return sess.rtn.status;
 		firstWrite = false;
 Onward:
@@ -706,7 +559,7 @@ Onward:
 		}
 
 	// Return result.
-	if(dclose(&fab, Fab_String) != 0)
+	if(dclose(&fab, FabStr) != 0)
 LibFail:
 		(void) librsset(Failure);
 	return sess.rtn.status;
@@ -741,7 +594,7 @@ static int strFunc(Datum *pRtnVal, CmdFuncId cmdFuncId) {
 			return sess.rtn.status;
 
 		// Have var value in pOldVarVal.  Verify that it is nil or string.
-		if(pOldVarVal->type == dat_nil)
+		if(disnil(pOldVarVal))
 			dsetnull(pOldVarVal);
 		else if(!isStrVal(pOldVarVal))
 			return sess.rtn.status;
@@ -755,14 +608,14 @@ static int strFunc(Datum *pRtnVal, CmdFuncId cmdFuncId) {
 		return sess.rtn.status;
 	if(sess.opFlags & OpEval) {
 		if(cmdFuncId == cf_strShift || cmdFuncId == cf_strPop) {
-			if(pDelim->type == dat_nil)
+			if(disnil(pDelim))
 				delimChar = '\0';
 			else if(!isCharVal(pDelim))
 				return sess.rtn.status;
 			else if((delimChar = pDelim->u.intNum) == ' ')
 				spaceDelim = true;
 			}
-		else if(pDelim->type == dat_nil)
+		else if(disnil(pDelim))
 			dsetnull(pDelim);
 		}
 
@@ -844,12 +697,12 @@ Paste:
 			{DFab fab;
 
 			if(dopenwith(&fab, pRtnVal, FabClear) != 0 ||
-			 dputs(str1, &fab) != 0)			// Copy initial portion of new var value to work buffer.
+			 dputs(str1, &fab, 0) != 0)			// Copy initial portion of new var value to work buffer.
 				goto LibFail;
 
 			// Append a delimiter if pOldVarVal is not null, and value (if strPush) or var (if strUnshift).
-			if((!disnull(pOldVarVal) && dputs(pDelim->str, &fab) != 0) || dputs(str2, &fab) != 0 ||
-			 dclose(&fab, Fab_String) != 0)
+			if((!disnull(pOldVarVal) && dputs(pDelim->str, &fab, 0) != 0) || dputs(str2, &fab, 0) != 0 ||
+			 dclose(&fab, FabStr) != 0)
 				goto LibFail;
 			pNewVar = pRtnVal;				// New var value.
 			}
@@ -857,7 +710,7 @@ Paste:
 			}
 
 	// Update variable and return status.
-	(void) putVar(pNewVar, &varDesc);
+	(void) setVar(pNewVar, &varDesc);
 Retn:
 	return sess.rtn.status;
 LibFail:
@@ -871,112 +724,88 @@ static void showSym(const char *name) {
 	}
 #endif
 
-// Insert, overwrite, replace, or write the text in src to a buffer n times.  This routine's job is to make the given buffer
-// the current buffer so that iorStr() can insert the text, then restore the current screen to its original form.  src, n, and
-// style are passed to iorStr().  If pBuf is NULL, the current buffer is used.  Return status.
+// Insert, overwrite, or replace the text in src to a buffer n times and return status.  This routine's job is to set the given
+// buffer as the current edit buffer, set current edit face and window accordingly, call iorStr() with src, n, and style to
+// insert the text (via the core editing routines), then restore the current edit buffer, face, and window to their previous
+// settings.  If pBuf is NULL, the current buffer is used.
 int iorText(const char *src, int n, ushort style, Buffer *pBuf) {
-	EScreen *pOldScrn = NULL;
-	EWindow *pOldWind = NULL;
-	Buffer *pOldBuf = NULL;
+	BufCtrl oldEdit = {NULL};
 
-	// If the target buffer is being displayed in another window, remember current window and move to the other one;
-	// otherwise, switch to the buffer in the current window.
-	if(pBuf != NULL && pBuf != sess.pCurBuf) {
+	// If the target buffer is not the current buffer and is being displayed in another window, remember current window and
+	// use face from other one; otherwise, use buffer's face.
+	if(pBuf != NULL && pBuf != sess.cur.pBuf) {
+		oldEdit = sess.edit;
+		sess.edit.pBuf = pBuf;
 		if(pBuf->windCount == 0) {
 
-			// Target buffer is not being displayed in any window... switch to it in current window.
-			pOldBuf = sess.pCurBuf;
-			if(bswitch(pBuf, SWB_NoBufHooks) != Success)
-				return sess.rtn.status;
+			// Target buffer is not being displayed in any window... use buffer's face for editing.
+			sess.edit.pFace = &pBuf->face;
+			sess.edit.pScrn = (EScreen *) (sess.edit.pWind = NULL);
 			}
 		else {
-			// Target buffer is being displayed.  Get window and find screen.
-			EWindow *pWind = findWind(pBuf);
-			EScreen *pScrn = sess.scrnHead;
-			EWindow *pWind2;
-			pOldWind = sess.pCurWind;
-			do {
-				pWind2 = pScrn->windHead;
-				do {
-					if(pWind2 == pWind)
-						goto Found;
-					} while((pWind2 = pWind2->next) != NULL);
-				} while((pScrn = pScrn->next) != NULL);
-Found:
-			// If screen is different, switch to it.
-			if(pScrn != sess.pCurScrn) {
-				pOldScrn = sess.pCurScrn;
-				if(sswitch(pScrn, SWB_NoBufHooks) != Success)
-					return sess.rtn.status;
-				}
+			// Target buffer is being displayed.  Get window and screen.
+			EScreen *pScrn;
+			EWindow *pWind = findWind(pBuf, &pScrn);
 
-			// If window is different, switch to it.
-			if(pWind != sess.pCurWind) {
-				(void) wswitch(pWind, SWB_NoBufHooks);		// Can't fail.
-				supd_windFlags(NULL, WFMode);
-				}
+			// Use window's face for editing.
+			sess.edit.pFace = &(sess.edit.pWind = pWind)->face;
+			if(pScrn == sess.cur.pScrn)
+				supd_windFlags(pBuf, WFMode);
+			else
+				sess.edit.pScrn = pScrn;
 			}
 		}
 
-	// Target buffer is current.  Now insert, overwrite, or replace the text in src n times.
+	// Edit pointers set.  Now insert, overwrite, or replace the text in src n times.
 	if(iorStr(src, n, style, NULL) == Success) {
 
-		// Restore old screen, window, and/or buffer, if needed.
-		if(pOldBuf != NULL)
-			(void) bswitch(pOldBuf, SWB_NoBufHooks);
-		else if(pOldScrn != NULL) {
-			if(sswitch(pOldScrn, SWB_NoBufHooks) != Success)
-				return sess.rtn.status;
-			if(pOldWind != sess.pCurWind)
-				goto RestoreWind;
-			}
-		else if(pOldWind != NULL) {
-RestoreWind:
-			(void) wswitch(pOldWind, SWB_NoBufHooks);		// Can't fail.
-			supd_windFlags(NULL, WFMode);
-			}
+		// Restore old edit pointers, if needed.
+		if(oldEdit.pBuf != NULL)
+			sess.edit = oldEdit;
 		}
 
 	return sess.rtn.status;
 	}
 
-// Concatenate command-line arguments into pRtnVal and insert, overwrite, replace, or write the resulting text to a buffer n
-// times, given text insertion style and buffer pointer.  If pBuf is NULL, use current buffer.  If n == 0, do one repetition and
-// don't move point.  If n < 0, do one repetition and process all newline characters literally (don't create a new line).
-// Return status.
-int chgText(Datum *pRtnVal, int n, ushort style, Buffer *pBuf) {
+// Concatenate script arguments into pRtnVal and insert, overwrite, or replace the resulting text to a buffer n times, given
+// text insertion style and buffer pointer.  If pBuf is NULL, use current buffer.  If n == 0, do one repetition and don't move
+// point.  If n < 0, do one repetition and process all newline characters literally (don't create a new line).  Return status.
+static int chgText(Datum *pRtnVal, int n, ushort style, Buffer *pBuf) {
+	int rtnCode;
 	Datum *pArg;
 	DFab text;
-	uint argFlags = ArgFirst | ArgBool1 | ArgArray1 | ArgNIS1;
-
-	if(n == INT_MIN)
-		n = 1;
 
 	if(dnewtrack(&pArg) != 0)
 		goto LibFail;
 
-	// Evaluate all the arguments and save in fabrication object (so that the text can be inserted more than once,
-	// if requested).
-	if(dopenwith(&text, pRtnVal, FabClear) != 0)
-		goto LibFail;
+	// Get first argument.  Skip fab creation if its the only one and is a string.
+	if(funcArg(pArg, ArgFirst | ArgBool1 | ArgArray1 | ArgNIS1) != Success)
+		return sess.rtn.status;
+	if(!haveSym(s_comma, false) && dtypstr(pArg))
+		dxfer(pRtnVal, pArg);
+	else {
+		// Evaluate all the arguments and save in fabrication object (so that the text can be inserted more than once,
+		// if requested).
+		if(dopenwith(&text, pRtnVal, FabClear) != 0)
+			goto LibFail;
+		goto First;
 
-	for(;;) {
-		if(!(argFlags & ArgFirst) && !haveSym(s_comma, false))
-			break;					// No arguments left.
-		if(funcArg(pArg, argFlags) != Success)
-			return sess.rtn.status;
-		argFlags = ArgBool1 | ArgArray1 | ArgNIS1;
-		if(isEmpty(pArg))
-			continue;				// Ignore null and nil values.
-		if(pArg->type == dat_blobRef || (pArg->type & DBoolMask)) {
-			if(dtosfchk(pArg, NULL, 0, &text) != Success)
+		for(;;) {
+			if(!haveSym(s_comma, false))
+				break;						// No arguments left.
+			if(funcArg(pArg, ArgBool1 | ArgArray1 | ArgNIS1) != Success)
+				return sess.rtn.status;
+First:
+			if(disempty(pArg))
+				continue;					// Ignore nil, null, and [] values.
+			if((rtnCode = dputd(pArg, &text, NULL, 0)) < 0)		// Add text chunk to fabrication object.
+				goto LibFail;
+			else if(endless(rtnCode) != Success)
 				return sess.rtn.status;
 			}
-		else if(dputd(pArg, &text) != 0)		// Add text chunk to fabrication object.
+		if(dclose(&text, FabStr) != 0)
 			goto LibFail;
 		}
-	if(dclose(&text, Fab_String) != 0)
-		goto LibFail;
 
 	// We have all the text in pRtnVal.  Now insert, overwrite, or replace it n times.
 	return iorText(pRtnVal->str, n, style, pBuf);
@@ -1057,16 +886,17 @@ TypChk:
 	return sess.rtn.status;
 	}
 
-// Return next argument to strFormat(), "flattening" arrays in the process.  Return status.
+// Return next argument to strFormat(), "flattening" arrays in the process.  "argFlags" will always be either ArgInt1 or
+// ArgNil1.  Return status.
 static int formatArg(Datum *pRtnVal, uint argFlags, ArrayState *pArrayState) {
 
 	for(;;) {
 		if(pArrayState->pArray == NULL) {
 			if(funcArg(pRtnVal, argFlags | ArgArray1 | ArgMay) != Success)
 				return sess.rtn.status;
-			if(pRtnVal->type != dat_blobRef)
+			if(!dtyparray(pRtnVal))
 				break;
-			pArrayState->pArray = wrapPtr(pRtnVal)->pArray;
+			pArrayState->pArray = pRtnVal->u.pArray;
 			pArrayState->i = 0;
 			}
 		else {
@@ -1074,7 +904,7 @@ static int formatArg(Datum *pRtnVal, uint argFlags, ArrayState *pArrayState) {
 			if(pArrayState->i == pArray->used)
 				pArrayState->pArray = NULL;
 			else {
-				if(datcpy(pRtnVal, pArray->elements[pArrayState->i]) != 0)
+				if(dcpy(pRtnVal, pArray->elements[pArrayState->i]) != 0)
 					return librsset(Failure);
 				++pArrayState->i;
 				break;
@@ -1084,14 +914,13 @@ static int formatArg(Datum *pRtnVal, uint argFlags, ArrayState *pArrayState) {
 
 	if(argFlags == ArgInt1)
 		(void) isIntVal(pRtnVal);
-	else if(argFlags == ArgNil1 && pRtnVal->type != dat_nil)
+	else if(argFlags == ArgNil1 && !disnil(pRtnVal))
 		(void) isStrVal(pRtnVal);
 	return sess.rtn.status;
 	}
 
-// Build string from "printf" format string (format) and argument(s).  If pArg is not NULL, process binary format (%)
-// expression using pArg as the argument; otherwise, process printf, sprintf, or bprintf function.
-// Return status.
+// Build string from "printf" format string and argument(s).  If pArg is not NULL, process binary operator (%)
+// expression using pArg as the argument; otherwise, process bprintf, insertf, printf, or sprintf function.  Return status.
 int strFormat(Datum *pRtnVal, Datum *pFormat, Datum *pArg) {
 	short c;
 	int specCount;
@@ -1120,7 +949,7 @@ int strFormat(Datum *pRtnVal, Datum *pFormat, Datum *pArg) {
 	specCount = 0;
 	while((c = *fmt++) != '\0') {
 		if(c != '%') {
-			if(dputc(c, &result) != 0)
+			if(dputc(c, &result, 0) != 0)
 				goto LibFail;
 			continue;
 			}
@@ -1203,20 +1032,18 @@ GetWidth:
 		// Get spec.
 		switch(c) {
 		case 's':
-			if(pArg != NULL) {
-				if(pArg->type != dat_nil) {
-					if(!isStrVal(pArg))	// Check pArg type.
-						return sess.rtn.status;
-					if(++specCount > 1)	// Check spec count.
-						goto TooMany;
-					}
+			if(pArg != NULL) {			// Check pArg type.
+				if(!disnil(pArg) && !isStrVal(pArg))
+					return sess.rtn.status;
+				if(++specCount > 1)		// Check spec count.
+					goto TooMany;
 				pFmtArg = pArg;
 				}
 			else if(formatArg(pFmtArg, ArgNil1, &aryState) != Success)
 				return sess.rtn.status;
-			if(pFmtArg->type == dat_nil)
+			if(disnil(pFmtArg))
 				dsetnull(pFmtArg);
-			sLen = strlen(str = pFmtArg->str);		// Length of string.
+			sLen = strlen(str = pFmtArg->str);	// Length of string.
 			if(flags & FMTprec) {			// If there is a precision...
 				if(precision < sLen)
 					if((sLen = precision) < 0)
@@ -1343,7 +1170,7 @@ ULFmt:
 
 		// If 0 padding, store prefix (if any).
 		if((flags & FMT0pad) && prefix != NULL) {
-			if(dputs(prefix, &result) != 0)
+			if(dputs(prefix, &result, 0) != 0)
 				goto LibFail;
 			prefix = NULL;
 			}
@@ -1353,23 +1180,23 @@ ULFmt:
 			if(!(flags & FMTleft)) {
 				short c1 = (flags & FMT0pad) ? '0' : ' ';
 				while(--padding >= 0)
-					if(dputc(c1, &result) != 0)
+					if(dputc(c1, &result, 0) != 0)
 						goto LibFail;
 				}
 			}
 
 		// Store prefix (if any).
-		if(prefix != NULL && dputs(prefix, &result) != 0)
+		if(prefix != NULL && dputs(prefix, &result, 0) != 0)
 			goto LibFail;
 
 		// Store (fixed-length) string.
-		if(dputmem((void *) str, sLen, &result) != 0)
+		if(dputmem((void *) str, sLen, &result, 0) != 0)
 			goto LibFail;
 
  		// Store right padding.
 		if(flags & FMTleft) {
 			while(--padding >= 0)
-				if(dputc(' ', &result) != 0)
+				if(dputc(' ', &result, 0) != 0)
 					goto LibFail;
 			}
 		}
@@ -1381,7 +1208,7 @@ ULFmt:
 	if(aryState.pArray != NULL && aryState.i < aryState.pArray->used)
 		return rsset(Failure, RSNoFormat, text204);
 			// "Too many arguments for 'printf' or 'sprintf' function"
-	if(dclose(&result, Fab_String) != 0)
+	if(dclose(&result, FabStr) != 0)
 LibFail:
 		(void) librsset(Failure);
 
@@ -1393,7 +1220,7 @@ static int getKill(Datum *pRtnVal, int n) {
 	RingEntry *pRingEntry;
 
 	// Which kill?
-	if((pRingEntry = rget(ringTable + RingIdxKill, n)) != NULL && datcpy(pRtnVal, &pRingEntry->data) != 0)
+	if((pRingEntry = rget(ringTable + RingIdxKill, n)) != NULL && dcpy(pRtnVal, &pRingEntry->data) != 0)
 		(void) librsset(Failure);
 	return sess.rtn.status;
 	}
@@ -1408,162 +1235,76 @@ Buffer *findBuf(Datum *pBufname) {
 	return pBuf;
 	}
 
-// Do mode? function.  Return status.
+//  Do mode? function (check if a mode is set) and return status.
 int modeQ(Datum *pRtnVal, int n, Datum **args) {
-	int status;
 	ModeSpec *pModeSpec;
-	bool matchFound = false;
-	Datum *pDatum, *pArg;
-	char *optStr, *keyword;
-	ArraySize elCount;
-	Datum **ppArrayEl = NULL;
-	Buffer *pBuf = NULL;
+	char *modeName;
+	Buffer *pBuf;
+	bool strict = n > 0;
 	bool result = false;
-	static bool checkAll, ignore;
-	static Option options[] = {
-		{"^All", NULL, 0, .u.ptr = (void *) &checkAll},
-		{"^Ignore", NULL, 0, .u.ptr = (void *) &ignore},
-		{NULL, NULL, 0, 0}};
-	static OptHdr optHdr = {
-		0, text451, false, options};
-			// "function option"
 
 	// Get buffer if specified.
-	if(args[0]->type != dat_nil && (pBuf = findBuf(args[0])) == NULL)
+	if(args[1] == NULL)
+		pBuf = sess.cur.pBuf;
+	else if((pBuf = findBuf(args[1])) == NULL)
 		return sess.rtn.status;
 
-	// Get options and set flags.
-	initBoolOpts(options);
-	if(n != INT_MIN) {
-		if(parseOpts(&optHdr, NULL, args[2], NULL) != Success)
-			return sess.rtn.status;
-		setBoolOpts(options);
-		if(checkAll)
-			result = true;
+	// Search mode table for a match.
+	modeName = args[0]->str;
+	if((pModeSpec = msrch(modeName, NULL)) != NULL) {
+
+		// Match found.  Set result.
+		result = (pModeSpec->flags & MdGlobal) ? pModeSpec->flags & MdEnabled : isBufModeSet(pBuf, pModeSpec);
 		}
-
-	// Get keyword(s).
-	if(dnewtrack(&pDatum) != 0)
-		return librsset(Failure);
-	while((status = nextArg(&pArg, args + 1, pDatum, &optStr, &ppArrayEl, &elCount)) == Success) {
-		keyword = pArg->str;
-
-		// Search mode table for a match.
-		matchFound = false;
-		if((pModeSpec = msrch(keyword, NULL)) != NULL) {
-
-			// Match found.  Mode enabled?
-			matchFound = true;
-			if(pBuf == NULL) {
-
-				// Checking global modes.  Right type?
-				if(!(pModeSpec->flags & MdGlobal))
-					goto Wrong;
-				if(pModeSpec->flags & MdEnabled)
-					goto Good;
-				goto Bad;
-				}
-			else {
-				// Checking buffer modes.  Right type?
-				if(pModeSpec->flags & MdGlobal)
-Wrong:
-					return rsset(Failure, 0, text456, keyword);
-						// "Wrong type of mode '%s'"
-				if(isBufModeSet(pBuf, pModeSpec)) {
-Good:
-					// Mode is enabled.  Done (success) if "any" check.
-					if(!checkAll)
-						result = true;
-					}
-
-				// Buffer mode not enabled.  Failure if "all" check.
-				else {
-Bad:
-					if(checkAll)
-						result = false;
-					}
-				}
-			}
-
-		// Unknown keyword.  Error if "Ignore" not specified.
-		else if(!ignore)
-			return rsset(Failure, 0, text66, keyword);
+	else {
+		// Unknown mode name.  Error if "strict" in effect.
+		if(strict)
+			return rsset(Failure, 0, text66, modeName);
 				// "Unknown or ambiguous mode '%s'"
 		}
 
-	// All arguments processed.  Return result.
-	if(status == NotFound) {
-		if(!matchFound)
-			return rsset(Failure, 0, text446, text389);
-				// "Valid %s not specified", "mode"
-		dsetbool(result, pRtnVal);
-		}
+	// Return result.
+	dsetbool(result, pRtnVal);
 	return sess.rtn.status;
 	}
 
-// Check if a mode in given group is set and return its name if so; otherwise, nil.  Return status.
+// Check if a mode in given group is set and return its name if so, otherwise nil.  Return status.
 int groupModeQ(Datum *pRtnVal, int n, Datum **args) {
 	ModeSpec *pModeSpec;
 	ModeGrp *pModeGrp;
 	Array *pArray;
 	Datum *pArrayEl;
 	ushort count;
-	Buffer *pBuf = NULL;
+	Buffer *pBuf;
 	ModeSpec *pResultSpec = NULL;
-	bool ignore = false;
-	bool bufMode = false;
-	static Option options[] = {
-		{"^Ignore", NULL, 0, 0},
-		{NULL, NULL, 0, 0}};
-	static OptHdr optHdr = {
-		0, text451, false, options};
-			// "function option"
+	bool strict = n > 0;
 
 	// Get buffer if specified.
-	if(args[0]->type != dat_nil) {
-		if((pBuf = findBuf(args[0])) == NULL)
-			return sess.rtn.status;
-		bufMode = true;
-		}
-
-	// Get options and set flags.
-	if(n != INT_MIN) {
-		if(parseOpts(&optHdr, NULL, args[2], NULL) != Success)
-			return sess.rtn.status;
-		if(options[0].ctrlFlags & OptSelected)
-			ignore = true;
-		}
+	if(args[1] == NULL)
+		pBuf = sess.cur.pBuf;
+	else if((pBuf = findBuf(args[1])) == NULL)
+		return sess.rtn.status;
 
 	// Get mode group.
-	if(!mgsrch(args[1]->str, NULL, &pModeGrp)) {
-		if(ignore)
+	if(!mgsrch(args[0]->str, NULL, &pModeGrp)) {
+		if(!strict)
 			goto SetNil;
-		return rsset(Failure, 0, text395, text390, args[1]->str);
+		return rsset(Failure, 0, text395, text390, args[0]->str);
 				// "No such %s '%s'", "group"
 		}
 
-	// If group has members, continue...
+	// If group has members, check them.
 	if(pModeGrp->useCount > 0) {
 
-		// Check for type mismatch; that is, a global mode specified for a buffer group, or vice versa.
-		pArray = &modeInfo.modeTable;
-		while((pArrayEl = aeach(&pArray)) != NULL) {
-			pModeSpec = modePtr(pArrayEl);
-			if(pModeSpec->pModeGrp == pModeGrp) {
-				if(!(pModeSpec->flags & MdGlobal) != bufMode)
-					return rsset(Failure, 0, text404, pModeGrp->name, bufMode ? text83 : text146);
-						// "'%s' is not a %s group", "buffer", "global"
-				break;
-				}
-			}
-
-		// Have valid argument(s).  Check if any mode is enabled in group.
+		// Scan mode table and check if any mode in group is enabled.
 		pArray = &modeInfo.modeTable;
 		count = 0;
 		while((pArrayEl = aeach(&pArray)) != NULL) {
 			pModeSpec = modePtr(pArrayEl);
 			if(pModeSpec->pModeGrp == pModeGrp) {
-				if(pBuf == NULL) {
+
+				// Found mode in group.  Enabled?
+				if(pModeSpec->flags & MdGlobal) {
 					if(pModeSpec->flags & MdEnabled)
 						goto Enabled;
 					}
@@ -1590,57 +1331,29 @@ SetNil:
 	}
 
 // Clone an array.  Return status.
-int arrayClone(Datum *pDest, Datum *pSrc, int depth) {
+int arrayClone(Datum *pDest, Datum *pSrc) {
 	Array *pArray;
 
-	if(maxArrayDepth > 0 && depth > maxArrayDepth)
-		return rsset(Failure, 0, text319, text822, maxArrayDepth);
-			// "Maximum %s recursion depth (%d) exceeded", "array"
-	if((pArray = aclone(wrapPtr(pSrc)->pArray)) == NULL)
+	if((pArray = aclone(pSrc->u.pArray)) == NULL)
 		return librsset(Failure);
-	if(awWrap(pDest, pArray) == Success) {
-		ArraySize n = pArray->used;
-		Datum **ppArrayEl = pArray->elements;
-
-		// Check for nested arrays.
-		while(n-- > 0) {
-			if((*ppArrayEl)->type == dat_blobRef && arrayClone(*ppArrayEl, *ppArrayEl, depth + 1) != Success)
-				return sess.rtn.status;
-			++ppArrayEl;
-			}
-		}
-	return sess.rtn.status;
-	}
-
-// Convert any value to a string form which will resolve to the original value if subsequently evaluated as an expression
-// (unless "force" is set (n > 0) and value is an array that includes itself).  Return status.
-#if !(MMDebug & Debug_CallArg)
-static
-#endif
-int quoteVal(Datum *pRtnVal, Datum *pDatum, uint flags) {
-	DFab fab;
-
-	if(dopenwith(&fab, pRtnVal, FabClear) != 0)
-		goto LibFail;
-	if(dtosfchk(pDatum, NULL, flags, &fab) == Success && dclose(&fab, Fab_String) != 0)
-LibFail:
-		(void) librsset(Failure);
+	agStash(pDest, pArray);
 
 	return sess.rtn.status;
 	}
 
-// Set wrap column to n.  Return status.
-int setWrapCol(int n, bool msg) {
+// Check if proposed wrap column is in range.  Return status.
+int checkWrapCol(int col) {
 
-	if(n < 0)
-		(void) rsset(Failure, 0, text39, text59, n, 0);
-			// "%s (%d) must be %d or greater", "Wrap column"
-	else {
-		sess.prevWrapCol = sess.wrapCol;
-		sess.wrapCol = n;
-		if(msg)
-			(void) rsset(Success, 0, "%s%s%d", text59, text278, n);
-					// "Wrap column", " set to "
+	return col < 0 ? rsset(Failure, 0, text39, text59, col, 0) : sess.rtn.status;
+				// "%s (%d) must be %d or greater", "Wrap column"
+	}
+
+// Set wrap column to col.  Return status.
+int setWrapCol(int col) {
+
+	if(checkWrapCol(col) == Success && col != sess.cur.pScrn->wrapCol) {
+		sess.cur.pScrn->prevWrapCol = sess.cur.pScrn->wrapCol;
+		sess.cur.pScrn->wrapCol = col;
 		}
 	return sess.rtn.status;
 	}
@@ -1673,8 +1386,30 @@ static int backForwTab(int n) {
 	int offset;
 
 	if((offset = tabStop(n)) >= 0)
-		sess.pCurWind->face.point.offset = offset;
+		sess.cur.pFace->point.offset = offset;
 	return sess.rtn.status;
+	}
+
+// Check if a character or string is in a character class.  Return -1 (error), 0 (false), or 1 (true).
+static int isCC(Datum *pClass, Datum *pVal) {
+	bool (*func)(short) = getCC(pClass->str);
+	if(func == NULL) {
+		(void) rsset(Failure, 0, text136, pClass->str);
+				// "No such character class '%s'"
+		return -1;
+		}
+	if(dtypstr(pVal)) {
+		char *str = pVal->str;
+		do {
+			if(!func((short) *str++))
+				return 0;
+			} while(*str != '\0');
+		return 1;
+		}
+	else if(!isCharVal(pVal))
+		return -1;
+	else
+		return func(pVal->u.intNum) ? 1 : 0;
 	}
 
 // Execute a system command or function, given result pointer, n argument, pointer into the command-function table
@@ -1701,7 +1436,9 @@ int execCmdFunc(Datum *pRtnVal, int n, CmdFunc *pCmdFunc, int minArgs, int maxAr
 			maxArgs = minArgs;
 		else if(pCmdFunc->attrFlags & CFShortLoad)
 			--maxArgs;
-		if(maxArgs > 0) {
+
+		// Proceed if at least one argument is allowed and either have a symbol or at least one argument is required.
+		if(maxArgs > 0 && (haveSym(s_any, false) || minArgs > 0)) {
 			Datum **args1 = args;
 			uint argFlags = ArgFirst | (pCmdFunc->argFlags & ArgPath);
 			do {
@@ -1720,18 +1457,94 @@ int execCmdFunc(Datum *pRtnVal, int n, CmdFunc *pCmdFunc, int minArgs, int maxAr
 		}
 
 	// Evaluate the command or function.
-	if(pCmdFunc->func != NULL)
+	if(pCmdFunc->func != NULL) {
+#if MMDebug & Debug_Expr
+		fprintf(logfile, "execCmdFunc(): Calling %s() with n = %d, and %d arguments...\n", pCmdFunc->name, n, argCount);
+#endif
 		(void) pCmdFunc->func(pRtnVal, n, args);
+		}
 	else {
 		int i;
 		const char *prompt;
 		long longVal;
-		Buffer *pBuf;
+		Array *pArray;
+		Buffer *pBuf = NULL;
 		int cmdFuncId = pCmdFunc - cmdFuncTable;
 
 		switch(cmdFuncId) {
 			case cf_abs:
 				dsetint(labs(args[0]->u.intNum), pRtnVal);
+				break;
+			case cf_aclone:
+				(void) arrayClone(pRtnVal, args[0]);
+				break;
+			case cf_acompact:
+				i = n != INT_MIN ? AOpInPlace : 0;
+				if((pArray = acompact(args[0]->u.pArray, i)) == NULL)
+					goto LibFail;
+				if(i == 0)
+					agStash(pRtnVal, pArray);
+				else
+					dxfer(pRtnVal, args[0]);
+				break;
+			case cf_adelete:
+				if(args[2] == NULL) {
+
+					// Delete an element.
+					Datum *pDatum = adelete(args[0]->u.pArray, args[1]->u.intNum);
+					if(pDatum == NULL)
+						goto LibFail;
+					if(dtyparray(pDatum))
+						agTrack(pDatum);	// Have array reference.
+					dxfer(pRtnVal, pDatum);
+					}
+				else {
+					// Cut a slice.
+					if((pArray = aslice(args[0]->u.pArray, args[1]->u.intNum, args[2]->u.intNum,
+					 AOpCut)) == NULL)
+						goto LibFail;
+					agStash(pRtnVal, pArray);
+					}
+				break;
+			case cf_adeleteif:
+				dsetint(adeleteif(args[0]->u.pArray, args[1], 0), pRtnVal);
+				break;
+			case cf_afill:
+				(void) doFill(pRtnVal, args);
+				break;
+			case cf_aincludeQ:
+				dsetbool(ainclude(args[0]->u.pArray, args[1], 0), pRtnVal);
+				break;
+			case cf_aindex:
+				if((i = aindex(args[0]->u.pArray, args[1], n > 0 ? AOpLast : 0)) < 0)
+					dsetnil(pRtnVal);
+				else
+					dsetint(i, pRtnVal);
+				break;
+			case cf_ainsert:
+				i = args[2]->u.intNum;
+				goto AInsert;
+			case cf_apop:
+			case cf_ashift:
+				pArray = args[0]->u.pArray;
+				if((args[1] = (cmdFuncId == cf_apop) ? apop(pArray) : ashift(pArray)) == NULL)
+					dsetnil(pRtnVal);
+				else {
+					dxfer(pRtnVal, args[1]);
+					if(dtyparray(pRtnVal))
+						agTrack(pRtnVal);
+					}
+				break;
+			case cf_apush:
+				i = args[0]->u.pArray->used;
+				goto AInsert;
+			case cf_aunshift:
+				i = 0;
+AInsert:
+				if(ainsert(args[0]->u.pArray, args[1], i, 0) != 0)
+					goto LibFail;
+				duntrack(args[1]);
+				dxfer(pRtnVal, args[0]);
 				break;
 			case cf_appendFile:
 				i = 'a';
@@ -1750,9 +1563,9 @@ int execCmdFunc(Datum *pRtnVal, int n, CmdFunc *pCmdFunc, int minArgs, int maxAr
 				break;
 			case cf_backspace:;
 				// Delete char or soft tab backward.  Return status.
-				Point *pPoint = &sess.pCurWind->face.point;
-				(void) (sess.softTabSize > 0 && pPoint->offset > 0 ? delTab(n == INT_MIN ? -1 : -n, true) :
-				 edelc(n == INT_MIN ? -1 : -n, 0));
+				Point *pPoint = &sess.cur.pFace->point;
+				(void) (sess.cur.pScrn->softTabSize > 0 && pPoint->offset > 0 ?
+				 delTab(n == INT_MIN ? -1 : -n, true) : edelc(n == INT_MIN ? -1 : -n, 0));
 				break;
 			case cf_basename:
 				if(dsetstr(fbasename(args[0]->str, n == INT_MIN || n > 0), pRtnVal) != 0)
@@ -1786,7 +1599,7 @@ int execCmdFunc(Datum *pRtnVal, int n, CmdFunc *pCmdFunc, int minArgs, int maxAr
 
 				// Get buffer pointer.
 				if(n == INT_MIN)
-					pBuf = sess.pCurBuf;
+					pBuf = sess.cur.pBuf;
 				else if((pBuf = bsrch(args[0]->str, NULL)) == NULL)
 					return rsset(Failure, 0, text118, args[0]->str);
 						// "No such buffer '%s'"
@@ -1794,6 +1607,7 @@ int execCmdFunc(Datum *pRtnVal, int n, CmdFunc *pCmdFunc, int minArgs, int maxAr
 				// Return Boolean result.
 				dsetbool(bempty(pBuf), pRtnVal);
 				break;
+			case cf_bprint:
 			case cf_bprintf:
 
 				// Get buffer pointer.
@@ -1801,9 +1615,16 @@ int execCmdFunc(Datum *pRtnVal, int n, CmdFunc *pCmdFunc, int minArgs, int maxAr
 					return rsset(Failure, 0, text118, args[0]->str);
 						// "No such buffer '%s'"
 
+				if(cmdFuncId == cf_bprint) {
+					if(!needSym(s_comma, true))
+						return sess.rtn.status;
+					i = Txt_Insert;
+					goto ChgText;
+					}
+
 				// Create formatted string in pRtnVal and insert into buffer.
 				if(strFormat(pRtnVal, args[1], NULL) == Success)
-					(void) iorText(pRtnVal->str, n == INT_MIN ? 1 : n, Txt_Insert, pBuf);
+					(void) iorText(pRtnVal->str, n, Txt_Insert, pBuf);
 				break;
 			case cf_bufBoundQ:
 				if(n != INT_MIN)
@@ -1823,13 +1644,10 @@ int execCmdFunc(Datum *pRtnVal, int n, CmdFunc *pCmdFunc, int minArgs, int maxAr
 				break;
 			case cf_chr:
 				if(isCharVal(args[0]))
-					dsetchr(args[0]->u.intNum, pRtnVal);
+					dconvchr(args[0]->u.intNum, pRtnVal);
 				break;
 			case cf_clearMsgLine:
-				(void) mlerase();
-				break;
-			case cf_clone:
-				(void) arrayClone(pRtnVal, args[0], 0);
+				(void) mlerase(MLForce);
 				break;
 			case cf_copyFencedRegion:
 				// Copy text to kill ring.
@@ -1909,10 +1727,10 @@ int execCmdFunc(Datum *pRtnVal, int n, CmdFunc *pCmdFunc, int minArgs, int maxAr
 				break;
 			case cf_emptyQ:
 				if(args[0]->type != dat_int || isCharVal(args[0]))
-					dsetbool(args[0]->type == dat_nil ? true :
+					dsetbool(disnil(args[0]) ? true :
 					 args[0]->type == dat_int ? args[0]->u.intNum == 0 :
-					 args[0]->type & DStrMask ? *args[0]->str == '\0' :
-					 wrapPtr(args[0])->pArray->used == 0, pRtnVal);
+					 dtypstr(args[0]) ? *args[0]->str == '\0' :
+					 args[0]->u.pArray->used == 0, pRtnVal);
 				break;
 			case cf_endBuf:
 				// Move to the end of the buffer.
@@ -1958,7 +1776,11 @@ BEBuf:
 				i = 1;
 				goto GSWind;
 			case cf_insert:
-				(void) chgText(pRtnVal, n, Txt_Insert, NULL);
+				i = Txt_Insert;
+				goto ChgText;
+			case cf_insertf:
+				if(strFormat(pRtnVal, args[0], NULL) == Success)
+					(void) iorText(pRtnVal->str, n, Txt_Insert, NULL);
 				break;
 			case cf_insertPipe:
 				prompt = text249;
@@ -1970,12 +1792,15 @@ BEBuf:
 				(void) insertNLSpace(n, EditSpace | EditHoldPoint);
 				break;
 			case cf_interactiveQ:
-				dsetbool(!(sess.opFlags & OpStartup) && !(pLastParse->flags & OpScript), pRtnVal);
+				dsetbool((sess.opFlags & (OpStartup | OpUserCmd)) == OpUserCmd, pRtnVal);
+				break;
+			case cf_isClassQ:
+				if((i = isCC(args[0], args[1])) >= 0)
+					dsetbool(i, pRtnVal);
 				break;
 			case cf_join:
 				if(needSym(s_comma, true))
-					(void) catArgs(pRtnVal, 1, args[0], n == INT_MIN || n > 0 ? CvtKeepAll :
-					 n == 0 ? CvtKeepNull : 0);
+					(void) catArgs(pRtnVal, 1, args[0], n <= 0 && n != INT_MIN ? ACvtSkipNil : 0);
 				break;
 			case cf_keyPendingQ:
 				if(typahead(&i) == Success)
@@ -2013,20 +1838,21 @@ KDCText:
 				(void) (n == INT_MIN ? kdcForwWord(1, -1) : n < 0 ? kdcBackWord(-n, -1) : kdcForwWord(n, -1));
 				break;
 			case cf_lastBuf:
-				if(sess.pCurScrn->pLastBuf != NULL) {
-					Buffer *pOldBuf = sess.pCurBuf;
-					if(render(pRtnVal, 1, sess.pCurScrn->pLastBuf, 0) == Success && n < 0 && n != INT_MIN) {
+				if(sess.cur.pScrn->pLastBuf != NULL) {
+					Buffer *pOldBuf = sess.cur.pBuf;
+					if(render(pRtnVal, 1, sess.cur.pScrn->pLastBuf, 0) == Success && n < 0 &&
+					 n != INT_MIN) {
 						char bufname[MaxBufname + 1];
 
 						strcpy(bufname, pOldBuf->bufname);
 					 	if(bdelete(pOldBuf, 0) == Success)
-							(void) rsset(Success, 0, text372, bufname);
+							(void) rsset(Success, RSHigh, text372, bufname);
 									// "Buffer '%s' deleted"
 						}
 					}
 				break;
 			case cf_length:
-				dsetint(args[0]->type == dat_blobRef ? (long) wrapPtr(args[0])->pArray->used :
+				dsetint(dtyparray(args[0]) ? (long) args[0]->u.pArray->used :
 				 (long) strlen(args[0]->str), pRtnVal);
 				break;
 			case cf_lowerCaseLine:
@@ -2067,7 +1893,7 @@ KDCText:
 				i = SWB_Repeat | SWB_Forw;
 				goto PNScreen;
 			case cf_nilQ:
-				dsetbool(args[0]->type == dat_nil, pRtnVal);
+				dsetbool(disnil(args[0]), pRtnVal);
 				break;
 			case cf_nullQ:
 				dsetbool(disnull(args[0]), pRtnVal);
@@ -2079,7 +1905,7 @@ KDCText:
 				if(insertNLSpace(n, EditHoldPoint) == Success && n < 0 && n != INT_MIN) {
 
 					// Move point to first empty line if possible.
-					Point *pPoint = &sess.pCurWind->face.point;
+					Point *pPoint = &sess.cur.pFace->point;
 					if(pPoint->pLine->used > 0 && pPoint->pLine->next->used == 0)
 						(void) moveChar(1);
 					}
@@ -2087,8 +1913,13 @@ KDCText:
 			case cf_ord:
 				dsetint((long) args[0]->str[0], pRtnVal);
 				break;
-			case cf_overwrite:
-				(void) chgText(pRtnVal, n, Txt_Overwrite, NULL);
+			case cf_overwriteChar:
+				i = Txt_Replace;
+				goto ChgText;
+			case cf_overwriteCol:
+				i = Txt_Overwrite;
+ChgText:
+				(void) chgText(pRtnVal, n, i, pBuf);
 				break;
 			case cf_pause:
 				if((i = args[0]->u.intNum) < 0)
@@ -2109,40 +1940,19 @@ KDCText:
 PopIt:
 				(void) doPop(pRtnVal, n, i);
 				break;
-			case cf_pop:
-			case cf_shift:
-				{Array *pArray = wrapPtr(args[0])->pArray;
-				if((args[1] = (cmdFuncId == cf_pop) ? apop(pArray) : ashift(pArray)) == NULL)
-					dsetnil(pRtnVal);
-				else {
-					datxfer(pRtnVal, args[1]);
-					if(pRtnVal->type == dat_blobRef)
-						awGarbPush(pRtnVal);
-					}
-				}
-				break;
-			case cf_push:
-			case cf_unshift:
-				{Array *pArray = wrapPtr(args[0])->pArray;
-				if(ainsert(pArray, cmdFuncId == cf_push ? pArray->used : 0, args[1], false) != 0)
-					goto LibFail;
-				else {
-					duntrack(args[1]);
-					datxfer(pRtnVal, args[0]);
-					}
-				}
-				break;
 			case cf_prevBuf:
 				i = BT_Backward;
 PNBuf:
-				// Switch to the previous or next buffer in the buffer list.  If n == 0, switch once and include
-				// buffers having same directory as current screen (only) as candidates.  If n < 0, switch once
-				// and delete the current buffer.
-				if(n <= 0 && n != INT_MIN) {
-					i |= (n == 0 ? BT_HomeDir : BT_Delete);
-					n = 1;
+				// Switch to the previous or next buffer in the buffer list.  If n >= 0, consider buffers having
+				// same directory as current screen (only) as candidates.  If n <= 0, delete current buffer
+				// after switch.
+				if(n != INT_MIN) {
+					if(n >= 0)
+						i |= BT_HomeDir;
+					if(n <= 0)
+						i |= BT_Delete;
 					}
-				(void) prevNextBuf(pRtnVal, n, i);
+				(void) prevNextBuf(pRtnVal, i);
 				break;
 			case cf_prevScreen:
 				i = SWB_Repeat;
@@ -2158,8 +1968,8 @@ PNScreen:
 				// Build message in pRtnVal and write result to message line.
 				if(strFormat(pRtnVal, args[0], NULL) == Success) {
 PrintMsg:
-					(void) mlputs(n == INT_MIN ? MLHome | MLFlush : MLHome | MLFlush | MLTermAttr,
-					 pRtnVal->str);
+					(void) mlputs(n == INT_MIN ? MLHome | MLFlush | MLForce :
+					 MLHome | MLFlush | MLForce | MLTermAttr, pRtnVal->str);
 					dsetnil(pRtnVal);
 					}
 				break;
@@ -2175,10 +1985,13 @@ PrintMsg:
 				break;
 			case cf_quote:
 				// Convert any value to a string form which will resolve to the original value.
-				(void) quoteVal(pRtnVal, args[0], n > 0 ? CvtExpr | CvtForceArray : CvtExpr);
+				if((i = dtos(pRtnVal, args[0], NULL, DCvtLang)) < 0)
+					(void) librsset(Failure);
+				else if(n <= 0)
+					(void) endless(i);
 				break;
 			case cf_rand:
-				dsetint(xorShift64Star(args[0]->u.intNum), pRtnVal);
+				dsetint(urand(args[0]->u.intNum), pRtnVal);
 				break;
 			case cf_readPipe:
 				prompt = text170;
@@ -2188,11 +2001,11 @@ PrintMsg:
 			case cf_reframeWind:
 				// Reposition point in current window per the standard redisplay subsystem.  Row defaults to
 				// zero to center current line in window.  If in script mode, also do partial screen update so
-				// that the window is moved to new point location.
-				sess.pCurWind->reframeRow = (n == INT_MIN) ? 0 : n;
-				sess.pCurWind->flags |= WFReframe;
+				// that the window is repositioned.
+				sess.cur.pWind->reframeRow = (n == INT_MIN) ? 0 : n;
+				sess.cur.pWind->flags |= WFReframe;
 				if(sess.opFlags & OpScript)
-					(void) wupd_reframe(sess.pCurWind);
+					(void) wupd_reframe(sess.cur.pWind);
 				break;
 			case cf_replace:
 				// Search and replace.
@@ -2200,15 +2013,12 @@ PrintMsg:
 Repl:
 				(void) replStr(pRtnVal, n, args, i);
 				break;
-			case cf_replaceText:
-				(void) chgText(pRtnVal, n, Txt_Replace, NULL);
-				break;
 			case cf_restoreBuf:
 				// Restore the saved buffer.
 				if(sess.pSavedBuf == NULL)
 					return rsset(Failure, 0, text208, text83);
 							// "Saved %s not found", "buffer"
-				if(bswitch(sess.pSavedBuf, 0) == Success && dsetstr(sess.pCurBuf->bufname, pRtnVal) != 0)
+				if(bswitch(sess.pSavedBuf, 0) == Success && dsetstr(sess.cur.pBuf->bufname, pRtnVal) != 0)
 					goto LibFail;
 				break;
 			case cf_restoreScreen:;
@@ -2235,10 +2045,10 @@ Repl:
 				pWind = sess.windHead;
 				do {
 					if(pWind == sess.pSavedWind) {
-						sess.pCurWind->flags |= WFMode;
+						sess.cur.pWind->flags |= WFMode;
 						(void) wswitch(pWind, 0);
-						sess.pCurWind->flags |= WFMode;
-						dsetint((long) getWindNum(sess.pCurWind), pRtnVal);
+						sess.cur.pWind->flags |= WFMode;
+						dsetint((long) getWindNum(sess.cur.pWind), pRtnVal);
 						return sess.rtn.status;
 						}
 					} while((pWind = pWind->next) != NULL);
@@ -2251,8 +2061,8 @@ Repl:
 				break;
 			case cf_saveBuf:
 				// Save pointer to current buffer.
-				sess.pSavedBuf = sess.pCurBuf;
-				if(dsetstr(sess.pCurBuf->bufname, pRtnVal) != 0)
+				sess.pSavedBuf = sess.cur.pBuf;
+				if(dsetstr(sess.cur.pBuf->bufname, pRtnVal) != 0)
 					goto LibFail;
 				break;
 			case cf_saveFile:
@@ -2262,27 +2072,37 @@ Repl:
 				break;
 			case cf_saveScreen:
 				// Save pointer to current screen.
-				sess.pSavedScrn = sess.pCurScrn;
+				sess.pSavedScrn = sess.cur.pScrn;
 				break;
 			case cf_saveWind:
 				// Save pointer to current window.
-				sess.pSavedWind = sess.pCurWind;
+				sess.pSavedWind = sess.cur.pWind;
 				break;
 			case cf_setWrapCol:
-				// Set wrap column to N, or previous value if n argument.
-				if(n != INT_MIN) {
-					if(sess.prevWrapCol < 0)
+				// Set wrap column to N... or swap with previous value if n >= 0; display values if n < 0
+				// and interactive.
+				if(interactive() && n < 0 && n != INT_MIN)
+					goto ShowWrapCol;
+				if(n >= 0) {
+					if(sess.cur.pScrn->prevWrapCol < 0)
 						return rsset(Failure, RSNoFormat, text298);
 							// "No previous wrap column set"
-					n = sess.prevWrapCol;
+					n = sess.cur.pScrn->prevWrapCol;
 					}
 				else {
-					if(getNArg(pRtnVal, text59) != Success || pRtnVal->type == dat_nil)
+					if(getNArg(pRtnVal, text59) != Success || disnil(pRtnVal))
 							// "Wrap column"
 						return sess.rtn.status;
-					n = pRtnVal->u.intNum;
+					if((n = pRtnVal->u.intNum) == sess.cur.pScrn->wrapCol)
+ShowWrapCol:
+						return rsset(Success, RSNoWrap | RSTermAttr, text496, sess.cur.pScrn->wrapCol,
+								// "~bCurrent wrap col:~B %d, ~bprevious wrap col:~B %d"
+						 sess.cur.pScrn->prevWrapCol);
 					}
-				(void) setWrapCol(n, true);
+				if(setWrapCol(n) == Success)
+					(void) rsset(Success, RSNoWrap, "%s %s %d (%s: %d)", text59, text278, n, text498,
+							// "Wrap column", "changed to", "previous"
+					 sess.cur.pScrn->prevWrapCol);
 				break;
 			case cf_shellCmd:
 				prompt = "> ";
@@ -2291,16 +2111,16 @@ PipeCmd:
 				(void) pipeCmd(pRtnVal, n, prompt, i);
 				break;
 			case cf_showDir:
-				if(dsetstr(sess.pCurScrn->workDir, pRtnVal) != 0)
+				if(dsetstr(sess.cur.pScrn->workDir, pRtnVal) != 0)
 					goto LibFail;
-				(void) rsset(Success, RSNoFormat | RSNoWrap, sess.pCurScrn->workDir);
+				(void) rsset(Success, RSNoFormat | RSNoWrap, sess.cur.pScrn->workDir);
 				break;
 			case cf_shQuote:
 				if(toStr(args[0]) == Success && dshquote(args[0]->str, pRtnVal) != 0)
 					goto LibFail;
 				break;
 			case cf_shrinkWind:
-				// Shrink the current window.  If n is negative, give lines to the upper window; otherwise,
+				// Shrink the current window.  If n is negative, give lines to the upper window, otherwise
 				// lower.
 				i = -1;
 GSWind:
@@ -2313,6 +2133,7 @@ InsNLSPC:
 				break;
 			case cf_splitWind:
 				{EWindow *pWind;
+
 				(void) wsplit(n, &pWind);
 				dsetint((long) getWindNum(pWind), pRtnVal);
 				}
@@ -2346,16 +2167,16 @@ InsNLSPC:
 			case cf_subline:
 				{long longVal2 = argCount < 2 ? LONG_MAX : args[1]->u.intNum;
 				longVal = args[0]->u.intNum;
-				if(longVal2 != 0 && (i = sess.pCurWind->face.point.pLine->used) > 0) {
+				if(longVal2 != 0 && (i = sess.cur.pFace->point.pLine->used) > 0) {
 
 					// Determine line offset and length and validate them.  Offset is position relative to
 					// point.
-					longVal += sess.pCurWind->face.point.offset;
+					longVal += sess.cur.pFace->point.offset;
 					if(longVal >= 0 && longVal < i &&
 					 (longVal2 >= 0 || (longVal2 = i - longVal + longVal2) > 0)) {
 						if(longVal2 > i - longVal)
 							longVal2 = i - longVal;
-						if(dsetsubstr(sess.pCurWind->face.point.pLine->text + (int) longVal,
+						if(dsetsubstr(sess.cur.pFace->point.pLine->text + (int) longVal,
 						 (size_t) longVal2, pRtnVal) != 0)
 							goto LibFail;
 						}
@@ -2400,37 +2221,37 @@ InsNLSPC:
 				i = CaseWord | CaseTitle;
 				goto CvtCase;
 			case cf_toInt:
-				datxfer(pRtnVal, args[0]);
+				dxfer(pRtnVal, args[0]);
 				(void) toInt(pRtnVal);
 				break;
 			case cf_tr:
 				(void) tr(pRtnVal, args[0], args[1], args[2]);
 				break;
-			case cf_truncBuf:;
-				// Truncate buffer.  Delete all text from current buffer position to end (default or n > 0) or
-				// beginning (n <= 0) and save in undelete buffer.
+			case cf_truncBuf:
+				// Truncate buffer.  Delete all text from current buffer position to beginning or end and save
+				// in undelete buffer, without confirmation if not interactive or abs(n) >= 2.
 
 				// No-op if currently at buffer boundary.
-				long bytes;
+				{long bytes;
 				bool yep;
-				if(n == INT_MIN || n > 0) {
+				bool forw = n == INT_MIN || n > 0;
+				bool confirm = n == INT_MIN || (n >= -1 && n <= 1);
+				if(forw) {
 					if(bufEnd(NULL))
 						break;
 					bytes = LONG_MAX;
-					yep = true;
 					}
 				else {
 					if(bufBegin(NULL))
 						break;
 					bytes = LONG_MIN + 1;
-					yep = false;
 					}
 
-				// Get confirmation if interactive.
-				if(!(sess.opFlags & OpScript)) {
+				// Get confirmation if no n-override and interactive.
+				if(confirm && interactive()) {
 					char workBuf[WorkBufSize];
 
-					sprintf(workBuf, text463, yep ? text465 : text464);
+					sprintf(workBuf, text463, forw ? text465 : text464);
 						// "Truncate to %s of buffer", "end", "beginning"
 					if(terminpYN(workBuf, &yep) != Success || !yep)
 						break;
@@ -2439,14 +2260,13 @@ InsNLSPC:
 				// Delete maximum possible, ignoring any end-of-buffer error.
 				if(killPrep(false) == Success)
 					(void) edelc(bytes, EditDel);
+				}
 				break;
 			case cf_typeQ:
 				(void) dsetstr(dtype(args[0], true), pRtnVal);
 				break;
 			case cf_undelete:
 				// Yank text from the delete ring.
-				if(n == INT_MIN)
-					n = 1;
 				(void) iorStr(NULL, n, Txt_Insert, ringTable + RingIdxDel);
 				break;
 			case cf_undeleteCycle:
@@ -2476,10 +2296,6 @@ CvtCase:
 FVFile:
 				(void) findViewFile(pRtnVal, n, i);
 				break;
-			case cf_wordCharQ:
-				if(isCharVal(args[0]))
-					dsetbool(wordChar[args[0]->u.intNum], pRtnVal);
-				break;
 			case cf_writeFile:
 				i = 'w';
 AWFile:
@@ -2488,8 +2304,6 @@ AWFile:
 				break;
 			case cf_yank:
 				// Yank text from the kill ring.
-				if(n == INT_MIN)
-					n = 1;
 				(void) iorStr(NULL, n, Txt_Insert, ringTable + RingIdxKill);
 				break;
 			case cf_yankCycle:
@@ -2504,7 +2318,7 @@ LibFail:
 	}
 
 // Parse an escaped character sequence, given pointer to leading backslash (\) character.  A sequence includes numeric form \nn,
-// where \0x... and \x... are hexadecimal; otherwise, octal.  Source pointer is updated after parsing is completed.  If
+// where \0x... and \x... are hexadecimal, otherwise octal.  Source pointer is updated after parsing is completed.  If
 // allowNull is true, a null (zero) value is allowed; otherwise, an error is returned.  If pChar is not NULL, result is returned
 // in *pChar.  Return status.
 int evalCharLit(char **pSrc, short *pChar, bool allowNull) {
@@ -2518,17 +2332,19 @@ int evalCharLit(char **pSrc, short *pChar, bool allowNull) {
 	// Parse \x and \0n... sequences.
 	switch(*src++) {
 		case 't':	// Tab
-			c = 011; break;
+			c = '\t'; break;
 		case 'r':	// CR
-			c = 015; break;
+			c = '\r'; break;
 		case 'n':	// NL
-			c = 012; break;
+			c = '\n'; break;
 		case 'e':	// Escape
-			c = 033; break;
+			c = '\e'; break;
 		case 's':	// Space
 			c = 040; break;
 		case 'f':	// Form feed
-			c = 014; break;
+			c = '\f'; break;
+		case 'v':	// Vertical tab
+			c = '\v'; break;
 		case 'x':
 			goto IsNum;
 		case '0':
@@ -2634,14 +2450,14 @@ int evalStrLit(Datum *pRtnVal, char *src) {
 			// "#{" found.  Execute what follows to "}" as a command line.
 			if(dnewtrack(&pDatum) != 0)
 				goto LibFail;
-			if(execExprStmt(pDatum, src + 2, TokC_ExprEnd, &src) != Success)
+			if(execExprStmt(pDatum, src + 2, ParseExprEnd | ParseStmtEnd, &src) != Success)
 				return sess.rtn.status;
 
 			// Append the result.
-			if(pDatum->type != dat_nil) {
+			if(!disnil(pDatum)) {
 				if(toStr(pDatum) != Success)
 					return sess.rtn.status;
-				if(dputd(pDatum, &result) != 0)
+				if(dputs(pDatum->str, &result, 0) != 0)
 					goto LibFail;
 				}
 
@@ -2654,12 +2470,12 @@ int evalStrLit(Datum *pRtnVal, char *src) {
 			++src;
 
 		// Save the character.
-		if(dputc(c, &result) != 0)
+		if(dputc(c, &result, 0) != 0)
 			goto LibFail;
 		}
 
 	// Terminate the result and return.
-	if(dclose(&result, Fab_String) != 0)
+	if(dclose(&result, FabStr) != 0)
 LibFail:
 		(void) librsset(Failure);
 	return sess.rtn.status;

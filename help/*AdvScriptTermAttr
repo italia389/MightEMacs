@@ -25,7 +25,7 @@ following:
      1. Make the window the current window and enter the desired terminal
         attribute specifications into its buffer.
      2. Enable processing of the attribute specifications by setting the
-        "TermAttr" buffer attribute via the "chgBufAttr" (~#uC-x a~U) command.
+        "TermAttr" buffer attribute via the ~bchgBufAttr~B (~#uC-x a~U) command.
 
 Once this is done, the attribute specifications will be converted to the
 correspoinding terminal attributes whenever the buffer is displayed in a window.
@@ -37,27 +37,27 @@ However, note the following:
     buffer is horizontally shifted, including a pop-up window.
 
 The process is similar to enable terminal attributes on the message line.  Any
-attribute specifications in text produced by the "print", "printf", "message",
-and "prompt" functions will be converted if the function is called with either
-an n argument ("print" and "printf") or the "TermAttr" option ("message" and
-"prompt").
+attribute specifications in text produced by the ~bprint~B, ~bprintf~B, ~bmessage~B,
+and ~bprompt~B functions will be converted if the function is called with either
+an n argument (~bprint~B and ~bprintf~B) or the "TermAttr" option (~bmessage~B and
+~bprompt~B).
 
 
 ~bColor Attribute~B
 
 Colored text can be displayed in a buffer or on the message line using the same
 technique described above; however, it is intended for use in a script and
-requires that the desired colors be set up first.  The "setColorPair" function
+requires that the desired colors be set up first.  The ~bsetColorPair~B function
 must be called to define one or more color pairs.  A color pair is a foreground
 (text) color and a background color.  Colors are integers in the range -1..n,
 where n (typically 7, 15, or 255) is dependent on the current terminal
 capabilities.  Color -1 is the default foreground or background color, and 0 is
 black.  To see all colors available for your terminal, press ~#uC-h C~U (showColors).
 
-After calling "setColorPair" to obtain a pair number, the number is then used in
+After calling ~bsetColorPair~B to obtain a pair number, the number is then used in
 a ~~~un~Uc specification to turn on the specific foreground and background colors,
 followed by the text you want to display, followed by a ~~C specification to turn
-color off.  For example, consider the following code snippet:
+color off.  For example, consider the following MScript code fragment:
 
     pair = setColorPair(0, 0, 11)    # Black text on yellow background.
     text = sprintf('~~%uc black on yellow ~~C', pair)
@@ -76,11 +76,11 @@ Note that the color terminal attribute can be freely intermixed with other
 attributes if desired.  Note also that color pair numbers are somewhat
 transitory and may be reused and redefined at any time.  (A finite number of
 pair numbers are available which are doled out in sequence in a circular
-fashion.)  Consequently, you should always call "setColorPair" in your scripts
+fashion.)  Consequently, you should always call ~bsetColorPair~B in your scripts
 just prior to displaying colored text to ensure that a pair number used
 previously was not redefined.  Color pairs currently in use can be displayed at
-any time by calling the "showColors" (~#uC-h C~U) command with a negative numeric
+any time by calling the ~bshowColors~B (~#uC-h C~U) command with a negative numeric
 prefix.  Additionally, current color availability and settings can be obtained
 in a script via "getInfo 'Colors'", which returns the requested values
-(controlled by the n argument) as an array.  See the "showFunctions" (~#uC-h f~U)
+(controlled by the n argument) in an array.  See the ~bshowFunctions~B (~#uC-h f~U)
 display for details.

@@ -28,8 +28,8 @@ You will be prompted for the key sequence to unbind.  To bind or unbind a single
 key, use a numeric prefix that is negative or zero.
 
 Recall that the ~#uC-h c~U (~#ushowCommands~U) command displays all system and user
-commands that match a pattern and their key bindings.  Also, "showKey" (~#uC-h ?~U)
-shows what a particular key sequence is bound to and "showBindings" (~#uC-h n~U)
+commands that match a pattern and their key bindings.  Also, ~bshowKey~B (~#uC-h ?~U)
+shows what a particular key sequence is bound to and ~bshowBindings~B (~#uC-h n~U)
 shows all possible key bindings that match a pattern and what they are bound to.
 
 See the ~bKey Binding Syntax~B section for the use and syntax of key bindings in
