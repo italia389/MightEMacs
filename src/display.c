@@ -296,7 +296,7 @@ static int getNum(const char *prompt, int screen, int *pNum) {
 	Datum *pDatum;
 
 	if(dnewtrack(&pDatum) != 0)
-		return librsset(Failure);
+		return libfail();
 	if(sess.opFlags & OpScript) {
 		if(getNArg(pDatum, NULL) != Success)
 			return sess.rtn.status;
@@ -677,7 +677,7 @@ int wsplit(int n, EWindow **ppWind) {
 	// Make sure we have enough space and can obtain a unique id.  If so, create a new window.
 	if(sess.cur.pWind->rows < 3)
 		return rsset(Failure, 0, text293, sess.cur.pWind->rows);
-			// "Cannot split a %d-line window"
+			// "Cannot split a %hu-line window"
 	if(getWindId(&id) != Success)
 		return sess.rtn.status;
 	if((pWind = (EWindow *) malloc(sizeof(EWindow))) == NULL)
@@ -728,9 +728,9 @@ int wsplit(int n, EWindow **ppWind) {
 			}
 		}
 
-	// Set top line and point line of each window as needed, keeping in mind that buffer may be empty (so top and point
-	// point to the first line) or have just a few lines in it.  In the latter case, set top in the bottom window to the
-	// last line of the buffer and point to same line, except for special case described below.
+	// Set top line and point line of each window as needed, keeping in mind that buffer may be empty (so top line and point
+	// line point to the first line) or have just a few lines in it.  In the latter case, set top in the bottom window to
+	// the last line of the buffer and point to same line, except for special case described below.
 	if(pointRow < sess.cur.pWind->rows) {
 
 		// Point is in old (upper) window.  Fixup new (lower) window.
@@ -1061,7 +1061,7 @@ Retn:
 		pBuf->flags &= ~BFHidden;
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Scroll the previous or next window up (backward) or down (forward) a page.

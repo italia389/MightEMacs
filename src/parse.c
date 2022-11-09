@@ -168,7 +168,7 @@ int toStr(Datum *pDatum) {
 		Datum *pDatum1;
 
 		if(dnewtrack(&pDatum1) != 0 || (rtnCode = dtos(pDatum1, pDatum, NULL, 0)) < 0)
-			return librsset(Failure);
+			return libfail();
 		if(endless(rtnCode) == Success) {
 			dxfer(pDatum, pDatum1);
 #if MMDebug & Debug_Expr
@@ -442,7 +442,7 @@ Retn:
 		*count = found;
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Convert first argument to string form, set result as return value, and return status.  Conversion options are parsed from
@@ -493,7 +493,7 @@ int toString(Datum *pRtnVal, int n, Datum **args) {
 		}
 
 	// Do conversion and return results.
-	return dtos(pRtnVal, args[0], delim, cflags) < 0 ? librsset(Failure) : sess.rtn.status;
+	return dtos(pRtnVal, args[0], delim, cflags) < 0 ? libfail() : sess.rtn.status;
 	}
 
 // Find a token in a string and return it, given destination pointer, pointer to source pointer, and delimiter character (or
@@ -537,7 +537,7 @@ int parseTok(Datum *pDest, char **pSrc, short delimChar) {
 
 	// Save the token and return results.
 	if(dsetsubstr(src0, src - src0, pDest) != 0)
-		return librsset(Failure);
+		return libfail();
 #if MMDebug & Debug_Token
 	fprintf(logfile, "parseTok(): Parsed token \"%s\"\n", pDest->str);
 #endif
@@ -583,7 +583,7 @@ int revParseTok(Datum *pDest, char **pSrc, char *base, short delimChar) {
 
 	// Save the token and return status.
 	if(dsetsubstr(src + 1, srcEnd - (src + 1), pDest) != 0)
-		return librsset(Failure);
+		return libfail();
 #if MMDebug & Debug_Token
 	fprintf(logfile, "revParseTok(): Parsed token \"%s\"\n", pDest->str);
 #endif
@@ -823,7 +823,7 @@ SaveExit:
 				c = *src;
 				*src = '\0';
 				if(dsetstr(src0, &pLastParse->tok) != 0)
-					return librsset(Failure);
+					return libfail();
 				*src = c;
 				break;
 				}

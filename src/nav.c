@@ -331,7 +331,7 @@ int getWord(Datum *pRtnVal, int n, Datum **args) {
 	// Save text and return.
 	if(dsetsubstr(pPoint->pLine->text + offset, (pPoint->pLine->text + pPoint->offset) - (pPoint->pLine->text + offset),
 	 pRtnVal) != 0)
-		(void) librsset(Failure);
+		(void) libfail();
 	else if(n < 0)
 		pPoint->offset = offset;
 	goto Retn;
@@ -549,7 +549,7 @@ int gotoLine(Datum *pRtnVal, int n, Datum **args) {
 
 	// Get line number and validate it.
 	if(dnewtrack(&pDatum) != 0)
-		return librsset(Failure);
+		return libfail();
 	if(sess.opFlags & OpScript) {
 		if(funcArg(pDatum, ArgFirst | ArgInt1) != Success)
 			return sess.rtn.status;
@@ -828,7 +828,7 @@ static int getMark(const char *basePrompt, int n, ushort flags, Mark **ppMark) {
 	// Success.  Return mark.
 	return findBufMark(id, ppMark, flags);
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Set a mark in the current buffer to point and return status.  If default n, use RegionMark; otherwise, get a mark with no

@@ -110,7 +110,7 @@ int array(Datum *pRtnVal, int n, Datum **args) {
 			pInitializer = *args;
 		}
 	if((pArray = anew(len, pInitializer)) == NULL)
-		return librsset(Failure);
+		return libfail();
 	agStash(pRtnVal, pArray);
 	return sess.rtn.status;
 	}
@@ -135,7 +135,7 @@ int strSplit(Datum *pRtnVal, int n, Datum **args) {
 		limit = (*args)->u.intNum;
 
 	if((pArray = asplit(delimChar, str, limit)) == NULL)
-		return librsset(Failure);
+		return libfail();
 	agStash(pRtnVal, pArray);
 
 	// Strip the elements if requested.
@@ -145,7 +145,7 @@ int strSplit(Datum *pRtnVal, int n, Datum **args) {
 
 		while((pDatum = aeach(&pArray1)) != NULL)
 			if(dsetstr(stripStr(pDatum->str, n), pDatum) != 0)
-				return librsset(Failure);
+				return libfail();
 		}
 
 	return sess.rtn.status;
@@ -269,7 +269,7 @@ static int strsub(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match 
 	if(dclose(&result, FabStr) == 0)
 		return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Perform RE substitution(s) in string 'pSrc' using search and replacement patterns in given Match object, and save result in
@@ -316,7 +316,7 @@ static int regsub(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match 
 			 dputs(pSrc->str + scanOffset + group0.rm_eo, &result, 0) != 0) ||
 			 dclose(&result, FabStr) != 0) {
 LibFail:
-				(void) librsset(Failure);
+				(void) libfail();
 				break;
 				}
 
@@ -423,7 +423,7 @@ LitChar:
 
 	if(dclose(pFab, FabStr) != 0)
 LibFail:
-		(void) librsset(Failure);
+		(void) libfail();
 	return sess.rtn.status;
 	}
 
@@ -462,7 +462,7 @@ static int trPrep(Datum *pFrom, Datum *pTo) {
 		}
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Translate a string, given result pointer, source pointer, translate-from string, and translate-to string.  Return status.
@@ -507,7 +507,7 @@ Next:
 	// Terminate and return the result.
 	if(dclose(&result, FabStr) != 0)
 LibFail:
-		(void) librsset(Failure);
+		(void) libfail();
 	return sess.rtn.status;
 	}
 
@@ -561,7 +561,7 @@ Onward:
 	// Return result.
 	if(dclose(&fab, FabStr) != 0)
 LibFail:
-		(void) librsset(Failure);
+		(void) libfail();
 	return sess.rtn.status;
 	}
 
@@ -714,7 +714,7 @@ Paste:
 Retn:
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 #if (MMDebug & Debug_Token) && 0
@@ -810,7 +810,7 @@ First:
 	// We have all the text in pRtnVal.  Now insert, overwrite, or replace it n times.
 	return iorText(pRtnVal->str, n, style, pBuf);
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Process stat? function.  Return status.
@@ -905,7 +905,7 @@ static int formatArg(Datum *pRtnVal, uint argFlags, ArrayState *pArrayState) {
 				pArrayState->pArray = NULL;
 			else {
 				if(dcpy(pRtnVal, pArray->elements[pArrayState->i]) != 0)
-					return librsset(Failure);
+					return libfail();
 				++pArrayState->i;
 				break;
 				}
@@ -1210,7 +1210,7 @@ ULFmt:
 			// "Too many arguments for 'printf' or 'sprintf' function"
 	if(dclose(&result, FabStr) != 0)
 LibFail:
-		(void) librsset(Failure);
+		(void) libfail();
 
 	return sess.rtn.status;
 	}
@@ -1221,7 +1221,7 @@ static int getKill(Datum *pRtnVal, int n) {
 
 	// Which kill?
 	if((pRingEntry = rget(ringTable + RingIdxKill, n)) != NULL && dcpy(pRtnVal, &pRingEntry->data) != 0)
-		(void) librsset(Failure);
+		(void) libfail();
 	return sess.rtn.status;
 	}
 
@@ -1322,7 +1322,7 @@ Enabled:
 	// Return result.
 	if(pResultSpec != NULL) {
 		if(dsetstr(pResultSpec->name, pRtnVal) != 0)
-			(void) librsset(Failure);
+			(void) libfail();
 		}
 	else
 SetNil:
@@ -1335,7 +1335,7 @@ int arrayClone(Datum *pDest, Datum *pSrc) {
 	Array *pArray;
 
 	if((pArray = aclone(pSrc->u.pArray)) == NULL)
-		return librsset(Failure);
+		return libfail();
 	agStash(pDest, pArray);
 
 	return sess.rtn.status;
@@ -1365,7 +1365,7 @@ int titleCaseStr(Datum *pRtnVal, int n, Datum **args) {
 	bool inWord = false;
 
 	if(dsalloc(pRtnVal, strlen(src = args[0]->str) + 1) != 0)
-		return librsset(Failure);
+		return libfail();
 	dest = pRtnVal->str;
 	while((c = *src++) != '\0') {
 		if(wordChar[c]) {
@@ -1868,7 +1868,7 @@ KDCText:
 				i = CaseWord | CaseLower;
 				goto CvtCase;
 			case cf_match:
-				{Match *pMatch = (n == INT_MIN) ? &matchRE : &searchCtrl.match;
+				{Match *pMatch = (n == INT_MIN) ? &matchRE : &bufSearch.match;
 				longVal = args[0]->u.intNum;
 				if(longVal < 0)
 					return rsset(Failure, 0, text5, longVal);
@@ -1986,7 +1986,7 @@ PrintMsg:
 			case cf_quote:
 				// Convert any value to a string form which will resolve to the original value.
 				if((i = dtos(pRtnVal, args[0], NULL, DCvtLang)) < 0)
-					(void) librsset(Failure);
+					(void) libfail();
 				else if(n <= 0)
 					(void) endless(i);
 				break;
@@ -2134,8 +2134,8 @@ InsNLSPC:
 			case cf_splitWind:
 				{EWindow *pWind;
 
-				(void) wsplit(n, &pWind);
-				dsetint((long) getWindNum(pWind), pRtnVal);
+				if(wsplit(n, &pWind) == Success)
+					dsetint((long) getWindNum(pWind), pRtnVal);
 				}
 				break;
 			case cf_sprintf:
@@ -2314,7 +2314,7 @@ AWFile:
 	// Command or function call completed.  Extra arguments in script mode are checked in fcall() so no need to do it here.
 	return sess.rtn.status == Success ? rssave() : sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Parse an escaped character sequence, given pointer to leading backslash (\) character.  A sequence includes numeric form \nn,
@@ -2477,6 +2477,6 @@ int evalStrLit(Datum *pRtnVal, char *src) {
 	// Terminate the result and return.
 	if(dclose(&result, FabStr) != 0)
 LibFail:
-		(void) librsset(Failure);
+		(void) libfail();
 	return sess.rtn.status;
 	}

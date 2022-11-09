@@ -118,7 +118,7 @@ int clearHook(Datum *pRtnVal, int n, Datum **args) {
 		uint argFlags = ArgFirst | ArgNotNull1;
 
 		if(dnewtrack(&pHookName) != 0)
-			return librsset(Failure);
+			return libfail();
 		for(;;) {
 			if(!(argFlags & ArgFirst) && !haveSym(s_comma, false))
 				break;					// No arguments left.
@@ -220,7 +220,7 @@ static int disableHook(HookRec *pHookRec) {
 	eraseHook(pHookRec);
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Execute a function bound to a hook with pRtnVal (if not NULL) and n.  If argInfo == 0, invoke the function directly;
@@ -332,7 +332,7 @@ Fail:
 	// Execution failed or hook returned false.  Disable hook and let the user know what's up.
 	return disableHook(pHookRec);
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Execute a named command or alias to a command interactively even if it is not bound or is being invoked from a user command
@@ -410,7 +410,7 @@ int eval(Datum *pRtnVal, int n, Datum **args) {
 
 	// Get the command line.
 	if(dnewtrack(&pDatum) != 0)
-		return librsset(Failure);
+		return libfail();
 	if(sess.opFlags & OpScript) {
 
 		// Concatenate all arguments into pDatum.
@@ -435,7 +435,7 @@ static int argDump(int n, Buffer *pBuf, Datum *pDatum) {
 	fprintf(logfile, "-----\nargDump(): n: %d, pBuf: '%s'\n", n, pBuf->bufname);
 	dinit(&argList);
 	if(dtos(&argList, pDatum, NULL, DCvtLang) < 0)
-		return librsset(Failure);
+		return libfail();
 	fprintf(logfile, "User command/function argument list: %s\n", argList.str);
 	dclear(&argList);
 	return sess.rtn.status;
@@ -524,7 +524,7 @@ static int argLoad(Buffer *pBuf, Datum *pArgV, uint flags) {
 	return sess.rtn.status;
 #endif
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 #if MMDebug & (Debug_Datum | Debug_Expr | Debug_Token)
@@ -809,7 +809,7 @@ int alias(Datum *pRtnVal, int n, Datum **args) {
 
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Delete one or more user commands, user functions, or aliases.  Set pRtnVal to count of items deleted or zero if error.
@@ -817,6 +817,7 @@ LibFail:
 static int delCFA(Datum *pRtnVal, uint selector, const char *prompt, const char *type, const char *errorMsg) {
 	UnivPtr univ;
 	uint count = 0;
+	bool delError = false;
 
 	if(sess.opFlags & OpEval)
 		dsetint(0L, pRtnVal);
@@ -847,6 +848,7 @@ Fail:
 					// Don't cause a running script to fail on Failure status.
 					if(sess.rtn.status < Failure)
 						return sess.rtn.status;
+					delError = true;
 					(void) rsunfail();
 					continue;
 					}
@@ -855,8 +857,8 @@ Fail:
 			}
 		} while((sess.opFlags & OpScript) && getSym() == Success && needSym(s_comma, false));
 
-	// Return count if evaluating and no errors.
-	if((sess.opFlags & OpEval) && disnull(&sess.rtn.msg))
+	// Return count if evaluating and no error.
+	if((sess.opFlags & OpEval) && !delError)
 		dsetint((long) count, pRtnVal);
 	if(count == 1)
 		(void) rsset(Success, RSHigh, "%s %s", type, text10);
@@ -972,7 +974,7 @@ static int userExecError(const char *errorMsg0, const char *errorMsg1, Buffer *p
 		goto LibFail;
 	return rsset(ScriptError, RSForce | RSNoFormat | RSTermAttr, msg.pDatum->str);
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Free a list of loop block pointers, given head of list.
@@ -1470,7 +1472,7 @@ Err:
 
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Parse a "for" line and initialize control variables.  Return status.
@@ -1510,7 +1512,7 @@ static int nextForEl(ForLoopHdr *pForHdr) {
 		return NotFound;
 		}
 	if((pDatum = aget(pForHdr->pArray, pForHdr->index++, 0)) == NULL)
-		return librsset(Failure);
+		return libfail();
 	return setVar(pDatum, &pForHdr->varDesc);
 	}
 
@@ -1540,7 +1542,7 @@ static int xbuf(Datum *pRtnVal, Buffer *pBuf, uint flags) {
 
 	// Prepare for execution.
 	if(dnewtrack(&pDatum) != 0 || dnewtrack(&pFullLine) != 0)
-		return librsset(Failure);
+		return libfail();
 	if(nextLevel(&levelTable) != Success)
 		return sess.rtn.status;
 	pLevel = levelTable;
@@ -1601,7 +1603,7 @@ static int xbuf(Datum *pRtnVal, Buffer *pBuf, uint flags) {
 			if(dopenwith(&fab, pFullLine, FabAppend) != 0 || dputmem((void *) lineText, thisIsCL ? len - 1 : len,
 			 &fab, 0) != 0 || dclose(&fab, FabStr) != 0) {
 LibFail:
-				(void) librsset(Failure);
+				(void) libfail();
 				goto RCExit;
 				}
 			}
@@ -2124,7 +2126,7 @@ int execBuf(Datum *pRtnVal, int n, Buffer *pBuf, char *runPath, uint flags) {
 				pScriptRun->path = fixNull(runPath);
 				pScriptRun->pBuf = pBuf;
 				if(dnew(&pScriptRun->pNArg) != 0)
-					return librsset(Failure);		// Fatal error.
+					return libfail();		// Fatal error.
 				dsetint(n, pScriptRun->pNArg);
 				pScriptRun->pVarStack = localVarRoot;
 
@@ -2220,7 +2222,7 @@ int xeqFile(Datum *pRtnVal, int n, Datum **args) {
 
 	// save it...
 	if(dsetstr(path, pRtnVal) != 0)
-		return librsset(Failure);
+		return libfail();
 
 	// and execute it with arg n.
 	return execFile(pRtnVal, pRtnVal->str, n, 0);

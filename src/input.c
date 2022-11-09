@@ -265,7 +265,7 @@ int fGetKey(Datum *pRtnVal, int n, Datum **args) {
 	if(!keyLit)
 		dsetint(ektoc(extKey, true), pRtnVal);
 	else if(dsetstr(ektos(extKey, keyBuf, false), pRtnVal) != 0)
-		return librsset(Failure);
+		return libfail();
 
 	return sess.rtn.status;
 	}
@@ -659,7 +659,7 @@ static int mli_close(InpCtrl *pInpCtrl, Datum **ppDatum) {
 	 pInpCtrl->curInpPos - pInpCtrl->inpBuf, pInpCtrl->endInpPos - pInpCtrl->inpBuf);
 #endif
 	if(dnewtrack(ppDatum) != 0 || dsalloc(*ppDatum, (pInpCtrl->endInpPos - pInpCtrl->inpBuf) + 1) != 0)
-		return librsset(Failure);
+		return libfail();
 	inpToStr((*ppDatum)->str, pInpCtrl);
 	return sess.rtn.status;
 	}
@@ -733,7 +733,7 @@ static int buildPrompt(char *dest, const char *prompt1, int maxPct, short defVal
 	strfit(dest, maxLen + (ctrlFlags & Term_Attr ? attrCount(str, promptLen, maxLen) : 0), str, promptLen);
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Compare a string to the message line input buffer and return Boolean result.
@@ -1140,7 +1140,7 @@ SetKey:
 
 		ektos(extKey, keyBuf, false);
 		if(dsetstr(keyBuf, pRtnVal) != 0)
-			return librsset(Failure);
+			return libfail();
 		}
 
 	return sess.rtn.status;
@@ -1275,7 +1275,7 @@ int termInp(Datum *pRtnVal, const char *basePrompt, uint argFlags, uint ctrlFlag
 	else if(ctrlFlags & Term_C_CFA) {
 		ppHashRec = cmdNameList;
 		if(hsort(execTable, hcmp, &ppHashRec) != 0)
-			return librsset(Failure);
+			return libfail();
 		}
 
 	// Get a string from the user with line-editing capabilities (via control characters and arrow keys).  Process each key
@@ -1524,7 +1524,7 @@ int terminpYN(const char *basePrompt, bool *result) {
 	if(dnewtrack(&pDatum) != 0 || dopentrack(&prompt) != 0 ||
 	 dputs(basePrompt, &prompt, 0) != 0 || dputs(text162, &prompt, 0) != 0 || dclose(&prompt, FabStr) != 0)
 						// " (y/n)?"
-		return librsset(Failure);
+		return libfail();
 
 	// Prompt user, get the response, and check it.
 	for(;;) {
@@ -1564,7 +1564,7 @@ int getCFA(const char *prompt, uint selector, UnivPtr *pUniv, const char *errorM
 	Datum *pDatum;
 
 	if(dnewtrack(&pDatum) != 0)
-		return librsset(Failure);
+		return libfail();
 	if(sess.opFlags & OpScript) {
 		if(funcArg(pDatum, ArgFirst | ArgNotNull1) != Success)
 			return sess.rtn.status;
@@ -1821,5 +1821,5 @@ ErrRtn:
 	return rsset(Failure, 0, text447, text457, pOptStr->str);
 		// "Invalid %s '%s'", "prompt option"
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}

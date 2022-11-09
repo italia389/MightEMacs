@@ -20,21 +20,21 @@ For a standard installation of MightEMacs, perform the following steps:
     If you are installing on a Linux platform, go to the next step; otherwise,
     go to step 5.
 
- 3. The Linux installer is memacs-9.6.0.sh, which includes a 64-bit binary built
+ 3. The Linux installer is memacs-9.7.0.sh, which includes a 64-bit binary built
     on a CentOS vers. 6 machine.  To run the installer, type the following
     commands:
 
 	$ su root
-	# ./memacs-9.6.0.sh
+	# ./memacs-9.7.0.sh
 	# exit
 
  4. Go to step 6.
 
- 5. The macOS installer is memacs-9.6.0.pkg, which includes a 64-bit binary
+ 5. The macOS installer is memacs-9.7.0.pkg, which includes a 64-bit binary
     built for macOS vers. 10.12 (Sierra) and later.  Open the installer
     package with the following command:
 
-	$ open memacs-9.6.0.pkg
+	$ open memacs-9.7.0.pkg
 
     and run the installer.
 

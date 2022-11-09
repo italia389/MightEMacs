@@ -1,4 +1,4 @@
-# Makefile for MightEMacs.		Ver. 9.6.0
+# Makefile for MightEMacs.		Ver. 9.7.0
 
 # Definitions.
 MAKEFLAGS = --no-print-directory
@@ -21,7 +21,7 @@ Libs = $(CXLib) $(XRELib) -lncurses -lc -lm
 
 BinDir = bin
 ManDir = share/man
-ManPage = memacs.1
+ManPage = $(BinName2).1
 SiteMS = site.ms
 UserMS = .memacs
 Install1 = /usr/local
@@ -147,7 +147,7 @@ uninstall:
 		echo "'$(BinName2)' binary not found." 1>&2;\
 	else \
 		for f in "$$destDir"/$(BinDir)/$(BinName1) "$$destDir"/$(BinDir)/$(BinName2)\
-		 "$$destDir"/$(LibDir)/$(ProjBaseDir) "$$destDir"/$(ProjDir) "$$destDir"/$(ManDir)/man1/$(ManPage); do \
+		 "$$destDir"/$(ProjDir) "$$destDir"/$(ManDir)/man1/$(ManPage); do \
 			if [ -e "$$f" ]; then \
 				rm -rf "$$f" && echo "Deleted '$$f'" 1>&2;\
 			fi;\

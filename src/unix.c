@@ -228,7 +228,7 @@ int sysCallError(const char *caller, const char *call, bool addTERM) {
 
 		if(dopenwith(&msg, &sess.rtn.msg, FabAppend) != 0 || dputf(&msg, 0, ", TERM '%s'", vTerm.termName) != 0 ||
 		 dclose(&msg, FabStr) != 0)
-			(void) librsset(Failure);
+			(void) libfail();
 		}
 	return sess.rtn.status;
 	}
@@ -700,7 +700,7 @@ int chgWorkDir(Datum *pRtnVal, int n, Datum **args) {
 	if(setWorkDir(sess.cur.pScrn) != Success)
 		return sess.rtn.status;
 	if(dsetstr(sess.cur.pScrn->workDir, pRtnVal) != 0)
-		return librsset(Failure);
+		return libfail();
 
 	// Set mode line update flag if needed.
 	if(modeInfo.cache[MdIdxWkDir]->flags & MdEnabled)
@@ -833,7 +833,7 @@ int shellCLI(Datum *pRtnVal, int n, Datum **args) {
 static int getCmd(Datum **ppCmdLine, const char *prompt) {
 
 	if(dnewtrack(ppCmdLine) != 0)
-		return librsset(Failure);
+		return libfail();
 	if(sess.opFlags & OpScript) {
 
 		// Concatenate all arguments into command line Datum object.
@@ -1212,7 +1212,7 @@ CloseWait:
 
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 OSErr:
 	return rsset(OSError, 0, text44, filename, myName);
 		// "calling %s() from %s() function"
@@ -1321,7 +1321,7 @@ int expandPath(Datum *pDest, Datum *pSrc) {
 		dxfer(pDest, fab.pDatum);
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Return pointer to base filename, given pathname or filename.  If withExt is true, return base filename with extension,
@@ -1516,7 +1516,7 @@ int pathSearch(const char *name, ushort flags, void *result, const char *funcNam
 	// No such luck.
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Get absolute pathname of "filename" (which may be modified) and return in "pPath".  Resolve it if it's a symbolic link and
@@ -1553,7 +1553,7 @@ ErrRetn:
 				// "Cannot get %s of file \"%s\": %s", "pathname"
 		if(dsetstr(nameBuf, pPath) != 0)
 LibFail:
-			(void) librsset(Failure);
+			(void) libfail();
 		}
 
 	return sess.rtn.status;

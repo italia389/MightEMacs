@@ -74,7 +74,7 @@ static int globtoa(Datum *pRtnVal, glob_t *pGlob) {
 		dinit(&datum);
 		do {
 			if(dsetstr(*pPath, &datum) != 0 || apush(pArray, &datum, AOpCopy) != 0)
-				return librsset(Failure);
+				return libfail();
 			} while(*++pPath != NULL);
 		dclear(&datum);
 		globfree(pGlob);
@@ -102,7 +102,7 @@ static int buftoa(Array *pArray, Buffer *pBuf) {
 	// Remove duplicates.
 	if(auniq(pArray, NULL, AOpInPlace) == NULL)
 LibFail:
-		return librsset(Failure);
+		return libfail();
 
 	return sess.rtn.status;
 	}
@@ -180,7 +180,7 @@ int absPathname(Datum *pRtnVal, int n, Datum **args) {
 					break;
 				if(apush(pArray0, path, AOpCopy) != 0)
 LibFail:
-					return librsset(Failure);
+					return libfail();
 				}
 			}
 		}
@@ -221,7 +221,7 @@ int xPathname(Datum *pRtnVal, int n, Datum **args) {
 			if(result == NULL)
 				dsetnil(pRtnVal);
 			else if(dsetstr(result, pRtnVal) != 0)
-				(void) librsset(Failure);
+				(void) libfail();
 			}
 		}
 	return sess.rtn.status;
@@ -797,7 +797,7 @@ int ioStat(DFab *rtnMsg, ushort flags, Datum *pBakName, int status, const char *
 	return rsset(status >= Success ? Success : status, flags & IOS_RSHigh ? RSHigh | RSNoFormat | RSNoWrap :
 	 RSNoFormat | RSNoWrap, rtnMsg->pDatum->str);
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Prompt for a filename (which cannot be null), using "def" as default (which may be NULL).  ArgFirst and/or Term_* flags may
@@ -853,7 +853,7 @@ int delFile(Datum *pRtnVal, int n, Datum **args) {
 			return rsset(Failure, 0, text493, text83, pBuf->bufname);
 				// "No filename set for %s '%s'", "buffer"
 		if(dsetstr(pBuf->filename, pRtnVal) != 0)
-			return librsset(Failure);
+			return libfail();
 		if(bdelete(pBuf, 0) != Success)
 			return sess.rtn.status;
 		}
@@ -901,7 +901,7 @@ int linkFile(Datum *pRtnVal, int n, Datum **args) {
 			// "command option"
 
 	if(dnewtrack(&pOldFile) != 0 || dnewtrack(&pNewFile) != 0)
-		return librsset(Failure);
+		return libfail();
 	initBoolOpts(options);
 	if(n != INT_MIN) {
 		int count;
@@ -1030,7 +1030,7 @@ int renameFile(Datum *pRtnVal, int n, Datum **args) {
 			// "command option"
 
 	if(dnewtrack(&pDatum) != 0)
-		return librsset(Failure);
+		return libfail();
 	initBoolOpts(options);
 	if(n != INT_MIN) {
 		int count;
@@ -1054,7 +1054,7 @@ int renameFile(Datum *pRtnVal, int n, Datum **args) {
 			return rsset(Failure, 0, text493, text83, pBuf->bufname);
 				// "No filename set for %s '%s'", "buffer"
 		if(dsetstr(pBuf->filename, pDatum) != 0)
-			return librsset(Failure);
+			return libfail();
 		}
 	else {
 		// Get old filename.
@@ -1140,7 +1140,7 @@ int readIn(Buffer *pBuf, const char *filename, ushort flags) {
 		DFab fab;
 
 		if(dopentrack(&fab) != 0)
-			return librsset(Failure);
+			return libfail();
 		if(ioStat(&fab, dataInsert.finalDelim ? IOS_RSHigh : IOS_RSHigh | IOS_NoDelim, NULL, dataInsert.status,
 		 filename, text131, dataInsert.lineCt) != Success)
 				// "Read"
@@ -1226,7 +1226,7 @@ int insertFile(Datum *pRtnVal, int n, Datum **args) {
 
 		if(insertData(n, NULL, &dataInsert) == Success) {
 			if(dopentrack(&fab) != 0)
-				return librsset(Failure);
+				return libfail();
 			(void) ioStat(&fab, dataInsert.finalDelim ? 0 : IOS_NoDelim, NULL, dataInsert.status, pRtnVal->str,
 			 text154, dataInsert.lineCt);
 				// "Inserted"
@@ -1331,7 +1331,7 @@ static int bufStatusCheck(Buffer *pBuf) {
 		if(dopentrack(&prompt) != 0 ||
 		 dputf(&prompt, 0, text147, text308, pBuf->bufname) != 0 || dclose(&prompt, FabStr) != 0)
 				// "%s buffer '%s'... write it out", "Narrowed"
-			(void) librsset(Failure);
+			(void) libfail();
 		else if(terminpYN(prompt.pDatum->str, &yep) == Success && !yep)
 			(void) rsset(UserAbort, 0, NULL);
 		}
@@ -1447,7 +1447,7 @@ static int writeOut(Buffer *pBuf, const char *filename, short mode, ushort flags
 	  status == Success && (saveFlags & 0x02) ? pBakName : NULL, status, filename, text149, lineCt) : sess.rtn.status;
 									// "Wrote"
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Do appendFile or writeFile command.  Ask for a filename, and write or append the contents of the current buffer to that file.
@@ -1523,7 +1523,7 @@ static int saveBuf(Buffer *pBuf, ushort flags, const char **pCurDir, const char 
 			 dputf(&prompt, 0, text423, pBuf->bufname, workDir, pBuf->filename) != 0 ||
 				// "Directory changed.  Write buffer '%s' to file \"%s/%s\""
 			 dclose(&prompt, FabStr) != 0)
-				return librsset(Failure);
+				return libfail();
 			if(terminpYN(prompt.pDatum->str, &yep) != Success)
 				return sess.rtn.status;
 			if(!yep)					// Permission given?
@@ -1716,7 +1716,7 @@ int setBufFile(Datum *pRtnVal, int n, Datum **args) {
 		dsetnil(pArray->elements[1]);
 	else if(dsetstr(pRtnVal->str, pArray->elements[1]) != 0)
 LibFail:
-		return librsset(Failure);
+		return libfail();
 	agStash(pRtnVal, pArray);
 
 	// Update mode line.

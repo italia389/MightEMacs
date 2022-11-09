@@ -153,7 +153,7 @@ all subsequent lines.  For example, if your screen looked like this:
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r=* (Exact) == unnamed ============================= MightEMacs 9.6.0 ~R|
+    |~r=* (Exact) == unnamed ============================= MightEMacs 9.7.0 ~R|
 
 with the point following the word "fork?", and you typed ~#uC-- 3 C-c RTN~U, the
 four-line block would be converted to this (assuming $wrapCol is set to the
@@ -170,7 +170,7 @@ terminal width):
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r=* (Exact) == unnamed ============================= MightEMacs 9.6.0 ~R|
+    |~r=* (Exact) == unnamed ============================= MightEMacs 9.7.0 ~R|
 
 with the point left at the end of the block.
 
@@ -192,7 +192,7 @@ For example, if the buffer contained the following lines:
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r=* (Exact) == myscript ============================ MightEMacs 9.6.0 ~R|
+    |~r=* (Exact) == myscript ============================ MightEMacs 9.7.0 ~R|
 
 with the point in the middle of the third line (after "away"), and you entered
 ~#uESC .~U, the first four lines would be converted to:
@@ -207,7 +207,7 @@ with the point in the middle of the third line (after "away"), and you entered
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r=* (Exact) == myscript ============================ MightEMacs 9.6.0 ~R|
+    |~r=* (Exact) == myscript ============================ MightEMacs 9.7.0 ~R|
 
 with the point left at the end of the comment block.  Notice that the first line
 determines the indentation for the whole block.

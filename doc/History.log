@@ -1,6 +1,20 @@
 MightEMacs RELEASE HISTORY
 
 ----------
+9.7.0	4 Nov 2022
+ 1. Updated code per changes made in XRE library version 1.2.0 and CXL library
+    version 1.2.0, including incorporation of Boyer-Moore search routines from
+    CXL library which are faster and more efficient than the old ones built-in
+    to the editor.
+ 2. Added "Homed" option to "showBuffers" command, which displays buffers homed
+    to current screen only.
+ 3. Made "fuzzy" searching a compile-time option and disabled it by default.
+ 4. Fixed bug in "splitWind" command where splitting a window having fewer than
+    three lines would cause a crash.
+ 5. Fixed bug in "delBuf" command where a zero deletion count could be returned
+    for a named buffer deletion even if the operation was successful.
+
+----------
 9.6.0	6 Jun 2022
  1. Updated code per changes made in CXL library version 1.1.0.
  2. Added option to restrict buffer search and/or replace operations to a fixed

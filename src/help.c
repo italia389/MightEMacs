@@ -116,7 +116,7 @@ Save:
 		strcpy(osName, name);
 		}
 
-	return dsetstr(name, pRtnVal) != 0 ? librsset(Failure) : sess.rtn.status;
+	return dsetstr(name, pRtnVal) != 0 ? libfail() : sess.rtn.status;
 	}
 #endif
 
@@ -165,7 +165,7 @@ static int binfo(Array *pArray, Buffer *pBuf, bool extended) {
 
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Build array of form [bufname], [bufname, filename, homeDir, bytes, lines], or [bufname, filename, homeDir, bytes, lines,
@@ -267,7 +267,7 @@ DoOneBuf:
 		}
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Build array for getInfo or bufInfo function and return it in pRtnVal.  Return status.
@@ -428,7 +428,7 @@ static int buildArray(Datum *pRtnVal, int n, CmdFuncId id) {
 	// Return results.
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // binSearch() helper function for returning a getInfo keyword, given table (array) and index.
@@ -464,7 +464,7 @@ int getInfo(Datum *pRtnVal, int n, Datum **args) {
 		// Match found.  Check keyword type.
 		pInfoTable = infoTable + i;
 		if(pInfoTable->value != NULL)
-			return dsetstr(pInfoTable->value, pRtnVal) != 0 ? librsset(Failure) : sess.rtn.status;
+			return dsetstr(pInfoTable->value, pRtnVal) != 0 ? libfail() : sess.rtn.status;
 #ifndef OSName
 		if(strcmp(pInfoTable->keyword, "os") == 0)
 			return getOS(pRtnVal);
@@ -657,7 +657,7 @@ Set:
 	if(result == NULL)
 		dsetnil(pRtnVal);
 	else if(dsetstr(result, pRtnVal) != 0)
-		(void) librsset(Failure);
+		(void) libfail();
 Retn:
 	return sess.rtn.status;
 	}
@@ -932,7 +932,7 @@ static int rptHdr(DFab *rpt, const char *title, bool plural, const char *colHead
 		goto LibFail;
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Write header lines to an open fabrication object, given report title.  Return status.
@@ -943,7 +943,7 @@ static int showHdr(ShowCtrl *pShowCtrl, const char *title) {
 		char workBuf[term.cols + 1];
 		dupChar(workBuf, '=', term.cols);
 		if(dputs(workBuf, &pShowCtrl->rpt, 0) != 0 || dputc('\n', &pShowCtrl->rpt, 0) != 0)
-			return librsset(Failure);
+			return libfail();
 		}
 
 	// Write title.
@@ -1070,7 +1070,7 @@ Init:
 
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Build a "show" listing in a report buffer, given ShowCtrl object, flags, section title (which may be NULL), and pointer to
@@ -1169,7 +1169,7 @@ MatchFound:
 	// Close fabrication object and append report (string) to report buffer if any items were written.
 	if(dclose(&pShowCtrl->rpt, FabStr) != 0)
 LibFail:
-		return librsset(Failure);
+		return libfail();
 	if(!firstItem) {
 
 		// Write blank line if title not NULL and buffer not empty.
@@ -1270,7 +1270,7 @@ static int findKeys(ShowCtrl *pShowCtrl, uint keyType, void *pItem) {
 
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Get options and set flags for showCommands() and showFunctions() functions.  Return status, including Cancelled if no options
@@ -1397,7 +1397,7 @@ static int nextCmdFunc(ShowCtrl *pShowCtrl, ushort request, const char **pName, 
 			break;
 		default: // SHReqValue
 			if(dputs(pShowCtrl->value.str, &pShowCtrl->rpt, 0) != 0)
-				(void) librsset(Failure);
+				(void) libfail();
 		}
 Retn:
 	return sess.rtn.status;
@@ -1512,7 +1512,7 @@ static int nextAlias(ShowCtrl *pShowCtrl, ushort request, const char **pName) {
 Retn:
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Create formatted list of aliases via calls to "show" routines.  Return status.
@@ -1585,13 +1585,14 @@ int showBuffers(Datum *pRtnVal, int n, Datum **args) {
 		{SB_ReadOnly, text459},			// "Read only"
 		{SB_Changed, text439},			// "Changed"
 		{'\0', NULL}};
-	static bool selCommand, selFunction, selHidden, selHomeDir, selVisible;
+	static bool selCommand, selFunction, selHomed, selVisible, inclHidden, inclHomeDir;
 	static Option options[] = {
 		{"^Visible", "^Viz", 0, .u.ptr = (void *) &selVisible},
-		{"^Hidden", "^Hid", 0, .u.ptr = (void *) &selHidden},
+		{"Ho^med", "H^md", 0, .u.ptr = (void *) &selHomed},
 		{"^Command", "^Cmd", 0, .u.ptr = (void *) &selCommand},
 		{"^Function", "^Func", 0, .u.ptr = (void *) &selFunction},
-		{"Home^Dir", "Hm^Dir", 0, .u.ptr = (void *) &selHomeDir},
+		{"^Hidden", "^Hid", 0, .u.ptr = (void *) &inclHidden},
+		{"Home^Dir", "Hm^Dir", 0, .u.ptr = (void *) &inclHomeDir},
 		{NULL, NULL, 0, 0}};
 	static OptHdr optHdr = {
 		0, text410, false, options};
@@ -1615,8 +1616,11 @@ int showBuffers(Datum *pRtnVal, int n, Datum **args) {
 		if(parseOpts(&optHdr, workBuf, args[0], &count) != Success || count == 0)
 			return sess.rtn.status;
 		setBoolOpts(options);
-		if(count == 1 && selHomeDir)
-			selVisible = true;
+		if(selVisible)
+			selHomed = false;
+		else if(!selHomed && !selCommand && !selFunction)
+			return rsset(Failure, 0, text455, optHdr.type);
+				// "Missing required %s",
 		}
 
 	// Get new buffer and fabrication object.
@@ -1637,17 +1641,26 @@ int showBuffers(Datum *pRtnVal, int n, Datum **args) {
 	while((pArrayEl = aeach(&pArray)) != NULL) {
 		pBuf = bufPtr(pArrayEl);
 
-		// Skip buffers not requested.
-		if(((pBuf->flags & BFCommand) && !selCommand) ||
-		 ((pBuf->flags & BFFunc) && !selFunction) ||
-		 ((pBuf->flags & (BFHidden | BFCommand | BFFunc)) == BFHidden && !selHidden) ||
-		 (!(pBuf->flags & BFHidden) && !selVisible))
-			continue;
+		// Skip if buffer not requested.
+		if(pBuf->flags & BFCommand) {
+			if(!selCommand)
+				continue;
+			}
+		else if(pBuf->flags & BFFunc) {
+			if(!selFunction)
+				continue;
+			}
+		else {
+			if((pBuf->flags & BFHidden) && !inclHidden)
+				continue;
+			if(!selVisible && (!selHomed || pBuf->saveDir == NULL || pBuf->saveDir != sess.cur.pScrn->workDir))
+				continue;
+			}
 
 		// Write separator line if displaying home directory and not first buffer.
 		if(firstBuf)
 			firstBuf = false;
-		else if(selHomeDir && sepLine(pageWidth, &rpt) != 0)
+		else if(inclHomeDir && sepLine(pageWidth, &rpt) != 0)
 			goto LibFail;
 
 		if(dputc('\n', &rpt, 0) != 0)
@@ -1680,7 +1693,7 @@ int showBuffers(Datum *pRtnVal, int n, Datum **args) {
 			goto LibFail;
 
 		// Output the home directory if requested and not NULL.
-		if(selHomeDir && pBuf->saveDir != NULL &&
+		if(inclHomeDir && pBuf->saveDir != NULL &&
 		 dputf(&rpt, 0, "\n%*s%sCWD: %s", colWidths[0].minWidth, "", space, pBuf->saveDir) != 0)
 			goto LibFail;
 		}
@@ -1704,7 +1717,7 @@ int showBuffers(Datum *pRtnVal, int n, Datum **args) {
 	// Display results.
 	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendRewind);
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Display color palette or users pairs in a pop-up window.
@@ -1785,7 +1798,7 @@ int showColors(Datum *pRtnVal, int n, Datum **args) {
 	// Add the results to the buffer.
 	if(dclose(&rpt, FabStr) != 0)
 LibFail:
-		return librsset(Failure);
+		return libfail();
 	if(bappend(pRptBuf, rpt.pDatum->str) != Success)
 		return sess.rtn.status;
 
@@ -1866,7 +1879,7 @@ int showHooks(Datum *pRtnVal, int n, Datum **args) {
 	// Add the results to the buffer.
 	if(dclose(&rpt, FabStr) != 0)
 LibFail:
-		return librsset(Failure);
+		return libfail();
 	if(bappend(pRptBuf, rpt.pDatum->str) != Success)
 		return sess.rtn.status;
 
@@ -1940,7 +1953,7 @@ PopUp:;
 	if(showOpen(&showCtrl, INT_MIN, text158, NULL) == Success) {
 				// "command"
 		if(dsetstr(name, &showCtrl.pat) != 0)
-			return librsset(Failure);
+			return libfail();
 		if(showBuild(&showCtrl, SHSepLine | SHExact, argSyntax, nextCommand) == Success)
 			(void) showClose(pRtnVal, -1, &showCtrl);
 		}
@@ -1995,7 +2008,7 @@ int showMarks(Datum *pRtnVal, int n, Datum **args) {
 	// Add the report to the buffer.
 	if(dclose(&rpt, FabStr) != 0)
 LibFail:
-		return librsset(Failure);
+		return libfail();
 	if(bappend(pRptBuf, rpt.pDatum->str) != Success)
 		return sess.rtn.status;
 
@@ -2149,7 +2162,7 @@ int showModes(Datum *pRtnVal, int n, Datum **args) {
 	// Display results.
 	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendRewind);
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Build and pop up a buffer containing all the strings in a ring.  Render buffer and return status.
@@ -2234,7 +2247,7 @@ int showRing(Datum *pRtnVal, int n, Datum **args) {
 	// Display results.
 	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendRewind);
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Build and pop up a buffer containing a list of all screens and their associated buffers.  Render buffer and return status.
@@ -2315,7 +2328,7 @@ int showScreens(Datum *pRtnVal, int n, Datum **args) {
 	// Add the results to the buffer.
 	if(dclose(&rpt, FabStr) != 0)
 LibFail:
-		return librsset(Failure);
+		return libfail();
 	if(bappend(pRptBuf, rpt.pDatum->str) != Success)
 		return sess.rtn.status;
 
@@ -2367,7 +2380,7 @@ int nextSysVar(ShowCtrl *pShowCtrl, ushort request, const char **pName) {
 				if(getSysVar(pDatum, pSysVar) == Success &&
 				 dputf(&pShowCtrl->rpt, 0, "~#u%s~U", pDatum->str) != 0)
 LibFail:
-					(void) librsset(Failure);
+					(void) libfail();
 				}
 			else
 				(void) svtofab(pSysVar, true, &pShowCtrl->rpt);
@@ -2406,12 +2419,12 @@ static int nextUserVar(ShowCtrl *pShowCtrl, ushort request, const char **pName, 
 			break;
 		case SHReqSynop:
 			if(dsetstr(pUserVar1->name, &pShowCtrl->name) != 0)
-				return librsset(Failure);
+				return libfail();
 			*pName = pUserVar1->name;
 			break;
 		default: // SHReqValue
 			if(dtofabattr(pUserVar1->pValue, &pShowCtrl->rpt, NULL, DCvtLang) < 0)
-				return librsset(Failure);
+				return libfail();
 		}
 Retn:
 	return sess.rtn.status;
@@ -2487,11 +2500,13 @@ int apropos(Datum *pRtnVal, int n, Datum **args) {
 	}
 
 #if MMDebug & Debug_ShowRE
+/*** NOTE: The following function is old code and needs to be updated to compile and run properly. ***/
+
 // Build and pop up a buffer containing the compiled search and replacement patterns.  Render buffer and return status.
 int showRegexp(Datum *pRtnVal, int n, Datum **args) {
 	Buffer *pRegList;
 	DFab rpt;
-	char patBuf[searchCtrl.match.patLen + OptCh_N + 1];
+	char patBuf[bufSearch.match.patLen + OptCh_N + 1];
 	struct RegInfo {
 		char *hdr;
 		char *pat;
@@ -2511,17 +2526,17 @@ int showRegexp(Datum *pRtnVal, int n, Datum **args) {
 	if(dopentrack(&rpt) != 0)
 		goto LibFail;
 
-	makePat(patBuf, &searchCtrl.match);
-	if(dputf(&rpt, 0, "Match flags: %.4x\n", searchCtrl.match.flags) != 0 ||
+	makePat(patBuf, &bufSearch.match);
+	if(dputf(&rpt, 0, "Match flags: %.4x\n", bufSearch.match.flags) != 0 ||
 	 dputf(&rpt, 0, "%s %s /", text994, text999) != 0 || dputs(patBuf, &rpt, DCvtVizChar) != 0 ||
 	 dputs("/\n", &rpt, 0) != 0)
 				// "SEARCH", "PATTERN"
 		goto LibFail;
-	if(searchCtrl.match.flags & SCpl_ForwardRE) {
-		regInfoTable[0].pat = searchCtrl.match.pat;
-		regInfoTable[0].compPat = &searchCtrl.match.regPat.compPat;
-		regInfoTable[1].pat = searchCtrl.match.regPat.backPat;
-		regInfoTable[1].compPat = &searchCtrl.match.regPat.compBackPat;
+	if(bufSearch.match.flags & SCpl_ForwardRE) {
+		regInfoTable[0].pat = bufSearch.match.pat;
+		regInfoTable[0].compPat = &bufSearch.match.regPat.compPat;
+		regInfoTable[1].pat = bufSearch.match.regPat.backPat;
+		regInfoTable[1].compPat = &bufSearch.match.regPat.compBackPat;
 		pRegInfo = regInfoTable;
 
 		do {
@@ -2529,7 +2544,7 @@ int showRegexp(Datum *pRtnVal, int n, Datum **args) {
 						// " pattern"
 			 DCvtVizChar) != 0 || dputs("/\n", &rpt, 0) != 0)
 				goto LibFail;
-			if((pRegInfo->pat == searchCtrl.match.pat || (searchCtrl.match.flags & SCpl_BackwardRE)) &&
+			if((pRegInfo->pat == bufSearch.match.pat || (bufSearch.match.flags & SCpl_BackwardRE)) &&
 			 dputf(&rpt, 0, "Group count: %lu\n", pRegInfo->compPat->re_nsub) != 0)
 				goto LibFail;
 			} while((++pRegInfo)->hdr != NULL);
@@ -2537,12 +2552,12 @@ int showRegexp(Datum *pRtnVal, int n, Datum **args) {
 #if 0
 	// Construct the replacement header lines.
 	if(dputf(&rpt, 0, "\n\n%s %s /", text995, text999) != 0 ||
-	 dputs(searchCtrl.match.replPat, &rpt, DCvtVizChar) != 0 || dputs("/\n", &rpt, 0) != 0)
+	 dputs(bufSearch.match.replPat, &rpt, DCvtVizChar) != 0 || dputs("/\n", &rpt, 0) != 0)
 				// "REPLACE", "PATTERN"
 		goto LibFail;
 
 	// Loop through replacement pattern.
-	if((pReplPat = searchCtrl.match.compReplPat) != NULL) {
+	if((pReplPat = bufSearch.match.compReplPat) != NULL) {
 		char *str, workBuf[WorkBufSize];
 		do {
 			str = stpcpy(workBuf, "    ");
@@ -2573,7 +2588,7 @@ int showRegexp(Datum *pRtnVal, int n, Datum **args) {
 	// Add the results to the buffer.
 	if(dclose(&rpt, FabStr) != 0)
 LibFail:
-		return librsset(Failure);
+		return libfail();
 	if(bappend(pRegList, rpt.pDatum->str) != Success)
 		return sess.rtn.status;
 
@@ -2586,7 +2601,7 @@ LibFail:
 static int center(DFab *rpt, const char *str) {
 	int indent = (term.cols - (strlen(str) - attrCount(str, -1, INT_MAX))) / 2;
 	if(dputc('\n', rpt, 0) != 0 || (indent > 0 && dputf(rpt, 0, "%*s", indent, "") != 0) || dputs(str, rpt, 0) != 0)
-		(void) librsset(Failure);
+		(void) libfail();
 	return sess.rtn.status;
 	}
 
@@ -2701,5 +2716,5 @@ int aboutMM(Datum *pRtnVal, int n, Datum **args) {
 	// Display results.
 	return render(pRtnVal, n, pRptBuf, RendNewBuf | RendRewind);
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}

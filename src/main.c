@@ -134,30 +134,6 @@ bool interactive(void) {
 	return !(sess.opFlags & (OpStartup | OpNoLoad)) && (!(sess.opFlags & OpScript) || (sess.opFlags & OpUserCmd));
 	}
 
-// Copy a string to open fabrication object pFab, escaping AttrSpecBegin (~) characters.  Return -1 if error, otherwise 0.
-int esctofab(const char *str, DFab *pFab) {
-
-	while(*str != '\0')
-		if((*str == AttrSpecBegin && dputc(AttrSpecBegin, pFab, 0) != 0) || dputc(*str++, pFab, 0) != 0)
-			return -1;
-	return 0;
-	}
-
-// Copy global return message to open fabrication object, escaping AttrSpecBegin (~) characters in terminal attribute
-// specifications.  Return status.
-int escAttr(DFab *pFab) {
-	char *str = sess.rtn.msg.str;
-	if(sess.rtn.flags & RSTermAttr) {
-		if(dputs(str, pFab, 0) != 0 || dputc(AttrSpecBegin, pFab, 0) != 0 || dputc(AttrAllOff, pFab, 0) != 0)
-			goto LibFail;
-		}
-	else if(esctofab(str, pFab) != 0)
-LibFail:
-		return librsset(Failure);
-
-	return Success;
-	}
-
 // Clear return message if RSKeepMsg flag not set, clear return flags, and set return status to Success.
 void rsclear(ushort flags) {
 
@@ -174,7 +150,7 @@ static int rscpy(RtnStatus *pDest, RtnStatus *pSrc) {
 	if((pDest->status = pSrc->status) == HelpExit)
 		dxfer(&pDest->msg, &pSrc->msg);
 	else if(dcpy(&pDest->msg, &pSrc->msg) != 0)
-		(void) librsset(Failure);
+		(void) libfail();
 #if MMDebug & Debug_Datum
 	fprintf(logfile, "rscpy(): copied from (%hu) '%s' [%d] to (%hu) '%s' [%d]\n",
 	 pSrc->msg.type, pSrc->msg.str, pSrc->status, pDest->msg.type, pDest->msg.str, pDest->status);
@@ -325,10 +301,46 @@ void rspop(short oldStatus, ushort oldFlags) {
 		}
 	}
 
-// Set and return proper status from a failed ProLib library call.
-int librsset(int status) {
+// Set and return proper status from a failed CXL library call.
+static int librsset(int status) {
 
 	return rsset((cxlExcep.flags & ExcepMem) ? Panic : status, 0, "%s", cxlExcep.msg);
+	}
+
+// Set and return Failure status from a failed CXL library call.
+int libfail(void) {
+
+	return librsset(Failure);
+	}
+
+// Set and return FatalError status from a failed CXL library call.
+int libfatal(void) {
+
+	return librsset(FatalError);
+	}
+
+// Copy a string to open fabrication object pFab, escaping AttrSpecBegin (~) characters.  Return -1 if error, otherwise 0.
+int esctofab(const char *str, DFab *pFab) {
+
+	while(*str != '\0')
+		if((*str == AttrSpecBegin && dputc(AttrSpecBegin, pFab, 0) != 0) || dputc(*str++, pFab, 0) != 0)
+			return -1;
+	return 0;
+	}
+
+// Copy global return message to open fabrication object, escaping AttrSpecBegin (~) characters in terminal attribute
+// specifications.  Return status.
+int escAttr(DFab *pFab) {
+	char *str = sess.rtn.msg.str;
+	if(sess.rtn.flags & RSTermAttr) {
+		if(dputs(str, pFab, 0) != 0 || dputc(AttrSpecBegin, pFab, 0) != 0 || dputc(AttrAllOff, pFab, 0) != 0)
+			goto LibFail;
+		}
+	else if(esctofab(str, pFab) != 0)
+LibFail:
+		return libfail();
+
+	return Success;
 	}
 
 // Concatenate any function arguments via catArgs() and save prefix and result in *ppDatum.  Return status.
@@ -347,7 +359,7 @@ static int buildMsg(Datum **ppDatum, const char *prefix, int minRequired) {
 			goto LibFail;
 	if(dclose(&msg, FabStr) != 0)
 LibFail:
-		(void) librsset(Failure);
+		(void) libfail();
 	return sess.rtn.status;
 	}
 
@@ -521,7 +533,7 @@ static int execKey(KeyBind *pKeyBind, int n) {
 	Datum *pSink;				// For throw-away return value, if any.
 
 	if(dnewtrack(&pSink) != 0)
-		return librsset(Failure);
+		return libfail();
 	dsetnil(pSink);
 
 	// Bound to a user command?
@@ -562,7 +574,7 @@ static int editInit0(void) {
 	dinit(&sess.scriptRtn.msg);
 	dsetnull(&sess.scriptRtn.msg);
 	dinit(&curMacro.name);
-	return dsetsubstr("%d", 2, &iVar.format) != 0 ? librsset(Failure) : sess.rtn.status;
+	return dsetsubstr("%d", 2, &iVar.format) != 0 ? libfail() : sess.rtn.status;
 	}
 
 // Set a list of characters to be considered in a word.  The word table is assumed to be already cleared.  Return status.
@@ -675,7 +687,7 @@ static int editInit1(void) {
 
 	// Initialize the key cache and the "exec" hash table with all command and function names.
 	if((execTable = hnew(CmdFuncCount, 0.7, 1.1)) == NULL)
-		return librsset(Failure);
+		return libfail();
 	pCoreKey = coreKeys;
 	pCmdFunc = cmdFuncTable;
 	do {
@@ -725,8 +737,8 @@ static int editInit1(void) {
 		} while((++modeInit)->name != NULL);
 
 	// Clear the search tables and initialize the word list.
-	if(newSearchPat("", &searchCtrl.match, NULL, false) == Success && newSearchPat("", &matchRE, NULL, false) == Success &&
-	 newReplPat("", &searchCtrl.match, false) == Success && newReplPat("", &matchRE, false) == Success)
+	if(newSearchPat("", &bufSearch.match, NULL, false) == Success && newSearchPat("", &matchRE, NULL, false) == Success &&
+	 newReplPat("", &bufSearch.match, false) == Success && newReplPat("", &matchRE, false) == Success)
 		(void) setWordList(WordChars);
 
 	return sess.rtn.status;
@@ -792,7 +804,7 @@ int setExecPath(const char *path) {
 	// Finished expanding path.  Set it and clean up.
 	if(dclose(&fab, FabStrRef) != 0)
 LibFail:
-		return librsset(Failure);
+		return libfail();
 	if(execPath != NULL)
 		free((void *) execPath);
 	execPath = fab.pDatum->str;
@@ -835,7 +847,7 @@ static int runScript(char *filename, int argCount, char *argList[]) {
 		}
 	if(dclose(&cmd, FabStr) != 0)
 LibFail:
-		return librsset(Failure);
+		return libfail();
 
 	// Have command line in fabrication object.  Execute it.
 	return execExprStmt(pSink, cmd.pDatum->str, 0, NULL);
@@ -873,7 +885,7 @@ int runCmd(Datum *pRtnVal, const char *cmdPrefix, const char *arg, const char *c
 	// Close fabrication object, disable "RtnMsg" mode, execute command line, and restore the mode.
 	if(dclose(&cmd, FabStr) != 0)
 LibFail:
-		return librsset(Failure);
+		return libfail();
 	ushort oldMsgFlag = modeInfo.cache[MdIdxRtnMsg]->flags & MdEnabled;
 	if(oldMsgFlag)
 		clearGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
@@ -986,7 +998,7 @@ static int procInfoSwitches(int argCount, char *argList[]) {
 			} while(*++pHelpSwitch != 0);
 		}
 
-	return (rtnCode < 0) ? librsset(Failure) : sess.rtn.status;
+	return (rtnCode < 0) ? libfail() : sess.rtn.status;
 	}
 
 // Scan command line arguments, looking for -D, -dir, -no-start, -no-user-start, and -path switches and (1), change current
@@ -1047,7 +1059,7 @@ static int procPreSwitches(int argCount, char *argList[], ushort *pFlags, char *
 
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Process command line arguments, skipping switches processed by procInfoSwitches() and procPreSwitches(), and return status.
@@ -1132,7 +1144,7 @@ DoCmd:
 
 	// Switch error?
 	if(rtnCode < 0)
-		return librsset(FatalError);
+		return libfatal();
 
 	// Process remaining arguments, if any.
 	if(!shellScript) {
@@ -1212,7 +1224,7 @@ Conflict2:
 Conflict3:
 							return rsset(FatalError, 0, text61, text175);
 							// "%sconflicts with -no-read", "-search, + or - switch "
-						if(newSearchPat(result.arg, &searchCtrl.match, NULL, true) != Success)
+						if(newSearchPat(result.arg, &bufSearch.match, NULL, true) != Success)
 							return sess.rtn.status;
 						searchFlag = true;
 						pBuf1 = pBuf;
@@ -1220,7 +1232,7 @@ Conflict3:
 					}
 				}
 			if(rtnCode < 0)
-				return librsset(FatalError);
+				return libfatal();
 			}
 		}
 	else if(runScript(*argList, argCount, argList) != Success)
@@ -1242,7 +1254,7 @@ Conflict3:
 
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Prepare to insert one or more characters at point.  Delete characters first if in replace or overwrite mode and not at end

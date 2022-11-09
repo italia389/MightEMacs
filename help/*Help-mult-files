@@ -23,7 +23,7 @@ first file; for example:
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r== (Exact) == Notes.txt == File: Notes.txt ======== MightEMacs 9.6.0 ~R|
+    |~r== (Exact) == Notes.txt == File: Notes.txt ======== MightEMacs 9.7.0 ~R|
 
 A buffer for the second file will be created also, but it will be in the
 background.  To bring it to the foreground, you typically would type ~#uC-x ]~U
@@ -49,7 +49,7 @@ session:
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r== (Exact) == Notes.txt == File: Notes.txt ======== MightEMacs 9.6.0 ~R|
+    |~r== (Exact) == Notes.txt == File: Notes.txt ======== MightEMacs 9.7.0 ~R|
     | End: ~b_~B                                                              |
      ---------------------------------------------------------------------
 
@@ -96,7 +96,7 @@ Let's say you wanted to open one more file in this editing session for output:
 create it first.  To do that, we can use the ~bshellCmd~B command.  You would
 press ~#uC-x !~U and the following would be displayed:
 
-    |~r== (Exact) == Notes.txt == File: Notes.txt ======== MightEMacs 9.6.0 ~R|
+    |~r== (Exact) == Notes.txt == File: Notes.txt ======== MightEMacs 9.7.0 ~R|
     | > ~b_~B                                                                 |
      ---------------------------------------------------------------------
 
@@ -107,7 +107,7 @@ command).
 Now we're ready to open our C file, which is done with the ~bfindFile~B command.
 You would type ~#uC-x C-f~U and at the prompt, enter "src/main.c":
 
-    |~r== (Exact) == Notes.txt == File: Notes.txt ======== MightEMacs 9.6.0 ~R|
+    |~r== (Exact) == Notes.txt == File: Notes.txt ======== MightEMacs 9.7.0 ~R|
     | Find file: src/main.c~b_~B                                              |
      ---------------------------------------------------------------------
 
@@ -117,7 +117,7 @@ exited the editor at this point without making any changes to the buffer, it
 wouldn't be).  Additionally, the mode line would show the "C" buffer mode, which
 enables automatic indentation and fence matching as you type your C code:
 
-    |~r== (Exact) [C] == main.c == File: src/main.c ====== MightEMacs 9.6.0 ~R|
+    |~r== (Exact) [C] == main.c == File: src/main.c ====== MightEMacs 9.7.0 ~R|
     |                                                                     |
      ---------------------------------------------------------------------
 

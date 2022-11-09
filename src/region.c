@@ -306,7 +306,7 @@ int regionToKill(Region *pRegion) {
 		}
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Copy all of the characters in the region to the given string buffer and return pointer to terminating null.  It is assumed
@@ -314,25 +314,25 @@ LibFail:
 char *regionToStr(char *buf, Region *pRegion) {
 	Line *pLine;
 	int offset;
-	long replTableSize, len;
+	long size, len;
 
 	pLine = pRegion->point.pLine;				// Current line.
 	offset = pRegion->point.offset;				// Current offset.
-	replTableSize = pRegion->size;
+	size = pRegion->size;
 
-	while(replTableSize > 0) {
+	while(size > 0) {
 		if((len = pLine->used - offset) == 0) {		// End of line.
 			*buf++ = '\n';
 			pLine = pLine->next;
-			--replTableSize;
+			--size;
 			offset = 0;
 			}
 		else {						// Beginning or middle of line.
-			if(len > replTableSize)
-				len = replTableSize;
+			if(len > size)
+				len = size;
 			buf = (char *) memstpcpy((void *) buf, (void *) (pLine->text + offset), len);
 			offset += len;
-			replTableSize -= len;
+			size -= len;
 			}
 		}
 	*buf = '\0';

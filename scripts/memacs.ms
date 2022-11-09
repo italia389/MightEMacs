@@ -3,7 +3,7 @@
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# memacs.ms		Ver. 9.6.0
+# memacs.ms		Ver. 9.7.0
 #	MightEMacs startup file.
 
 ##### Global Variables #####
@@ -25,6 +25,7 @@ command showCheatSheet(0) {description: 'Display %s cheat sheet on a separate sc
 			if (path = 1 => xPathname('memacs', 'SkipNull')) &&\
 			 stat? (path = sprintf('%s/../help/%s', 1 => dirname(path), name)), 'f'
 				0 => readFile path
+				setBufFile name, nil
 				1 => chgBufAttr name, 'Hidden, ReadOnly, TermAttr'
 			else
 				return 1 => message 'Fail, High', 'Cheat sheet not found "', path, '"'
@@ -45,8 +46,7 @@ command showCheatSheet(0) {description: 'Display %s cheat sheet on a separate sc
 		saveScreen
 		selectScreen 0
 		selectBuf name
-		setBufFile name, nil
-		gotoLine 1
+		beginBuf
 		1 => message 'TermAttr', 'Type ~#u%s~U again to return to previous screen' % binding('KeyList', $RunName)[0]
 	endif
 endroutine
@@ -243,7 +243,7 @@ endroutine
 function pnListBuf(1)
 	nukeBuf = nil
 
-	# Buffer list in $findList defined and not empty?
+	# Is buffer list in $findList and not empty?
 	if nil?(screenRec = getScreenRec()) || empty?(bufList = screenRec[1])
 		return 1 => message 'Fail, High', 'No buffer list'
 	elsif $0 == defn
@@ -254,17 +254,9 @@ function pnListBuf(1)
 		nukeBuf = $bufname		# Delete current buffer after buffer switch.
 	endif
 
-	# Set scanning parameters such that i + incr yields next or previous buffer in list.
+	# Set scanning parameters such that i + incr yields index of next or previous buffer in list.
 	incr = $1 ? 1 : -1
-	if ainclude? bufList, $bufname
-		i = -1
-		for name in bufList
-			++i
-			if name == $bufname
-				break
-			endif
-		endloop
-	else
+	if nil?(i = aindex(bufList, $bufname))
 		i = $1 ? -1 : length(bufList)
 	endif
 
@@ -286,26 +278,10 @@ function pnListBuf(1)
 
 	# Delete buffer that was exited if requested.
 	if nukeBuf
-		force delBuf nukeBuf
-		if defined?('Name', nukeBuf) != 'buffer'
+		if delBuf(nukeBuf) == 1
 
 			# Buffer was deleted.  Remove it from the list if present.
-			if ainclude? bufList, nukeBuf
-				if (j = length(bufList) - 1) > 0
-					i = -1
-					for name in bufList
-						++i
-						if name == nukeBuf
-							break
-						endif
-					endloop
-					while i < j
-						bufList[i] = bufList[i + 1]
-						++i
-					endloop
-				endif
-				apop bufList
-			endif
+			adeleteif bufList, nukeBuf
 			message "Buffer '#{nukeBuf}' deleted"
 		endif
 	endif
@@ -322,6 +298,31 @@ endroutine
 command prevListBuf(0) {description: "Switch to previous buffer in list created from most recent ~bfindFiles~B invocation n\
  times.  If n < 0, switch once and delete buffer that was exited.\n\nReturns: name of last buffer switched to."}
 	$0 => pnListBuf false
+endroutine
+
+# Get buffer list from $findList for current screen, delete all buffers in list (if possible), and remove each name from list.
+# Return number of buffers deleted.
+command delListBufs(0) {description: "Delete all buffers in list created from most recent ~bfindFiles~B\
+ invocation.\n\nReturns: number of buffers deleted."}
+
+	# Is buffer list in $findList and not empty?
+	if nil?(screenRec = getScreenRec()) || empty?(bufList = screenRec[1])
+		return 1 => message 'Fail, High', 'No buffer list'
+	endif
+
+	# Loop through the list and delete the buffers.
+	count = 0
+	newBufList = []
+	for bufname in bufList
+		if delBuf(bufname) == 1
+			++count
+		else
+			apush newBufList, bufname
+		endif
+	endloop
+	screenRec[1] = newBufList
+	1 => message 'High', sprintf("%u buffer%s deleted", count, count == 1 ? '' : 's')
+	count
 endroutine
 
 # Show a variable.
@@ -912,8 +913,8 @@ command findFiles(0) {description: "Find all files or buffers matching a templat
  search pattern, and/or exclusion pattern (but not the filename template) may be null, in which case it has no effect on the\
  buffer selection process (except that all visible buffers are selected if the apropos pattern is null).  The names of the\
  resulting buffers are saved in a global variable so that they can be subsequently searched by the ~bqueryReplaceAll~B or\
- ~bppDeletePPLines~B command, or stepped through with the ~bprevListBuf~B and ~bnextListBuf~B commands.\n\nReturns: true if any\
- files or buffers were found, otherwise false."}
+ ~bppDeletePPLines~B command, stepped through with the ~bprevListBuf~B and ~bnextListBuf~B commands, or deleted with the\
+ ~bdelListBufs~B command.\n\nReturns: true if any files or buffers were found, otherwise false."}
 
 	# Get options if n argument.
 	aproposBuf = excludeBuf = doPush = false
@@ -1201,7 +1202,9 @@ function addKey(5)
 			else
 				pad = 13
 			endif
-			bprintf $1, "%-*s%s%s\n", pad, keyLit, nil?(index(defined?('Name', name), 'user')) ? ' ' : '@', name
+			prefix = defined?('Name', name)
+			prefix = nil?(prefix) || nil?(index(prefix, 'user')) ? ' ' : '@'
+			bprintf $1, "%-*s%s%s\n", pad, keyLit, prefix, name
 		endif
 	endif
 endroutine
@@ -1296,7 +1299,7 @@ endroutine
 
 ##### Bindings and Aliases #####
 bindKey 'C-c TAB', chgIndent
-#bindKey 'C-x D', delFile
+bindKey 'C-x ,', delListBufs
 bindKey 'ESC #', enumLine
 bindKey 'ESC "', fenceWord
 bindKey 'C-x f', findFiles
@@ -1313,7 +1316,6 @@ bindKey 'C-c -', popFindList
 bindKey 'C-h [', prevHomeBuf
 bindKey 'C-c [', prevListBuf
 bindKey 'ESC C-q', queryReplaceAll
-#bindKey 'C-x R', renameFile
 bindKey 'C-h n', showBindings
 bindKey 'C-h e', showCheatSheet
 bindKey 'C-h F', showFindStacks

@@ -25,7 +25,7 @@ displays the following in a pop-up window:
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r=* (Exact) == unnamed ============================= MightEMacs 9.6.0 ~R|
+    |~r=* (Exact) == unnamed ============================= MightEMacs 9.7.0 ~R|
     | End: ~b_~B                                                              |
      ---------------------------------------------------------------------
 
@@ -33,7 +33,7 @@ displays the following in a pop-up window:
 we used earlier in the ~bIntroduction~B section.  Now type ~#uC-u C-u C-h ? C-h~U.  You
 will see the following on the ~bmessage line~B instead:
 
-    |~r=* (Exact) == unnamed ============================= MightEMacs 9.6.0 ~R|
+    |~r=* (Exact) == unnamed ============================= MightEMacs 9.7.0 ~R|
     |~uC-h~U -> ~bprefix3~B - Begin prefix 3 key sequence.                        |
      ---------------------------------------------------------------------
 
@@ -62,7 +62,7 @@ This command prompts for a search string, scans the names from all the
 aforementioned commands, and displays all the items that contain the string you
 entered, ignoring case.  If the string entered is null, all output is displayed:
 
-    |~r=* (Exact) == unnamed ============================= MightEMacs 9.6.0 ~R|
+    |~r=* (Exact) == unnamed ============================= MightEMacs 9.7.0 ~R|
     |Apropos name: ~b_~B                                                      |
      ---------------------------------------------------------------------
 

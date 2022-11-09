@@ -533,7 +533,7 @@ FixMarks:
 	// and now remember we are narrowed.
 	sess.cur.pBuf->flags |= BFNarrowed;
 
-	return dsetstr(sess.cur.pBuf->bufname, pRtnVal) != 0 ? librsset(Failure) : rsset(Success, RSHigh, text73, text58);
+	return dsetstr(sess.cur.pBuf->bufname, pRtnVal) != 0 ? libfail() : rsset(Success, RSHigh, text73, text58);
 								// "%s narrowed", "Buffer"
 	}
 
@@ -621,7 +621,7 @@ int widenBuf(Datum *pRtnVal, int n, Datum **args) {
 	// Restore current buffer to pre-narrowed state.
 	unnarrow(sess.cur.pBuf);
 	if(dsetstr(sess.cur.pBuf->bufname, pRtnVal) != 0)
-		return librsset(Failure);
+		return libfail();
 	(void) rsset(Success, RSHigh, text75, text58);
 		// "%s widened", "Buffer"
 	return execCmdFunc(pRtnVal, INT_MIN, cmdFuncTable + cf_reframeWind, 0, 0);
@@ -717,7 +717,7 @@ static Datum *delistBuf(Buffer *pBuf) {
 static int enlistBuf(Datum *pDatum, ssize_t index) {
 
 	if(ainsert(&bufTable, pDatum, index, 0) != 0)
-		(void) librsset(Failure);
+		(void) libfail();
 	return sess.rtn.status;
 	}
 
@@ -863,7 +863,7 @@ int bfind(const char *name, ushort ctrlFlags, ushort bufFlags, Buffer **ppBuf, b
 		// Insert a copy of the Buffer object into the list using slot index from bsrch() call and an
 		// untracked Datum object.
 		if(dnew(&pDatum) != 0 || dsetmem((void *) &newBuf, sizeof(Buffer), pDatum) != 0)
-	 		return librsset(Failure);
+	 		return libfail();
 	 	if(enlistBuf(pDatum, index) != Success)
 	 		return sess.rtn.status;
 
@@ -1216,7 +1216,7 @@ SetFlags:
 	 rsset(Success, RSHigh | RSNoFormat, text375);
 		// "Attribute(s) changed"
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Get a buffer name (if n not default) and perform operation on buffer according to "op" argument.  If prompt == NULL (bgets
@@ -1293,7 +1293,7 @@ int bufOp(Datum *pRtnVal, int n, const char *prompt, uint op, int flag) {
 
 				// return the spoils...
 				if(dsetsubstr(pPoint->pLine->text + pPoint->offset, len, pRtnVal) != 0)
-					return librsset(Failure);
+					return libfail();
 
 				// and step the buffer's line pointer ahead one line (or to end of last line).
 				if(pPoint->pLine->next == NULL)
@@ -1522,7 +1522,7 @@ int runBufHook(Datum **ppRtnVal, ushort flags) {
 
 	if(!(sess.cur.pBuf->flags & BFCmdFunc)) {
 		if(*ppRtnVal == NULL && dnewtrack(ppRtnVal) != 0)
-			return librsset(Failure);
+			return libfail();
 		if(flags & SWB_ExitHook) {
 
 			// Run exit-buffer user hook on current (old) buffer.
@@ -1574,8 +1574,8 @@ int bswitch(Buffer *pBuf, ushort flags) {
 	return sess.rtn.status;
 	}
 
-// Switch to the previous or next visible buffer in the buffer list per flags and return status.  Set pRtnVal (if not NULL) to
-// name of last buffer switched to, or leave as is (nil) if no switch occurred.
+// Switch to the previous or next visible buffer in the buffer list per flags and return status.  Do nothing if not found.  Set
+// pRtnVal (if not NULL) to name of last buffer switched to, or leave as is (nil) if no switch occurred.
 //
 // Buffers are selected per flags:
 //	BT_Backward	Traverse buffer list backward, otherwise forward.
@@ -1626,7 +1626,7 @@ int prevNextBuf(Datum *pRtnVal, ushort flags) {
 					// "Buffer '%s' deleted"
 		}
 
-	return (pRtnVal != NULL && dsetstr(pBuf1->bufname, pRtnVal) != 0) ? librsset(Failure) : sess.rtn.status;
+	return (pRtnVal != NULL && dsetstr(pBuf1->bufname, pRtnVal) != 0) ? libfail() : sess.rtn.status;
 	}
 
 // Clear current buffer, or named buffer if n argument.  Force it if n < 0.  Set pRtnVal to false if buffer is not cleared,
@@ -1812,7 +1812,7 @@ int bdelete(Buffer *pBuf, ushort flags) {
 
 	if(sess.pSavedBuf == pBuf)			// Unsave buffer if saved.
 		sess.pSavedBuf = NULL;
-	pScrn = sess.scrnHead;				// Clear all screens' "last buffer".
+	pScrn = sess.scrnHead;				// Clear from all screens' "last buffer".
 	do {
 		if(pScrn->pLastBuf == pBuf)
 			pScrn->pLastBuf = NULL;
@@ -1907,7 +1907,8 @@ int bnuke(ushort dflags, const char *workDir, int *pCount) {
 //  3. If "Force" is specified, changed and/or narrowed buffers are deleted without confirmation.
 int delBuf(Datum *pRtnVal, int n, Datum **args) {
 	Buffer *pBuf;
-	int count;
+	uint count;
+	bool delError = false;
 	ushort dflags;
 	char workBuf[64];
 	static Option options[] = {
@@ -1997,7 +1998,7 @@ int delBuf(Datum *pRtnVal, int n, Datum **args) {
 	Datum *pBufname;
 	uint argFlags = ArgFirst | ArgNotNull1;
 	if(dnewtrack(&pBufname) != 0)
-		return librsset(Failure);
+		return libfail();
 	do {
 		if(!(argFlags & ArgFirst) && !haveSym(s_comma, false))
 			break;					// No arguments left.
@@ -2015,6 +2016,7 @@ NukeIt:
 				// Don't cause a running script to fail on Failure status.
 				if(sess.rtn.status < Failure)
 					return sess.rtn.status;
+				delError = true;
 				(void) rsunfail();
 				}
 			else
@@ -2022,8 +2024,8 @@ NukeIt:
 			}
 		} while(sess.opFlags & OpScript);
 
-	// Return count if no errors.
-	if(disnull(&sess.rtn.msg)) {
+	// Return count if no error.
+	if(!delError) {
 		dsetint((long) count, pRtnVal);
 		if(interactive())
 			(void) rsset(Success, RSHigh, "%s %s", text58, text10);
@@ -2165,7 +2167,7 @@ SetNew:
 
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Rename current buffer (if interactive and default n) or a named buffer.  Return status.

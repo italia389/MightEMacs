@@ -384,7 +384,7 @@ const char
  text290[] = "Length argument",
  text291[] = " without delimiter at EOF",
  text292[] = "variable",
- text293[] = "Cannot split a %d-line window",
+ text293[] = "Cannot split a %hu-line window",
  text294[] = "Only one window",
  text295[] = "Unknown prompt type '%s'",
  text296[] = "Clear all and set",
@@ -851,14 +851,19 @@ Disable mode(s).\n\tn == 0\t\tToggle mode(s) (default).\n\tn == 1\t\tEnable mode
  if current line not blank."
 #define CFLit_delBuf		"Delete named buffer(s) with confirmation if changed (or ignore changes if n < 0). \
  Alternatively if n > 0, delete multiple buffers as selected by the comma-separated option(s) specified in string argument\
- opts, as follows:\n\tOne (only) of the following options must be specified:\n\t\tVisible\t\tSelect all visible, non-displayed\
- buffers.\n\t\tUnchanged\tSelect all unchanged, visible, non-displayed buffers.\n\t\tHomed\t\tSelect all visible, non-displayed\
- buffers \"homed\" to current screen.\n\t\tInactive\tSelect all inactive, visible, non-displayed buffers.\n\tZero or more of\
- the following options may also be specified:\n\t\tDisplayed\tInclude displayed buffers in selection.\n\t\tHidden\t\tInclude\
- hidden buffers in selection.\n\t\tConfirm\t\tAsk for confirmation on every buffer.\n\t\tForce\t\tDelete all selected buffers,\
- ignoring changes, with initial confirmation.\nCase of option keywords is ignored.  \"Confirm\" and \"Force\" may not both be\
- specified.  If neither is specified, buffers are deleted with confirmation on changed ones only.  User command and function\
- buffers are skipped unconditionally.\n\nReturns: zero if failure, otherwise number of buffers deleted."
+ opts, as follows:\n\tOne (only) of the following options must be specified:\n\
+\t\tVisible\t\tSelect all visible, non-displayed buffers.\n\
+\t\tUnchanged\tSelect all unchanged, visible, non-displayed buffers.\n\
+\t\tHomed\t\tSelect all visible, non-displayed buffers \"homed\" to current screen.\n\
+\t\tInactive\tSelect all inactive, visible, non-displayed buffers.\n\
+\tZero or more of the following options may also be specified:\n\
+\t\tDisplayed\tInclude displayed buffers in selection.\n\
+\t\tHidden\t\tInclude hidden buffers in selection.\n\
+\t\tConfirm\t\tAsk for confirmation on every buffer.\n\
+\t\tForce\t\tDelete all selected buffers, ignoring changes, with initial confirmation.\n\
+Case of option keywords is ignored.  \"Confirm\" and \"Force\" may not both be specified.  If neither is specified, buffers are\
+ deleted with confirmation on changed ones only.  User command and function buffers are skipped unconditionally.\n\nReturns:\
+ zero if failure, otherwise number of buffers deleted."
 #define CFLit_delFencedRegion	"Delete text from point to matching ( ), [ ], { }, or < > fence character."
 #define CFLit_delFile		"Delete a file on disk.  If n argument, one or both of the following comma-separated options\
  may be specified in string argument opts; otherwise, the first argument must be omitted:\n\
@@ -1212,12 +1217,27 @@ Case of option keywords is ignored."
  ~bselectBuf~B values."
 #define CFLit_searchBack	"Search backward for nth occurrence of a pattern if n > 0, otherwise first."\
  CFLit_restrictBack CFLit_searchPat CFLit_searchReturn
-#define CFLit_searchForw	"Search forward for nth occurrence of a pattern if n >= 0, otherwise first.  If n < 0,"\
+#define CFLit_searchForw0	"Search forward for nth occurrence of a pattern if n >= 0, otherwise first.  If n < 0,"\
  CFLit_restrictForw "  Pattern may contain a suffix of form ':~bopts~B' for specifying options, where opts is one or more of\
- the following letters:\n\te\tExact matching.\n\ti\tIgnore case.\n\tf\tFuzzy (approximate) matching.\n\tm\tMulti-line regular\
- expression matching ('.' and '[^' match a newline).\n\tp\tInterpret pat as plain text.\n\tr\tInterpret pat as a regular\
- expression; for example, '\\<\\w+\\>:re'.\nIf f or m is specified, r is assumed.  An invalid suffix is assumed to be part of\
- the pattern.  Options override the \"Exact\" and \"Regexp\" modes.  " CFLit_searchReturn
+ the following letters:\n\
+\te\tExact matching.\n\
+\ti\tIgnore case.\n"
+#if FuzzySearch
+#define CFLit_fuzzy1		"\tf\tFuzzy (approximate) matching.\n"
+#else
+#define CFLit_fuzzy1
+#endif
+#define CFLit_searchForw1	"\tm\tMulti-line regular expression matching ('.' and '[^' match a newline).\n\
+\tp\tInterpret pat as plain text.\n\
+\tr\tInterpret pat as a regular expression; for example, '\\<\\w+\\>:re'.\n"
+#if FuzzySearch
+#define CFLit_fuzzy2	"If f or m"
+#else
+#define CFLit_fuzzy2	"If m"
+#endif
+#define CFLit_searchForw2	" is specified, r is assumed.  An invalid suffix is assumed to be part of the pattern.  Options\
+ override the \"Exact\" and \"Regexp\" modes.  " CFLit_searchReturn
+#define CFLit_searchForw	CFLit_searchForw0 CFLit_fuzzy1 CFLit_searchForw1 CFLit_fuzzy2 CFLit_searchForw2
 #define CFLit_selectBuf		"Select named buffer and render it according to n argument:\n\
 \tn < -2\t\tDisplay buffer in a different window and switch to that window.\n\
 \tn == -2\t\tDisplay buffer in a different window but stay in current window.\n\
@@ -1279,10 +1299,16 @@ Case of parameter names is ignored."
  ~bselectBuf~B options (in a pop-up window if default n).  If pattern is plain text, match is successful if name contains pat. \
  If pattern is nil or a null string, all aliases are listed.\n\nReturns: ~bselectBuf~B values."
 #define CFLit_showBuffers	"Generate list of buffers in a new buffer and render it per ~bselectBuf~B options.  If default\
- n, all visible buffers are displayed in a pop-up window; otherwise, one or more of the following comma-separated option(s) may\
- be specified in string argument opts:\n\tVisible\t\tSelect visible buffers.\n\tHidden\t\tSelect hidden (non-\
-command/function) buffers.\n\tCommand\t\tSelect user command buffers.\n\tFunction\tSelect user function buffers.\n\t\
-HomeDir\t\tInclude buffer's home directory.\nThe first column in the list is buffer attribute and state information:\
+ n, all visible buffers are displayed in a pop-up window; otherwise, buffers are selected by the comma-separated option(s)\
+ specified in string argument opts, as follows:\n\tOne or more of the following option(s) must be specified:\n\
+\t\tVisible\t\tSelect all visible buffers.\n\
+\t\tHomed\t\tSelect visible buffers \"homed\" to current screen only.\n\
+\t\tCommand\t\tSelect user command buffers.\n\
+\t\tFunction\tSelect user function buffers.\n\
+\tZero or more of the following options may also be specified:\n\
+\t\tHidden\t\tInclude hidden (non-command/function) buffers in selection.\n\
+\t\tHomeDir\t\tInclude buffer's home directory in display if available.\n\
+The first column in the list is buffer attribute and state information:\
  ~u~bA~Zctive, ~u~bH~Zidden, ~u~bU~Zser command/function, ~u~bP~Zreprocessed, ~u~bN~Zarrowed, ~u~bT~ZermAttr, ~u~bB~Zackground,\
  ~u~bR~ZeadOnly, and ~u~bC~Zhanged.\n\nReturns: ~bselectBuf~B values."
 #define CFLit_showColors	"Generate a palette of available colors or defined color pairs and display it in a pop-up\

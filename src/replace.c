@@ -66,7 +66,7 @@ static int delInsert(int delLen, const char *src, bool useRMP, QueryCtrl *pQuery
 	if(edelc(delLen, 0) != Success)
 		return sess.rtn.status;
 	if(useRMP) {
-		Match *pMatch = &searchCtrl.match;
+		Match *pMatch = &bufSearch.match;
 		ReplPat *pReplPat = pMatch->compReplPat;
 		replStr = "";
 		while(pReplPat != NULL) {
@@ -233,7 +233,7 @@ int compileRepl(Match *pMatch) {
 static int replQuery(Datum *pPat) {
 	DFab msg;
 	Datum *pDatum;
-	Match *pMatch = &searchCtrl.match;
+	Match *pMatch = &bufSearch.match;
 	char lineBuf[TTY_MaxCols + 1];
 
 	// Display the matched string in roughly half the terminal width.
@@ -264,7 +264,7 @@ static int replQuery(Datum *pPat) {
 			}
 		if(dclose(&msg, FabStr) != 0)
 LibFail:
-			return librsset(Failure);
+			return libfail();
 		pPat = pDatum;
 		}
 	strfit(lineBuf, (size_t) term.cols - term.msgLineCol - 3, pPat->str, 0);
@@ -312,7 +312,7 @@ int replStr(Datum *pRtnVal, int n, Datum **args, bool qRepl) {
 	// Get ready.
 	queryCtrl.pReplPat = NULL;
 	queryCtrl.flags = QR_Forever;
-	queryCtrl.pMatch = &searchCtrl.match;
+	queryCtrl.pMatch = &bufSearch.match;
 
 	// Get the pattern and replacement string.
 	if(getPat(args, qRepl ? text85 : text84, true) != Success || getPat(args + 1, text86, false) != Success)
@@ -342,9 +342,10 @@ int replStr(Datum *pRtnVal, int n, Datum **args, bool qRepl) {
 	// Compile as a plain-text pattern if not an RE request or not really an RE (SRegical not set).
 	if(!bufPlainSearch())
 		queryCtrl.flags |= QR_Regexp;
-	else if(searchCtrl.forwDelta1[0] == -1 ||
+	else if(!(bufSearch.match.flags & SCpl_ForwardBM) ||
 	 (((queryCtrl.pMatch->flags & SCpl_PlainExact) != 0) != exactSearch(queryCtrl.pMatch)))
-		makeDeltas();
+		if(compileBM(SCpl_ForwardBM) != Success)
+			return sess.rtn.status;
 
 	// Compile replacement pattern.
 	if(queryCtrl.pMatch->compReplPat == NULL && compileRepl(queryCtrl.pMatch) != Success)
@@ -629,7 +630,7 @@ Rpt:
 			 dclose(&msg, FabStr) != 0)
 					// "Mark ~u%c~U set to previous position"
 LibFail:
-				return librsset(Failure);
+				return libfail();
 			}
 		}
 
@@ -643,14 +644,14 @@ LibFail:
 void freeReplPat(Match *pMatch) {
 
 	freeRepl(pMatch);
-	if(pMatch->replTableSize > 0) {
+	if(pMatch->replPatSize > 0) {
 		free((void *) pMatch->replPat);
-		pMatch->replTableSize = 0;
+		pMatch->replPatSize = 0;
 		}
 	}
 
-// Initialize parameters for new replacement pattern, which may be null.  If addToRing is true, add pattern to replace ring
-// also.
+// Initialize parameters for new replacement pattern, which may be null.  If addToRing is true, add pattern to replace
+// ring also.
 int newReplPat(const char *pat, Match *pMatch, bool addToRing) {
 	int patLen = strlen(pat);
 
@@ -658,13 +659,13 @@ int newReplPat(const char *pat, Match *pMatch, bool addToRing) {
 	freeRepl(pMatch);
 
 	// Free up arrays if too big or too small.
-	if(pMatch->replTableSize > PatSizeMax || (pMatch->replTableSize > 0 && (uint) patLen > pMatch->replTableSize))
+	if(pMatch->replPatSize > PatSizeMax || (pMatch->replPatSize > 0 && (uint) patLen > pMatch->replPatSize))
 		freeReplPat(pMatch);
 
 	// Get heap space for arrays if needed.
-	if(pMatch->replTableSize == 0) {
-		pMatch->replTableSize = patLen < PatSizeMin ? PatSizeMin : patLen;
-		if((pMatch->replPat = (char *) malloc(pMatch->replTableSize + 1)) == NULL)
+	if(pMatch->replPatSize == 0) {
+		pMatch->replPatSize = patLen < PatSizeMin ? PatSizeMin : patLen;
+		if((pMatch->replPat = (char *) malloc(pMatch->replPatSize + 1)) == NULL)
 			return rsset(Panic, 0, text94, "newReplPat");
 					// "%s(): Out of memory!"
 		}

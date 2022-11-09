@@ -783,7 +783,7 @@ int binding(Datum *pRtnVal, int n, Datum **args) {
 				if(dsetstr(ektos(pKeyBind->code, keyBuf, false), &keyLit) != 0 ||
 				 apush(pArray, &keyLit, AOpCopy) != 0)
 LibFail:
-					return librsset(Failure);
+					return libfail();
 				}
 			} while((pKeyBind = nextBind(&keyWalk)) != NULL);
 		dclear(&keyLit);
@@ -800,7 +800,7 @@ int execNew(const char *name, UnivPtr *pUniv) {
 	HashRec *pHashRec;
 
 	return (pHashRec = hset(execTable, name, NULL, false)) == NULL ||
-	 dsetmem((void *) pUniv, sizeof(UnivPtr), pHashRec->pValue) != 0 ? librsset(Failure) : sess.rtn.status;
+	 dsetmem((void *) pUniv, sizeof(UnivPtr), pHashRec->pValue) != 0 ? libfail() : sess.rtn.status;
 	}
 
 // Find an executable name (command, function, or alias) in the execution table and return status or Boolean result.
@@ -1037,7 +1037,7 @@ Next:;
 			} while(++pKey < curMacro.pMacEnd);
 		if(dclose(&fab, FabStr) != 0)
 LibFail:
-			return librsset(Failure);
+			return libfail();
 		}
 
 	return sess.rtn.status;
@@ -1159,7 +1159,7 @@ SaveIt:
 Retn:
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Reset macro (reload from ring) and return current status.
@@ -1265,7 +1265,7 @@ int finishMacro(KeyBind *pKeyBind) {
 
 	// Valid macro was recorded.  Check if duplicate.
 	if(dnewtrack(&pDatum) != 0)
-		return librsset(Failure);
+		return libfail();
 	if(encodeMacro(pDatum) != Success)
 		return sess.rtn.status;
 	if((pEntry = macFind(pDatum->str, 0, NULL)) != NULL) {
@@ -1446,7 +1446,7 @@ DelEntry:
 Retn:
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Enable execution of a macro abs(n) times (which will be subsequently run by the getkey() function).  Error if not in
@@ -1492,7 +1492,7 @@ int renameMacro(Datum *pRtnVal, int n, Datum **args) {
 
 	// Get name of macro to rename.
 	if(dnew(&pDatum) != 0)
-		return librsset(Failure);
+		return libfail();
 	if(getMacroName(pDatum, text29, NULL, ArgFirst | ArgNotNull1, OpDelete, &pEntry, NULL) != Success || disnil(pDatum))
 			// "Rename"
 		return sess.rtn.status;
@@ -1507,7 +1507,7 @@ int renameMacro(Datum *pRtnVal, int n, Datum **args) {
 	char macro[strlen(value) + MaxMacroName + 2];
 	sprintf(macro, "%c%s%s", *value, pRtnVal->str, value);
 	if(dsetstr(macro, &pEntry->data) != 0)
-		return librsset(Failure);
+		return libfail();
 	if(n != INT_MIN)
 		macLoad(pEntry);
 	else if(pEntry == ringTable[RingIdxMacro].pEntry)

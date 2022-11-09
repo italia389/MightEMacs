@@ -146,7 +146,7 @@ int rsave(Ring *pRing, const char *value, bool force) {
 AddIt:
 			// Entry not found or a force... add it.
 			if(rnew(pRing) == Success && dsetstr(value, &pRing->pEntry->data) != 0)
-				(void) librsset(Failure);
+				(void) libfail();
 			}
 		}
 	return sess.rtn.status;
@@ -262,7 +262,7 @@ int getRingName(Ring **ppRing) {
 
 	// Get ready.
 	if(dnewtrack(&pDatum) != 0)
-		return librsset(Failure);
+		return libfail();
 
 	if(!(sess.opFlags & OpScript)) {
 		if(termInp(pDatum, text43, ArgFirst | ArgNotNull1, Term_C_Ring, NULL) != Success || disnil(pDatum))
@@ -332,7 +332,7 @@ int ringSize(Datum *pRtnVal, int n, Datum **args) {
 Retn:
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Set pattern or macro at top of search, replace, or macro ring.  If search pattern, make a copy so that a search
@@ -343,12 +343,12 @@ static int setTopEntry(Ring *pRing) {
 		char workBuf[strlen(entry) + 1];
 
 		// Set search pattern.
-		return newSearchPat(strcpy(workBuf, entry), &searchCtrl.match, NULL, false);
+		return newSearchPat(strcpy(workBuf, entry), &bufSearch.match, NULL, false);
 		}
 	if(pRing == ringTable + RingIdxRepl)
 
 		// Set replacement pattern.
-		return newReplPat(entry, &searchCtrl.match, false);
+		return newReplPat(entry, &bufSearch.match, false);
 
 	// Set macro.
 	return decodeMacro(entry);
@@ -414,7 +414,7 @@ int ringNames(Datum *pRtnVal) {
 		pRingEnd = (pRing = ringTable) + ringTableSize;
 		do {
 			if(dsetstr(pRing->ringName, *ppArrayEl++) != 0)
-				return librsset(Failure);
+				return libfail();
 			} while(++pRing < pRingEnd);
 		}
 	return sess.rtn.status;

@@ -320,18 +320,18 @@ int getSysVar(Datum *pRtnVal, SysVar *pSysVar) {
 			dsetint((long) sess.overlap, pRtnVal);
 			break;
 		case sv_replacePat:
-			str = searchCtrl.match.replPat;
+			str = bufSearch.match.replPat;
 			goto Kopy;
 		case sv_screenNum:
 			dsetint((long) sess.cur.pScrn->num, pRtnVal);
 			break;
 		case sv_searchDelim:
-			ektos(searchCtrl.inpDelim, str = workBuf, false);
+			ektos(bufSearch.inpDelim, str = workBuf, false);
 			goto Kopy;
 		case sv_searchPat:
-			{char patBuf[searchCtrl.match.patLen + OptCh_N + 1];
+			{char patBuf[bufSearch.match.patLen + OptCh_N + 1];
 
-			if(dsetstr(makePat(patBuf, &searchCtrl.match), pRtnVal) != 0)
+			if(dsetstr(makePat(patBuf, &bufSearch.match), pRtnVal) != 0)
 				goto LibFail;
 			}
 			break;
@@ -368,7 +368,7 @@ int getSysVar(Datum *pRtnVal, SysVar *pSysVar) {
 Kopy:
 	if(dsetstr(str, pRtnVal) != 0)
 LibFail:
-		(void) librsset(Failure);
+		(void) libfail();
 Retn:
 	return sess.rtn.status;
 	}
@@ -378,7 +378,7 @@ static int copyNewVal(Datum *pDest, Datum *pSrc, VarDesc *pVarDesc) {
 
 	if(dtyparray(pDest) && pVarDesc->type == VTyp_GlobalVar)
 		agTrack(pDest);
-	return dcpy(pDest, pSrc) != 0 ? librsset(Failure) : sess.rtn.status;
+	return dcpy(pDest, pSrc) != 0 ? libfail() : sess.rtn.status;
 	}
 
 // Calculate horizontal jump columns from percentage.
@@ -606,7 +606,7 @@ ERange:
 					sess.overlap = pDatum->u.intNum;
 					break;
 				case sv_replacePat:
-					(void) newReplPat(pDatum->str, &searchCtrl.match, true);
+					(void) newReplPat(pDatum->str, &bufSearch.match, true);
 					break;
 				case sv_screenNum:
 					(void) gotoScreen(pDatum->u.intNum, 0);
@@ -622,12 +622,12 @@ ERange:
 						 text343);
 							// "search"
 						}
-					searchCtrl.inpDelim = extKey;
+					bufSearch.inpDelim = extKey;
 					break;
 				case sv_searchPat:
 					// Make copy so original is returned unmodified.
 					{char workPat[strlen(pDatum->str) + 1];
-					(void) newSearchPat(strcpy(workPat, pDatum->str), &searchCtrl.match, NULL, true);
+					(void) newSearchPat(strcpy(workPat, pDatum->str), &bufSearch.match, NULL, true);
 					}
 					break;
 				case sv_softTabSize:
@@ -697,7 +697,7 @@ XeqCmd:
 		}
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Create local or global user variable, given name and descriptor pointer.  Return status.
@@ -843,11 +843,11 @@ int vderefv(Datum *pDatum, VarDesc *pVarDesc) {
 			break;
 		default:	// VTyp_ArrayElRef
 			if((pValue = aget(pVarDesc->p.pArray, pVarDesc->i.index, 0)) == NULL)
-				return librsset(Failure);
+				return libfail();
 		}
 
 	// Copy value.
-	return dcpy(pDatum, pValue) != 0 ? librsset(Failure) : sess.rtn.status;
+	return dcpy(pDatum, pValue) != 0 ? libfail() : sess.rtn.status;
 	}
 
 // Derefence a variable, given name, and save variable's value in *pDatum.  Return status.
@@ -910,7 +910,7 @@ static int ctosf(Datum *pDatum, DFab *pFab) {
 		}
 	if(dputc(c, pFab, 0) != 0)
 LibFail:
-		(void) librsset(Failure);
+		(void) libfail();
 	return sess.rtn.status;
 	}
 
@@ -964,7 +964,7 @@ int svtofab(SysVar *pSysVar, bool escTermAttr, DFab *pFab) {
 	 DCvtVizStr : DCvtLang)) >= 0)
 		return endless(rtnCode);
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Set a variable interactively ("let" command).  Evaluate value as an expression if n argument.  *Interactive only*
@@ -978,7 +978,7 @@ int let(Datum *pRtnVal, int n, Datum **args) {
 
 	// First get the variable to set.
 	if(dnewtrack(&pDatum) != 0)
-		return librsset(Failure);
+		return libfail();
 	if(termInp(pDatum, text51, ArgNil1, Term_C_MutVar, NULL) != Success || disnil(pDatum))
 			// "Assign variable"
 		goto Retn;
@@ -1038,7 +1038,7 @@ int let(Datum *pRtnVal, int n, Datum **args) {
 		}
 	if(dclose(&fab, FabStr) != 0)
 LibFail:
-		return librsset(Failure);
+		return libfail();
 
 	// Get new value.
 	TermInpCtrl termInpCtrl = {NULL, delimChar, 0, NULL};
@@ -1076,7 +1076,7 @@ int getArrayRef(ExprNode *pNode, VarDesc *pVarDesc, bool create) {
 	pVarDesc->i.index = pNode->index;
 	pVarDesc->p.pArray = pNode->pValue->u.pArray;
 	if(aget(pVarDesc->p.pArray, pVarDesc->i.index, create ? AOpGrow : 0) == NULL)
-		(void) librsset(Failure);
+		(void) libfail();
 	return sess.rtn.status;
 	}
 
@@ -1102,7 +1102,7 @@ int bumpVar(ExprNode *pNode, bool incr, bool pre) {
 				// "Variable '~b%s~B' not an integer"
 		}
 	if(dnewtrack(&pDatum) != 0)
-		return librsset(Failure);
+		return libfail();
 	if(vderefv(pDatum, &varDesc) != Success)			// Dereference variable...
 		return sess.rtn.status;
 	longVal = pDatum->u.intNum + (incr ? 1 : -1);			// compute new value of variable...

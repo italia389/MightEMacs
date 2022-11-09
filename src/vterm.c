@@ -1362,7 +1362,7 @@ int bpop(Buffer *pBuf, ushort flags) {
 				 findHelpKeys(backLine, &prompt) != 0 ||
 				 dputs(" ~ug~U ~btop~B, ~uG~U ~bbot~B, ~uESC~U|~uq~U ~bquit~B, ~u?~U ~bhelp~B: ",
 				 &prompt, 0) != 0 || dclose(&prompt, FabStr) != 0)
-		 			return librsset(Failure);
+		 			return libfail();
 				if(mlputs(MLHome | MLTermAttr | MLFlush | MLForce, prompt.pDatum->str) != Success)
 					return sess.rtn.status;
 				}

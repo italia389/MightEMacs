@@ -18,11 +18,11 @@ let's say you typed:
 
 to start MightEMacs.  The mode line would then look something like this:
 
-  ~r== (Exact) [MScript] == test.ms == File: test.ms ======= MightEMacs 9.6.0 ~R
+  ~r== (Exact) [MScript] == test.ms == File: test.ms ======= MightEMacs 9.7.0 ~R
 
 This says that global mode "Exact" and buffer mode "MScript" are enabled, the
 buffer name is "test.ms" (derived from the filename), the file pathname is
-"test.ms", and we are running version 9.6.0 of the editor.  Global modes are
+"test.ms", and we are running version 9.7.0 of the editor.  Global modes are
 shown in parentheses and buffer modes in brackets.
 
 If you typed some text into the buffer, you would notice that an asterisk

@@ -654,7 +654,7 @@ Retn:
 		bchange(sess.edit.pBuf, windFlags);
 	return hitEOB ? NotFound : sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Quote the next character, and insert it into the buffer abs(n) times, ignoring "Over" and "Repl" buffer modes if n < 0.  All
@@ -794,7 +794,7 @@ static int getTabSize(Datum **args, int *pTabSize) {
 		TermInpCtrl termInpCtrl = {workBuf, RtnKey, 0, NULL};
 
 		if(dnewtrack(&pDatum) != 0)
-			return librsset(Failure);
+			return libfail();
 		sprintf(workBuf, "%d", sess.cur.pScrn->hardTabSize);
 		if(termInp(pDatum, text393, ArgNotNull1 | ArgNil1, 0, &termInpCtrl) != Success)
 				// "Tab size"
@@ -979,7 +979,7 @@ static int getIndent(Datum **ppIndent, Line *pLine) {
 	if(str == pLine->text)
 		*ppIndent = NULL;
 	else if(dnewtrack(ppIndent) != 0 || dsetsubstr(pLine->text, str - pLine->text, *ppIndent) != 0)
-		return librsset(Failure);
+		return libfail();
 
 	return sess.rtn.status;
 	}
@@ -1866,7 +1866,7 @@ int writeBuf(Datum *pRtnVal, int n, Datum **args) {
 
 	// Preallocate a string and copy region to it.
 	if(dsalloc(pRtnVal, region.size + 1) != 0)
-		return librsset(Failure);
+		return libfail();
 	regionToStr(pRtnVal->str, &region);
 
 	// Insert the text into the buffer.
@@ -2011,7 +2011,7 @@ int wrapLine(Datum *pRtnVal, int n, Datum **args) {
 			// "Indentation exceeds wrap column (%d)"
 	if(pPoint->offset > 0) {					// Save any indentation (from first line of block)...
 		if(dnewtrack(&pIndent) != 0 || dsetsubstr(pPoint->pLine->text, pPoint->offset, pIndent) != 0)
-			return librsset(Failure);
+			return libfail();
 		if(edelc(-pPoint->offset, 0) != Success)		// and delete it.
 			return sess.rtn.status;
 		}

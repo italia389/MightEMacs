@@ -165,21 +165,6 @@ void initCharTables(void) {
 		}
 	}
 
-// Reverse string in place and return it.
-char *strrev(char *s) {
-	char *strEnd = strchr(s, '\0');
-	if(strEnd - s > 1) {
-		short c;
-		char *str = s;
-		do {
-			c = *--strEnd;
-			*strEnd = *str;
-			*str++ = c;
-			} while(strEnd > str);
-		}
-	return s;
-	}
-
 // Get line number, given buffer and line pointer.
 long getLineNum(Buffer *pBuf, Line *pTargLine) {
 	Line *pLine;
@@ -478,7 +463,7 @@ int seti(Datum *pRtnVal, int n, Datum **args) {
 		char numBuf[LongWidth];
 
 		if(dnewtrack(&pDatum) != 0)
-			return librsset(Failure);
+			return libfail();
 
 		// Prompt for "i" value.
 		if(termInp(pDatum, text102, 0, 0, &termInpCtrl) != Success || toInt(pDatum) != Success)
@@ -588,7 +573,7 @@ int doFill(Datum *pRtnVal, Datum **args) {
 		arrayVal = true;
 		}
 	rtnCode = afill(pArray, pVal, args[2]->u.intNum, args[3]->u.intNum, AOpGrow);
-	if(libpanic())
+	if(cxlExcep.flags & ExcepMem)
 		goto LibFail;
 	if(arrayVal) {
 		Datum **ppArrayEl, **ppArrayElEnd;
@@ -609,7 +594,7 @@ int doFill(Datum *pRtnVal, Datum **args) {
 	dxfer(pRtnVal, args[0]);
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Perform binary search on a sorted array of string elements (which may be empty) given key string, array pointer, number of
@@ -652,7 +637,7 @@ bool binSearch(const char *key, const void *table, ssize_t n, int (*cmp)(const c
 int makeArray(Datum *pRtnVal, ArraySize len, Array **ppAry) {
 
 	if((*ppAry = anew(len, NULL)) == NULL)
-		return librsset(Failure);
+		return libfail();
 	agStash(pRtnVal, *ppAry);
 	return sess.rtn.status;
 	}
@@ -795,7 +780,7 @@ int mcreate(const char *name, ssize_t index, const char *desc, ushort flags, Mod
 	dsetmemref((void *) pModeSpec, 0, pDatum);
 	if(ainsert(&modeInfo.modeTable, pDatum, index, 0) != 0)
 LibFail:
-		(void) librsset(Failure);
+		(void) libfail();
 	return sess.rtn.status;
 	}
 
@@ -1261,7 +1246,7 @@ Found:
 		}
 	if(dclose(&result, FabStr) != 0)
 LibFail:
-		(void) librsset(Failure);
+		(void) libfail();
 	return sess.rtn.status;
 	}
 
@@ -1274,7 +1259,7 @@ static int editMGPrompt(ushort type, int n, Datum *pDatum) {
 					// "Edit"		"Delete", "Create or edit", "mode"
 	 (type == MG_GrpAttr && dputf(&prompt, 0, " %s", text390) != 0) || dclose(&prompt, FabStr) != 0) ?
 						// "group"
-	 librsset(Failure) : sess.rtn.status;
+	 libfail() : sess.rtn.status;
 	}
 
 // Edit a user mode or group.  Return status.
@@ -1285,7 +1270,7 @@ static int editMG(Datum *pRtnVal, int n, Datum **args, ushort type) {
 	bool created = false;
 
 	if(dnewtrack(&pDatum) != 0)
-		return librsset(Failure);
+		return libfail();
 
 	// Get mode or group name and validate it.
 	if(sess.opFlags & OpScript)
@@ -1393,7 +1378,7 @@ int getModes(Datum *pRtnVal, Buffer *pBuf) {
 		}
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Check if a partial (or full) mode name is unique.  If "bufModeOnly" is true, consider buffer modes only, otherwise global
@@ -1638,5 +1623,5 @@ DoMode:
 
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}

@@ -79,7 +79,7 @@
 
 // Program identification.
 #define ProgName	"MightEMacs"
-#define ProgVer		"9.6.0"
+#define ProgVer		"9.7.0"
 
 /***** BEGIN CUSTOMIZATIONS *****/
 
@@ -103,6 +103,7 @@
 #define MMPath_Name	"MSPATH"	// Name of shell environmental variable containing custom search path.
 #define MMPath ":/usr/local/share/memacs/scripts"
 					// Standard search path for script files.
+#define FuzzySearch	0		// Include code for "fuzzy" searching via XRE library.
 
 // Limits -- [Set any].
 #define LineBlockSize	32		// Number of bytes, line block chunks.
@@ -1233,8 +1234,8 @@ extern int kdcLine(int n, int kdc);
 extern int kdcText(int n, int kdc, Region *pRegion);
 extern int killPrep(int kill);
 extern int lalloc(int used, Line **ppLine);
-#define libpanic()	(cxlExcep.flags & ExcepMem)
-extern int librsset(int status);
+extern int libfail(void);
+extern int libfatal(void);
 extern void llink(Line *pLine1, Buffer *pBuf, Line *pLine2);
 extern bool lineInWind(EWindow *pWind, Line *pLine);
 extern void lreplace1(Line *pLine1, Buffer *pBuf, Line *pLine2);
@@ -1341,7 +1342,6 @@ extern int sortRegion(Datum *pRtnVal, int n, Datum **args);
 extern int spanWhite(bool end);
 extern int sswitch(EScreen *pScrn, ushort flags);
 extern char *strparse(char **pStr, short delimChar);
-extern char *strrev(char *s);
 extern char *strSamp(const char *src, size_t srcLen, size_t maxLen);
 extern void supd_windFlags(Buffer *pBuf, ushort flags);
 extern int suspendMM(Datum *pRtnVal, int n, Datum **args);

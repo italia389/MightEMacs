@@ -6,6 +6,7 @@
 // search.h	Search and replace definitions for MightEMacs.
 
 #include "xre.h"
+#include "cxl/bmsearch.h"
 
 #define CharScanCount	50000000	// Number of scanned regexp characters which triggers display of progress message.
 #define Metacharacters	"^$([{.*+?|\\"	// Metacharacters in a regular expression.
@@ -44,7 +45,9 @@
 
 #define OptCh_Begin	':'		// Beginning of options (not part of pattern).
 #define OptCh_Exact	'e'		// Case-sensitive matches.
+#if FuzzySearch
 #define OptCh_Fuzzy	'f'		// Fuzzy matches.
+#endif
 #define OptCh_Ignore	'i'		// Ignore case.
 #define OptCh_Multi	'm'		// Multiline mode.
 #define OptCh_Plain	'p'		// Plain-text mode.
@@ -86,7 +89,6 @@ typedef struct {
 
 // Structure for a regular expression pattern and its variants.
 typedef struct {
-	char *backPat;			// Backward pattern string (atom-by-atom).
 	regex_t compPat;		// Compiled forward pattern.
 	regex_t compBackPat;		// Compiled backward (reversed) pattern.
 	} RegPat;
@@ -107,11 +109,11 @@ typedef struct {
 	Datum *groups;			// Array of Datum objects (or NULL if "size" is zero).
 	} GrpMatch;
 
-// Pattern-matching control variables.  Note that group elements in "mcpat" point to array elements in "groups".
+// Pattern-matching control parameters for buffers and strings, both RE and non-RE.
 typedef struct {
-	ushort flags;			// RE flags (below).
-	uint searchTableSize;		// Size of search arrays.
-	uint replTableSize;		// Size of replacement arrays.
+	ushort flags;			// Pattern flags (below).
+	uint searchPatSize;		// Size of search pattern arrays.
+	uint replPatSize;		// Size of replacement pattern array.
 	ushort grpCount;		// Number of groups in RE pattern, not counting group 0.
 	int patLen;			// Length of search pattern (RE and non-RE) without trailing option characters.
 	char *pat;			// Forward search pattern (RE and non-RE) without trailing option characters.
@@ -122,39 +124,47 @@ typedef struct {
 					// entire matched text from source object (buffer or string).
 	} Match;
 
-// Search control variables -- for search and replace commands.
+// Buffer-search control parameters -- for search and replace commands.
 typedef struct {
 	ushort inpDelim;		// Search prompt terminator.
+#if BufBackPat
 	char *backPat;			// Backward (reversed) search pattern for plain text buffer searches.
-	int forwDelta1[256];		// Forward non-RE delta1 table.
-	int backDelta1[256];		// Backward non-RE delta1 table.
-	int *forwDelta2;		// Forward non-RE delta2 table.
-	int *backDelta2;		// Backward non-RE delta2 table.
+#endif
+	BMPat forwBM;			// Forward Boyer-Moore (non-RE) compilation object.
+	BMPat backBM;			// Backward Boyer-Moore (non-RE) compilation object.
 	Match match;			// Match information.
-	} SearchCtrl;
+	} BufSearch;
 
+// Flags in Match structure.
 #define SRegical	0x0001		// Metacharacters found in search string.
 #define	RRegical	0x0002		// Metacharacters found in replacement string.
 
 // The following pattern options must be different than Forward and Backward bit(s).
 #define SOpt_Exact	0x0004		// Case-sensitive matches.
-#define SOpt_Fuzzy	0x0008		// Fuzzy matches.
-#define SOpt_Ignore	0x0010		// Ignore case.
-#define SOpt_Multi	0x0020		// Multiline mode ('.' and [^...] match '\n').
-#define SOpt_Plain	0x0040		// Plain-text mode.
-#define SOpt_Regexp	0x0080		// Regexp mode.
-#define SOpt_All	(SOpt_Exact | SOpt_Fuzzy | SOpt_Ignore | SOpt_Multi | SOpt_Plain | SOpt_Regexp)
+#define SOpt_Ignore	0x0008		// Ignore case.
+#define SOpt_Plain	0x0010		// Plain-text mode.
+#define SOpt_Regexp	0x0020		// Regexp mode.
+#define SOpt_Multi	0x0040		// Multiline mode ('.' and [^...] match '\n').
+#if FuzzySearch
+#define SOpt_Fuzzy	0x0080		// Fuzzy matches.
+#define SOpt_All	(SOpt_Exact | SOpt_Ignore | SOpt_Plain | SOpt_Regexp | SOpt_Multi | SOpt_Fuzzy)
+#else
+#define SOpt_All	(SOpt_Exact | SOpt_Ignore | SOpt_Plain | SOpt_Regexp | SOpt_Multi)
+#endif
 
+#define SCpl_ForwardBM	0x0400		// Forward plain text pattern (Boyer-Moore) compiled?
+#define SCpl_BackwardBM	0x0800		// Backward plain text pattern (Boyer-Moore) compiled?
 #define SCpl_PlainExact	0x1000		// Plain text compile done in Exact mode?
-#define SCpl_RegExact	0x2000		// RE compile done in Exact mode?
-#define SCpl_ForwardRE	0x4000		// Forward RE compiled?
-#define SCpl_BackwardRE	0x8000		// Backward RE compiled?
+#define SCpl_ForwardRE	0x2000		// Forward regular expression pattern compiled?
+#define SCpl_BackwardRE	0x4000		// Backward regular expression pattern compiled?
+#define SCpl_RegExact	0x8000		// Regular expression compile done in Exact mode?
 
 // External function declarations.
 extern int boundary(Point *pPoint, int dir);
 extern bool bufPlainSearch(void);
 extern bool bufRESearch(void);
 extern int checkOpts(char *pat, ushort *flags);
+extern int compileBM(ushort flags);
 extern int compileRE(Match *pMatch, ushort flags);
 extern int compileRepl(Match *pMatch);
 extern bool exactSearch(Match *pMatch);
@@ -167,7 +177,6 @@ extern int huntBack(Datum *pRtnVal, int n, Datum **args);
 extern int huntForw(Datum *pRtnVal, int n, Datum **args);
 extern void initInfoColors(void);
 extern void minit(Match *pMatch);
-extern void makeDeltas(void);
 extern char *makePat(char *dest, Match *pMatch);
 extern int newReplPat(const char *pat, Match *pMatch, bool addToRing);
 extern int newSearchPat(char *pat, Match *pMatch, ushort *flags, bool addToRing);
@@ -188,16 +197,16 @@ extern int strIndex(Datum *pRtnVal, ushort flags, Datum *pSrc, Datum *pPat, Matc
 // **** For search.c ****
 
 // Global variables.
-Match matchRE;				// Match results for =~ and !~ operators and the 'index' function.
-SearchCtrl searchCtrl = {
+BufSearch bufSearch = {
 	Ctrl | '['
 	};
+Match matchRE;				// Match results for =~ and !~ operators and the 'index' function.
 
 #else
 
 // **** For all the other .c files ****
 
 // External variable declarations.
+extern BufSearch bufSearch;
 extern Match matchRE;
-extern SearchCtrl searchCtrl;
 #endif

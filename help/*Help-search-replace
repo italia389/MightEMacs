@@ -18,7 +18,6 @@ A colon and one or more lowercase letters may be appended to any pattern to
 specify options, as follows:
 
     ~be~B       Exact pattern matching.  Case of letters is significant.
-    ~bf~B       Fuzzy matching.  Approximate matching is performed.
     ~bi~B       Ignore case.  Case of letters is not significant.
     ~bp~B       Plain text matching.  The pattern is matched literally.
     ~br~B       Regexp matching.  The pattern is matched as a regular expression.

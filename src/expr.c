@@ -234,7 +234,7 @@ static int agUsage(int step) {
 						fprintf(logfile, "ARRAY [%.8x], size %ld\n", (uint) pArray, pArray->used);
 						}
 					else if(dtos(&datum, *ppArrayEl, NULL, DCvtEscChar | DCvtQuote | DCvtShowNil) < 0)
-						return librsset(Failure);
+						return libfail();
 					else
 						fprintf(logfile, "%s\n", datum.str);
 					++ppArrayEl;
@@ -272,7 +272,7 @@ static int agUsage1(ArrayWrapper *pArray, DFab *pFab) {
 		}
 	if(dputc(']', pFab, 0) != 0)
 LibFail:
-		(void) librsset(Failure);
+		(void) libfail();
 
 	return sess.rtn.status;
 	}
@@ -334,7 +334,7 @@ static int agUsage(DFab *pFab, int step) {
 		}
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 #endif
 
@@ -478,7 +478,7 @@ int agFree(void) {
 				fprintf(logfile, "Freeing array %.8x...\n", (uint) pArray);
 #elif MMDebug & Debug_ArrayBuf
 				if(dputf(&fab, 0, "Freeing array %.8x...\n", (uint) pArray) != 0)
-					return librsset(Failure);
+					return libfail();
 #endif
 				afree(pArray);
 				}
@@ -859,7 +859,7 @@ NextSym:
 
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Handle a command, function, or alias call.
@@ -1221,7 +1221,7 @@ Retn:
 	sess.opFlags = (sess.opFlags & ~OpParens) | oldParens;
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Evaluate unary expression and return status.  Unary expressions are any of:
@@ -1317,7 +1317,7 @@ static int arrayOp(ExprNode *pNode1, ExprNode *pNode2, Symbol sym, bool clone) {
 		}
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Concatenate two string nodes and return status.
@@ -1328,7 +1328,7 @@ static int concat(ExprNode *pNode1, ExprNode *pNode2) {
 
 		if(dopenwith(&fab, pNode1->pValue, FabAppend) != 0 || dputs(pNode2->pValue->str, &fab, 0) != 0 ||
 		 dclose(&fab, FabStr) != 0)
-			return librsset(Failure);
+			return libfail();
 		}
 	return sess.rtn.status;
 	}
@@ -1577,7 +1577,7 @@ ArrayOp:
 Retn:
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Process multiplication, division and modulus operators.
@@ -1772,7 +1772,7 @@ static int ge_logical(ExprNode *pNode, int (*func)(ExprNode *pNode)) {
 		return sess.rtn.status;
 
 	if(dnewtrack(&pValue2) != 0)
-		return librsset(Failure);
+		return libfail();
 
 	// Loop until no operator(s) at this level remain.
 	for(;;) {
@@ -1883,7 +1883,7 @@ static int ge_cond(ExprNode *pNode) {
 		if(sess.opFlags & OpEval) {
 			eat = !toBool(pNode->pValue);
 			if(dnewtrack(&pValue2) != 0)
-				return librsset(Failure);
+				return libfail();
 			}
 
 		// Loop twice.
@@ -2150,7 +2150,7 @@ ArrayOp:
 Retn:
 	return sess.rtn.status;
 LibFail:
-	return librsset(Failure);
+	return libfail();
 	}
 
 // Evaluate low precedence logical not expression "not".
@@ -2193,7 +2193,7 @@ int ge_andOr(ExprNode *pNode) {
 		return sess.rtn.status;
 
 	if(dnewtrack(&pValue2) != 0)
-		return librsset(Failure);
+		return libfail();
 	eval = (sess.opFlags & OpEval) != 0;
 
 	// Loop until no operator(s) at this level remain.  If we weren't evaluating initially (eval is false), then all ops
@@ -2373,7 +2373,7 @@ int nextArg(Datum **ppRtnVal, Datum **ppInput, Datum *pWork, char **keywordList,
 			if(*str == '\0')
 				continue;
 			if(dsetstr(str, pWork) != 0)
-				return librsset(Failure);
+				return libfail();
 			*ppRtnVal = pWork;
 			break;
 			}
