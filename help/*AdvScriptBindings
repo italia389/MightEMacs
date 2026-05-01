@@ -1,9 +1,9 @@
 ~bKey Binding Syntax~B
 
-The ~bbindKey~B and ~bunbindKey~B commands take a key binding as their first
-argument and the ~bbinding~B function optionally takes a key binding as its second
-argument.  Key bindings are specified in a coded string form as one or two "key
-literals" separated by a space.  A key literal is defined as:
+The ~bbindKey~B command, ~bunbindKey~B command, and the ~bbinding~B function take a key
+binding as their first (or only) argument.  Key bindings are specified in a
+coded string form as one or two "key literals" separated by a space.  A key
+literal is defined as:
 
     Zero or more of the following with no intervening space:
 

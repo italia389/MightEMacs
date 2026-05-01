@@ -1,4 +1,4 @@
-// (c) Copyright 2022 Richard W. Marinelli
+// (c) Copyright 2026 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -6,8 +6,8 @@
 // exec.c	Routines dealing with execution of commands, command lines, buffers, and files for MightEMacs.
 
 #include "std.h"
+#include <ctype.h>
 #include <stdarg.h>
-#include "cmd.h"
 #include "bind.h"
 
 // Make selected global definitions local.
@@ -22,8 +22,13 @@
 // Control data for if/loop execution levels.
 typedef struct {
 	VarDesc varDesc;		// Loop variable descriptor.
-	Array *pArray;			// Loop array.
-	ArraySize index;		// Index of next element to process.
+	ushort type;			// Type of iteration object (array, hash, or string).
+	union {
+		ArrayEach arrayEach;	// Array iteration state.
+		HashEach hashEach;	// Hash iteration state.
+		char *next;		// String iteration state.
+		} e;
+	char *str;			// String to iterate over.
 	} ForLoopHdr;
 typedef struct ExecLevel {
 	struct ExecLevel *prev, *next;
@@ -70,8 +75,8 @@ static int findHook(const char *name, HookRec **ppHookRec) {
 			}
 		} while((++pHookRec)->name != NULL);
 
-	return rsset(Failure, 0, text317, name);
-			// "No such hook '%s'"
+	return rsset(Failure, 0, text52, text136, name);
+			// "No such %s \"%s\"", "hook"
 	}
 
 // Check if a user function is bound to a hook and return true if so (and set error if isError is true), otherwise, false.
@@ -94,15 +99,15 @@ bool isHook(Buffer *pBuf, bool isError) {
 static void eraseHook(HookRec *pHookRec) {
 
 	pHookRec->func.type = PtrNull;
-	pHookRec->func.u.pVoid = NULL;
+	pHookRec->func.u.ptr = NULL;
 	}
 
-// Clear named hook(s), or all hooks if n <= 0.  Return status.
-int clearHook(Datum *pRtnVal, int n, Datum **args) {
+// Clear named hook(s), or all hooks if n <= 0.  Return number of hooks cleared.
+int clearHook(Datum *pRtnVal, long n, Datum **args) {
 	HookRec *pHookRec;
 	int count = 0;
 
-	if(n <= 0 && n != INT_MIN) {
+	if(n <= 0 && n != DefN) {
 
 		// Clear all hooks.
 		pHookRec = hookTable;
@@ -111,13 +116,12 @@ int clearHook(Datum *pRtnVal, int n, Datum **args) {
 			++count;
 			} while((++pHookRec)->name != NULL);
 		}
-
-	// Clear named hook(s).
 	else {
+		// Clear named hook(s).
 		Datum *pHookName;
 		uint argFlags = ArgFirst | ArgNotNull1;
 
-		if(dnewtrack(&pHookName) != 0)
+		if((pHookName = dnewtrack()) == NULL)
 			return libfail();
 		for(;;) {
 			if(!(argFlags & ArgFirst) && !haveSym(s_comma, false))
@@ -141,56 +145,56 @@ int clearHook(Datum *pRtnVal, int n, Datum **args) {
 	}
 
 // Return name of function bound to a hook, given function pointer.
-const char *hookFuncName(UnivPtr *pUniv) {
+const char *hookFuncName(ExecPtr *pExec) {
 
-	return (pUniv->type == PtrSysFunc) ? pUniv->u.pCmdFunc->name : pUniv->u.pBuf->bufname + 1;
+	return (pExec->type == PtrSysFunc) ? pExec->u.pCmdFunc->name : pExec->u.pBuf->bufname + 1;
 	}
 
 // Set a hook.  Return status.
-int setHook(Datum *pRtnVal, int n, Datum **args) {
+int setHook(Datum *pRtnVal, long n, Datum **args) {
 	HookRec *pHookRec;
-	UnivPtr univ;			// Pointer to the requested function.
+	ExecPtr exec;			// Pointer to the requested function.
 	short minArgs, maxArgs;
 	const char *name;
 	Datum *pHookName = args[0];
 
 	// Check if hook name is valid.
-	if((sess.opFlags & OpEval) && findHook(pHookName->str, &pHookRec) != Success)
+	if(sess.opFlags & OpEval && findHook(pHookName->str, &pHookRec) != Success)
 		goto Retn;
 
 	// Get the function name (bare word).
 	if(!needSym(s_comma, true))
 		goto Retn;
-	if(getCF(NULL, &univ, PtrSysFunc | PtrUserFunc) != Success)
+	if(getCF(NULL, &exec, PtrSysFunc | PtrUserFunc) != Success)
 		goto Retn;
 
 	// Non-hook system function?
-	if(univ.type == PtrSysFunc && !(univ.u.pCmdFunc->attrFlags & CFHook))
-		return rsset(Failure, RSTermAttr, text420, text336, hookFuncName(&univ));
-					// "Hook may not be set to %s '~b%s~B'", "system function"
+	if(exec.type == PtrSysFunc && !(exec.u.pCmdFunc->attrFlags & CFHook))
+		return rsset(Failure, RSTermAttr, text420, text336, hookFuncName(&exec));
+					// "Hook may not be set to %s ~b%s~B", "system function"
 	// Argument count mismatch?
-	if(univ.type == PtrSysFunc) {
-		minArgs = univ.u.pCmdFunc->minArgs;
-		maxArgs = univ.u.pCmdFunc->maxArgs;
+	if(exec.type == PtrSysFunc) {
+		minArgs = exec.u.pCmdFunc->minArgs;
+		maxArgs = exec.u.pCmdFunc->maxArgs;
 		if(minArgs != pHookRec->argCount || maxArgs != pHookRec->argCount) {
-			name = univ.u.pCmdFunc->name;
+			name = exec.u.pCmdFunc->name;
 			goto Mismatch;
 		 	}
 		}
 	else {
-		minArgs = univ.u.pBuf->pCallInfo->minArgs;
-		maxArgs = univ.u.pBuf->pCallInfo->maxArgs;
+		minArgs = exec.u.pBuf->pCallHdr->minArgs;
+		maxArgs = exec.u.pBuf->pCallHdr->maxArgs;
 		if(minArgs != pHookRec->argCount || maxArgs != pHookRec->argCount) {
-			name = univ.u.pBuf->bufname + 1;
+			name = exec.u.pBuf->bufname + 1;
 Mismatch:
-			return rsset(Failure, RSTermAttr, text413, name, minArgs, maxArgs, pHookRec->argCount);
-					// "Function '~b%s~B' argument count (%hd, %hd) does not match hook's (%hd)"
+			return rsset(Failure, RSTermAttr, text413, name, minArgs, maxArgs, pHookRec->name, pHookRec->argCount);
+					// "Function \"~b%s~B\" argument count (%hd, %hd) does not match \"%s\" hook's (%hd)"
 			}
 	 	}
 
 	// Set the hook if evaluating.
 	if(sess.opFlags & OpEval)
-		pHookRec->func = univ;
+		pHookRec->func = exec;
 Retn:
 	return sess.rtn.status;
 	}
@@ -200,34 +204,34 @@ static int disableHook(HookRec *pHookRec) {
 
 	// Hook execution failed -- let the user know what's up.
 	pHookRec->running = false;
-	if(sess.rtn.status > FatalError) {
-		DFab msg;
-
-		if(dopenwith(&msg, &sess.rtn.msg, FabAppend) != 0)
-			goto LibFail;
-		if(dfabempty(&msg) && dputf(&msg, 0, text176, hookFuncName(&pHookRec->func)) != 0)
-					 // "Function '~b%s~B' failed"
-			goto LibFail;
-		if(dputf(&msg, 0, text161, pHookRec->name) != 0 || dclose(&msg, FabStr) != 0)
+#if MMDebug & Debug_MsgLnRtn
+	fprintf(logfile, "disableHook('%s') BEGIN: return status %hd, flags %.4hx, msg \"%s\"\n",
+	 pHookRec->name, sess.rtn.status, sess.rtn.flags, sess.rtn.msg.str);
+#endif
+	if(sess.rtn.status > MinExit) {
+		if(disnull(&sess.rtn.msg))
+			(void) rsset(ScriptError, RSForce | RSTermAttr, text176, hookFuncName(&pHookRec->func));
+								// "Function ~b%s~B failed"
+		if(!(sess.opFlags & OpStartup))
+			(void) rscat(text161, pHookRec->name);
 				// " (disabled '%s' hook)"
-			goto LibFail;
-#if MMDebug & Debug_MsgLine
-		fprintf(logfile, "disableHook(): set new return message '%s'\n", sess.rtn.msg.str);
+		(void) rsset(ScriptError, 0, NULL);
+#if MMDebug & Debug_MsgLnRtn
+		fprintf(logfile, "disableHook(): set new return message \"%s\", flags now %.4hx\n",
+		 sess.rtn.msg.str, sess.rtn.flags);
 #endif
 		}
 
 	// Disable the hook and return (error) status.
 	eraseHook(pHookRec);
 	return sess.rtn.status;
-LibFail:
-	return libfail();
 	}
 
 // Execute a function bound to a hook with pRtnVal (if not NULL) and n.  If argInfo == 0, invoke the function directly;
 // otherwise, build a command line with arguments.  In the latter case, argInfo contains the argument count and types of each
 // argument (string, long, or Datum *).  The lowest four bits of argInfo comprise the argument count.  Each pair of higher bits
 // is 0 for a string argument, 1 for a long (integer) argument, and 2 for a Datum pointer argument.
-int execHook(Datum *pRtnVal, int n, HookRec *pHookRec, uint argInfo, ...) {
+int execHook(Datum *pRtnVal, long n, HookRec *pHookRec, uint argInfo, ...) {
 
 	// Nothing to do if hook not set or function already running.
 	if(pHookRec->func.type == PtrNull || pHookRec->running) {
@@ -235,7 +239,7 @@ int execHook(Datum *pRtnVal, int n, HookRec *pHookRec, uint argInfo, ...) {
 			dsetnil(pRtnVal);
 		return sess.rtn.status;
 		}
-	if(pRtnVal == NULL && dnewtrack(&pRtnVal) != 0)		// For throw-away return value.
+	if(pRtnVal == NULL && (pRtnVal = dnewtrack()) == NULL)		// For throw-away return value.
 		goto LibFail;
 
 	// Build command line if requested.
@@ -244,12 +248,12 @@ int execHook(Datum *pRtnVal, int n, HookRec *pHookRec, uint argInfo, ...) {
 		va_list varArgList;
 		DFab cmd;
 		char *str;
-		ushort oldOpFlag;
+		ushort oldUserCmd;
 		short delimChar = ' ';
-		uint argCount = argInfo & 0xF;
+		uint argCount = argInfo & 0xf;
 
 		// Concatenate function name with arguments...
-		if(dopentrack(&cmd) != 0 || (n != INT_MIN && dputf(&cmd, 0, "%d => ", n) != 0) ||
+		if(dopentrack(&cmd) != 0 || (n != DefN && dputf(&cmd, 0, "%ld => ", n) != 0) ||
 		 dputs(hookFuncName(&pHookRec->func), &cmd, 0) != 0)
 			goto LibFail;
 		va_start(varArgList, argInfo);
@@ -263,7 +267,7 @@ int execHook(Datum *pRtnVal, int n, HookRec *pHookRec, uint argInfo, ...) {
 						if(dputs(viz_nil, &cmd, 0) != 0)
 							goto LibFail;
 						}
-					else if(dputs(str, &cmd, DCvtLang) != 0)
+					else if(dputs(str, &cmd, CvtLang) != 0)
 						goto LibFail;
 					break;
 				case 1:			// long argument.
@@ -271,7 +275,7 @@ int execHook(Datum *pRtnVal, int n, HookRec *pHookRec, uint argInfo, ...) {
 						goto LibFail;
 					break;
 				default:		// Datum *
-					if((rtnCode = dputd(va_arg(varArgList, Datum *), &cmd, NULL, DCvtLang)) < 0)
+					if((rtnCode = dputd(va_arg(varArgList, Datum *), &cmd, NULL, CvtLang)) < 0)
 						goto LibFail;
 					if(endless(rtnCode) != Success)
 						goto Fail;
@@ -284,7 +288,7 @@ int execHook(Datum *pRtnVal, int n, HookRec *pHookRec, uint argInfo, ...) {
 			goto LibFail;
 
 		// save and clear OpUserCmd flag...
-		oldOpFlag = sess.opFlags & OpUserCmd;
+		oldUserCmd = sess.opFlags & OpUserCmd;
 		sess.opFlags &= ~OpUserCmd;
 
 		// execute command...
@@ -301,23 +305,20 @@ int execHook(Datum *pRtnVal, int n, HookRec *pHookRec, uint argInfo, ...) {
 			goto Fail;
 
 		// and restore OpUserCmd flag.
-		sess.opFlags |= oldOpFlag;
+		sess.opFlags |= oldUserCmd;
 		}
 	else {
 		short oldStatus;
 		ushort oldFlags;
-		ushort oldNoLoad = sess.opFlags & OpNoLoad;
 
-		// Save and restore status if running "exit" hook so that execBuf() or execCmdFunc() will run.
+		// Save and restore status if running "exit" hook so that execBuf() and execCmdFunc() will run.
 		if(pHookRec == hookTable + HkExit)
 			rspush(&oldStatus, &oldFlags);
-		sess.opFlags |= OpNoLoad;
 		pHookRec->running = true;
 		if(pHookRec->func.type == PtrUserFunc)
-			(void) execBuf(pRtnVal, n, pHookRec->func.u.pBuf, NULL, ArgFirst);
+			(void) execBuf(pRtnVal, n, pHookRec->func.u.pBuf, NULL, SRun_NoArgs | ArgFirst);
 		else
 			(void) execCmdFunc(pRtnVal, n, pHookRec->func.u.pCmdFunc, 0, 0);
-		sess.opFlags = (sess.opFlags & ~OpNoLoad) | oldNoLoad;
 		if(pHookRec == hookTable + HkExit)
 			rspop(oldStatus, oldFlags);
 		else if(sess.rtn.status != Success)
@@ -337,10 +338,10 @@ LibFail:
 
 // Execute a named command or alias to a command interactively even if it is not bound or is being invoked from a user command
 // or function.
-int run(Datum *pRtnVal, int n, Datum **args) {
-	UnivPtr univ;		// Pointer to command or alias to execute.
+int run(Datum *pRtnVal, long n, Datum **args) {
+	ExecPtr exec;		// Pointer to command or alias to execute.
 	ushort oldScript;
-	ushort oldMsgFlag = modeInfo.cache[MdIdxRtnMsg]->flags & MdEnabled;
+	ushort oldMsgFlag = mode.cache[MdIdxRtnMsg]->flags & MdActive;
 
 	// If we are in script mode, force the command interactively.
 	if((oldScript = sess.opFlags & OpScript)) {
@@ -352,9 +353,9 @@ int run(Datum *pRtnVal, int n, Datum **args) {
 		// look it up...
 		if(sess.opFlags & OpEval) {
 			if(!execFind(pLastParse->tok.str, OpQuery, PtrSysCmd | PtrAliasSysCmd | PtrUserCmd | PtrAliasUserCmd,
-			 &univ))
-				return rsset(Failure, 0, text244, pLastParse->tok.str);
-					// "No such command or alias '%s'"
+			 &exec))
+				return rsset(Failure, 0, text52, text116, pLastParse->tok.str);
+					// "No such %s \"%s\"", "command or alias"
 			}
 
 		// and get next symbol.
@@ -367,29 +368,32 @@ int run(Datum *pRtnVal, int n, Datum **args) {
 
 		// Otherwise, prepare to execute the command -- interactively.
 		sess.opFlags &= ~OpScript;
-		setGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
+		setGlobalMode(mode.cache[MdIdxRtnMsg]);
 		}
 
 	// Prompt the user to type a named command or alias.
 	else {
 		// Interactive mode.
-		if(getCFA(": ", PtrSysCmd | PtrAliasSysCmd | PtrUserCmd | PtrAliasUserCmd, &univ, text244) != Success ||
-								// "No such command or alias '%s'"
-		 univ.type == PtrNull)
+		if(getCFA(": ", PtrSysCmd | PtrAliasSysCmd | PtrUserCmd | PtrAliasUserCmd, &exec, text116) != Success ||
+											// "command or alias"
+		 exec.type == PtrNull)
 			return sess.rtn.status;
 		}
 
 	// Execute it.
-	if(univ.type & PtrAlias)
-		univ = univ.u.pAlias->targ;
-	if(univ.type == PtrUserCmd) {
+	if(exec.type & PtrAlias)
+		exec = exec.u.pAlias->targ;
+	if(exec.type == PtrUserCmd) {
+
+		// Save and restore OpUserCmd flag.
+		ushort oldUserCmd = sess.opFlags & OpUserCmd;
 		sess.opFlags |= OpUserCmd;
-		(void) execBuf(pRtnVal, n, univ.u.pBuf, NULL,
+		(void) execBuf(pRtnVal, n, exec.u.pBuf, NULL,
 		 sess.opFlags & OpParens ? ArgFirst | SRun_Parens : ArgFirst);		// Call the user command.
-		sess.opFlags &= ~OpUserCmd;
+		sess.opFlags = (sess.opFlags & ~OpUserCmd) | oldUserCmd;
 		}
 	else {
-		CmdFunc *pCmdFunc = univ.u.pCmdFunc;
+		CmdFunc *pCmdFunc = exec.u.pCmdFunc;
 		if(n != 0 || !(pCmdFunc->attrFlags & CFNCount))
 			if(allowEdit(pCmdFunc->attrFlags & CFEdit) == Success)
 				(void) execCmdFunc(pRtnVal, n, pCmdFunc, 0, 0);		// Call the system command.
@@ -399,17 +403,17 @@ int run(Datum *pRtnVal, int n, Datum **args) {
 
 	// Clean up and return result.
 	if(oldScript && !oldMsgFlag)
-		clearGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
+		clearGlobalMode(mode.cache[MdIdxRtnMsg]);
 	sess.opFlags = (sess.opFlags & ~OpScript) | oldScript;
 	return sess.rtn.status;
 	}
 
 // Concatenate all arguments and execute string result.  Return status.
-int eval(Datum *pRtnVal, int n, Datum **args) {
+int eval(Datum *pRtnVal, long n, Datum **args) {
 	Datum *pDatum;
 
 	// Get the command line.
-	if(dnewtrack(&pDatum) != 0)
+	if((pDatum = dnewtrack()) == NULL)
 		return libfail();
 	if(sess.opFlags & OpScript) {
 
@@ -428,15 +432,15 @@ int eval(Datum *pRtnVal, int n, Datum **args) {
 	}
 
 #if MMDebug & Debug_CallArg
-// Dump user command/function argument list to log file.
-static int argDump(int n, Buffer *pBuf, Datum *pDatum) {
+// Dump user routine argument list to log file.
+static int argDump(long n, Buffer *pBuf, Datum *pDatum) {
 	Datum argList;
 
-	fprintf(logfile, "-----\nargDump(): n: %d, pBuf: '%s'\n", n, pBuf->bufname);
+	fprintf(logfile, "-----\nargDump(): n: %ld, pBuf: '%s'\n", n, pBuf->bufname);
 	dinit(&argList);
-	if(dtos(&argList, pDatum, NULL, DCvtLang) < 0)
+	if(dtos(&argList, pDatum, NULL, CvtLang) < 0)
 		return libfail();
-	fprintf(logfile, "User command/function argument list: %s\n", argList.str);
+	fprintf(logfile, "User routine argument list: %s\n", argList.str);
 	dclear(&argList);
 	return sess.rtn.status;
 	}
@@ -446,36 +450,29 @@ static int argDump(int n, Buffer *pBuf, Datum *pDatum) {
 // arguments (if any) on command line, dependent on number specified in Buffer record; otherwise, create empty list.  "flags"
 // contains script flags and argument flags.  Return status.
 #if MMDebug & Debug_CallArg
-static int argLoad(int n, Buffer *pBuf, Datum *pArgV, uint flags) {
+static int argLoad(long n, Buffer *pBuf, Datum *pArgV, uint flags) {
 #else
 static int argLoad(Buffer *pBuf, Datum *pArgV, uint flags) {
 #endif
 	Array *pArray;
 
 #if MMDebug & Debug_CallArg
-	fprintf(logfile, "*argLoad(%d,%s,%.8x)...\n", n, pBuf->bufname, flags);
+	fprintf(logfile, "*argLoad(%ld, %s, %.8x)...\n", n, pBuf->bufname, flags);
 #endif
 	// Create array for argument list (which may remain empty).
 	if(makeArray(pArgV, 0, &pArray) != Success)
 		return sess.rtn.status;
 
-	// Don't get arguments (that don't exist) if executing a hook; that is, OpNoLoad is set.
-	if((sess.opFlags & (OpScript | OpNoLoad)) == OpScript) {
+	// Don't get arguments (that don't exist) if executing a hook.
+	if(sess.opFlags & OpScript && !(flags & SRun_NoArgs)) {
 		Datum *pArg;
 		int argCount, minArgs, maxArgs;
-		uint argFlags = (flags & ArgFirst) | ArgBool1 | ArgArray1 | ArgNIS1;
-
-		if(pBuf->pCallInfo == NULL) {
-			minArgs = 0;
-			maxArgs = SHRT_MAX;
-			}
-		else {
-			minArgs = pBuf->pCallInfo->minArgs;
-			maxArgs = (pBuf->pCallInfo->maxArgs < 0) ? SHRT_MAX : pBuf->pCallInfo->maxArgs;
-			}
+		uint argFlags = (flags & ArgFirst) | ArgAny1;
+		minArgs = pBuf->pCallHdr->minArgs;
+		maxArgs = pBuf->pCallHdr->maxArgs < 0 ? SHRT_MAX : pBuf->pCallHdr->maxArgs;
 
 		// Get arguments until none left.
-		if(dnewtrack(&pArg) != 0)
+		if((pArg = dnewtrack()) == NULL)
 			goto LibFail;
 #if MMDebug & Debug_CallArg
 		fprintf(logfile, "\tParsing arguments.  tok: \"%s\", src: \"%s\"\n", pLastParse->tok.str, pLastParse->src);
@@ -500,10 +497,10 @@ static int argLoad(Buffer *pBuf, Datum *pArgV, uint flags) {
 				// We have a symbol.  Get expression.
 				if(funcArg(pArg, argFlags) != Success)
 					return sess.rtn.status;
-				argFlags = ArgBool1 | ArgArray1 | ArgNIS1;
+				argFlags = ArgBool1 | ArgArray1 | ArgHash1 | ArgNIS1;
 
 				// Got an argument... add it to array and count it.
-				if(apush(pArray, pArg, AOpCopy) != 0)
+				if(apush(pArray, pArg, OpXfer) != 0)
 					goto LibFail;
 				++argCount;
 				}
@@ -514,10 +511,9 @@ static int argLoad(Buffer *pBuf, Datum *pArgV, uint flags) {
 					// "Wrong number of arguments (at token '%s')"
 			}
 		}
-	else if((sess.opFlags & OpNoLoad) && pBuf->pCallInfo != NULL && pBuf->pCallInfo->minArgs > 0)
+	else if(flags & SRun_NoArgs && pBuf->pCallHdr->minArgs > 0)
 		return rsset(Failure, 0, text69, "");
 			// "Wrong number of arguments (at token '%s')"
-	sess.opFlags &= ~OpNoLoad;
 #if MMDebug & Debug_CallArg
 	return argDump(n, pBuf, pArgV);
 #else
@@ -552,16 +548,16 @@ static int parseBegin(Parse **ppOldParse, Parse *pNewParse, char *cmdLine, ushor
 #if MMDebug & (Debug_Datum | Debug_Expr | Debug_Token)
 	printInstance(true);
 #endif
-	pLastParse->garbHead = datGarbHead;
+	pLastParse->trackHead = datTrackHead;
 #if MMDebug & Debug_Datum
-	fprintf(logfile, "parseBegin(): saved datum garbage pointer %.8x\n", (uint) datGarbHead);
+	fprintf(logfile, "parseBegin(): saved datum tracking pointer %.8x\n", (uint) datTrackHead);
 #endif
 	// Save old "script mode" flag and enable it.
 	pLastParse->flags = (sess.opFlags & OpScript) | flags;
 	sess.opFlags = (sess.opFlags & ~OpParens) | OpScript;
 
 	// Get first symbol and return.
-	(void) getSym();		// Ignore any "NotFound" return.
+	(void) getSym();			// Ignore any "NotFound" return.
 	return sess.rtn.status;
 	}
 
@@ -569,9 +565,9 @@ static int parseBegin(Parse **ppOldParse, Parse *pNewParse, char *cmdLine, ushor
 static void parseEnd(Parse *pOldParse) {
 
 #if MMDebug & Debug_Datum
-	fprintf(logfile, "parseEnd(): old instance %.8x: calling dgPop()...\n", (uint) pLastParse);
+	fprintf(logfile, "parseEnd(): old instance %.8x: calling dtpop()...\n", (uint) pLastParse);
 #endif
-	dgPop(pLastParse->garbHead);
+	dtpop(pLastParse->trackHead);
 	dclear(&pLastParse->tok);
 	sess.opFlags = (sess.opFlags & ~OpScript) | (pLastParse->flags & OpScript);
 	pLastParse = pOldParse;
@@ -592,7 +588,7 @@ static int xstmt(Datum *pRtnVal) {
 		keyEntry.curFlags = 0;
 
 		// Evaluate the string (as an expression).
-		nodeInit(&node, pRtnVal, true);
+		nodeInit(&node, pRtnVal, EN_TopLevel);
 #if MMDebug & (Debug_Expr | Debug_Script)
 		fprintf(logfile, "xstmt() BEGIN: calling ge_andOr() on token '%s', line '%s'...\n", pLastParse->tok.str,
 		 pLastParse->src);
@@ -609,7 +605,7 @@ static int xstmt(Datum *pRtnVal) {
 
 		// Error if extra symbol(s) or if parsing "#{...}" and right brace missing.
 		if(!extraSym()) {
-			if((pLastParse->flags & ParseExprEnd) && *pLastParse->src != TokC_ExprEnd)
+			if(pLastParse->flags & ParseExprEnd && *pLastParse->src != TokC_ExprEnd)
 				(void) rsset(Failure, 0, text173, TokC_Expr, TokC_ExprBegin, TokC_ExprEnd);
 						// "Unbalanced %c%c%c string parameter"
 			}
@@ -622,7 +618,7 @@ static int xstmt(Datum *pRtnVal) {
 	return sess.rtn.status;
 	}
 
-// Parse and execute a string as an expression statement, given result pointer, string pointer, terminator character, and
+// Parse and execute a string as an expression statement, given result pointer, string pointer, parse-terminator flags, and
 // optional pointer in which to return updated string pointer.  This function is called anytime a string needs to be executed as
 // a "statement" (without a leading statement keyword); for example, by xbuf(), xeqCmdLine(), "#{...}", or the -e switch at
 // startup.
@@ -657,10 +653,10 @@ int execExprStmt(Datum *pRtnVal, char *cmdLine, ushort flags, char **pCmdLine) {
 //		Delete the alias and the associated execTable entry.
 // If the alias does not already exist:
 //	If op is OpCreate:
-//		Create a new object, set its contents to *pUniv, and add it to the linked list and execution table.
+//		Create a new object, set its contents to *pExec, and add it to the linked list and execution table.
 //	If op is OpDelete:
 //		Return an error.
-int editAlias(const char *name, ushort op, UnivPtr *pUniv) {
+int editAlias(const char *name, uint op, ExecPtr *pExec) {
 	Alias *pAlias1, *pAlias2;
 	int result;
 
@@ -704,7 +700,7 @@ int editAlias(const char *name, ushort op, UnivPtr *pUniv) {
 	if(op == OpCreate) {
 		Symbol sym;
 		char *str;
-		UnivPtr univ;
+		ExecPtr exec;
 
 		// Valid identifier name?
 		str = (char *) name;
@@ -714,7 +710,7 @@ int editAlias(const char *name, ushort op, UnivPtr *pUniv) {
 
 		// Allocate the needed memory.
 		if((pAlias2 = (Alias *) malloc(sizeof(Alias) + strlen(name))) == NULL)
-			return rsset(Panic, 0, text94, "afind");
+			return rsset(Panic, 0, text94, "editAlias");
 				// "%s(): Out of memory!"
 
 		// Find the place in the list to insert this alias.
@@ -732,26 +728,26 @@ int editAlias(const char *name, ushort op, UnivPtr *pUniv) {
 
 		// Set the other record members.
 		strcpy(pAlias2->name, name);
-		pAlias2->targ = *pUniv;
-		pAlias2->type = pUniv->type == PtrSysCmd ? PtrAliasSysCmd : pUniv->type == PtrSysFunc ? PtrAliasSysFunc :
-		 pUniv->type == PtrUserCmd ? PtrAliasUserCmd : PtrAliasUserFunc;
+		pAlias2->targ = *pExec;
+		pAlias2->type = pExec->type == PtrSysCmd ? PtrAliasSysCmd : pExec->type == PtrSysFunc ? PtrAliasSysFunc :
+		 pExec->type == PtrUserCmd ? PtrAliasUserCmd : PtrAliasUserFunc;
 
 		// Add its name to the execTable hash.
-		return execFind((univ.u.pAlias = pAlias2)->name, OpCreate, univ.type = pAlias2->type, &univ);
+		return execFind((exec.u.pAlias = pAlias2)->name, OpCreate, exec.type = pAlias2->type, &exec);
 		}
 
 	// Delete request but alias not found.
-	return rsset(Failure, 0, text271, name);
-			// "No such alias '%s'"
+	return rsset(Failure, 0, text52, text127, name);
+			// "No such %s \"%s\"", "alias"
 	}
 
 // Create an alias to a command or function.  Replace any existing alias if n > 0.
-int alias(Datum *pRtnVal, int n, Datum **args) {
-	UnivPtr univ;
+int alias(Datum *pRtnVal, long n, Datum **args) {
+	ExecPtr exec;
 	Datum *pName;
 
 	// Get the alias name.
-	if(dnewtrack(&pName) != 0)
+	if((pName = dnewtrack()) == NULL)
 		goto LibFail;
 	if(sess.opFlags & OpScript) {
 		if(!haveSym(s_ident, false) && !haveSym(s_identQuery, true))
@@ -763,11 +759,11 @@ int alias(Datum *pRtnVal, int n, Datum **args) {
 			// "Create alias "
 		return sess.rtn.status;
 
-	// Existing command, function, alias, or user variable of same name?  Exclude aliases from search if n > 0 (a force).
-	if((sess.opFlags & OpEval) && (execFind(pName->str, OpQuery, n > 0 ? PtrAny & ~PtrAlias : PtrAny, NULL) ||
-	 findUserVar(pName->str) != NULL))
-		return rsset(Failure, RSTermAttr, text165, pName->str);
-			// "Name '~b%s~B' already in use"
+	// Existing command, function, alias, or local variable of same name?  Exclude aliases from search if n > 0 (a force).
+	if(sess.opFlags & OpEval && (execFind(pName->str, OpQuery, n > 0 ? PtrAny & ~PtrAlias : PtrAny, NULL) ||
+	 findLocalVar(pName->str) != NULL))
+		return rsset(Failure, RSTermAttr, text165, pName->str, text109);
+					// "Name '~b%s~B'%s", " already in use"
 
 	if(sess.opFlags & OpScript) {
 
@@ -781,30 +777,30 @@ int alias(Datum *pRtnVal, int n, Datum **args) {
 			return sess.rtn.status;
 
 		// Get the command or function name.
-		(void) getCF(NULL, &univ, PtrSysCmdFunc | PtrUserCmdFunc);
+		(void) getCF(NULL, &exec, PtrSysCmdFunc | PtrUserCmdFunc);
 		}
 	else {
 		char workBuf[strlen(text215) + strlen(pName->str) + strlen(text325) + strlen(text313) + 8];
-
+				// "Create alias "			"of"		"command or function"
 		// Get the command or function name.
 		sprintf(workBuf, "%s'~b%s~B' %s %s", text215, pName->str, text325, text313);
 						// "Create alias "	"of", "command or function"
-		(void) getCF(workBuf, &univ, PtrSysCmdFunc | PtrUserCmdFunc);
+		(void) getCF(workBuf, &exec, PtrSysCmdFunc | PtrUserCmdFunc);
 		}
 
-	if(sess.rtn.status == Success && univ.type != PtrNull) {
+	if(sess.rtn.status == Success && exec.type != PtrNull) {
 
 		// Delete any existing alias.
 		if(n > 0 && execFind(pName->str, OpQuery, PtrAlias, NULL))
 			(void) editAlias(pName->str, OpDelete, NULL);
 
 		// Create the alias.
-		if(editAlias(pName->str, OpCreate, &univ) != Success)
+		if(editAlias(pName->str, OpCreate, &exec) != Success)
 			return sess.rtn.status;
 
 		// Increment alias use count on user command or function.
-		if(univ.type & PtrUserCmdFunc)
-			++univ.u.pBuf->aliasCount;
+		if(exec.type & PtrUserCmdFunc)
+			++exec.u.pBuf->aliasCount;
 		}
 
 	return sess.rtn.status;
@@ -814,17 +810,19 @@ LibFail:
 
 // Delete one or more user commands, user functions, or aliases.  Set pRtnVal to count of items deleted or zero if error.
 // Return status.
-static int delCFA(Datum *pRtnVal, uint selector, const char *prompt, const char *type, const char *errorMsg) {
-	UnivPtr univ;
+static int delCFA(Datum *pRtnVal, uint selector, const char *type) {
+	ExecPtr exec;
 	uint count = 0;
-	bool delError = false;
 
 	if(sess.opFlags & OpEval)
-		dsetint(0L, pRtnVal);
+		dsetint(0, pRtnVal);
 
-	// If interactive, get alias, command, or function name from user.
+	// If interactive, get one alias, command, or function name from user.
 	if(!(sess.opFlags & OpScript)) {
-		if(getCFA(prompt, selector, &univ, errorMsg) != Success || univ.type == PtrNull)
+		char prompt[strlen(text26) + strlen(type) + 2];
+				// "Delete"
+		sprintf(prompt, "%s %s", text26, type);
+		if(getCFA(prompt, selector, &exec, type) != Success || exec.type == PtrNull)
 			return sess.rtn.status;
 		goto NukeIt;
 		}
@@ -834,59 +832,64 @@ static int delCFA(Datum *pRtnVal, uint selector, const char *prompt, const char 
 		if(!haveSym(s_ident, false) && !haveSym(s_identQuery, true))
 			return sess.rtn.status;
 		if(sess.opFlags & OpEval) {
-			if(!execFind(pLastParse->tok.str, OpQuery, selector, &univ))
-				(void) rsset(Success, RSNoWrap, errorMsg, pLastParse->tok.str);
+			if(!execFind(pLastParse->tok.str, OpQuery, selector, &exec))
+				(void) rsset(Success, RSNoWrap, text52, type, pLastParse->tok.str);
+							// "No such %s \"%s\""
 			else {
 NukeIt:
 				// Nuke it.
 				if(selector & PtrUserCmdFunc) {
-					if(bdelete(univ.u.pBuf, BC_IgnChgd) != Success)
+					if(bdelete(exec.u.pBuf, BC_IgnChgd) != Success)
 						goto Fail;
 					}
-				else if(editAlias(univ.u.pAlias->name, OpDelete, NULL) != Success) {
+				else if(editAlias(exec.u.pAlias->name, OpDelete, NULL) != Success) {
 Fail:
 					// Don't cause a running script to fail on Failure status.
 					if(sess.rtn.status < Failure)
 						return sess.rtn.status;
-					delError = true;
-					(void) rsunfail();
+					rsunfail();
 					continue;
 					}
 				++count;
 				}
 			}
-		} while((sess.opFlags & OpScript) && getSym() == Success && needSym(s_comma, false));
+		} while(sess.opFlags & OpScript && getSym() == Success && needSym(s_comma, false));
 
-	// Return count if evaluating and no error.
-	if((sess.opFlags & OpEval) && !delError)
-		dsetint((long) count, pRtnVal);
-	if(count == 1)
-		(void) rsset(Success, RSHigh, "%s %s", type, text10);
-						// "deleted"
+	// If script mode...
+	if(sess.opFlags & OpScript) {
+
+		// Return count if evaluating.
+		if(sess.opFlags & OpEval)
+			dsetint(count, pRtnVal);
+		}
+	else if(count == 1)
+		(void) rsset(Success, RSHigh, "%c%s %s", upCase[(int) *type], type + 1, text10);
+										// "deleted"
 	return sess.rtn.status;
 	}
 
 // Delete one or more alias(es).  Return status.
-int delAlias(Datum *pRtnVal, int n, Datum **args) {
+int delAlias(Datum *pRtnVal, long n, Datum **args) {
 
-	return delCFA(pRtnVal, PtrAlias, text269, text411, text271);
-			// "Delete alias", "Alias", "No such alias '%s'"
+	return delCFA(pRtnVal, PtrAlias, text127);
+					// "alias"
 	}
 
 // Delete one or more user routines (commands and/or functions).  Return status.
-int delRoutine(Datum *pRtnVal, int n, Datum **args) {
+int delRoutine(Datum *pRtnVal, long n, Datum **args) {
 
-	return delCFA(pRtnVal, PtrUserCmdFunc, text216, text449, text440);
-			// "Delete user routine", "User routine", "No such user routine '%s'"
+	return delCFA(pRtnVal, PtrUserCmdFunc, text152);
+					// "user routine"
 	}
 
 // Execute the contents of a buffer (of commands) and return result in pRtnVal.
-int xeqBuf(Datum *pRtnVal, int n, Datum **args) {
+int xeqBuf(Datum *pRtnVal, long n, Datum **args) {
 	Buffer *pBuf;		// Pointer to buffer to execute.
 
-	// Find out what buffer the user wants to execute...
-	if(getBufname(pRtnVal, text117, sess.cur.pBuf->bufname, ArgFirst | OpDelete, &pBuf, NULL) != Success || pBuf == NULL)
+	// Find out what buffer the user wants to execute, activate it if needed...
+	if(getBufname(pRtnVal, text117, ArgFirst | OpDelete | OpCurBName, &pBuf, NULL) != Success || pBuf == NULL ||
 			// "Execute"
+	 (!(pBuf->flags & BFActive) && bactivate(pBuf) != Success))
 		return sess.rtn.status;
 
 	// and execute it with arg n.
@@ -895,19 +898,6 @@ int xeqBuf(Datum *pRtnVal, int n, Datum **args) {
 #else
 	return execBuf(pRtnVal, n, pBuf, pBuf->filename, sess.opFlags & OpParens ? SRun_Parens : 0);
 #endif
-	}
-
-// Skip white space in a fixed-length string, given indirect source pointer and length.  Update pointer to point to the first
-// non-white character (or end of string if none) and return number of bytes remaining.
-static int skipWhite(char **pSrc, int len) {
-	char *src = *pSrc;
-
-	while(len > 0 && (*src == ' ' || *src == '\t')) {
-		++src;
-		--len;
-		}
-	*pSrc = src;
-	return len;
 	}
 
 // Look up a statement keyword, given indirect pointer to beginning of command line and length.  Update *pCmdLine and return
@@ -933,10 +923,10 @@ static Symbol findStmtKeyword(char **pCmdLine, int len) {
 	return s_nil;
 	}
 
-// Build an error message for a user command or function execution which includes the buffer name and line currently being
-// executed, and set via rsset().  If errorMsg0 is NULL, use sess.rtn.msg as the initial portion; if sess.rtn.msg is null, use a
-// generic error message.  Return status.
-static int userExecError(const char *errorMsg0, const char *errorMsg1, Buffer *pBuf, Line *pLine, uint flags) {
+// Expand an error message from a user command or function execution which includes the file (preferred) or buffer name and line
+// currently being executed, and set via rsset() with ScriptError severity.  If errorMsg0 is NULL, use sess.rtn.msg as the
+// initial portion; if sess.rtn.msg is null, use a generic error message.  Return status.
+static int userExecError(const char *errorMsg0, const char *errorMsg1, Buffer *pBuf, Line *pLine) {
 	DFab msg;
 	const char *name, *label;
 	short delimChar;
@@ -961,14 +951,14 @@ static int userExecError(const char *errorMsg0, const char *errorMsg1, Buffer *p
 
 	// Prepend errorMsg0 and errorMsg1.
 	if(errorMsg0 == NULL && errorMsg1 == NULL && !disnull(&sess.rtn.msg)) {
-		if(escAttr(&msg) != Success)
+		if(escMsgAttr(&msg) < Failure)
 			return sess.rtn.status;
 		}
 	else if((errorMsg1 == NULL ? dputs(errorMsg0 != NULL ? errorMsg0 : text219, &msg, 0) :
 								// "Script failed"
 	 dputf(&msg, 0, errorMsg0, errorMsg1)) != 0)
 		goto LibFail;
-	if(dputf(&msg, 0, "%s %s %c%s%c %s %ld", text229, label, delimChar, name, delimChar, text230,
+	if(dputf(&msg, 0, "%s %s %c%s%c %s %d", text229, label, delimChar, name, delimChar, text230,
 					// ", in",				"at line"
 	 getLineNum(pBuf, pLine)) != 0 || dclose(&msg, FabStr) != 0)
 		goto LibFail;
@@ -989,14 +979,14 @@ static void lbfree(LoopBlock *pBlock) {
 
 // Free any user command/function preprocessor storage in a buffer.
 void preprocFree(Buffer *pBuf) {
-	CallInfo *pCallInfo = pBuf->pCallInfo;
-	if(pCallInfo != NULL) {
-		if(pCallInfo->execBlocks != NULL) {
-			lbfree(pCallInfo->execBlocks);
-			pCallInfo->execBlocks = NULL;
+	CallHdr *pCallHdr = pBuf->pCallHdr;
+	if(pCallHdr != NULL) {
+		if(pCallHdr->execBlocks != NULL) {
+			lbfree(pCallHdr->execBlocks);
+			pCallHdr->execBlocks = NULL;
 			}
-		dclear(&pCallInfo->argSyntax);
-		dclear(&pCallInfo->descrip);
+		dclear(&pCallHdr->argSyntax);
+		dclear(&pCallHdr->descrip);
 		pBuf->flags &= ~BFPreproc;		// Clear "preprocessed" flag.
 		}
 	}
@@ -1015,9 +1005,9 @@ static void lbdump(Line *pLine, const char *label) {
 	}
 #endif
 
-// Preprocess a buffer and return status.  If no errors found, set pBuf->pCallInfo->execBlocks to result.  pBuf->pCallInfo is
+// Preprocess a buffer and return status.  If no errors found, set pBuf->pCallHdr->execBlocks to result.  pBuf->pCallHdr is
 // assumed to not be NULL.
-static int preprocBuf(Buffer *pBuf, uint flags) {
+static int preprocBuf(Buffer *pBuf) {
 	Line *pLine;			// Pointer to line to execute.
 	Symbol keywordId;		// Statement keyword ID
 	int len;			// Line length.
@@ -1093,12 +1083,12 @@ static int preprocBuf(Buffer *pBuf, uint flags) {
 NewBlock:
 					// Not an orphan, make a block.
 					if((pTempBlock = (LoopBlock *) malloc(sizeof(LoopBlock))) == NULL)
-						return rsset(Panic, 0, text94, "ppbuf");
+						return rsset(Panic, 0, text94, "preprocBuf");
 							// "%s(): Out of memory!"
 
 					// Record line and block type.
-					pTempBlock->pMarkLine = pLine;
-					pTempBlock->pBreakLine = pTempBlock->pJumpLine = NULL;
+					pTempBlock->pBlockBegin = pLine;
+					pTempBlock->pEndLoopUp = pTempBlock->pEndLoop = NULL;
 					pTempBlock->type = keywordId;
 
 					// Add the block to the open list.
@@ -1119,20 +1109,20 @@ NewBlock:
 					// loop (SLoopType) record is moved.  This will complete the most recent SLoopType
 					// block.
 					do {
-						pOpenBlock->pJumpLine = pLine;
+						pOpenBlock->pEndLoop = pLine;
 						if(pOpenBlock->type & SLoopType) {
 							pTempBlock = pOpenBlock->next;
 
-							// For loop records, record the marker line (temporarily) of the
-							// *parent* loop record in this record's pBreakLine member so that it
+							// For loop records, record the block-begin line (temporarily) of the
+							// *parent* loop record in this record's pEndLoopUp member so that it
 							// can be set later to the parent's ENDLOOP line (which is needed for
 							// multi-level breaks).  If there is no parent loop block, the
-							// pBreakLine member will remain NULL, which is okay.
+							// pEndLoopUp member will remain NULL, which is okay.
 							while(pTempBlock != NULL) {
 								if(pTempBlock->type & SLoopType) {
 
-									// Found parent loop block.  Save marker line pointer.
-									pOpenBlock->pBreakLine = pTempBlock->pMarkLine;
+									// Found parent loop block.  Save block-begin pointer.
+									pOpenBlock->pEndLoopUp = pTempBlock->pBlockBegin;
 									break;
 									}
 								pTempBlock = pTempBlock->next;
@@ -1167,30 +1157,30 @@ NewBlock:
 			// "Unmatched '~bcommand~B' or '~bfunction~B' keyword"
 		errorMsg2 = NULL;
 FailExit:
-		(void) userExecError(errorMsg1, errorMsg2, pBuf, pLine, flags);
+		(void) userExecError(errorMsg1, errorMsg2, pBuf, pLine);
 		goto Exit;
 		}
 
 	// Everything looks good.  Last step is to fix up the loop records.
 	for(pTempBlock = pExecBlock; pTempBlock != NULL; pTempBlock = pTempBlock->next) {
-		if((pTempBlock->type & SLoopType) && pTempBlock->pBreakLine != NULL) {
+		if(pTempBlock->type & SLoopType && pTempBlock->pEndLoopUp != NULL) {
 			LoopBlock *pTempBlock2 = pExecBlock;
 
-			// Find loop block ahead of this block that contains this block's marker.
+			// Find loop block ahead of this block that contains this block's block-begin line.
 			do {
-				if(pTempBlock2->pMarkLine == pTempBlock->pBreakLine) {
+				if(pTempBlock2->pBlockBegin == pTempBlock->pEndLoopUp) {
 
-					// Found parent block.  Set this loop's pBreakLine to parent's
-					// ENDLOOP line (instead of the top marker line).
-					pTempBlock->pBreakLine = pTempBlock2->pJumpLine;
+					// Found parent block.  Set this loop's pEndLoopUp to parent's
+					// ENDLOOP line (instead of the block-begin line).
+					pTempBlock->pEndLoopUp = pTempBlock2->pEndLoop;
 					goto NextFix;
 					}
 				} while((pTempBlock2 = pTempBlock2->next) != NULL &&
-				 pTempBlock2->pMarkLine != pTempBlock->pMarkLine);
+				 pTempBlock2->pBlockBegin != pTempBlock->pBlockBegin);
 
 			// Huh?  Matching loop block not found! (This is a bug.)
-			(void) rsset(Failure, 0, text220, getLineNum(pBuf, pTempBlock->pMarkLine));
-				// "Parent block of loop block at line %ld not found during buffer scan"
+			(void) rsset(Failure, 0, text220, getLineNum(pBuf, pTempBlock->pBlockBegin));
+				// "Parent block of loop block at line %'d not found during buffer scan"
 			goto RCExit;
 			}
 NextFix:;
@@ -1225,26 +1215,36 @@ NextFix:;
 				break;
 			}
 		fprintf(logfile, "-----\n Type: %.4x %s\n", pTempBlock->type, str);
-		lbdump(pTempBlock->pMarkLine, " Mark");
-		lbdump(pTempBlock->pJumpLine, " Jump");
-		lbdump(pTempBlock->pBreakLine, "Break");
+		lbdump(pTempBlock->pBlockBegin, " BlockBegin");
+		lbdump(pTempBlock->pEndLoop, " EndLoop");
+		lbdump(pTempBlock->pEndLoopUp, "EndLoopUp");
 		}
 //	return rsset(FatalError, RSNoFormat, "preprocBuf() exit");
 #endif
 	// Success!  Save block pointer in buffer-extension record and set "preprocessed" flag.
-	pBuf->pCallInfo->execBlocks = pExecBlock;
+	pBuf->pCallHdr->execBlocks = pExecBlock;
 	pBuf->flags |= BFPreproc;
 	goto Exit;
 
 	// Clean up and exit per sess.rtn.status.
 RCExit:
 	lbfree(pOpenBlock);
-	(void) userExecError(NULL, NULL, pBuf, pLine, flags);
+	(void) userExecError(NULL, NULL, pBuf, pLine);
 Exit:
 	if(sess.rtn.status == Success)
 		return sess.rtn.status;
 	lbfree(pExecBlock);
 	return sess.rtn.status;
+	}
+
+// Clear and invalidate for loop header.
+static void clearFor(ForLoopHdr *pForHdr) {
+
+	if(pForHdr->str != NULL) {
+		free((void *) pForHdr->str);
+		pForHdr->str = NULL;
+		}
+	pForHdr->type = 0;
 	}
 
 // Free execution level storage.
@@ -1253,13 +1253,15 @@ static void lfree(ExecLevel *pLevel) {
 
 	do {
 		pLevel1 = pLevel->next;
-		if(pLevel->pForHdr != NULL)
+		if(pLevel->pForHdr != NULL) {
+			clearFor(pLevel->pForHdr);
 			free((void *) pLevel->pForHdr);
+			}
 		free((void *) pLevel);
 		} while((pLevel = pLevel1) != NULL);
 	}
 
-// Move forward to a new execution level, creating a level object if needed.
+// Move forward to a new execution level (for loop or if statement), creating a level object if needed.
 static int nextLevel(ExecLevel **ppLevel) {
 	ExecLevel *pLevel = *ppLevel;
 
@@ -1302,15 +1304,16 @@ static int nextLevel(ExecLevel **ppLevel) {
 	}
 
 // Return to the most recent loop level (bypassing "if" levels).  Top level should never be reached.
-static int prevLevel(ExecLevel **ppLevel) {
+static int prevLoopLevel(ExecLevel **ppLevel) {
 	ExecLevel *pLevel = *ppLevel;
 
 	for(;;) {
 #if SanityCheck
 		if(pLevel->prev == NULL)
 
-			// Huh?  Loop level not found! (This is a bug.)
-			return rsset(Failure, RSNoFormat, "Prior loop execution level not found while rewinding stack");
+			// Huh?  Loop level not found!  (This is a bug.)
+			return rsset(Failure, RSNoFormat, text992);
+				// "Prior loop execution level not found while rewinding stack"
 #endif
 		if(pLevel->loopSpawn)
 			break;
@@ -1360,8 +1363,8 @@ ErrRtn:
 //	endroutine
 // Return value is set to command/function name as a comment.
 static int getCmdFunc(Datum *pRtnVal, Buffer **ppCallBuf, ushort bufFlags) {
-	UnivPtr univ;
-	CallInfo *pCallInfo;
+	ExecPtr exec;
+	CallHdr *pCallHdr;
 	bool whitespace, exists;
 	Datum *pDatum1, *pDatum2;
 	char *pCmdFuncName;
@@ -1370,7 +1373,7 @@ static int getCmdFunc(Datum *pRtnVal, Buffer **ppCallBuf, ushort bufFlags) {
 	ushort haveText1 = 0, haveText2 = 0;
 	short minArgs = 0, maxArgs = -1;
 
-	if(dnewtrack(&pDatum1) != 0 || dnewtrack(&pDatum2) != 0)
+	if((pDatum1 = dnewtrack()) == NULL || (pDatum2 = dnewtrack()) == NULL)
 		goto LibFail;
 
 	// Get command or function name.
@@ -1380,13 +1383,14 @@ static int getCmdFunc(Datum *pRtnVal, Buffer **ppCallBuf, ushort bufFlags) {
 		return rsset(Failure, 0, text232, pLastParse->tok.str, MaxBufname - 1);
 			// "Command or function name '%s' cannot exceed %d characters"
 
-	// Construct the buffer header (and name) in pRtnVal temporarily.
+	// Construct the buffer header (and name) in pRtnVal.
 	if(dsalloc(pRtnVal, strlen(pLastParse->tok.str) + cmdFuncLen + 4) != 0)
 		goto LibFail;
 	pRtnVal->str[0] = TokC_Comment;
 	pRtnVal->str[1] = ' ';
 	pCmdFuncName = stpcpy(pRtnVal->str + 2, bufFlags == BFFunc ? text247 : text158);
 								// "function", "command"
+	// Create buffer name (temporarily) for duplicate check.
 	*pCmdFuncName++ = BCmdFuncLead;
 	strcpy(pCmdFuncName, pLastParse->tok.str);
 
@@ -1404,7 +1408,7 @@ static int getCmdFunc(Datum *pRtnVal, Buffer **ppCallBuf, ushort bufFlags) {
 			if(!needSym(s_rightParen, false)) {
 				if(funcArg(pDatum1, ArgFirst | ArgInt1) != Success)
 					return sess.rtn.status;
-				if((minArgs = pDatum1->u.intNum) < 0)
+				if((minArgs = dgetint(pDatum1)) < 0)
 					goto Err;
 				if(!haveSym(s_comma, false))
 					maxArgs = minArgs;
@@ -1413,11 +1417,11 @@ static int getCmdFunc(Datum *pRtnVal, Buffer **ppCallBuf, ushort bufFlags) {
 					 funcArg(pDatum2, ArgFirst | ArgInt1) != Success))
 						return sess.rtn.status;
 					if(!disnil(pDatum2))
-						if((maxArgs = pDatum2->u.intNum) < 0) {
+						if((maxArgs = dgetint(pDatum2)) < 0) {
 							minArgs = maxArgs;
 Err:
-							return rsset(Failure, 0, text39, text206, (int) minArgs, 0);
-								// "%s (%d) must be %d or greater"
+							return rsset(Failure, 0, text39, text206, (long) minArgs, 0);
+								// "%s (%'ld) must be %d or greater"
 								// "Command or function argument count"
 							}
 					}
@@ -1443,31 +1447,31 @@ Err:
 			}
 		}
 
-	// Existing command, function, alias, or user variable of same name as this user command or function?
-	if(((exists = execFind(pCmdFuncName, OpQuery, PtrAny, &univ)) && (!(univ.type & PtrUserCmdFunc) ||
-	 !(modeInfo.cache[MdIdxClob]->flags & MdEnabled))) || findUserVar(pCmdFuncName) != NULL)
-		return rsset(Failure, RSTermAttr, text165, pCmdFuncName);
-			// "Name '~b%s~B' already in use"
+	// Existing command, function, alias, or local variable of same name as this user command or function?
+	if(((exists = execFind(pCmdFuncName, OpQuery, PtrAny, &exec)) && (!(exec.type & PtrUserCmdFunc) ||
+	 !(mode.cache[MdIdxClob]->flags & MdActive))) || findLocalVar(pCmdFuncName) != NULL)
+		return rsset(Failure, RSTermAttr, text165, pCmdFuncName, text109);
+					// "Name '~b%s~B'%s", " already in use"
 
 	// Create a hidden buffer, make sure it's empty, and has the correct pointer type in execTable.
-	if(bfind(pCmdFuncName - 1, BS_Create | BS_Extend, bufFlags | BFHidden | BFReadOnly, ppCallBuf, NULL) != Success)
+	if(bfind(pCmdFuncName - 1, BN_Create | BN_Extend, bufFlags | BFHidden | BFReadOnly, ppCallBuf, NULL) != Success)
 		return sess.rtn.status;
 	if(exists) {
 		if(bclear(*ppCallBuf, BC_IgnChgd | BC_Unnarrow | BC_ClrFilename) != Success)
 			return sess.rtn.status;
-		univ.type = (bufFlags == BFCommand) ? PtrUserCmd : PtrUserFunc;
-		(void) execFind(pCmdFuncName, OpUpdate, 0, &univ);
+		exec.type = (bufFlags == BFCommand) ? PtrUserCmd : PtrUserFunc;
+		(void) execFind(pCmdFuncName, OpUpdate, 0, &exec);
 		(*ppCallBuf)->flags = ((*ppCallBuf)->flags & ~BFCmdFunc) | bufFlags;
 		}
 
 	// Set the buffer extension parameters.
-	pCallInfo = (*ppCallBuf)->pCallInfo;
-	pCallInfo->minArgs = minArgs;
-	pCallInfo->maxArgs = maxArgs;
+	pCallHdr = (*ppCallBuf)->pCallHdr;
+	pCallHdr->minArgs = minArgs;
+	pCallHdr->maxArgs = maxArgs;
 	if(haveText1)
-		dxfer(haveText1 == 1 ? &pCallInfo->argSyntax : &pCallInfo->descrip, pDatum1);
+		dxfer(haveText1 == 1 ? &pCallHdr->argSyntax : &pCallHdr->descrip, pDatum1);
 	if(haveText2)
-		dxfer(haveText2 == 1 ? &pCallInfo->argSyntax : &pCallInfo->descrip, pDatum2);
+		dxfer(haveText2 == 1 ? &pCallHdr->argSyntax : &pCallHdr->descrip, pDatum2);
 	pCmdFuncName[-1] = ' ';
 
 	return sess.rtn.status;
@@ -1479,45 +1483,77 @@ LibFail:
 static int initFor(ForLoopHdr **ppForHdr, Datum *pDatum) {
 	ExprNode node;
 	ForLoopHdr *pForHdr;
+	static const char myName[] = "initFor";
 
 	if((pForHdr = *ppForHdr) == NULL) {
 		if((pForHdr = (ForLoopHdr *) malloc(sizeof(ForLoopHdr))) == NULL)
-			return rsset(Panic, 0, text94, "initFor");
-				// "%s(): Out of memory!"
+			goto ErrRtn;
+		pForHdr->str = NULL;
 		*ppForHdr = pForHdr;
 		}
 
 	// Get the variable name and "in" keyword.
-	if(!haveSym(s_any, true) || findVar(pLastParse->tok.str, &pForHdr->varDesc, OpCreate) != Success ||
+	if(!haveSym(s_any, true) || vfind(pLastParse->tok.str, &pForHdr->varDesc, OpCreate) != Success ||
 	 getSym() < NotFound || !needSym(kw_in, true))
 		return sess.rtn.status;
 
-	// Get (array) expression.
-	nodeInit(&node, pDatum, false);
-	if(ge_assign(&node) != Success || extraSym() || !isArrayVal(node.pValue))
+	// Get array, hash, or string expression.
+	nodeInit(&node, pDatum, 0);
+	if(ge_assign(&node) != Success || extraSym() || !isAryHshStrVal(node.pVal))
 		return sess.rtn.status;
 
 	// Finish up.
-	pForHdr->pArray = pDatum->u.pArray;
-	pForHdr->index = 0;
+	pForHdr->type = pDatum->type;
+	if(dtyphash(pDatum))
+		heachinit(&pForHdr->e.hashEach, dgethashptr(pDatum));
+	else if(dtyparray(pDatum))
+		aeachinit(&pForHdr->e.arrayEach, dgetarrayptr(pDatum));
+	else if((pForHdr->e.next = pForHdr->str = strdup(pDatum->str)) == NULL)
+ErrRtn:
+		return rsset(Panic, 0, text94, myName);
+			// "%s(): Out of memory!"
 	return sess.rtn.status;
 	}
 
-// Get next array element and set "for" loop control variable to it if found; otherwise, return NotFound.  Return status.
-static int nextForEl(ForLoopHdr *pForHdr) {
+// Get next array element, hash node, or string character and set value in variable referenced in *pForHdr object.  If no items
+// left, return NotFound, otherwise status.
+static int nextForItem(ForLoopHdr *pForHdr) {
 	Datum *pDatum;
+	Datum datum;
 
-	if(pForHdr->index == pForHdr->pArray->used) {
-		pForHdr->index = -1;	// Invalidate control object.
-		return NotFound;
+	// If iterating through a hash, return next node as a [key, value] array.
+	if(pForHdr->type & DHashMask) {
+		Array *pArray;
+		HashNode *pNode = heach(&pForHdr->e.hashEach);
+		if(pNode == NULL)
+			goto Done;
+		if((pArray = hntoa(pNode)) == NULL)
+			return libfail();
+		dinit(&datum);
+		astash(pDatum = &datum, pArray);
 		}
-	if((pDatum = aget(pForHdr->pArray, pForHdr->index++, 0)) == NULL)
-		return libfail();
-	return setVar(pDatum, &pForHdr->varDesc);
+	else if(pForHdr->type & DArrayMask) {
+
+		// Return next array element.
+		if((pDatum = aeach(&pForHdr->e.arrayEach)) == NULL)
+			goto Done;
+		}
+	else {
+		// Return next string character.
+		if(*pForHdr->e.next == '\0') {
+Done:
+			clearFor(pForHdr);	// Invalidate control object.
+			return NotFound;
+			}
+		dinit(&datum);
+		dsetint(*pForHdr->e.next++, pDatum = &datum);
+		}
+
+	return setVar(&pForHdr->varDesc, pDatum);
 	}
 
 // Execute a compiled buffer, save result in pRtnVal, and return status.
-static int xbuf(Datum *pRtnVal, Buffer *pBuf, uint flags) {
+static int xbuf(Datum *pRtnVal, Buffer *pBuf) {
 	Line *pBeginLine, *pEndLine;	// Pointers to beginning and ending line(s) to execute, allowing for continuation lines.
 	bool force;			// "force" statement?
 	Symbol keywordId;		// Keyword index.
@@ -1529,7 +1565,7 @@ static int xbuf(Datum *pRtnVal, Buffer *pBuf, uint flags) {
 	int breakLevel;			// Number of levels to "break".
 	ushort bufFlags;
 	ExecLevel *levelTable = NULL;	// Level table.
-	ExecLevel *pLevel;		// Current level.
+	ExecLevel *pLevel, *pLevel1;	// Current level.
 	LoopBlock *pBlock;
 	Buffer *pCallBuf = NULL;	// "cmd" or "func" buffer pointer.
 	Datum *pDatum;			// Work Datum object.
@@ -1539,10 +1575,14 @@ static int xbuf(Datum *pRtnVal, Buffer *pBuf, uint flags) {
 	const char *errorMsg1, *errorMsg2;
 	Parse *pOldLast, newLast;
 	ExprNode node;
-
+#if MMDebug & (Debug_Script | Debug_Preproc)
+	static uint instance = 0;
+	uint myInstance = ++instance;
+#endif
 	// Prepare for execution.
-	if(dnewtrack(&pDatum) != 0 || dnewtrack(&pFullLine) != 0)
-		return libfail();
+	pBeginLine = pEndLine = pBuf->pFirstLine;
+	if((pDatum = dnewtrack()) == NULL || (pFullLine = dnewtrack()) == NULL)
+		goto LibFail;
 	if(nextLevel(&levelTable) != Success)
 		return sess.rtn.status;
 	pLevel = levelTable;
@@ -1554,17 +1594,15 @@ static int xbuf(Datum *pRtnVal, Buffer *pBuf, uint flags) {
 
 	// Now EXECUTE the buffer.
 #if MMDebug & (Debug_Script | Debug_Preproc)
-	static uint instance = 0;
-	uint myInstance = ++instance;
-	fprintf(logfile, "*** BEGIN xbuf(%u,%s): %s...\n", myInstance, pBuf->bufname, showFlags(&newLast));
+	fprintf(logfile, "*** BEGIN xbuf(%u, %s): %s...\n", myInstance, pBuf->bufname, showFlags(&newLast));
 #endif
-	pBeginLine = pEndLine = pBuf->pFirstLine;
 	do {
 		// Skip blank lines and comments unless last line was a continuation line or "salting" a user routine.
 		lineText = pEndLine->text;
 		len = pEndLine->used;
 #if MMDebug & (Debug_Script | Debug_Preproc)
-		fprintf(logfile, "%.8x [level %u.%u] >> %.*s\n", (uint) pEndLine, myInstance, pLevel->level, len, lineText);
+		fprintf(logfile, "%.8x [level %u.%u] %c>> %.*s\n",
+		 (uint) pEndLine, myInstance, pLevel->level, pLevel->live ? '!' : ' ', len, lineText);
 #endif
 		isWhiteLine = false;
 		if((len = skipWhite(&lineText, len)) == 0 || *lineText == TokC_Comment) {
@@ -1659,8 +1697,15 @@ DoCmdFunc:
 							goto RCExit;
 
 						// Turn off command/function storing if live.
-						if(pLevel->live)
+						if(pLevel->live) {
+
+							// Move point to beginning of command/function buffer...
+							pCallBuf->face.point.pLine = pCallBuf->pFirstLine;
+							pCallBuf->face.point.offset = 0;
+
+							// and disable it.
 							pCallBuf = NULL;
+							}
 						goto NextLn;
 					default:
 						;	// Do nothing.
@@ -1705,14 +1750,14 @@ Salt1:
 
 					// Begin new level.
 					if(nextLevel(&pLevel) != Success)
-						goto RCExit;
+						return sess.rtn.status;
 					pLevel->loopSpawn = false;
 
 					// Prior level true?
 					if(pLevel->prev->live) {
 EvalIf:
 						// Yes, grab the value of the logical expression.
-						nodeInit(&node, pDatum, false);
+						nodeInit(&node, pDatum, 0);
 						if(ge_andOr(&node) != Success || extraSym())
 							goto RCExit;
 
@@ -1792,7 +1837,7 @@ EvalIf:
 
 					// Skip unless current level is true.
 					if(!pLevel->live)
-						goto JumpDown;
+						goto JumpEnd;
 
 					// Error if extra arguments; otherwise, begin next loop.
 					if(extraSym())
@@ -1804,19 +1849,20 @@ EvalIf:
 					if(pLevel->live) {
 						int status;
 
-						// Yes, parse line and initialize loop controls if first time.
-						if((pLevel->pForHdr == NULL || pLevel->pForHdr->index < 0) &&
+						// Yes, parse line and initialize loop controls if first iteration.
+						if((pLevel->pForHdr == NULL || pLevel->pForHdr->type == 0) &&
 						 initFor(&pLevel->pForHdr, pDatum) != Success)
 							goto RCExit;
 
-						// Set control variable to next array element and begin next loop, or break if
-						// none left.
-						if((status = nextForEl(pLevel->pForHdr)) == Success)
+						// Set loop variable to next item and begin next loop, or break if none left.
+						if((status = nextForItem(pLevel->pForHdr)) == Success)
 							goto NextLoop;
 						if(status != NotFound)
 							goto RCExit;
+
+						// All iterations completed... jump to end of loop block.
 						}
-					goto JumpDown;
+					goto JumpEnd;
 				case kw_while:	// "while" keyword.
 					go = true;
 					goto DoLoop;
@@ -1828,7 +1874,7 @@ DoLoop:
 					if(pLevel->live) {
 
 						// Yes, get the "while" or "until" logical expression.
-						nodeInit(&node, pDatum, false);
+						nodeInit(&node, pDatum, 0);
 						if(ge_andOr(&node) != Success || extraSym())
 							goto RCExit;
 
@@ -1837,7 +1883,7 @@ DoLoop:
 						if(toBool(pDatum) == go) {
 NextLoop:
 							if(nextLevel(&pLevel) != Success)
-								goto RCExit;
+								return sess.rtn.status;
 							pLevel->live = true;
 							pLevel->loopSpawn = true;
 							goto NextLn;
@@ -1845,7 +1891,7 @@ NextLoop:
 						}
 
 					// Current level or condition is false: skip this block.
-					goto JumpDown;
+					goto JumpEnd;
 
 				case kw_break:	// "break" keyword.
 				case kw_next:	// "next" keyword.
@@ -1857,45 +1903,56 @@ NextLoop:
 					// Check "break" argument.
 					if(keywordId == kw_break) {
 						if(haveSym(s_any, false)) {
-							nodeInit(&node, pDatum, false);
+							nodeInit(&node, pDatum, 0);
 							if(ge_assign(&node) != Success || extraSym() || !isIntVal(pDatum))
 								goto RCExit;
-							if(pDatum->u.intNum <= 0) {
-								(void) rsset(Failure, 0, text217, pDatum->u.intNum);
+							if(dgetint(pDatum) <= 0) {
+								(void) rsset(Failure, 0, text217, dgetint(pDatum));
 									// "'break' level '%ld' must be 1 or greater"
 								goto RCExit;
 								}
-							breakLevel = pDatum->u.intNum;
+							breakLevel = dgetint(pDatum);
 							}
 						else
 							breakLevel = 1;
 
 						// Invalidate any "for" loop in progress.
-						if(pLevel->prev->pForHdr != NULL)
-							pLevel->prev->pForHdr->index = -1;
+						pLevel1 = pLevel;
+						if(prevLoopLevel(&pLevel1) != Success)
+							goto RCExit;
+						if(pLevel1->prev->pForHdr != NULL)
+							clearFor(pLevel1->prev->pForHdr);
 						}
 
 					// Extraneous "next" argument(s)?
 					else if(extraSym())
 						goto RCExit;
-JumpDown:
-					// Continue or break out of loop: find the right block (kw_while, kw_until, kw_loop,
-					// kw_for, kw_break, or kw_next) and jump down to its "endloop".
-					for(pBlock = pBuf->pCallInfo->execBlocks; pBlock != NULL; pBlock = pBlock->next)
-						if(pBlock->pMarkLine == pBeginLine) {
+JumpEnd:
+					// Continue loop or break out of it.  If arrived here from top of loop block, then
+					// either current level is not live or loop condition indicates "done"; otherwise,
+					// processing a break or next statement within a loop block.
+					//
+					// Find the right block (kw_while, kw_until, kw_loop, kw_for, kw_break, or kw_next) and
+					// jump down to its "endloop" or the line that follows it.
+					for(pBlock = pBuf->pCallHdr->execBlocks; pBlock != NULL; pBlock = pBlock->next)
+						if(pBlock->pBlockBegin == pBeginLine) {
+							if(keywordId & SBreakType) {
 
-							// If this is a "break" or "next", set the line pointer to the "endloop"
-							// line so that the "endloop" is executed; otherwise, set it to the line
-							// after the "endloop" line so that the "endloop" is bypassed.
-							pEndLine = (keywordId & SBreakType) ? pBlock->pJumpLine :
-							 pBlock->pJumpLine->next;
-
-							// Return to the most recent loop level (bypassing "if" levels) if this
-							// is a "break" or "next"; otherwise, just reset the loop counter.
-							if(!(keywordId & SBreakType))
+								// Have "break" or "next".  Set the line pointer to the
+								// "endloop" line so that the "endloop" is executed and return
+								// to the most recent loop level (bypassing "if" levels).
+								pEndLine = pBlock->pEndLoop;
+								if(prevLoopLevel(&pLevel) != Success)
+									goto RCExit;
+								}
+							else {
+								// Jumped here from top of loop block -> done iterating and at
+								// correct level.  Set the line pointer to the line after the
+								// "endloop" line so that the "endloop" is bypassed, and reset
+								// the loop counter.
+								pEndLine = pBlock->pEndLoop->next;
 								pLevel->loopCount = 0;
-							else if(prevLevel(&pLevel) != Success)
-								goto RCExit;
+								}
 
 							goto Onward;
 							}
@@ -1905,13 +1962,15 @@ JumpDown:
 
 				case kw_endloop:	// "endloop" keyword.
 
+					// Continue loop or break out of it.  Arrived here normally from a "loop", "for" or
+					// "while" that's true, or an "until" that's false, OR jumped here from a "break" or
+					// "next".
+					//
 					// Extra arguments?
 					if(extraSym())
 						goto RCExit;
 
-					// This line is executed only when its partner is a "loop", "for", a "while" that's
-					// true, or an "until" that's false, or jumped to from a "break" or "next" (otherwise,
-					// it's bypassed).
+					// If not a "break"...
 					if(breakLevel == 0) {
 
 						// Is current level top or was initiated by an "if" statement?
@@ -1930,15 +1989,15 @@ Misplaced:
 						pLevel = pLevel->prev;
 						if(maxLoop > 0 && ++pLevel->loopCount > maxLoop) {
 							(void) rsset(Failure, 0, text112, maxLoop);
-								// "Maximum number of loop iterations (%d) exceeded!"
+								// "Maximum number of loop iterations (%'d) exceeded!"
 							goto RCExit;
 							}
 						}
 
 					// We're good... just find the "loop", "for", "while" or "until", and go back to it, or
 					// to a prior level if we're processing a "break".
-					for(pBlock = pBuf->pCallInfo->execBlocks; pBlock != NULL; pBlock = pBlock->next)
-						if((pBlock->type & SLoopType) && pBlock->pJumpLine == pBeginLine) {
+					for(pBlock = pBuf->pCallHdr->execBlocks; pBlock != NULL; pBlock = pBlock->next)
+						if(pBlock->type & SLoopType && pBlock->pEndLoop == pBeginLine) {
 
 							// while/until/loop/for block found: set the line pointer to the line
 							// after its "endloop" line or its parent's "endloop" line if we're
@@ -1946,26 +2005,29 @@ Misplaced:
 							// otherwise, back to the beginning.
 							if(breakLevel > 0) {
 								if(--breakLevel > 0) {
-									if(pBlock->pBreakLine == NULL) {
+									if(pBlock->pEndLoopUp == NULL) {
 										(void) rsset(Failure, 0, text225, breakLevel);
 									// "Too many break levels (%d short) from inner 'break'"
 										goto RCExit;
 										}
-									pEndLine = pBlock->pBreakLine;
+									pEndLine = pBlock->pEndLoopUp;
 
 									// Return to the most recent loop level before this one.
 									pLevel = pLevel->prev;
-									if(prevLevel(&pLevel) != Success)
+									if(prevLoopLevel(&pLevel) != Success)
 										goto RCExit;
 									}
 								else {
+									// Now at final "break"; that is, at correct parent loop
+									// block and its level (inside block).  Move past
+									// "endloop" and up one level.
 									pEndLine = pEndLine->next;
 									pLevel = pLevel->prev;
 									}
 								pLevel->loopCount = 0;	// Reset the loop counter.
 								}
 							else
-								pEndLine = pBlock->pMarkLine;
+								pEndLine = pBlock->pBlockBegin;
 							goto Onward;
 							}
 LoopBugExit:
@@ -1982,7 +2044,7 @@ LoopBugExit:
 						if(!haveSym(s_any, false))
 							dsetnil(pRtnVal);
 						else {
-							nodeInit(&node, pRtnVal, false);
+							nodeInit(&node, pRtnVal, 0);
 							if(ge_andOr(&node) != Success || extraSym())
 								goto RCExit;
 							}
@@ -2001,14 +2063,12 @@ LoopBugExit:
 						goto RCExit;
 					force = true;
 					break;
-				default:
 #if SanityCheck
-					// Huh?  Unknown keyword! (This is a bug.)
-					(void) rsset(Failure, 0, "xbuf(): Error: Unknown keyword '%.*s'",
-					 (int) (exprText - lineText), lineText);
+				default:
+					// Huh?  Unknown keyword!  (This is a bug.)
+					(void) rsset(Failure, 0, text993, (int)(exprText - lineText), lineText);
+						// "xbuf(): Error: Unknown keyword '%.*s'",
 					goto RCExit;
-#else
-					;
 #endif
 
 				}
@@ -2034,7 +2094,7 @@ LoopBugExit:
 
 			if(force)		// Force Success status.
 				rsclear(0);
-			if(sess.rtn.status != Success) {
+			else if(sess.rtn.status != Success) {
 				EWindow *pWind = sess.windHead;
 
 				// Check if buffer is on-screen.
@@ -2044,7 +2104,7 @@ LoopBugExit:
 						// Found a window.  Set point to error line.
 						pWind->face.point.pLine = pBeginLine;
 						pWind->face.point.offset = 0;
-						pWind->flags |= WFMove;
+						pWind->face.wflags |= WFMove;
 						}
 					} while((pWind = pWind->next) != NULL);
 
@@ -2053,7 +2113,7 @@ LoopBugExit:
 				pBuf->face.point.offset = 0;
 
 				// Build a more detailed message that includes the command error message, if any.
-				(void) userExecError(NULL, NULL, pBuf, pBeginLine, flags);
+				(void) userExecError(NULL, NULL, pBuf, pBeginLine);
 				goto Exit;
 				}
 			} // End statement execution.
@@ -2075,10 +2135,10 @@ Onward:
 
 	// Clean up and exit per sess.rtn.status.
 RCExit:
-	(void) userExecError(NULL, NULL, pBuf, pBeginLine, flags);
+	(void) userExecError(NULL, NULL, pBuf, pBeginLine);
 Exit:
 #if MMDebug & (Debug_Script | Debug_Preproc)
-	fprintf(logfile, "*** END xbuf(%u,%s), sess.rtn.msg \"%s\"...\n", myInstance, pBuf->bufname, sess.rtn.msg.str);
+	fprintf(logfile, "*** END xbuf(%u, %s), sess.rtn.msg \"%s\"...\n", myInstance, pBuf->bufname, sess.rtn.msg.str);
 	--myInstance;
 #endif
 	lfree(levelTable);
@@ -2089,64 +2149,61 @@ Exit:
 	}
 
 // Execute the contents of a buffer, given Datum object for return value, numeric argument, buffer pointer, pathname of file
-// being executed (or NULL), and invocation flags.
-int execBuf(Datum *pRtnVal, int n, Buffer *pBuf, char *runPath, uint flags) {
+// being executed (or NULL), and invocation flags (which are passed to argLoad()).  Return status.
+int execBuf(Datum *pRtnVal, long n, Buffer *pBuf, char *runPath, uint flags) {
 
 	// Check for narrowed buffer and runaway recursion.
 	if(pBuf->flags & BFNarrowed)
 		(void) rsset(Failure, RSNoFormat, text72);
 			// "Cannot execute a narrowed buffer"
-	else if(maxCallDepth > 0 && pBuf->pCallInfo != NULL && pBuf->pCallInfo->execCount >= maxCallDepth)
+	else if(maxCallDepth > 0 && pBuf->pCallHdr != NULL && pBuf->pCallHdr->execCount >= maxCallDepth)
 		(void) rsset(Failure, 0, text319, text313, maxCallDepth);
-			// "Maximum %s recursion depth (%d) exceeded", "command or function"
+			// "Maximum %s recursion depth (%'d) exceeded", "command or function"
 	else {
 		Datum args;
 
 		// Create buffer-extension record if needed.
-		if(pBuf->pCallInfo == NULL && bextend(pBuf) != Success)
+		if(pBuf->pCallHdr == NULL && bextend(pBuf) != Success)
 			return sess.rtn.status;
 
 		// Get call arguments.
-		dinit(&args);		// No need to dclear() this later because it will always contain an array.
+		dinit(&args);		// No need to dclear() this later because it will always contain an array reference.
 #if MMDebug & Debug_CallArg
 		if(argLoad(n, pBuf, &args, flags) == Success) {
 #else
 		if(argLoad(pBuf, &args, flags) == Success) {
 #endif
 			// If evaluating, preprocess buffer if needed.
-			if((pBuf->flags & BFPreproc) || preprocBuf(pBuf, flags) == Success) {
+			if(pBuf->flags & BFPreproc || preprocBuf(pBuf) == Success) {
 				ScriptRun *pOldRun, newRun;
 
 				// Make new run instance and prepare for execution.
 				pOldRun = pScriptRun;
 				pScriptRun = &newRun;
-				if((pScriptRun->msgFlag = modeInfo.cache[MdIdxRtnMsg]->flags & MdEnabled))
-					clearGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
-				pScriptRun->pArgs = &args;
+				if((pScriptRun->msgFlag = mode.cache[MdIdxRtnMsg]->flags & MdActive))
+					clearGlobalMode(mode.cache[MdIdxRtnMsg]);
+				pScriptRun->pArgs = args.u.pArray;
 				pScriptRun->path = fixNull(runPath);
 				pScriptRun->pBuf = pBuf;
-				if(dnew(&pScriptRun->pNArg) != 0)
-					return libfail();		// Fatal error.
-				dsetint(n, pScriptRun->pNArg);
+				pScriptRun->n = n;
 				pScriptRun->pVarStack = localVarRoot;
 
 				// Flag that we are executing the buffer and execute it.
-				++pBuf->pCallInfo->execCount;
+				++pBuf->pCallHdr->execCount;
 #if MMDebug & Debug_Script
 				fprintf(logfile, "execBuf(): Calling xbuf(%s): %s...\n", pBuf->bufname, showFlags(NULL));
 #endif
-				(void) xbuf(pRtnVal, pBuf, flags);		// Execute the buffer.
+				(void) xbuf(pRtnVal, pBuf);			// Execute the buffer.
 #if MMDebug & Debug_Script
 				fprintf(logfile, "execBuf(): xbuf() returned %s result and status %d \"%s\".\n",
 				 dtype(pRtnVal, false), sess.rtn.status, sess.rtn.msg.str);
 #endif
-				(void) freeUserVars(pScriptRun->pVarStack);	// Clear any local vars that were created.
+				freeLocalVars(pScriptRun->pVarStack);		// Clear any local variables that were created.
 
 				// Clean up.
-				--pBuf->pCallInfo->execCount;
-				dfree(pScriptRun->pNArg);
+				--pBuf->pCallHdr->execCount;
 				if(pScriptRun->msgFlag)
-					setGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
+					setGlobalMode(mode.cache[MdIdxRtnMsg]);
 				pScriptRun = pOldRun;
 				}
 			}
@@ -2157,9 +2214,9 @@ int execBuf(Datum *pRtnVal, int n, Buffer *pBuf, char *runPath, uint flags) {
 
 #if MMDebug & (Debug_Datum | Debug_Script | Debug_CallArg | Debug_Preproc)
 // Call execBuf() with debugging.
-int debug_execBuf(Datum *pRtnVal, int n, Buffer *pBuf, char *runPath, uint flags, const char *caller) {
+int debug_execBuf(Datum *pRtnVal, long n, Buffer *pBuf, char *runPath, uint flags, const char *caller) {
 
-	fprintf(logfile, "*execBuf() called by %s() with args: n %d, bufname %s, runPath '%s', flags %.8x, %s...\n",
+	fprintf(logfile, "*execBuf() called by %s() with args: n %ld, bufname %s, runPath '%s', flags %.8x, %s...\n",
 	 caller, n, pBuf->bufname, runPath, flags, showFlags(NULL));
 	(void) execBuf(pRtnVal, n, pBuf, runPath, flags);
 	fprintf(logfile, "execBuf(%s) from %s() returned %s result and status %d \"%s\".\n",
@@ -2170,18 +2227,18 @@ int debug_execBuf(Datum *pRtnVal, int n, Buffer *pBuf, char *runPath, uint flags
 
 // Yank a file into a buffer and execute it, given result pointer, filename, n argument, and "at startup" flag (used for error
 // reporting).  Suppress any extraneous messages during read.  If there are no errors, delete the buffer on exit.
-int execFile(Datum *pRtnVal, const char *filename, int n, uint flags) {
+static int execFile(Datum *pRtnVal, const char *filename, long n, uint flags) {
 	Buffer *pBuf;
 
-	if(bfind(filename, BS_Create | BS_Force | BS_Derive, BFHidden,		// Create a hidden buffer...
+	if(bfind(filename, BN_Create | BN_Force | BN_Derive, BFHidden,		// Create a hidden buffer...
 	 &pBuf, NULL) != Success)
 		return sess.rtn.status;
-	ushort msgFlag = modeInfo.cache[MdIdxRtnMsg]->flags & MdEnabled;	// save current message flag...
+	ushort msgFlag = mode.cache[MdIdxRtnMsg]->flags & MdActive;		// save current message flag...
 	if(msgFlag)
-		clearGlobalMode(modeInfo.cache[MdIdxRtnMsg]);			// clear it...
+		clearGlobalMode(mode.cache[MdIdxRtnMsg]);			// clear it...
 	(void) readIn(pBuf, filename, RWKeep | RWExist);			// read the file...
 	if(msgFlag)
-		setGlobalMode(modeInfo.cache[MdIdxRtnMsg]);			// restore message flag...
+		setGlobalMode(mode.cache[MdIdxRtnMsg]);				// restore message flag...
 	if(sess.rtn.status == Success) {
 #if MMDebug & Debug_Script
 		(void) debug_execBuf(pRtnVal, n, pBuf, pBuf->filename, flags, "execFile");
@@ -2191,34 +2248,30 @@ int execFile(Datum *pRtnVal, const char *filename, int n, uint flags) {
 		}
 
 	// If not displayed, remove the now unneeded buffer and return.
-	pBuf->flags &= ~BFHidden;
 	if(sess.rtn.status >= Cancelled && pBuf->windCount == 0)
 		(void) bdelete(pBuf, BC_IgnChgd);
+	else {
+		pBuf->flags &= ~BFHidden;
+		bcount(pBuf, 0);
+		}
 	return sess.rtn.status;
 	}
 
 // Execute commands in a file and return result in pRtnVal.
-int xeqFile(Datum *pRtnVal, int n, Datum **args) {
+int xeqFile(Datum *pRtnVal, long n, Datum **args) {
 	char *path;
 
 	// Get the filename.
-	if(!(sess.opFlags & OpScript)) {
-		TermInpCtrl termInpCtrl = {NULL, RtnKey, MaxPathname, NULL};
-
-		if(termInp(pRtnVal, text129, ArgNotNull1 | ArgNil1, Term_C_Filename, &termInpCtrl) != Success ||
-				// "Execute script file"
-		 disnil(pRtnVal))
-			return sess.rtn.status;
-		}
-	else if(funcArg(pRtnVal, ArgFirst | ArgNotNull1 | ArgPath) != Success)
+	if(getFilename(pRtnVal, text129, NULL, ArgFirst) != Success || disnil(pRtnVal))
+			// "Execute MScript"
 		return sess.rtn.status;
 
 	// Look up the path...
 	if(pathSearch(pRtnVal->str, 0, (void *) &path, NULL) != Success)
 		return sess.rtn.status;
 	if(path == NULL)
-		return rsset(Failure, 0, text152, pRtnVal->str);	// Not found.
-			// "No such file \"%s\""
+		return rsset(Failure, 0, text52, text99, pRtnVal->str);	// Not found.
+				// "No such %s \"%s\"", "file"
 
 	// save it...
 	if(dsetstr(path, pRtnVal) != 0)

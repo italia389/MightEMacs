@@ -13,7 +13,7 @@ characters are shown in ~bbold~B and parameters are ~uunderlined~U:
      [~b{~B [~barguments:~B ~ustring~U] [~b,~B] [~bdescription:~B ~ustring~U] ~b}~B]
         Begin a command or function definition.  If ~bfunction~B is specified, the
         routine may not be bound to a key or run interactively, and will not be
-        listed in the ~bshowFunctions~B display by default unless it includes
+        listed in the ~bshowRoutines~B help text by default unless it includes
         either the ~barguments~B or ~bdescription~B parameter, or is bound to a hook.
         If ~bcommand~B is specified, the routine may be bound to a key or run
         interactively, but may not be bound to a hook.
@@ -51,8 +51,8 @@ characters are shown in ~bbold~B and parameters are ~uunderlined~U:
         for details.
 
         The ~barguments~B and ~bdescription~B text values are shown with the command or
-        function name in the help text produced by the ~bapropos~B (~#uESC a~U),
-        ~bshowCommands~B (~#uC-h c~U), and ~bshowFunctions~B (~#uC-h f~U) commands.
+        function name in the help text produced by the ~bapropos~B (~#uESC a~U) and
+        ~bshowRoutines~B (~#uC-h r~U) commands.
 
     ~bendroutine~B
     	End the definition of the most recent command or function being defined,
@@ -78,12 +78,17 @@ characters are shown in ~bbold~B and parameters are ~uunderlined~U:
         End an "if" statement, which is determined by locating the most recent
         unpaired ~bif~B keyword.
 
-    ~bfor~B ~uvar~U ~bin~B ~uarray-expr~U
-        Begin a "for" statement.  ~uarray-expr~U is evaluated.  Then for each
-        element in the array (which may be empty), the value is assigned to
-        variable ~uvar~U and the block of statements following the keyword to
-        its paired ~bendloop~B is executed.  If the array is empty, the block is
-        not executed and ~uvar~U is set to ~bnil~B.
+    ~bfor~B ~uvar~U ~bin~B {~uarray-expr~U | ~uhash-expr~U | ~ustring-expr~U}
+        Begin a "for" statement.  ~uarray-expr~U, ~uhash-expr~U, or ~ustring-expr~U is
+        evaluated.  Then for each element in the array, node in the hash, or
+        character in the string (any of which may be empty), the value is
+        assigned to variable ~uvar~U and the block of statements following the
+        keyword to its paired ~bendloop~B is executed.  If iterating through a
+        string, each value will be a character type (integer).  If iterating
+        through a hash, the nodes will be accessed in an unordered fashion and
+        the value will be a two-element array containing each node's key and
+        value.  If the array or hash is empty or the string is null, the block
+        is not executed and ~uvar~U is set to ~bnil~B.
 
     ~bwhile~B ~uand-or-expr~U
         Begin a "while" statement.  The block of statements following the

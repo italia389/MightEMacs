@@ -3,17 +3,19 @@
 As you may recall, a text object is saved in the kill ring whenever it is copied
 or killed.  The ~byank~B (~uC-y~U) command is used to insert text from the kill ring
 into the current buffer at point.  The yanked text is also marked as a region.
+You can also yank text and delete it from the kill ring in one step with the
+~byankDel~B (~#uC-h C-y~U) command.
 
 There are five other related commands that you can use to manage the kill ring:
 
-    yankCycle           ~#uESC C-y~U
+    yankCycle           ~#uC-c C-y~U
     revertYank          ~#uC-x C-y~U
     cycleKillRing       ~#uC-c k~U
     delKillEntry        ~#uC-x k~U
     showKillRing        ~#uC-h k~U
 
 To yank the most recent kill, press ~uC-y~U.  If you want a kill before that,
-immediately press ~#uESC C-y~U (yankCycle) one or more times.  Each time you execute
+immediately press ~#uC-c C-y~U (yankCycle) one or more times.  Each time you execute
 the ~byankCycle~B command, the last inserted kill text is replaced with the
 previous one.  It also cycles the kill ring so that the last kill inserted stays
 at the "top".  You can also cancel the whole operation by pressing ~#uC-x C-y~U

@@ -307,7 +307,7 @@ dash), which makes it easier to type.  Hence, it is shown as `C--` in the exampl
     <b>C-x C-x .</b> (swap again -- back at "region.")
     <b>C-x C-x x</b> (swap with mark "x" -- now at "Header")
     <b>C-x C-x x</b> (swap again -- back at "region.")
-    <b>ESC SPC x</b> (go to mark "x")
+    <b>ESC C-SPC x</b> (go to mark "x")
     </pre>
     Yields:
 
@@ -421,7 +421,6 @@ dash), which makes it easier to type.  Hence, it is shown as `C--` in the exampl
     <b>ESC u</b> (undelete -- restore most recently-deleted text)
     </pre>
 
-
 Distribution
 ------------
 The current distribution of MightEMacs may be obtained at
@@ -429,15 +428,14 @@ The current distribution of MightEMacs may be obtained at
 
 Contact and Feedback
 --------------------
-User feedback is welcomed and encouraged.  If you have the time and interest, please contact
-Rick Marinelli <italian389@yahoo.com> with your questions, comments, bug reports, likes,
-dislikes, or whatever you feel is worth mentioning.  Questions and feature requests are welcomed
-as well.  You may also post questions or comments on the MightEMacs discussion forum on Reddit
-at `http://reddit.com/r/memacs`.
+User feedback is welcomed.  If you have the time and interest, please contact Rick
+Marinelli <italian389@yahoo.com> with your questions, comments, bug reports, likes, dislikes, or
+whatever you feel is worth mentioning.  Questions and feature requests are welcomed as well.
+You may also report a bug by opening an issue on the GitHub page.
 
 Notes
 -----
-This distribution of MightEMacs is version 9.7.0.  Installer packages containing 64-bit binaries
+This distribution of MightEMacs is version 10.0.0.  Installer packages containing 64-bit binaries
 are included for Linux platforms and macOS ver. 10.12 and later.  The sources can be compiled as
 well if desired; however, the build process has not been tested on other Unix platforms and
 there may be some (hopefully minor) issues which will need to be resolved.  If you are compiling
@@ -450,7 +448,4 @@ for doing this are in file *CustomInstall.txt*.
 
 Credits
 -------
-MightEMacs (c) Copyright 2022 Richard W. Marinelli was written by Rick Marinelli
-<italian389@yahoo.com>.
-
-See License.txt for the MightEMacs license.
+MightEMacs (c) Copyright 2026 Richard W. Marinelli was written by Rick Marinelli <italian389@yahoo.com>.

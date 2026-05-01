@@ -1,10 +1,10 @@
-.\" (c) Copyright 2022 Richard W. Marinelli    Ver. 9.6.0
+.\" (c) Copyright 2026 Richard W. Marinelli    Ver. 10.0.0
 .\"
 .\" This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 .\" "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 .\"
 .ad l
-.TH MEMACS 1 2022-11-04 "Ver. 9.7" "MightEMacs Documentation"
+.TH MEMACS 1 2026-04-21 "Ver. 10.0" "MightEMacs Documentation"
 .nh \" Turn off hyphenation.
 .SH "NAME"
 \fBmemacs\fR \- fast and full-featured Emacs-style text editor
@@ -76,7 +76,7 @@ or switching buffers) including command hooks that allow for total control of th
 function.
 .IP \fB\-\fR 2
 Quick informational displays; for example, \fBapropos\fR, \fBshowBuffers\fR, \fBshowCommands\fR, \fBshowKey\fR,
-\fBshowMarks\fR, \fBshowModes\fR, \fBshowRing\fR, and \fBshowVariables\fR.
+\fBshowMarks\fR, \fBshowModes\fR, \fBshowRing\fR, and \fBshowConstVars\fR.
 .IP \fB\-\fR 2
 Help systems for both the beginner and advanced user.
 .IP \fB\-\fR 2
@@ -91,8 +91,8 @@ file containing a C function and opening it at that location.
 See on-line help (\fIESC ?\fR) for various help topics (including an introductory overview of the editor and a cheat sheet),
 the MightEMacs Tutorial (\fIC-h t\fR) for an interactive tutorial which can be saved at any time and resumed later,
 the \fBshowCommands\fR (\fIC-h c\fR) command for a list of all interactive commands and their key bindings, and the
-\fBshowFunctions\fR (\fIC-h f\fR) and \fBshowVariables\fR (\fIC-h v\fR) commands for a list of all functions
-(in addition to commands) and variables that are available for use in a script.
+\fBshowFunctions\fR (\fIC-h f\fR) and \fBshowConstVars\fR (\fIC-h v\fR) commands for a list of all functions
+(in addition to commands), constants, and variables that are available for use in a script.
 .SH COMMAND SWITCHES AND ARGUMENTS
 .IP "\fB\-?\fR, \fB\-usage\fR" 4
 Display usage and exit.
@@ -181,7 +181,7 @@ Buffer "unnamed" is created and set as the current buffer.
 .IP " 2." 4
 If a \fB-D\fR or \fB\-dir\fR switch was specified, the current directory is changed to the specified directory.
 .IP " 3." 4
-The script execution path is initialized to either the value of the \fB\-path\fR switch, the MSPATHx\
+The script execution path is initialized to either the value of the \fB\-path\fR switch, the MSPATH
 environmental variable if it is defined, or ":/usr/local/share/memacs/scripts", in that order of priority.
 .IP " 4." 4
 If the \fB-no-startup\fR switch was not specified, the site startup file "memacs.ms" is searched for on
@@ -236,16 +236,17 @@ Alternate MightEMacs executable.
 Standard and user-customizable site startup files.
 .IP "\fI\s-1~/.memacs\s0\fR" 4
 User startup file.
-.IP "\fI\s-1/usr/local/share/memacs/scripts/*Init.ms\s0\fR" 4
+.IP "\fI\s-1/usr/local/share/memacs/scripts/lang/*Init.ms\s0\fR" 4
 .sp -1v
-.IP "\fI\s-1/usr/local/share/memacs/scripts/*Lib.ms\s0\fR" 4
+.IP "\fI\s-1/usr/local/share/memacs/scripts/lang/*Lib.ms\s0\fR" 4
 .sp -1v
-.IP "\fI\s-1/usr/local/share/memacs/scripts/lang.ms\s0\fR" 4
+.IP "\fI\s-1/usr/local/share/memacs/scripts/lang/lang.ms\s0\fR" 4
 Files containing routines for formatting and editing code for various programming languages.  The files are
 loaded automatically when a file with an extension for the specific language
 is opened for editing (via hooks defined in \fIlang.ms\fR).
-.IP "\fI\s-1/usr/local/share/memacs/scripts/blockFormat.ms\s0\fR" 4
-File containing routines for formatting line "blocks", which may be comments or numbered list items.
+.IP "\fI\s-1/usr/local/share/memacs/scripts/textFormat.ms\s0\fR" 4
+File containing routines for formatting text "blocks", which may be comment line(s), numbered list items,
+bulleted items, or plain text line(s).
 .IP "\fI\s-1/usr/local/share/memacs/scripts/macroUtil.ms\s0\fR" 4
 File containing macro management routines, including ones for saving and restoring macros from a file in the HOME directory.
 .IP "\fI\s-1/usr/local/share/memacs/help/*\s0\fR" 4

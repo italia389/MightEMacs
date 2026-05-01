@@ -1,4 +1,4 @@
-// (c) Copyright 2022 Richard W. Marinelli
+// (c) Copyright 2026 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -10,7 +10,6 @@
 #include "std.h"
 #include <stdarg.h>
 #include "cxl/lib.h"
-#include "cmd.h"
 #include "bind.h"
 #include "exec.h"
 #include "file.h"
@@ -23,7 +22,7 @@ static void dumpMode(ModeSpec *pModeSpec) {
 	 pModeSpec->flags & MdUser ? 'U' : '.',
 	 pModeSpec->flags & MdGlobal ? 'G' : '.',
 	 pModeSpec->flags & MdHidden ? 'H' : '.',
-	 pModeSpec->flags & MdEnabled ? SM_Active : '.',
+	 pModeSpec->flags & MdActive ? SM_Active : '.',
 	 pModeSpec->pModeGrp == NULL ? "NULL" : pModeSpec->pModeGrp->name,
 	 pModeSpec->descrip == NULL ? "NULL" : pModeSpec->descrip);
 	}
@@ -34,13 +33,13 @@ void dumpModes(Buffer *pBuf, bool sepLine, const char *fmt, ...) {
 	fputs(sepLine ? "----------\n" : "\n", logfile);
 	va_start(varArgList, fmt);
 	if(pBuf == NULL) {
-		Datum *pArrayEl;
-		Array *pArray = &modeInfo.modeTable;
+		HashNode *pNode, **pAry;
 
 		fputs("MODE TABLE - ", logfile);
 		vfprintf(logfile, fmt, varArgList);
-		while((pArrayEl = aeach(&pArray)) != NULL)
-			dumpMode(modePtr(pArrayEl));
+		(void) ohAryPrep(&mode.idx, &pAry);
+		while((pNode = *pAry++) != NULL)
+			dumpMode(modePtr(pNode->pVal));
 		}
 	else {
 		BufMode *pBufMode = pBuf->modes;
@@ -49,9 +48,9 @@ void dumpModes(Buffer *pBuf, bool sepLine, const char *fmt, ...) {
 		if(pBufMode == NULL)
 			fputs("\t*None set*\n", logfile);
 		else
-			do
+			do {
 				dumpMode(pBufMode->pModeSpec);
-				while((pBufMode = pBufMode->next) != NULL);
+				} while((pBufMode = pBufMode->next) != NULL);
 		}
 	va_end(varArgList);
 	}
@@ -59,7 +58,7 @@ void dumpModes(Buffer *pBuf, bool sepLine, const char *fmt, ...) {
 
 // Check if any given mode (ModeSpec pointers in vararg list) is set in a buffer and return Boolean result.  If "clear" is true,
 // also clear each mode that is found.
-bool isAnyBufModeSet(Buffer *pBuf, bool clear, int modeCount, ...) {
+bool mscan(Buffer *pBuf, bool clear, int modeCount, ...) {
 	BufMode *pBufMode0, *pBufMode1, *pBufMode2;
 	ModeSpec *pModeSpec;
 	va_list varArgList;
@@ -70,7 +69,7 @@ bool isAnyBufModeSet(Buffer *pBuf, bool clear, int modeCount, ...) {
 #if MMDebug & Debug_Modes
 	ModeSpec *pModeSpec2;
 	if(clear)
-		dumpModes(pBuf, true, "isAnyBufModeSet(..., CLEAR, %d, ...)\n", modeCount);
+		dumpModes(pBuf, true, "mscan(..., CLEAR, %d, ...)\n", modeCount);
 #endif
 	// For each buffer mode...
 	pBufMode0 = NULL;
@@ -129,7 +128,7 @@ Next:
 
 #if MMDebug & Debug_Modes
 	if(clear)
-		dumpModes(pBuf, false, "isAnyBufModeSet() END\n");
+		dumpModes(pBuf, false, "mscan() END\n");
 #endif
 	return modeFound;
 	}
@@ -174,10 +173,12 @@ bool bufClearModes(Buffer *pBuf) {
 
 // Clear a mode in all buffers.
 void clearBufMode(ModeSpec *pModeSpec) {
-	Datum *pArrayEl;
-	Array *pArray = &bufTable;
-	while((pArrayEl = aeach(&pArray)) != NULL)
-		isAnyBufModeSet(bufPtr(pArrayEl), true, 1, pModeSpec);
+	HashNode *pNode;
+	HashEach each;
+
+	heachinit(&each, &buf.table);
+	while((pNode = heach(&each)) != NULL)
+		mscan(bufPtr(pNode->pVal), true, 1, pModeSpec);
 	}
 
 // Set a mode in a buffer.  If clear is true, clear all existing modes first.  If clear is false and pWasSet not NULL, set
@@ -236,9 +237,8 @@ void clearBufFilename(Buffer *pBuf) {
 	}
 
 // Get user confirmation for creating a buffer or changing a filename if appropriate flag set and not running a script.  Note
-// that the interactive() call is not used here because buffer names and filenames are not entered interactively in a script and
-// thus, cannot be mistyped.
-bool opConfirm(ushort flags) {
+// that the interactive() call is not used here because buffer names and filenames are hard-coded in a script.
+bool opConfirm(uint flags) {
 
 	if((flags & (BF_CreateBuf | BF_WarnExists | BF_Overwrite)) && !(sess.opFlags & OpScript)) {
 		bool yep;
@@ -249,9 +249,9 @@ bool opConfirm(ushort flags) {
 			prompt = (char *) text140;
 				// "Buffer does not exist.  Create it"
 		else
-			sprintf(prompt = promptBuf, text479, flags & BF_WarnExists ? text480 : text481);
-					// "File already exists.  %s", "Allow overwrite", "Overwrite"
-		if(terminpYN(prompt, &yep) != Success)
+			sprintf(prompt = promptBuf, text479, text468, flags & BF_WarnExists ? text480 : text481);
+					// "File %s.  %s", " already exists", "Allow overwrite", "Overwrite"
+		if(termInpYN(prompt, &yep) != Success)
 			return sess.rtn.status;
 		if(!yep)
 			return rsset(Cancelled, 0, NULL);
@@ -262,7 +262,7 @@ bool opConfirm(ushort flags) {
 // Set buffer filename and execute "filename" hook if filename was changed.  If BF_UpdBufDir flag set and filename was changed,
 // update buffer directory.  If BF_WarnExists or BF_Overwrite flag set, get user confirmation for filename change first if
 // needed.
-int setFilename(Buffer *pBuf, const char *filename, ushort flags) {
+int setFilename(Buffer *pBuf, const char *filename, uint flags) {
 	bool fnChange = false;
 	bool oldIsNull = (pBuf->filename == NULL);
 	bool newIsNull = (filename == NULL || *filename == '\0');
@@ -286,10 +286,8 @@ Changed:
 
 			// Its a go... change the filename.
 			clearBufFilename(pBuf);
-			if((pBuf->filename = (char *) malloc(strlen(filename) + 1)) == NULL)
-				return rsset(Panic, 0, text94, "setFilename");
-					// "%s(): Out of memory!"
-			strcpy(pBuf->filename, filename);
+			if(strclone(&pBuf->filename, filename, "setFilename") != Success)
+				return sess.rtn.status;
 			}
 		}
 
@@ -297,9 +295,9 @@ Changed:
 		if(flags & BF_UpdBufDir) {
 
 			// Update buffer directory.
-			pBuf->saveDir = (pBuf->filename == NULL || *pBuf->filename == '/') ? NULL : sess.cur.pScrn->workDir;
+			pBuf->homeDir = sess.pCurScrn->workDir;
 			}
-		(void) execHook(NULL, INT_MIN, hookTable + HkFilename, 2, pBuf->bufname, pBuf->filename);
+		(void) execHook(NULL, DefN, hookTable + HkFilename, 2, pBuf->bufname, pBuf->filename);
 		}
 
 	return sess.rtn.status;
@@ -308,14 +306,15 @@ Changed:
 // Get the default buffer (a guess) for various buffer commands.  If only two visible buffers exist (active or inactive), return
 // first one found that is not the current buffer, otherwise NULL.
 Buffer *bdefault(void) {
-	Datum *pArrayEl;
 	Buffer *pBuf, *pBuf1 = NULL;
 	int count = 0;
-	Array *pArray = &bufTable;
+	HashNode *pNode;
+	HashEach each;
 
-	// Scan buffer list for visible buffers.
-	while((pArrayEl = aeach(&pArray)) != NULL) {
-		pBuf = bufPtr(pArrayEl);
+	// Scan buffer table for visible buffers.
+	heachinit(&each, &buf.table);
+	while((pNode = heach(&each)) != NULL) {
+		pBuf = bufPtr(pNode->pVal);
 		if(!(pBuf->flags & BFHidden)) {
 			if(++count > 2)
 				return NULL;
@@ -384,6 +383,19 @@ bool bufEnd(Point *pPoint) {
 	return pPoint->pLine->next == NULL && pPoint->offset == pPoint->pLine->used;
 	}
 
+// Return number of lines in a buffer.
+static long bufLineCount(Buffer *pBuf) {
+	long count = 0;
+	Line *pLine = pBuf->pFirstLine;
+
+	do {
+		if(pLine->next != NULL || pLine->used > 0)
+			++count;
+		} while((pLine = pLine->next) != NULL);
+
+	return count;
+	}
+
 // Inactivate all user marks that are outside the current narrowed buffer by negating their point offsets.
 static void markOff(void) {
 	Mark *pMark;
@@ -411,7 +423,7 @@ static void markOff(void) {
 // Narrow to lines or region.  Makes all but the specified line(s) in the current buffer hidden and inaccessible.  Set pRtnVal
 // to buffer name and return status.  Note that the last line in the narrowed portion of the buffer inherits the "last line of
 // buffer" property; that is, it is assumed to not end with a newline delimiter.
-int narrowBuf(Datum *pRtnVal, int n, Datum **args) {
+int narrowBuf(Datum *pRtnVal, long n, Datum **args) {
 	EScreen *pScrn;
 	EWindow *pWind;
 	Mark *pMark;
@@ -455,10 +467,10 @@ ErrRtn:
 		} while((pScrn = pScrn->next) != NULL);
 
 	// Get the boundaries of the current region, if requested.
-	if(n == INT_MIN)
+	if(n == DefN)
 		n = 1;
 	else if(n < 0) {
-		int i = n;
+		long i = n;
 
 		// Move back abs(n) lines max.
 		n = 1;
@@ -515,7 +527,7 @@ FixMarks:
 				// Found window attached to narrowed buffer.  Update its buffer settings.
 				pWind->face.pTopLine = pWind->face.point.pLine = pLine;
 				pWind->face.point.offset = pWind->face.firstCol = 0;
-				pWind->flags |= (WFHard | WFMode);
+				pWind->face.wflags |= (WFHard | WFMode);
 				}
 			} while((pWind = pWind->next) != NULL);
 		} while((pScrn = pScrn->next) != NULL);
@@ -587,14 +599,14 @@ static void unnarrow(Buffer *pBuf) {
 		// In all windows...
 		pWind = pScrn->windHead;
 		do {
-			if(pWind != sess.cur.pWind && pWind->pBuf == sess.cur.pBuf) {
+			if(pWind != sess.pCurWind && pWind->pBuf == sess.cur.pBuf) {
 
 				// Found window attached to widened buffer.  Restore its face.
 				(void) findBufMark(pWind->id, &pMark, MKWind);	// Can't return an error.
 				if(pMark != NULL) {
 					pWind->face.point = pMark->point;
 					pWind->reframeRow = pMark->reframeRow;
-					pWind->flags |= WFReframe;
+					pWind->face.wflags |= WFReframe;
 					}
 				}
 			} while((pWind = pWind->next) != NULL);
@@ -611,7 +623,7 @@ static void unnarrow(Buffer *pBuf) {
 	}
 
 // Widen (restore) a narrowed buffer.  Set pRtnVal to buffer name and return status.
-int widenBuf(Datum *pRtnVal, int n, Datum **args) {
+int widenBuf(Datum *pRtnVal, long n, Datum **args) {
 
 	// Make sure we are narrowed.
 	if(!(sess.cur.pBuf->flags & BFNarrowed))
@@ -624,38 +636,55 @@ int widenBuf(Datum *pRtnVal, int n, Datum **args) {
 		return libfail();
 	(void) rsset(Success, RSHigh, text75, text58);
 		// "%s widened", "Buffer"
-	return execCmdFunc(pRtnVal, INT_MIN, cmdFuncTable + cf_reframeWind, 0, 0);
+	return execCmdFunc(pRtnVal, DefN, cmdFuncTable + cf_reframeWind, 0, 0);
 	}
 
 // binSearch() helper function for returning a buffer name, given table (array) and index.
 static const char *fetchBufname(const void *table, ssize_t i) {
 
-	return bufPtr(((Datum **) table)[i])->bufname;
+	return bufPtr(((HashNode **) table)[i]->pVal)->bufname;
 	}
 
-// Search the buffer list for given name and return pointer to Buffer object if found, otherwise NULL.  In either case, set
+// Search the buffer table for given name and return pointer to Buffer object if found, otherwise NULL.  In either case, set
 // *pIndex to target array index if pIndex not NULL.
 Buffer *bsrch(const char *bufname, ssize_t *pIndex) {
 
 	// Check current buffer name first, being that it is often "searched" for (but only if index not requested).
-	if(pIndex == NULL && strcmp(bufname, sess.cur.pBuf->bufname) == 0)
+	if(pIndex == NULL && sess.cur.pBuf != NULL && strcmp(bufname, sess.cur.pBuf->bufname) == 0)
 		return sess.cur.pBuf;
 
-	// No go... search the buffer list.
-	ssize_t i;
-	bool found = binSearch(bufname, (const void *) bufTable.elements, bufTable.used, strcmp, fetchBufname, &i);
-	if(pIndex != NULL)
-		*pIndex = i;
-	return found ? bufPtr(bufTable.elements[i]) : NULL;
+	// No go... search the buffer table.
+	if(pIndex != NULL) {
+		HashNode **pAry;
+		ssize_t i;
+		bool found;
+
+		if(ohAryPrep(&buf, &pAry) != 0)
+			(void) libfail();
+		else {
+			found = binSearch(bufname, (const void *) buf.pAry, buf.table.nodeCount, strcmp,
+			 fetchBufname, &i);
+			*pIndex = i;
+			if(found)
+				return bufPtr(buf.pAry[i]->pVal);
+			}
+		}
+	else {
+		HashNode *pNode = hsearch(&buf.table, bufname);
+		if(pNode != NULL)
+			return bufPtr(pNode->pVal);
+		}
+
+	return NULL;
 	}
 
-// Generate a valid buffer name from a pathname.  bufname is assumed to point to a buffer that is MaxBufname + 1 or greater
-// in size.
+// Generate a valid buffer name from a pathname (which is the basename, truncated if needed, with all non-printable characters
+// converted to BAltBufLead).  bufname is assumed to point to a buffer that is MaxBufname + 1 or greater in size.
 static char *fileBufname(char *bufname, const char *filename) {
 	char *str;
 
 	// Get file basename with extension and validate it.
-	stplcpy(bufname, fbasename(filename, true), MaxBufname + 1);
+	stplcpy(bufname, cname((char *) filename, CNBasename | CNPtrOnly), MaxBufname + 1);
 	if(*bufname == ' ' || *bufname == BCmdFuncLead)	// Convert any leading space or user command/function character...
 		*bufname = BAltBufLead;
 	stripStr(bufname, 1);				// remove any trailing white space...
@@ -670,7 +699,7 @@ static char *fileBufname(char *bufname, const char *filename) {
 // Generate a unique buffer name (from filename if not NULL) by appending digit(s) if needed and return it.  The string buffer
 // that bufname points to is assumed to be of size MaxBufname + 1 or greater.
 static char *bunique(char *bufname, const char *filename) {
-	int n, i;
+	int suf, i;
 	char *str0, *str1, *strEnd = bufname + MaxBufname;
 	char workBuf[sizeof(int) * 3];
 
@@ -686,47 +715,69 @@ static char *bunique(char *bufname, const char *filename) {
 		while(str1 > bufname && str1[-1] >= '0' && str1[-1] <= '9')
 			--str1;
 		str0 = str1;
-		n = i = 0;
+		suf = i = 0;
 		while(*str1 != '\0') {
-			n = n * 10 + (*str1++ - '0');
+			suf = suf * 10 + (*str1++ - '0');
 			i = 1;
 			}
 
 		// Add 1 to numeric suffix (or begin at 0), and put it back.  Assume that MaxBufname is >= number of bytes
 		// needed to encode an int in decimal form (10 for 32-bit int) and that we will never have more than INT_MAX
 		// buffers (> 2 billion).
-		longToAsc((long) (n + i), workBuf);
-		n = strlen(workBuf);
-		strcpy(str0 + n > strEnd ? strEnd - n : str0, workBuf);
+		longToAsc((long) (suf + i), workBuf);
+		suf = strlen(workBuf);
+		strcpy(str0 + suf > strEnd ? strEnd - suf : str0, workBuf);
 		}
 
 	return bufname;
 	}
 
 // Remove buffer from buffer list and return its Datum object.
-static Datum *delistBuf(Buffer *pBuf) {
-	Datum *pDatum;
-	ssize_t index;
+static Datum *bdel(Buffer *pBuf) {
 
-	(void) bsrch(pBuf->bufname, &index);		// Can't fail.
-	pDatum = adelete(&bufTable, index);
-	return pDatum;
+	buf.flags |= OH_Changed;
+	return hdelete(&buf.table, pBuf->bufname);	// Can't fail.
 	}
 
-// Insert buffer into buffer list at given index.  Return status.
-static int enlistBuf(Datum *pDatum, ssize_t index) {
+// Insert buffer into buffer list, given name, which is assumed to be unique.  Return status.
+static int badd(Datum *pDatum, char *bufname) {
+	HashNode *pNode;
 
-	if(ainsert(&bufTable, pDatum, index, 0) != 0)
+	// Insert datum into hash table...
+	if((pNode = hinsert(&buf.table, bufname, pDatum, OpAdopt, NULL)) == NULL)
 		(void) libfail();
+	else {
+		// and set Buffer object's bufname to hash key.
+		bufPtr(pDatum)->bufname = pNode->key;
+		buf.flags |= OH_Changed;
+		}
 	return sess.rtn.status;
+	}
+
+// Increment visible buffer counter if none of given flags are set in given buffer (for "BufCount" global mode).
+void bcount(Buffer *pBuf, ushort flags) {
+
+	if(!(pBuf->flags & flags)) {
+		++sess.vizBufCount;
+		if(sess.scrnHead != NULL)
+			windNextIs(NULL)->face.wflags |= WFMode;	// Update mode line of bottom window.
+		}
+	}
+
+// Decrement visible buffer counter if none of given flags are set in given buffer (for "BufCount" global mode).
+static void buncount(Buffer *pBuf, ushort flags) {
+
+	if(!(pBuf->flags & flags)) {
+		--sess.vizBufCount;
+		windNextIs(NULL)->face.wflags |= WFMode;		// Update mode line of bottom window.
+		}
 	}
 
 // Initialize point position, marks, first column position, and I/O delimiters of a buffer.
 static void bufInit(Buffer *pBuf, Line *pLine) {
 
 	faceInit(&pBuf->face, pLine, pBuf);
-	*pBuf->inpDelim.u.delim = '\0';
-	pBuf->inpDelim.len = 0;
+	pBuf->inpDelimSym = FDelimUndef;
 	}
 
 // Check if given buffer name is valid and return Boolean result.
@@ -752,63 +803,64 @@ static bool isBufname(const char *name) {
 	return true;
 	}
 
-// Create buffer-extension record (CallInfo) for given buffer.  Return status.
+// Create buffer-extension record (CallHdr) for given buffer.  Return status.
 int bextend(Buffer *pBuf) {
-	CallInfo *pCallInfo;
+	CallHdr *pCallHdr;
 
-	if((pBuf->pCallInfo = pCallInfo = (CallInfo *) malloc(sizeof(CallInfo))) == NULL)
+	if((pBuf->pCallHdr = pCallHdr = (CallHdr *) malloc(sizeof(CallHdr))) == NULL)
 		return rsset(Panic, 0, text94, "bextend");
 			// "%s(): Out of memory!"
-	pCallInfo->minArgs = 0;
-	pCallInfo->maxArgs = -1;
-	pCallInfo->execCount = 0;
-	pCallInfo->execBlocks = NULL;
-	dinit(&pCallInfo->argSyntax);
-	dinit(&pCallInfo->descrip);
+	pCallHdr->minArgs = 0;
+	pCallHdr->maxArgs = -1;
+	pCallHdr->execCount = 0;
+	pCallHdr->execBlocks = NULL;
+	dinit(&pCallHdr->argSyntax);
+	dinit(&pCallHdr->descrip);
 	return sess.rtn.status;
 	}
 
-// Find a buffer by name and return status or Boolean result.  Actions taken depend on ctrlFlags:
-//	If BS_Derive is set:
+// Find a buffer by name and return status or Boolean result.  Actions taken depend on opFlags:
+//	If BN_Derive is set:
 //		Use the base filename of "name" as the default buffer name; otherwise, use "name" directly.
-//	If BS_Force is set:
-//		Create a unique buffer name derived from the default one.  (BS_Create is assumed to also be set.)
-//	If BS_Create is set:
-//		If the buffer is found and BS_Force is not set:
+//	If BN_Force is set:
+//		Create a unique buffer name derived from the default one.  (BN_Create is assumed to also be set.)
+//	If BN_Create is set:
+//		If the buffer is found and BN_Force is not set:
 //			Set *ppBuf (if ppBuf not NULL) to the buffer pointer, set *created (if created not NULL) to false,
 //			and return status.
-//		If the buffer is not found or BS_Force is set:
-//			Create a buffer (with confirmation if BS_Confirm is set), set it's flag word to bufFlags, create a
-//			buffer-extension record if BS_Extend is set, run "createBuf" hook if BS_CreateHook is set, set *ppBuf
+//		If the buffer is not found or BN_Force is set:
+//			Create a buffer (with confirmation if BN_Confirm is set), set it's flag word to bufFlags, create a
+//			buffer-extension record if BN_Extend is set, run "createBuf" hook if BN_CreateHook is set, set *ppBuf
 //			(if ppBuf not NULL) to buffer pointer, set *created (if created not NULL) to true, and return status.
-//	If BS_Create is not set:
+//	If BN_Create is not set:
 //		If the buffer is found:
 //			Set *ppBuf (if ppBuf not NULL) to the buffer pointer and return true, ignoring created.
 //		If the buffer is not found:
 //			Return false, ignoring ppBuf and created.
-// In all cases, if a buffer is created and BS_CreateHook is set, the "createBuf" hook is executed before returning.
-int bfind(const char *name, ushort ctrlFlags, ushort bufFlags, Buffer **ppBuf, bool *created) {
-	ssize_t index;
+// In all cases, if a buffer is created and BN_CreateHook is set, the "createBuf" hook is executed before returning.
+int bfind(const char *name, uint opFlags, ushort bufFlags, Buffer **ppBuf, bool *created) {
 	Buffer *pBuf;
 	char *bufname, workBuf[MaxBufname + 1];
 
-	// Set default buffer name.
-	if(ctrlFlags & BS_Force)
-		(void) bsrch(bufname = (ctrlFlags & BS_Derive) ? bunique(workBuf, name) : bunique(strcpy(workBuf, name), NULL),
-		 ctrlFlags & BS_Create ? &index : NULL);
+	// Determine target buffer name.
+	if(opFlags & BN_Force) {
+
+		// Force-creating a buffer.  Get a unique name.
+		bufname = opFlags & BN_Derive ? bunique(workBuf, name) : bunique(strcpy(workBuf, name), NULL);
+		}
 	else {
-		if(ctrlFlags & BS_Derive)
+		if(opFlags & BN_Derive)
 			fileBufname(bufname = workBuf, name);
 		else
 			bufname = (char *) name;
 
 		// Search for the buffer.
-		if((pBuf = bsrch(bufname, ctrlFlags & BS_Create ? &index : NULL)) != NULL) {
+		if((pBuf = bsrch(bufname, NULL)) != NULL) {
 
 			// Found it.  Return results.
 			if(ppBuf != NULL)
 				*ppBuf = pBuf;
-			if(ctrlFlags & BS_Create) {
+			if(opFlags & BN_Create) {
 				if(created != NULL)
 					*created = false;
 				return sess.rtn.status;
@@ -818,7 +870,7 @@ int bfind(const char *name, ushort ctrlFlags, ushort bufFlags, Buffer **ppBuf, b
 		}
 
 	// No such buffer exists, create it?
-	if(ctrlFlags & BS_Create) {
+	if(opFlags & BN_Create) {
 		Line *pLine;
 		Datum *pDatum;
 		Buffer newBuf;
@@ -834,7 +886,7 @@ int bfind(const char *name, ushort ctrlFlags, ushort bufFlags, Buffer **ppBuf, b
 					// "Cannot %s buffer: name '%s' cannot begin with %c", "create"
 
 		// Get user confirmation if requested.
-		if((ctrlFlags & BS_Confirm) && opConfirm(BF_CreateBuf) != Success)
+		if(opFlags & BN_Confirm && opConfirm(BF_CreateBuf) != Success)
 			return sess.rtn.status;
 
 		// Allocate memory for the first line.
@@ -844,8 +896,8 @@ int bfind(const char *name, ushort ctrlFlags, ushort bufFlags, Buffer **ppBuf, b
 		pLine->next = NULL;
 
 		// Create buffer extension if requested...
-		if(!(ctrlFlags & BS_Extend))
-			newBuf.pCallInfo = NULL;
+		if(!(opFlags & BN_Extend))
+			newBuf.pCallHdr = NULL;
 		else if(bextend(&newBuf) != Success)
 			return sess.rtn.status;
 
@@ -856,35 +908,36 @@ int bfind(const char *name, ushort ctrlFlags, ushort bufFlags, Buffer **ppBuf, b
 		newBuf.flags = bufFlags | BFActive;
 		newBuf.modes = NULL;
 		newBuf.windCount = newBuf.aliasCount = 0;
-		newBuf.saveDir = NULL;
+		newBuf.homeDir = NULL;
 		newBuf.filename = NULL;
-		strcpy(newBuf.bufname, bufname);
 
-		// Insert a copy of the Buffer object into the list using slot index from bsrch() call and an
-		// untracked Datum object.
-		if(dnew(&pDatum) != 0 || dsetmem((void *) &newBuf, sizeof(Buffer), pDatum) != 0)
+		// Insert a copy of the Buffer object into the buffer table using an untracked Datum object.
+		if((pDatum = dnew()) == NULL || dsetmem((void *) &newBuf, sizeof(Buffer), pDatum) != 0)
 	 		return libfail();
-	 	if(enlistBuf(pDatum, index) != Success)
+	 	if(badd(pDatum, bufname) != Success)
 	 		return sess.rtn.status;
 
-		// Add user command or function name to execTable hash...
+		// Increment buffer counter if visible user buffer.
+		bcount(bufPtr(pDatum), BFCmdFunc | BFHidden);
+
+		// Add user command or function name to execTable hash.
 		if(bufFlags & BFCmdFunc) {
-			UnivPtr univ;
+			ExecPtr exec;
 
 			pBuf = bufPtr(pDatum);
-			univ.type = (pBuf->flags & BFCommand) ? PtrUserCmd : PtrUserFunc;
-			if(execFind((univ.u.pBuf = pBuf)->bufname + 1, OpCreate, univ.type, &univ) != Success)
+			exec.type = pBuf->flags & BFCommand ? PtrUserCmd : PtrUserFunc;
+			if(execFind((exec.u.pBuf = pBuf)->bufname + 1, OpCreate, exec.type, &exec) != Success)
 				return sess.rtn.status;
 			}
 
-		// return results to caller...
+		// Return results to caller.
 		if(ppBuf != NULL)
 			*ppBuf = bufPtr(pDatum);
 		if(created != NULL)
 			*created = true;
 
-		// run createBuf hook if requested and return.
-		return (ctrlFlags & BS_CreateHook) ? execHook(NULL, INT_MIN, hookTable + HkCreateBuf, 1, bufname) :
+		// Run createBuf hook if requested and return.
+		return opFlags & BN_CreateHook ? execHook(NULL, DefN, hookTable + HkCreateBuf, 1, bufname) :
 		 sess.rtn.status;
 		}
 
@@ -934,19 +987,42 @@ static int bfree(Buffer *pBuf) {
 	return sess.rtn.status;
 	}
 
+// Set or clear BFChanged flag on given buffer and update "buffer changed" counter if needed.
+void bchgflag(Buffer *pBuf, bool setFlag) {
+
+	if(setFlag) {
+		if(!(pBuf->flags & BFChanged)) {				// Nothing to do if flag already set.
+			pBuf->flags |= BFChanged;				// We're good.  Set flag.
+			if(!(pBuf->flags & BFCmdFunc)) {			// Don't increment counter if CmdFunc buffer.
+				++sess.chgBufCount;
+				goto SetWindFlag;
+				}
+			}
+		}
+	else if(pBuf->flags & BFChanged) {					// Nothing to do if flag not set.
+		pBuf->flags &= ~BFChanged;					// We're good.  Clear flag.
+		if(!(pBuf->flags & BFCmdFunc)) {				// Don't decrement counter if CmdFunc buffer.
+			--sess.chgBufCount;
+SetWindFlag:
+			if(mode.cache[MdIdxBufCount]->flags & MdActive)		// Counter changed.  Update mode line of bottom
+				windNextIs(NULL)->face.wflags |= WFMode;	// window if BufCount mode active.
+			}
+		}
+	}
+
 // Check if a buffer can be erased and get confirmation from user if needed.  If it's marked as changed, it will not be erased
 // unless BC_IgnChgd is set in "flags" or the user gives the okay.  This to save the user the grief of losing text.  If the
 // buffer is narrowed and BC_Unnarrow is set, the buffer is silently unnarrowed before being cleared; otherwise, the user is
 // prompted to give the okay before proceeding.
 //
 // Return Success if it's a go, Failure if error, or Cancelled if user changed his or her mind.
-int bconfirm(Buffer *pBuf, ushort flags) {
+int bconfirm(Buffer *pBuf, uint flags) {
 	bool yep;
 	bool eraseML = false;
 	bool eraseOK = false;
 
 	// Executing buffer?
-	if(pBuf->pCallInfo != NULL && pBuf->pCallInfo->execCount > 0)
+	if(pBuf->pCallHdr != NULL && pBuf->pCallHdr->execCount > 0)
 		return rsset(Failure, 0, text226, text264, text238, pBuf->bufname);
 			// "Cannot %s %s buffer '%s'", "clear", "executing"
 
@@ -955,8 +1031,8 @@ int bconfirm(Buffer *pBuf, ushort flags) {
 		return sess.rtn.status;
 
 	// "Confirm all" or changed buffer?  Skip if need "narrowed buffer" confirmation as well, which preempts this.
-	if(((flags & BC_Confirm) || ((pBuf->flags & BFChanged) && !(flags & BC_IgnChgd))) &&
-	 (!(pBuf->flags & BFNarrowed) || (flags & BC_Unnarrow))) {
+	if((flags & BC_Confirm || (pBuf->flags & BFChanged && !(flags & BC_IgnChgd))) &&
+	 (!(pBuf->flags & BFNarrowed) || flags & BC_Unnarrow)) {
 		const char *prompt;
 		char promptBuf[WorkBufSize];
 
@@ -976,7 +1052,7 @@ int bconfirm(Buffer *pBuf, ushort flags) {
 				 pBuf->bufname);
 			prompt = promptBuf;
 			}
-		if(terminpYN(prompt, &yep) != Success)
+		if(termInpYN(prompt, &yep) != Success)
 			return sess.rtn.status;
 		if(!yep)
 			goto ClearML;
@@ -994,7 +1070,7 @@ int bconfirm(Buffer *pBuf, ushort flags) {
 
 			// Not a force.  Get user confirmation (and leave narrowed).
 			eraseML = true;
-			if(terminpYN(text95, &yep) != Success)
+			if(termInpYN(text95, &yep) != Success)
 					// "Narrowed buffer... delete visible portion"
 				return sess.rtn.status;
 			if(!yep)
@@ -1011,7 +1087,7 @@ ClearML:
 
 // This routine blows away all of the text in a buffer and returns status.  If BC_ClrFilename flag is set, the filename
 // associated with the buffer is set to null.
-int bclear(Buffer *pBuf, ushort flags) {
+int bclear(Buffer *pBuf, uint flags) {
 
 	if(bconfirm(pBuf, flags) != Success)
 		return sess.rtn.status;
@@ -1027,7 +1103,7 @@ int bclear(Buffer *pBuf, ushort flags) {
 		return sess.rtn.status;
 	bchange(pBuf, WFHard | WFMode);				// Update window flags.
 	if(pBuf->flags & BFNarrowed) {				// If narrowed buffer...
-		pBuf->flags |= BFChanged;			// mark as changed...
+		bchgflag(pBuf, true);				// mark as changed...
 		faceInit(&pBuf->face, pBuf->pFirstLine, NULL);	// reset buffer line pointers and...
 		Mark *pMark = &pBuf->markHdr;			// set all non-window visible marks to beginning of first line.
 		do {
@@ -1039,9 +1115,10 @@ int bclear(Buffer *pBuf, ushort flags) {
 		}
 	else {
 Unchange:
-		pBuf->flags &= ~BFChanged;			// Otherwise, mark as not changed...
+		bchgflag(pBuf, false);				// Otherwise, mark as not changed...
 		bufInit(pBuf, pBuf->pFirstLine);		// reset buffer line pointers, delete marks...
-		supd_windFlags(pBuf, WFMode);			// and update mode line(s) if needed.
+		supd_windFlags(pBuf, WFMode);			// update mode line(s) if needed...
+		pBuf->flags |= BFActive;			// and make sure buffer is active.
 		}
 
 	return sess.rtn.status;
@@ -1050,12 +1127,12 @@ Unchange:
 // Find a window displaying given buffer and return it, giving preference to current screen and current window.  If ppScrn not
 // NULL, also set *ppScrn to screen that window is on.
 EWindow *findWind(Buffer *pBuf, EScreen **ppScrn) {
-	EScreen *pScrn = sess.cur.pScrn;
+	EScreen *pScrn = sess.pCurScrn;
 	EWindow *pWind;
 
 	// If current window is displaying the buffer, use it.
-	if(sess.cur.pWind->pBuf == pBuf)
-		pWind = sess.cur.pWind;
+	if(sess.pCurWind->pBuf == pBuf)
+		pWind = sess.pCurWind;
 	else {
 		// In current screen...
 		pWind = sess.windHead;
@@ -1067,7 +1144,7 @@ EWindow *findWind(Buffer *pBuf, EScreen **ppScrn) {
 		// In all other screens...
 		pScrn = sess.scrnHead;
 		do {
-			if(pScrn == sess.cur.pScrn)			// Skip current screen.
+			if(pScrn == sess.pCurScrn)			// Skip current screen.
 				continue;
 			if(pScrn->pCurWind->pBuf == pBuf) {		// Use current window first.
 				pWind = pScrn->pCurWind;
@@ -1088,118 +1165,103 @@ Retn:
 	return pWind;
 	}
 
-// Change zero or more buffer attributes (flags), given result pointer and action (n < 0: clear, n == 0 (default): toggle,
-// n == 1: set, or n > 1: clear all and set).  Mutable attributes are: "Changed", "Hidden", and "TermAttr".
+// Change one or more buffer attributes (flags), given result pointer and action (n < 0: clear, n == 0 (default): toggle,
+// n == 1: set, or n > 1: clear all and set).  Mutable attributes are: "Changed", "Hidden", "ReadOnly", and "TermAttr".
 // If interactive:
 //	. Prompt for one (if default n) or more (otherwise) single-letter attributes via parseOpts().
 //	. Use current buffer if default n; otherwise, prompt for buffer name.
 // If script mode:
 //	. Get buffer name from args[0].
-//	. Get zero or more keyword attributes via parseOpts().
-// Perform operation, set pRtnVal to former state (-1 or 1) of last attribute altered (or zero if n > 1 and no attributes
-// specified), and return status.
-int chgBufAttr(Datum *pRtnVal, int n, Datum **args) {
+//	. Get one or more keyword attributes via parseOpts().
+// Perform operation, set pRtnVal to former state (-1 or 1) of last attribute changed, and return status.
+int chgBufAttr(Datum *pRtnVal, long n, Datum **args) {
 	Buffer *pBuf;
-	int count;
+	Option *pOpt, *pOptEnd;
 	long formerState = 0;
 	ushort oldBufFlags, newBufFlags, windFlags;
 	ushort newFlags = 0;
-	int action = (n == INT_MIN) ? 0 : n;
-	static OptHdr optHdr = {
-		ArgNil1, text374, false, bufAttrTable};
-			// "buffer attribute"
+	int action = (n == DefN) ? 0 : n;
 
 	// Interactive?
 	if(!(sess.opFlags & OpScript)) {
-		DFab prompt;
 
-		// Build prompt.
-		if(dopentrack(&prompt) != 0 || dputf(&prompt, 0, "%s %s %s",
-		 action < 0 ? text65 : action == 0 ? text231 : action == 1 ? text64 : text296, text83, text186) != 0 ||
-				// "Clear", "Toggle", "Set", "Clear all and set"		"buffer", "attribute"
-		 dclose(&prompt, FabStr) != 0)
-			goto LibFail;
-
-		// Get attribute(s) from user.
-		optHdr.single = (n == INT_MIN);
-		if(parseOpts(&optHdr, prompt.pDatum->str, NULL, &count) != Success || (count == 0 && action <= 1))
+		// Bail out if no attributes were entered.
+		if(!(bufAttrHdr.ctrlFlags & OHdrFound))
 			return sess.rtn.status;
 
 		// Get buffer.  If default n, use current buffer.
-		if(n == INT_MIN)
+		if(n == DefN)
 			pBuf = sess.cur.pBuf;
-		else {
-			// n is not the default.  Get buffer name.  If nothing is entered, bag it.
-			pBuf = bdefault();
-			if(getBufname(pRtnVal, text229 + 2, pBuf != NULL ? pBuf->bufname : NULL, ArgFirst | OpDelete, &pBuf,
-					// ", in"
-			 NULL) != Success || disnil(pRtnVal))
-				return sess.rtn.status;
 
-			// If "Clear all and set" and no attribute was selected, skip attribute processing.
-			if(action > 1 && count == 0)
-				goto SetFlags;
-			}
+		// n is not the default.  Get buffer name.  If nothing is entered, bag it.
+		else if(getBufname(pRtnVal, text229 + 2, OpDelete | OpDefBName, &pBuf, NULL) != Success || disnil(pRtnVal))
+					// ", in"
+			return sess.rtn.status;
 		}
 	else {
-		// Script mode.  Get buffer name argument.
-		if((pBuf = bsrch(args[0]->str, NULL)) == NULL)
-			return rsset(Failure, 0, text118, args[0]->str);
-				// "No such buffer '%s'"
-
-		// Get attribute(s).
-		optHdr.single = false;
-		if(parseOpts(&optHdr, NULL, args[1], &count) != Success)
+		// Script mode.  Get buffer.
+		if((pBuf = findBuf(args[1])) == NULL)
 			return sess.rtn.status;
 
-		if(count == 0 && action <= 1)
-			return rsset(Failure, 0, text455, optHdr.type);
-				// "Missing required %s"
+		// Get attribute(s).  If "clear" operation and attribute is "*" (signal was set), set all mutables.
+		if(bufAttrHdr.ctrlFlags & OHdrSpecial) {
+			newFlags = BFMutable;
+			goto SetFlags;
+			}
 		}
 
 	// Scan attribute table and set newFlags.
-	if(count > 0) {
-		Option *pOpt = bufAttrTable;
-		do {
-			if(pOpt->ctrlFlags & OptSelected) {
-				formerState = (pBuf->flags & pOpt->u.value) ? 1L : -1L;
-				newFlags |= pOpt->u.value;
-				}
-			} while((++pOpt)->keyword != NULL);
-		}
+	pOptEnd = (pOpt = bufAttrTable) + bufAttrHdr.optCount;
+	do {
+		if(pOpt->ctrlFlags & OptSelected) {
+			formerState = pBuf->flags & pOpt->u.value ? 1L : -1L;
+			newFlags |= pOpt->u.value;
+			}
+		} while(++pOpt < pOptEnd);
 SetFlags:
 	// Have flag(s) and buffer.  Perform operation.
 	oldBufFlags = newBufFlags = pBuf->flags;
 	if(action > 1)
-		newBufFlags &= ~(BFChanged | BFHidden | BFReadOnly | BFTermAttr);
-	if(newFlags != 0) {
-		if(action < 0)
-			newBufFlags &= ~newFlags;			// Clear.
-		else {
-			if(action > 0)
-				newBufFlags |= newFlags;		// Set.
-			else
-				newBufFlags ^= newFlags;		// Toggle.
+		newBufFlags &= ~BFMutable;			// Clear all (and set).
+	if(action < 0)
+		newBufFlags &= ~newFlags;			// Clear.
+	else {
+		if(action > 0)
+			newBufFlags |= newFlags;		// Set.
+		else
+			newBufFlags ^= newFlags;		// Toggle.
 
-			// Have new buffer flags in newBufFlags.  Check for conflicts.
-			if((newBufFlags & (BFCommand | BFTermAttr)) == (BFCommand | BFTermAttr) ||
-			 (newBufFlags & (BFFunc | BFTermAttr)) == (BFFunc | BFTermAttr))
-				return rsset(Failure, 0, text344, text376);
-					// "Operation not permitted on a %s buffer", "user command or function"
-			if((newBufFlags & (BFChanged | BFReadOnly)) == (BFChanged | BFReadOnly)) {
-				if(interactive())
-					tbeep();
-				if(pBuf->flags & BFChanged)
-					return rsset(Failure, 0, text461, text260, text460);
-							// "Cannot set %s buffer to %s", "changed", "read-only"
-				return rsset(Failure, 0, text109, text58, text460);
-						// "%s is %s", "Buffer", "read-only"
-				}
+		// Have new buffer flags in newBufFlags.  Check for conflicts.
+		if((newBufFlags & (BFCommand | BFTermAttr)) == (BFCommand | BFTermAttr) ||
+		 (newBufFlags & (BFFunc | BFTermAttr)) == (BFFunc | BFTermAttr))
+			return rsset(Failure, 0, text344, text376);
+				// "Operation not permitted on a %s buffer", "user command or function"
+		if((newBufFlags & (BFChanged | BFReadOnly)) == (BFChanged | BFReadOnly)) {
+			if(interactive())
+				tbeep();
+			if(pBuf->flags & BFChanged)
+				return rsset(Failure, 0, text461, text260, text460);
+						// "Cannot set %s buffer to %s", "changed", "read-only"
+			return rsset(Failure, 0, text461, text460, text260);
+						// "Cannot set %s buffer to %s", "read-only", "changed"
 			}
 		}
 
-	// All is well... set new buffer flags.
+	// All is well... update buffer-changed counter if BFChanged flag was changed on a user buffer.
+	if(!(oldBufFlags & BFCmdFunc) && (oldBufFlags & BFChanged) != (newBufFlags & BFChanged))
+		bchgflag(pBuf, newBufFlags & BFChanged);
+
+	// Set new buffer flags.
 	pBuf->flags = newBufFlags;
+
+	// Adjust visible buffer counter on mode line if "hidden" attribute was changed on a user buffer.
+	if(!(oldBufFlags & BFCmdFunc) && (oldBufFlags & BFHidden) != (newBufFlags & BFHidden)) {
+		if(newBufFlags & BFHidden)
+			--sess.vizBufCount;
+		else
+			++sess.vizBufCount;
+		windNextIs(NULL)->face.wflags |= WFMode;		// Update mode line of bottom window.
+		}
 
 	// Set window flags if needed.
 	windFlags = (oldBufFlags & (BFChanged | BFReadOnly)) != (newBufFlags & (BFChanged | BFReadOnly)) ? WFMode : 0;
@@ -1212,51 +1274,103 @@ SetFlags:
 	dsetint(formerState, pRtnVal);
 
 	// Wrap it up.
-	return !(sess.opFlags & OpScript) && (newFlags & (BFChanged | BFReadOnly)) && n == INT_MIN ? mlerase(0) :
+	return !(sess.opFlags & OpScript) && newFlags & (BFChanged | BFReadOnly) && n == DefN ? mlerase(0) :
 	 rsset(Success, RSHigh | RSNoFormat, text375);
 		// "Attribute(s) changed"
-LibFail:
-	return libfail();
 	}
 
-// Get a buffer name (if n not default) and perform operation on buffer according to "op" argument.  If prompt == NULL (bgets
-// function), set pRtnVal to function return value, otherwise buffer name.  Return status.
-int bufOp(Datum *pRtnVal, int n, const char *prompt, uint op, int flag) {
+// Change a buffer's home directory and return status.
+int chgBufHome(Datum *pRtnVal, long n, Datum **args) {
+	Buffer *pBuf;
+	EScreen *pScrn;
+	int scrnNum;
+	char workBuf[32];
+
+	// Get screen number.
+	sprintf(workBuf, text449, n == DefN ? text3 : text526);
+			// "Home %s buffer to", "current", "a"
+	if(getNum(workBuf, 2, &scrnNum) != Success)
+		return sess.rtn.status;
+
+	// Get screen pointer.
+	if(scrnNum != 0 && !sfind((ushort) scrnNum, NULL, &pScrn))
+		return rsset(Failure, 0, text5, text380, (long) scrnNum);
+				// "No such %s '%'ld'", "screen"
+
+	// Get the buffer name.  Use current buffer if interactive and default n, or script mode and no arguments left.
+	if(haveArg(n, NULL, false))
+		pBuf = sess.cur.pBuf;
+	else {
+		if(getBufname(pRtnVal, text24, OpDelete | OpDefBName, &pBuf, NULL) != Success || pBuf == NULL)
+				// "Select"
+			return sess.rtn.status;
+		if(pBuf->flags & BFCmdFunc)
+			return rsset(Failure, 0, text344, text376);
+				// "Operation not permitted on a %s buffer", "user command or function"
+		}
+
+	// Have screen and buffer... set or clear home directory.
+	pBuf->homeDir = scrnNum == 0 ? NULL : pScrn->workDir;
+	return rsset(Success, 0, scrnNum == 0 ? text497 : text223, pBuf->bufname, scrnNum);
+			// "Unhomed buffer '%s'", "Buffer '%s' homed to screen %d"
+	}
+
+// Try to activate a buffer.  It is assumed that BFActive flag is not set.  Return status.
+int bactivate(Buffer *pBuf) {
+
+	// Check for directory mismatch.
+	if(pBuf->homeDir != NULL && pBuf->homeDir != sess.pCurScrn->workDir) {
+		char workBuf[WorkBufSize];
+
+		sprintf(workBuf, text415, text309, pBuf->bufname);
+			// "%s buffer '%s'", "Directory unknown for"
+		(void) rsset(Failure, RSHigh, text141, workBuf, pBuf->filename);
+			// "I/O Error: %s, file \"%s\""
+		}
+	else
+		// All is well.  Read attached file into buffer.
+		(void) readIn(pBuf, NULL, RWReadHook | RWKeep | RWStats);
+	return sess.rtn.status;
+	}
+
+// Get a buffer if interactive and non-default n, or argument given in script mode, and perform multi-line move operation on it
+// according to "op" argument.  If prompt is NULL (bgets function), set pRtnVal to function return value, otherwise buffer name.
+// Return status.
+int bigBufMove(Datum *pRtnVal, long n, const char *prompt, uint op, long arg) {
 	Point *pPoint;
 	Buffer *pBuf = NULL;
 
-	// Get the buffer name.  n will never be the default for a bgets() call.
-	if(n == INT_MIN)
+	// Get the buffer name.  Use current buffer if interactive and default n, or script mode and no arguments left.  (n will
+	// never be the default for a bgets() call.)
+	if(haveArg(n, NULL, false))
 		pBuf = sess.cur.pBuf;
-	else {
-		if(prompt != NULL)
-			pBuf = bdefault();
-		if(getBufname(pRtnVal, prompt, pBuf != NULL ? pBuf->bufname : NULL, ArgFirst | OpDelete, &pBuf, NULL)
-		 != Success || pBuf == NULL)
-			return sess.rtn.status;
-		}
-
-	// Perform requested operation (BO_GotoLine, BO_BeginEnd, or BO_ReadBuf).
-	if(op == BO_GotoLine && flag == 0) {
-		op = BO_BeginEnd;
-		flag = true;
-		}
+	else if(getBufname(pRtnVal, prompt, op == BM_GotoLine ? OpDelete | OpDefBName : ArgFirst | OpDelete | OpDefBName,
+	 &pBuf, NULL) != Success || pBuf == NULL)
+		return sess.rtn.status;
 
 	// Move point in buffer... usually a massive adjustment.  Grab point.  If the buffer is being displayed, get from window
 	// face instead of buffer face.
 	if(pBuf->windCount > 0) {
 		EWindow *pWind = findWind(pBuf, NULL);
-		pWind->flags |= WFMove;			// Set "hard motion" flag.
+		pWind->face.wflags |= WFMove;			// Set "hard motion" flag.
 		pPoint = &pWind->face.point;
 		}
+
+	// Buffer in background... activate it if needed.
+	else if((!(pBuf->flags & BFActive) && bactivate(pBuf) != Success))
+		return sess.rtn.status;
 	else
 		pPoint = &pBuf->face.point;
 
-	// Perform operation.
+	// Perform requested operation (BM_GotoLine, BM_BeginEnd, or BM_ReadBuf).
+	if(op == BM_GotoLine && (arg == 0 || arg == 1)) {
+		op = BM_BeginEnd;
+		arg = (arg == 0);
+		}
 	switch(op) {
-		case BO_BeginEnd:
+		case BM_BeginEnd:
 			// Go to beginning or end of buffer.
-			if(flag) {		// EOB
+			if(arg) {		// EOB
 				pPoint->pLine = pBuf->pFirstLine->prev;
 				pPoint->offset = pPoint->pLine->used;
 				}
@@ -1265,19 +1379,38 @@ int bufOp(Datum *pRtnVal, int n, const char *prompt, uint op, int flag) {
 				pPoint->offset = 0;
 				}
 			break;
-		case BO_GotoLine:
-			// Go to beginning of buffer and count lines.
-			pPoint->pLine = pBuf->pFirstLine;
+		case BM_GotoLine:
+			// Go to beginning or end of buffer and count lines.
 			pPoint->offset = 0;
-			if(pBuf == sess.cur.pBuf)
-				return moveLine(flag - 1);
-			for(--flag; flag > 0; --flag) {
-				if(pPoint->pLine->next == NULL)
-					break;
-				pPoint->pLine = pPoint->pLine->next;
+			if(arg > 0) {
+				// Going forward from top.
+				pPoint->pLine = pBuf->pFirstLine;
+				if(pBuf == sess.cur.pBuf) {
+					--arg;
+					goto MoveLine;
+					}
+				for(--arg; arg > 0; --arg) {
+					if(pPoint->pLine->next == NULL)
+						break;
+					pPoint->pLine = pPoint->pLine->next;
+					}
+				}
+			else {
+				// Going backward from bottom.
+				pPoint->pLine = pBuf->pFirstLine->prev;
+				if(pPoint->pLine->used > 0)
+					++arg;
+				if(pBuf == sess.cur.pBuf)
+MoveLine:
+					return moveLine(arg);
+				for(; arg < 0; ++arg) {
+					if(pPoint->pLine == pBuf->pFirstLine)
+						break;
+					pPoint->pLine = pPoint->pLine->prev;
+					}
 				}
 			break;
-		default:	// BO_ReadBuf
+		default:	// BM_ReadBuf
 			// Read next line from buffer n times.
 			while(n-- > 0) {
 				size_t len;
@@ -1309,40 +1442,65 @@ int bufOp(Datum *pRtnVal, int n, const char *prompt, uint op, int flag) {
 	}
 
 // Set name of a system (internal) buffer and call bfind();
-int sysBuf(const char *root, Buffer **ppBuf, ushort flags) {
-	char bufname[strlen(root) + 2];
+int sysBuf(const char *root, Buffer **ppBuf, uint flags) {
+	char *bufEnd, bufname[strlen(root) + 2];
 
 	bufname[0] = BSysLead;
-	strcpy(bufname + 1, root);
-	return bfind(bufname, BS_Create | BS_Force, BFHidden | flags, ppBuf, NULL);
+	bufEnd = stpcpy(bufname + 1, root);
+	bufname[1] = upCase[(int) bufname[1]];
+	if(flags & Plural)
+		strcpy(bufEnd, bufEnd[-1] == 's' ? "es" : "s");
+	return bfind(bufname, BN_Create | BN_Force, flags & ~Plural | BFHidden, ppBuf, NULL);
 	}
 
-// Activate a buffer if needed.  Return status.
-int bactivate(Buffer *pBuf) {
+// Convert a buffer to an array or string per "toArray" argument.
+int cvtBuf(Datum *pRtnVal, Datum **args, bool toArray) {
+	Buffer *pBuf;
+	Line *pLine;
 
-	// Check if buffer is active.
-	if(!(pBuf->flags & BFActive)) {
+	// Get buffer pointer and activate buffer if needed.
+	if((pBuf = findBuf(args[0])) == NULL || (!(pBuf->flags & BFActive) && bactivate(pBuf) != Success))
+		return sess.rtn.status;
 
-		// Not active: check for directory mismatch.
-		if(pBuf->saveDir != NULL && pBuf->saveDir != sess.cur.pScrn->workDir) {
-			char workBuf[WorkBufSize];
+	if(toArray) {
+		Array *pArray;
+		long i, size;
 
-			sprintf(workBuf, text415, text309, pBuf->bufname);
-				// "%s buffer '%s'", "Directory unknown for"
-			(void) rsset(Failure, RSHigh, text141, workBuf, pBuf->filename);
-				// "I/O Error: %s, file \"%s\""
+		if(makeArray(pRtnVal, size = bufLineCount(pBuf), &pArray) == Success && size > 0) {
+			pLine = pBuf->pFirstLine;
+			i = 0;
+			do {
+				if(dsetsubstr(pLine->text, pLine->used, aget(pArray, i, 0)) != 0)
+					goto LibFail;
+				pLine = pLine->next;
+				} while(++i < size);
 			}
-		else
-			// All is well.  Read attached file into buffer.
-			(void) readIn(pBuf, NULL, RWReadHook | RWKeep | RWStats);
+		}
+	else if(bempty(pBuf))
+		dsetnull(pRtnVal);
+	else {
+		DFab bufStr;
+
+		if(dopenwith(&bufStr, pRtnVal, FabClear) != 0)
+			goto LibFail;
+		pLine = pBuf->pFirstLine;
+		do {
+			if(dputsubstr(pLine->text, pLine->used, &bufStr, 0) != 0 ||
+			 (pLine->next != NULL && dputc('\n', &bufStr, 0) != 0))
+				goto LibFail;
+			} while((pLine = pLine->next) != NULL);
+		if(dclose(&bufStr, FabStr) != 0)
+			goto LibFail;
 		}
 
 	return sess.rtn.status;
+LibFail:
+	return libfail();
 	}
 
 // Insert a buffer into the current buffer and set current region to inserted lines.  If n == 0, leave point before the inserted
 // lines, otherwise after.  Return status.
-int insertBuf(Datum *pRtnVal, int n, Datum **args) {
+int insertBuf(Datum *pRtnVal, long n, Datum **args) {
 	Buffer *pBuf;
 	DataInsert dataInsert = {
 		sess.cur.pBuf,	// Target buffer.
@@ -1351,8 +1509,7 @@ int insertBuf(Datum *pRtnVal, int n, Datum **args) {
 		};
 
 	// Get the buffer name.  Reject if current buffer.
-	pBuf = bdefault();
-	if(getBufname(pRtnVal, text55, pBuf != NULL ? pBuf->bufname : NULL, ArgFirst | OpDelete, &pBuf, NULL) != Success)
+	if(getBufname(pRtnVal, text55, ArgFirst | OpDelete | OpDefBName, &pBuf, NULL) != Success)
 			// "Insert"
 		return sess.rtn.status;
 	dclear(pRtnVal);
@@ -1363,12 +1520,12 @@ int insertBuf(Datum *pRtnVal, int n, Datum **args) {
 			// "Cannot insert current buffer into itself"
 
 	// Let user know what's up.
-	if(mlputs(MLHome | MLWrap | MLFlush, text153) != Success)
+	if(mlputs(text153, MLHome | MLWrap | MLFlush) != Success)
 			// "Inserting data..."
 		return sess.rtn.status;
 
 	// Prepare buffer to be inserted.  Return after activation if buffer is empty.
-	if(bactivate(pBuf) != Success)
+	if(!(pBuf->flags & BFActive) && bactivate(pBuf) != Success)
 		return sess.rtn.status;
 	if(bempty(pBuf))
 		return rsset(Success, RSHigh, "%s 0 %ss", text154, text205);
@@ -1381,97 +1538,65 @@ int insertBuf(Datum *pRtnVal, int n, Datum **args) {
 	}
 
 // Attach a buffer to the current window, creating it if necessary (default).  Render buffer and return status.
-int selectBuf(Datum *pRtnVal, int n, Datum **args) {
+int selectBuf(Datum *pRtnVal, long n, Datum **args) {
 	Buffer *pBuf;
 	bool created;
 	const char *prompt;
 	uint op;
 
 	// Get the buffer name.
-	pBuf = bdefault();
 	if(n == -1) {
 		prompt = text27;
 			// "Pop"
 		op = OpDelete;
 		}
 	else {
-		prompt = (n == INT_MIN || n == 1) ? text113 : text24;
+		prompt = (n == DefN || n == 1) ? text113 : text24;
 						// "Switch to", "Select"
 		op = OpCreate | OpConfirm;
 		}
-	if(getBufname(pRtnVal, prompt, pBuf != NULL ? pBuf->bufname : NULL, ArgFirst | op, &pBuf, &created) != Success ||
-	 pBuf == NULL)
+	if(getBufname(pRtnVal, prompt, ArgFirst | OpDefBName | op, &pBuf, &created) != Success || pBuf == NULL)
 		return sess.rtn.status;
 
 	// Render the buffer.
-	return render(pRtnVal, n == INT_MIN ? 1 : n, pBuf, created ? RendNewBuf | RendNotify : 0);
+	return render(pRtnVal, n == DefN ? 1 : n, pBuf, created ? RendNewBuf | RendNotify : 0);
 	}
 
 // Display a file or buffer in a pop-up window with options.  Return status.
-int doPop(Datum *pRtnVal, int n, bool popBuf) {
+int doPop(Datum *pRtnVal, long n, CmdFunc *pCmdFunc) {
 	Buffer *pBuf;
-	int count = 0;
-	ushort bufFlags;
-	ushort rendFlags = 0;
 	bool created = false;
-	ushort oldMsgFlag = modeInfo.cache[MdIdxRtnMsg]->flags & MdEnabled;
-	static Option options[] = {
-		{"^Existing", "^Exist", 0, 0},
-		{"^AltModeLine", "^AltML", 0, RendAltML},
-		{"^Shift", "^Shft", 0, RendShift},
-		{"^TermAttr", "^TAttr", 0, 0},
-		{"^Delete", "^Del", 0, RendNewBuf},
-		{NULL, NULL, 0, 0}};
-	static OptHdr optHdr = {
-		0, text223, false, options};
-			// "pop option"
-
-	// Get buffer name or filename.
-	if(popBuf) {
-		// Get buffer name.
-		pBuf = bdefault();
-		if(getBufname(pRtnVal, text27, pBuf != NULL ? pBuf->bufname : NULL, ArgFirst | OpDelete, &pBuf, NULL)
-				// "Pop"
-		 != Success || pBuf == NULL)
-			return sess.rtn.status;
-		options[0].ctrlFlags |= OptIgnore;
-		}
-	else {
-		// Get filename.
-		if(getFilename(pRtnVal, text299, NULL, ArgFirst) != Success || disnil(pRtnVal))
-				// "Pop"
-			return sess.rtn.status;
-		options[0].ctrlFlags &= ~OptIgnore;
-		}
-
-	// Get options if applicable.
-	if(n != INT_MIN && parseOpts(&optHdr, text448, NULL, &count) != Success)
-				// "Options"
-		return sess.rtn.status;
+	ushort bufFlags;
+	ushort oldMsgFlag = mode.cache[MdIdxRtnMsg]->flags & MdActive;
+	OptHdr *pOptHdr = pCmdFunc->pOptHdr;
+	uint rendFlags = pOptHdr->selFlags;
 
 	if(oldMsgFlag)
-		clearGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
+		clearGlobalMode(mode.cache[MdIdxRtnMsg]);
 
 	// Open and read file in pRtnVal, if applicable.
-	if(!popBuf) {
-		ushort ctrlFlags = (count > 0 && (options[0].ctrlFlags & OptSelected)) ? BS_Create | BS_Derive :
-		 BS_Create | BS_Derive | BS_Force;
-		if(bfind(pRtnVal->str, ctrlFlags, 0, &pBuf, &created) != Success ||
+	if(pCmdFunc - cmdFuncTable == cf_popFile) {
+		uint opFlags = pOptHdr->optTable[0].ctrlFlags & OptSelected ?		// "Existing"
+		 BN_Create | BN_Derive : BN_Create | BN_Derive | BN_Force;
+		if(bfind(pRtnVal->str, opFlags, 0, &pBuf, &created) != Success ||
 		 (created && readIn(pBuf, pRtnVal->str, RWKeep | RWExist) != Success))
 			return sess.rtn.status;
 		if(created)
 			rendFlags |= RendNewBuf;
 		}
+	else {
+		// Activate buffer if needed.
+		pBuf = dgetmemptr(pRtnVal);
+		if((!(pBuf->flags & BFActive) && bactivate(pBuf) != Success))
+			return sess.rtn.status;
+		}
 
 	// Process options.
-	if(count > 0) {
-		rendFlags = getFlagOpts(options);
-		if(options[3].ctrlFlags & OptSelected) {		// "TermAttr"
-			if(pBuf->flags & BFCmdFunc)
-				return rsset(Failure, 0, text344, text376);
-					// "Operation not permitted on a %s buffer", "user command or function"
-			pBuf->flags |= BFTermAttr;
-			}
+	if(pOptHdr->optTable[3].ctrlFlags & OptSelected) {				// "TermAttr"
+		if(pBuf->flags & BFCmdFunc)
+			return rsset(Failure, 0, text344, text376);
+				// "Operation not permitted on a %s buffer", "user command or function"
+		pBuf->flags |= BFTermAttr;
 		}
 
 	bufFlags = pBuf->flags;		// Save buffer flags for possible restore after pop.
@@ -1479,7 +1604,7 @@ int doPop(Datum *pRtnVal, int n, bool popBuf) {
 	// Render the buffer and return notice if it is deleted and was not just created.
 	if(render(pRtnVal, -1, pBuf, rendFlags) == Success) {
 		if(oldMsgFlag)
-			setGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
+			setGlobalMode(mode.cache[MdIdxRtnMsg]);
 		if(!(rendFlags & RendNewBuf))
 			pBuf->flags = bufFlags;
 		else if(!created)
@@ -1490,23 +1615,28 @@ int doPop(Datum *pRtnVal, int n, bool popBuf) {
 	return sess.rtn.status;
 	}
 
-// Create a scratch buffer; that is, one with a unique name and no filename associated with it.  Set *ppBuf to buffer pointer
-// and return status.
+// Create a scratch buffer; that is, one with a unique name and no filename associated with it.  Home buffer to current screen,
+// set *ppBuf to buffer pointer, and return status.
 int bscratch(Buffer **ppBuf) {
 	Buffer *pBuf;
 	char bufname[MaxBufname + 1];
 
 	// Create a buffer with a unique name...
 	sprintf(bufname, "%s%u", Scratch, scratchBufNum++);
-	(void) bfind(bufname, BS_Create | BS_CreateHook | BS_Force, 0, &pBuf, NULL);
+	if(bfind(bufname, BN_Create | BN_CreateHook | BN_Force, 0, &pBuf, NULL) == Success) {
 
-	// and return it.
-	*ppBuf = pBuf;
+		// home buffer to current screen...
+		pBuf->homeDir = sess.pCurScrn->workDir;
+
+		// and return it.
+		*ppBuf = pBuf;
+		}
+
 	return sess.rtn.status;
 	}
 
 // Create a scratch buffer.  Render buffer and return status.
-int scratchBuf(Datum *pRtnVal, int n, Datum **args) {
+int scratchBuf(Datum *pRtnVal, long n, Datum **args) {
 	Buffer *pBuf;
 
 	// Create buffer...
@@ -1514,24 +1644,24 @@ int scratchBuf(Datum *pRtnVal, int n, Datum **args) {
 		return sess.rtn.status;
 
 	// and render it.
-	return render(pRtnVal, n == INT_MIN ? 1 : n, pBuf, RendNewBuf);
+	return render(pRtnVal, n == DefN ? 1 : n, pBuf, RendNewBuf);
 	}
 
 // Run exit-buffer hook (and return result) or enter-buffer hook.  Return status.
-int runBufHook(Datum **ppRtnVal, ushort flags) {
+int runBufHook(Datum **ppRtnVal, uint flags) {
 
 	if(!(sess.cur.pBuf->flags & BFCmdFunc)) {
-		if(*ppRtnVal == NULL && dnewtrack(ppRtnVal) != 0)
+		if(*ppRtnVal == NULL && (*ppRtnVal = dnewtrack()) == NULL)
 			return libfail();
 		if(flags & SWB_ExitHook) {
 
 			// Run exit-buffer user hook on current (old) buffer.
 			dsetnil(*ppRtnVal);
-			(void) execHook(*ppRtnVal, INT_MIN, hookTable + HkExitBuf, 0);
+			(void) execHook(*ppRtnVal, DefN, hookTable + HkExitBuf, 0);
 			}
 		else
 			// Run enter-buffer user hook on current (new) buffer.
-			(void) execHook(*ppRtnVal, INT_MIN, hookTable + HkEnterBuf, 0x21, *ppRtnVal);
+			(void) execHook(*ppRtnVal, DefN, hookTable + HkEnterBuf, 0x21, *ppRtnVal);
 		}
 	return sess.rtn.status;
 	}
@@ -1539,7 +1669,7 @@ int runBufHook(Datum **ppRtnVal, ushort flags) {
 // Switch to given buffer in current window, update pLastBuf variable in current screen (per flags), and return status.  The top
 // line, point, and display column offset values from the current window are saved in the old buffer's header and replacement
 // ones are fetched from the new (given) buffer's header.
-int bswitch(Buffer *pBuf, ushort flags) {
+int bswitch(Buffer *pBuf, uint flags) {
 	Datum *pRtnVal = NULL;
 
 	// Nothing to do if pBuf is current buffer.
@@ -1552,20 +1682,19 @@ int bswitch(Buffer *pBuf, ushort flags) {
 
 	// Decrement window use count of current (old) buffer and save the current window settings.
 	--sess.cur.pBuf->windCount;
-	windFaceToBufFace(sess.cur.pWind, sess.cur.pBuf);
-	if(!(flags & SWB_NoLastBuf))
-		sess.cur.pScrn->pLastBuf = sess.cur.pBuf;
+	windFaceToBufFace(sess.pCurWind, sess.cur.pBuf);
+	sess.pCurScrn->pLastBuf = sess.cur.pBuf;
 
 	// Switch to new buffer.
-	sess.cur.pWind->pBuf = sess.edit.pBuf = sess.cur.pBuf = pBuf;
+	sess.pCurWind->pBuf = sess.edit.pBuf = sess.cur.pBuf = pBuf;
 	++pBuf->windCount;
 
-	// Activate buffer.
-	if(bactivate(sess.cur.pBuf) <= MinExit)
+	// Activate buffer if needed.
+	if(!(pBuf->flags & BFActive) && bactivate(pBuf) <= MinExit)
 		return sess.rtn.status;
 
 	// Update window settings.
-	bufFaceToWindFace(sess.cur.pBuf, sess.cur.pWind);
+	bufFaceToWindFace(sess.cur.pBuf, sess.pCurWind);
 
 	// Run enter-buffer user hook on current (new) buffer, if applicable.
 	if(sess.rtn.status == Success && !(flags & SWB_NoBufHooks))
@@ -1580,100 +1709,93 @@ int bswitch(Buffer *pBuf, ushort flags) {
 // Buffers are selected per flags:
 //	BT_Backward	Traverse buffer list backward, otherwise forward.
 //	BT_Hidden	Include hidden, non-command/function buffers as candidates.
-//	BT_HomeDir	Select buffers having same home directory as current screen only.
+//	BT_Homed	Select buffers homed to current screen only.
 //	BT_Delete	Delete the current buffer after first switch.
-int prevNextBuf(Datum *pRtnVal, ushort flags) {
+int prevNextBuf(Datum *pRtnVal, uint flags) {
 	Buffer *pBuf0, *pBuf1;
-	Datum **ppBufItem0, **ppBufItem, **ppBufItemEnd;
+	HashNode **ppBufObj0, **ppBufObj, **ppBufObjEnd;
 	ssize_t index;
-	int incr = (flags & BT_Backward) ? -1 : 1;
-	const char *homeDir = sess.cur.pScrn->workDir;
+	int incr = flags & BT_Backward ? -1 : 1;
+	const char *homeDir = sess.pCurScrn->workDir;
 
-	// Get the current buffer list pointer.
-	(void) bsrch(sess.cur.pBuf->bufname, &index);
-	ppBufItem0 = bufTable.elements + index;
+	// Get buffer array pointer for current buffer.
+	if(bsrch(sess.cur.pBuf->bufname, &index) == NULL)	// hsort() error?
+		return sess.rtn.status;				// Yes, return.
+	ppBufObj0 = buf.pAry + index;				// Location of current buffer in array.
 
 	// Find the first buffer before or after the current one that meets the criteria.
-	ppBufItem = ppBufItem0 + incr;
-	ppBufItemEnd = bufTable.elements + bufTable.used;
+	ppBufObj = ppBufObj0 + incr;
+	ppBufObjEnd = buf.pAry + buf.table.nodeCount;
 	for(;;) {
-		// Wrap around buffer list if needed.
-		if(ppBufItem < bufTable.elements || ppBufItem == ppBufItemEnd)
-			ppBufItem = (flags & BT_Backward) ? ppBufItemEnd - 1 : bufTable.elements;
+		// Wrap around buffer list if at beginning or end.
+		if(ppBufObj < buf.pAry || ppBufObj == ppBufObjEnd)
+			ppBufObj = flags & BT_Backward ? ppBufObjEnd - 1 : buf.pAry;
 
-		if(ppBufItem == ppBufItem0) {
+		if(ppBufObj == ppBufObj0) {
 
 			// We're back where we started... buffer not found.  Bail out (do nothing).
-			return sess.rtn.status;
+			return interactive() ? rsset(Success, RSNoWrap, text505, flags & BT_Homed ? text506 : "") :
+								// "Only one%s buffer",			" homed"
+			 sess.rtn.status;
 			}
-		pBuf1 = bufPtr(*ppBufItem);
-		if(!(pBuf1->flags & BFCmdFunc) && (pBuf1->saveDir == homeDir || !(flags & BT_HomeDir)) &&
-		 (!(pBuf1->flags & BFHidden) || (flags & BT_Hidden)))
+		pBuf1 = bufPtr((*ppBufObj)->pVal);
+		if(!(pBuf1->flags & BFCmdFunc) && (pBuf1->homeDir == homeDir || !(flags & BT_Homed)) &&
+		 (!(pBuf1->flags & BFHidden) || flags & BT_Hidden))
 			break;
-		ppBufItem += incr;
+		ppBufObj += incr;
 		}
 
 	// Buffer found... switch to it.
 	pBuf0 = sess.cur.pBuf;
 	if(bswitch(pBuf1, 0) != Success)
 		return sess.rtn.status;
-	if(flags & BT_Delete) {
-		char bufname[MaxBufname + 1];
-
-		strcpy(bufname, pBuf0->bufname);
-		if(bdelete(pBuf0, 0) == Success)
-			(void) rsset(Success, RSForce, text372, bufname);
-					// "Buffer '%s' deleted"
-		}
+	if(flags & BT_Delete)
+		(void) bdelete(pBuf0, BD_RtnMsg);
 
 	return (pRtnVal != NULL && dsetstr(pBuf1->bufname, pRtnVal) != 0) ? libfail() : sess.rtn.status;
 	}
 
-// Clear current buffer, or named buffer if n argument.  Force it if n < 0.  Set pRtnVal to false if buffer is not cleared,
-// otherwise true.  Return status.
-int clearBuf(Datum *pRtnVal, int n, Datum **args) {
+// Clear current buffer (or named buffer if interactive and n argument, or argument given in script mode).  Force it if n < 0.
+// Set pRtnVal to false if buffer is not cleared, otherwise true.  Return status.
+int clearBuf(Datum *pRtnVal, long n, Datum **args) {
 	Buffer *pBuf;
 
 	// Get the buffer name to clear.
-	if(n == INT_MIN)
+	if(haveArg(n, NULL, false))
 		pBuf = sess.cur.pBuf;
-	else {
-		pBuf = bdefault();
-		if(getBufname(pRtnVal, text169, pBuf != NULL ? pBuf->bufname : NULL, ArgFirst | OpDelete, &pBuf, NULL)
+	else if(getBufname(pRtnVal, text169, ArgFirst | OpDelete | OpDefBName, &pBuf, NULL) != Success || pBuf == NULL)
 				// "Clear"
-		 != Success || pBuf == NULL)
-			return sess.rtn.status;
-		}
+		return sess.rtn.status;
 
 	// Blow text away unless user gets cold feet.
-	if(bclear(pBuf, n < 0 && n != INT_MIN ? BC_IgnChgd : 0) >= Cancelled)
+	if(bclear(pBuf, n < 0 && n != DefN ? BC_IgnChgd : 0) >= Cancelled)
 		dsetbool(sess.rtn.status == Success, pRtnVal);
 
 	return sess.rtn.status;
 	}
 
 // Check if an attribute is set in a buffer and set pRtnVal to Boolean result.  Return status.
-int bufAttrQ(Datum *pRtnVal, int n, Datum **args) {
+int bufAttrQ(Datum *pRtnVal, long n, Datum **args) {
 	Buffer *pBuf;
 	char *attr = args[0]->str;
 	bool result = false;
-	Option *pOpt = bufAttrTable;
+	Option *pOpt, *pOptEnd;
 
 	// Get buffer.
 	if(args[1] == NULL)
 		pBuf = sess.cur.pBuf;
-	else if((pBuf = bsrch(args[1]->str, NULL)) == NULL)
-		return rsset(Failure, 0, text118, args[1]->str);
-			// "No such buffer '%s'"
+	else if((pBuf = findBuf(args[1])) == NULL)
+		return sess.rtn.status;
 
 	// Scan buffer attribute table for a match.
+	pOptEnd = (pOpt = bufAttrTable) + bufAttrHdr.optCount;
 	do {
 		if(strcasecmp(attr, *pOpt->keyword == '^' ? pOpt->keyword + 1 : pOpt->keyword) == 0) {
 			if(pBuf->flags & pOpt->u.value)
 				result = true;
 			goto Found;
 			}
-		} while((++pOpt)->keyword != NULL);
+		} while(++pOpt < pOptEnd);
 
 	// Match not found... return an error.
 	return rsset(Failure, 0, text447, text374, attr);
@@ -1684,27 +1806,30 @@ Found:
 	}
 
 // Delete marks, given buffer pointer.  Free all visible user marks, plus invisible user marks if MKViz flag is not set,
-// plus window marks if MKWind flag is set -- then set root mark to default.
-void delBufMarks(Buffer *pBuf, ushort flags) {
+// plus window marks if MKWind flag is set -- then set root mark to default.  Return number of marks deleted.
+int delBufMarks(Buffer *pBuf, uint flags) {
 	Mark *pMark0, *pMark1, *pMark2;
 	Mark *pMark = &pBuf->markHdr;
+	int count = 0;
 
 	// Free marks in list.
 	for(pMark1 = (pMark0 = pMark)->next; pMark1 != NULL; pMark1 = pMark2) {
 		pMark2 = pMark1->next;
 		if((pMark1->id <= '~' && (pMark1->point.offset >= 0 || !(flags & MKViz))) ||
-		 (pMark1->id > '~' && (flags & MKWind))) {
+		 (pMark1->id > '~' && flags & MKWind)) {
 			free((void *) pMark1);
 			pMark0->next = pMark2;
+			++count;
 			}
 		else
 			pMark0 = pMark1;
 		}
 
-	// Initialize root mark to end of buffer.
+	// Initialize root mark to end of buffer and return count.
 	pMark->id = RegionMark;
 	pMark->point.offset = (pMark->point.pLine = pBuf->pFirstLine->prev)->used;
 	pMark->reframeRow = 0;
+	return count;
 	}
 
 // Find all windows where given buffer is being displayed and switch to another buffer in each if possible.  The buffer to
@@ -1721,14 +1846,14 @@ static int bundisplay(Buffer *pBuf) {
 	EScreen *pOldScrn, *pScrn;
 
 	// Save current screen and window.
-	pOldScrn = sess.cur.pScrn;
-	pOldWind = sess.cur.pWind;
+	pOldScrn = sess.pCurScrn;
+	pOldWind = sess.pCurWind;
 
 	// In all screens...
 	pScrn = sess.scrnHead;
 	do {
 		// Disable remembered buffer for this screen if same as one to undisplay or is a user command or function.
-		if((pLastBuf = pScrn->pLastBuf) != NULL && (pLastBuf == pBuf || (pLastBuf->flags & BFCmdFunc)))
+		if((pLastBuf = pScrn->pLastBuf) != NULL && (pLastBuf == pBuf || pLastBuf->flags & BFCmdFunc))
 			pLastBuf = NULL;
 
 		// In all windows...
@@ -1743,7 +1868,7 @@ static int bundisplay(Buffer *pBuf) {
 					if(bswitch(pLastBuf, 0) != Success)
 						goto Retn;
 					}					// Not available.  Try next homed buffer.
-				else if(prevNextBuf(NULL, BT_HomeDir) != Success)
+				else if(prevNextBuf(NULL, BT_Homed) != Success)
 					goto Retn;
 				else if(sess.cur.pBuf == pBuf) {		// None found.  Try next visible buffer.
 					if(prevNextBuf(NULL, 0) != Success)
@@ -1772,26 +1897,27 @@ Retn:
 
 // Delete the buffer pointed to by pBuf.  Don't allow if buffer is being executed or aliased, or is a user function bound to a
 // hook.  If buffer is being displayed, switch to a different buffer in all its windows first if possible; otherwise, return an
-// error.  If buffer can be deleted, pass "flags" with BC_Unnarrow set to bclear() to clear the buffer, then free the header
-// line and the buffer block.  Also delete any key binding and remove the execTable entry if it's a user command or function.
-// Return status, including Cancelled if user changed his or her mind.
-int bdelete(Buffer *pBuf, ushort flags) {
-	UnivPtr univ;
+// error.  If buffer can be deleted, pass "flags" to bclear() with BC_ClrFilename and BC_Unnarrow set to clear the buffer, then
+// free the header line and the buffer block.  Also delete any key binding and remove the execTable entry if it's a user command
+// or function.  Return status, including Cancelled if user changed his or her mind.
+int bdelete(Buffer *pBuf, uint flags) {
+	ExecPtr exec;
 	KeyBind *pKeyBind;
 	EScreen *pScrn;
+	char bufname[MaxBufname + 1];
 
 	// We cannot nuke an executing buffer.
-	if(pBuf->pCallInfo != NULL && pBuf->pCallInfo->execCount > 0)
+	if(pBuf->pCallHdr != NULL && pBuf->pCallHdr->execCount > 0)
 		return rsset(Failure, 0, text226, text263, text238, pBuf->bufname);
 			// "Cannot %s %s buffer '%s'", "delete", "executing"
 
-	// We cannot nuke a aliased buffer.
+	// We cannot nuke an aliased buffer.
 	if(pBuf->aliasCount > 0)
 		return rsset(Failure, 0, text272, text412, text247, pBuf->aliasCount);
 			// "%s or %s has %hu alias(es)", "User command", "function"
 
 	// We cannot nuke a user function bound to a hook.
-	if((pBuf->flags & BFFunc) && isHook(pBuf, true))
+	if(pBuf->flags & BFFunc && isHook(pBuf, true))
 		goto Retn;
 
 	// "Undisplay" buffer if needed.
@@ -1803,12 +1929,12 @@ int bdelete(Buffer *pBuf, ushort flags) {
 		goto Retn;
 
 	// Delete execTable entry.
-	if((pBuf->flags & BFCmdFunc) && execFind(pBuf->bufname + 1, OpDelete, 0, NULL) != Success)
+	if(pBuf->flags & BFCmdFunc && execFind(pBuf->bufname + 1, OpDelete, 0, NULL) != Success)
 		goto Retn;
 
 	delBufMarks(pBuf, MKWind);			// Delete all marks.
-	univ.u.pBuf = pBuf;				// Get key binding, if any.
-	pKeyBind = getPtrEntry(&univ);
+	exec.u.pBuf = pBuf;				// Get key binding, if any.
+	pKeyBind = findBindPtr(&exec);
 
 	if(sess.pSavedBuf == pBuf)			// Unsave buffer if saved.
 		sess.pSavedBuf = NULL;
@@ -1818,49 +1944,55 @@ int bdelete(Buffer *pBuf, ushort flags) {
 			pScrn->pLastBuf = NULL;
 		} while((pScrn = pScrn->next) != NULL);
 	preprocFree(pBuf);				// Release any script preprocessor storage.
-	if(pBuf->pCallInfo != NULL)
-		free((void *) pBuf->pCallInfo);		// Release buffer extension record.
-	dfree(delistBuf(pBuf));				// Remove from buffer list and destroy Buffer and Datum objects.
+	if(pBuf->pCallHdr != NULL)
+		free((void *) pBuf->pCallHdr);		// Release buffer extension record.
+	buncount(pBuf, BFCmdFunc | BFHidden);		// Decrement buffer counter if visible user buffer.
+	if(flags & BD_RtnMsg)
+		strcpy(bufname, pBuf->bufname);		// Save buffer name for return message.
+	dfree(bdel(pBuf));				// Remove from buffer list and destroy Buffer and Datum objects.
 	if(pKeyBind != NULL)
 		unbind(pKeyBind);			// Delete buffer key binding.
+	if(flags & BD_RtnMsg)				// Set return message if requested.
+		(void) rsset(Success, RSHigh, text372, bufname);
+				// "Buffer '%s' deleted"
 Retn:
 	return sess.rtn.status;
 	}
 
-// Delete buffers per "dflags" and return status.  If BD_Homed flag set, use "workDir" as home directory to match on.  Set
-// *pCount to number of buffers deleted.
-int bnuke(ushort dflags, const char *workDir, int *pCount) {
+// Delete buffers per "oflags" and return status.  (Common routine called for "delBuf" and "delScreen" commands.)  If BD_Homed
+// flag set, use "workDir" as home directory to match on.  Set *pCount to number of buffers deleted.
+int bnuke(uint oflags, const char *workDir, uint *pCount) {
 	Buffer *pBuf;
-	Datum **ppBufItem = bufTable.elements;
-	Datum **ppBufItemEnd = ppBufItem + bufTable.used;
-	ushort cflags = (dflags & BD_Confirm) ? (BC_ShowName | BC_Confirm) :
-	 (dflags & BD_Force) ? (BC_ShowName | BC_IgnChgd) : BC_ShowName;
-	int count = 0;
-
+	HashNode *pNode;
+	HashEach each;
+	uint cflags = oflags & BD_Confirm ? (BC_ShowName | BC_Confirm) :
+	 oflags & BD_Force ? (BC_ShowName | BC_IgnChgd) : BC_ShowName;
+	uint count = 0;
 	*pCount = 0;
 
-	// Loop through buffer list.
-	do {
-		pBuf = bufPtr(*ppBufItem);
+	// Loop through buffer table.
+	heachinit(&each, &buf.table);
+	while((pNode = heach(&each)) != NULL) {
+		pBuf = bufPtr(pNode->pVal);
 
 		// Skip buffer if:
-		//  1. a user command or function;
-		//  2. being displayed and BD_Displayed flag not specified;
-		//  3. not homed to current screen and BD_Homed flag specified;
-		//  4. hidden and BD_Hidden flag not specified;
-		//  5. modified and BD_Unchanged flag specified;
-		//  6. active and BD_Inactive flag specified.
-		if((pBuf->flags & BFCmdFunc) ||
-		 (pBuf->windCount > 0 && !(dflags & BD_Displayed)) ||
-		 (pBuf->saveDir != workDir && (dflags & BD_Homed)) ||
-		 ((pBuf->flags & BFHidden) && !(dflags & BD_Hidden)) ||
-		 ((pBuf->flags & BFChanged) && (dflags & BD_Unchanged)) ||
-		 ((pBuf->flags & BFActive) && (dflags & BD_Inactive)))
-			++ppBufItem;
-		else {
-			// Nuke it (if confirmed), but don't increment ppBufItem if successful because array element it
-			// points to will be removed.  Decrement ppBufItemEnd instead.
-			if(!(cflags & BC_Confirm) && (!(pBuf->flags & BFChanged) || (cflags & BC_IgnChgd))) {
+		//  1. A user command or function.
+		//  2. Being displayed and BD_Displayed flag not specified.
+		//  3. Not homed to current screen and BD_Homed flag specified.
+		//  4. Hidden and BD_Hidden flag not specified.
+		//  5. Modified and BD_Unchanged flag specified.
+		//  6. Active and BD_Inactive flag specified.
+		if(!(pBuf->flags & BFCmdFunc) &&
+		 (pBuf->windCount == 0 || oflags & BD_Displayed) &&
+		 (pBuf->homeDir == workDir || !(oflags & BD_Homed)) &&
+		 (!(pBuf->flags & BFHidden) || oflags & BD_Hidden) &&
+		 (!(pBuf->flags & BFChanged) || !(oflags & BD_Unchanged)) &&
+		 (!(pBuf->flags & BFActive) || !(oflags & BD_Inactive))) {
+
+			// Nuke buffer if confirmed.  Note that array pointer can be incremented whether or not deletion is
+			// successful because we are iterating through an array that is separate from the buffer hash table (and
+			// hence, won't be affected by a hash node deletion).
+			if(!(cflags & BC_Confirm) && (!(pBuf->flags & BFChanged) || cflags & BC_IgnChgd)) {
 				if(mlprintf(MLHome | MLWrap | MLFlush, text367, pBuf->bufname) != Success)
 						// "Deleting buffer %s..."
 					return sess.rtn.status;
@@ -1869,16 +2001,12 @@ int bnuke(ushort dflags, const char *workDir, int *pCount) {
 				}
 			if(bdelete(pBuf, cflags) < Cancelled)
 				break;
-			if(sess.rtn.status == Success) {
+			if(sess.rtn.status == Success)
 				++count;
-				--ppBufItemEnd;
-				}
-			else {
+			else
 				rsclear(0);
-				++ppBufItem;
-				}
 			}
-		} while(ppBufItem < ppBufItemEnd);
+		}
 
 	// Done.
 	*pCount = count;
@@ -1905,91 +2033,71 @@ int bnuke(ushort dflags, const char *workDir, int *pCount) {
 //  1. User command and function buffers are skipped unconditionally.
 //  2. If neither "Confirm" nor "Force" is specified, confirmation is requested for changed buffers only.
 //  3. If "Force" is specified, changed and/or narrowed buffers are deleted without confirmation.
-int delBuf(Datum *pRtnVal, int n, Datum **args) {
+int delBuf(Datum *pRtnVal, long n, Datum **args) {
 	Buffer *pBuf;
 	uint count;
-	bool delError = false;
-	ushort dflags;
-	char workBuf[64];
-	static Option options[] = {
-		{"^Visible", "^Viz", 0, .u.value = BD_Visible},
-		{"^Unchanged", "^Unchg", 0, .u.value = BD_Unchanged},
-		{"Ho^med", "Ho^m", 0, .u.value = BD_Homed},
-		{"^Inactive", "^Inact", 0, .u.value = BD_Inactive},
-		{"^Displayed", "^Disp", 0, .u.value = BD_Displayed},
-		{"^Hidden", "^Hid", 0, .u.value = BD_Hidden},
-		{"^Confirm", "^Cfrm", 0, .u.value = BD_Confirm},
-		{"^Force", "^Frc", 0, .u.value = BD_Force},
-		{NULL, NULL, 0, 0}};
-	static OptHdr optHdr = {
-		ArgFirst, text410, false, options};
-			// "command option"
+	uint oflags;
+	OptHdr *pOptHdr = cmdFuncTable[cf_delBuf].pOptHdr;
+	char workBuf[48];
 
 	dsetint(0, pRtnVal);
 
 	// Check if processing multiple unnamed buffers.
 	if(n > 0) {
-		Option *pOpt, *pOptEnd;
+		Option *pOpt, *pOptEnd4, *pOptEnd;
 
-		// Build prompt if interactive.
-		if(sess.opFlags & OpScript)
-			workBuf[0] = '\0';
-		else
-			sprintf(workBuf, "%s %ss", text26, text83);
-					// "Delete", "buffer"
+		if(!(pOptHdr->ctrlFlags & OHdrFound))
+			return sess.rtn.status;			// User cancelled.
 
 		// Get op codes, set flags, and validate them.
-		if(parseOpts(&optHdr, workBuf, NULL, &count) != Success || count == 0)
-			return sess.rtn.status;
-		count = dflags = 0;
-		pOptEnd = (pOpt = options) + 4;
+		count = oflags = 0;
+		pOptEnd4 = (pOpt = pOptHdr->optTable) + 4;
+		pOptEnd = pOptHdr->optTable + pOptHdr->optCount;
 		do {
 			if(pOpt->ctrlFlags & OptSelected) {
-				dflags |= pOpt->u.value;
-				if(pOpt < pOptEnd)
+				oflags |= pOpt->u.value;
+				if(pOpt < pOptEnd4)
 					++count;
 				}
-			} while((++pOpt)->keyword != NULL);
+			} while(++pOpt < pOptEnd);
 		if(count == 0)
 			return rsset(Failure, 0, text455, text410);
 				// "Missing required %s", "command option"
-		if(count > 1 || (dflags & (BD_Confirm | BD_Force)) == (BD_Confirm | BD_Force))
+		if(count > 1 || (oflags & (BD_Confirm | BD_Force)) == (BD_Confirm | BD_Force))
 			return rsset(Failure, 0, text454, text410);
 				// "Conflicting %ss", "command option"
 
 		// Get confirmation if interactive and force-deleting all other buffers.
-		if(interactive() && (dflags & (BD_Visible | BD_Force)) == (BD_Visible | BD_Force)) {
+		if(interactive() && (oflags & (BD_Visible | BD_Force)) == (BD_Visible | BD_Force)) {
 			bool yep;
 
-			sprintf(workBuf, text168, dflags & BD_Hidden ? "" : text452);
+			sprintf(workBuf, text168, oflags & BD_Hidden ? "" : text452);
 				// "Delete all other %sbuffers", "visible "
 
-			if(terminpYN(workBuf, &yep) != Success)
+			if(termInpYN(workBuf, &yep) != Success)
 				return sess.rtn.status;
 			if(!yep)
 				return mlerase(0);
 			}
 
 		// It's a go.  Nuke the selected buffers.
-		if(bnuke(dflags, sess.cur.pScrn->workDir, &count) == Success) {
+		if(bnuke(oflags, sess.pCurScrn->workDir, &count) == Success) {
 			dsetint(count, pRtnVal);
 			(void) rsset(Success, RSHigh, text368, count, count != 1 ? "s" : "");
-						// "%d buffer%s deleted"
+						// "%u buffer%s deleted"
 			}
 		return sess.rtn.status;
 		}
 
 	// Process named buffer(s).
 	count = 0;
-	if(n == INT_MIN)
+	if(n == DefN)
 		n = 0;		// No force.
 
 	// If interactive, get buffer name from user.
 	if(!(sess.opFlags & OpScript)) {
-		pBuf = bdefault();
-		if(getBufname(pRtnVal, text26, pBuf != NULL ? pBuf->bufname : NULL, ArgFirst | OpDelete, &pBuf, NULL)
-				// "Delete"
-		 != Success || pBuf == NULL)
+		if(getBufname(pRtnVal, text26, ArgFirst | OpDelete | OpDefBName | TermC_NoAuto, &pBuf, NULL) != Success ||
+		 pBuf == NULL)	// "Delete"
 			return sess.rtn.status;
 		goto NukeIt;
 		}
@@ -1997,7 +2105,7 @@ int delBuf(Datum *pRtnVal, int n, Datum **args) {
 	// Script mode: get buffer name(s) to delete.
 	Datum *pBufname;
 	uint argFlags = ArgFirst | ArgNotNull1;
-	if(dnewtrack(&pBufname) != 0)
+	if((pBufname = dnewtrack()) == NULL)
 		return libfail();
 	do {
 		if(!(argFlags & ArgFirst) && !haveSym(s_comma, false))
@@ -2006,8 +2114,8 @@ int delBuf(Datum *pRtnVal, int n, Datum **args) {
 			return sess.rtn.status;
 		argFlags = ArgNotNull1;
 		if((pBuf = bsrch(pBufname->str, NULL)) == NULL)
-			(void) rsset(Success, RSNoWrap, text118, pBufname->str);
-				// "No such buffer '%s'"
+			(void) rsset(Success, RSNoWrap, text52, text83, pBufname->str);
+						// "No such %s \"%s\"", "buffer"
 		else {
 NukeIt:
 			// Nuke it.
@@ -2016,44 +2124,44 @@ NukeIt:
 				// Don't cause a running script to fail on Failure status.
 				if(sess.rtn.status < Failure)
 					return sess.rtn.status;
-				delError = true;
-				(void) rsunfail();
+				rsunfail();
 				}
 			else
 				++count;
 			}
 		} while(sess.opFlags & OpScript);
 
-	// Return count if no error.
-	if(!delError) {
-		dsetint((long) count, pRtnVal);
-		if(interactive())
-			(void) rsset(Success, RSHigh, "%s %s", text58, text10);
-						// "Buffer", "deleted"
-		}
+	// If script mode...
+	if(sess.opFlags & OpScript) {
 
+		// Return count.
+		dsetint(count, pRtnVal);
+		}
+	else if(count == 1)
+		(void) rsset(Success, RSHigh, "%s %s", text58, text10);
+						// "Buffer", "deleted"
 	return sess.rtn.status;
 	}
 
 // Rename a buffer and set pRtnVal (if not NULL) to the new name.  If BR_Auto set in flags, derive the name from the filename
 // attached to the buffer and use it, without prompting; otherwise, get new buffer name (and use BR_Current flag to determine
 // correct prompt if interactive).  Return status.
-int brename(Datum *pRtnVal, ushort flags, Buffer *pTargBuf) {
+int brename(Datum *pRtnVal, uint flags, Buffer *pTargBuf) {
 	Buffer *pBuf;
-	Array *pArray;
-	ssize_t index;
+	HashNode *pNode;
+	HashEach each;
 	const char *prompt;
 	Datum *pDatum;
-	Datum *pBufname;			// New buffer name.
+	Datum *pNewName;			// New buffer name.
 	TermInpCtrl termInpCtrl = {NULL, RtnKey, MaxBufname, NULL};
 	char askStr[WorkBufSize];
 
 	// We cannot rename an executing buffer.
-	if(pTargBuf->pCallInfo != NULL && pTargBuf->pCallInfo->execCount > 0)
-		return rsset(Failure, 0, text284, text275, text248);
-			// "Cannot %s %s buffer", "rename", "an executing"
+	if(pTargBuf->pCallHdr != NULL && pTargBuf->pCallHdr->execCount > 0)
+		return rsset(Failure, 0, text284, text275, text238);
+			// "Cannot %s %s buffer", "rename", "executing"
 
-	if(dnewtrack(&pBufname) != 0)
+	if((pNewName = dnewtrack()) == NULL)
 		goto LibFail;
 
 	// Auto-rename if BR_Auto flag set.  Do nothing if buffer name is already the target name.
@@ -2061,33 +2169,33 @@ int brename(Datum *pRtnVal, ushort flags, Buffer *pTargBuf) {
 		if(pTargBuf->filename == NULL)
 			return rsset(Failure, 0, text145, pTargBuf->bufname);
 					// "No filename associated with buffer '%s'"
-		if(dsalloc(pBufname, MaxBufname + 1) != 0)
+		if(dsalloc(pNewName, MaxBufname + 1) != 0)
 			goto LibFail;
-		if(strcmp(fileBufname(pBufname->str, pTargBuf->filename), pTargBuf->bufname) == 0)
+		if(strcmp(fileBufname(pNewName->str, pTargBuf->filename), pTargBuf->bufname) == 0)
 			return sess.rtn.status;
-		bunique(pBufname->str, NULL);
+		bunique(pNewName->str, NULL);
 		goto SetNew;
 		}
 
 	// Set initial prompt.
-	prompt = (flags & BR_Current) ? text385 : text339;
+	prompt = flags & BR_Current ? text385 : text339;
 			// "Change buffer name to", "to";
 
 Ask:
 	// Get the new buffer name.
 	if(sess.opFlags & OpScript) {
-		if(funcArg(pBufname, ArgNotNull1) != Success)
+		if(funcArg(pNewName, ArgNotNull1) != Success)
 			return sess.rtn.status;
 		}
-	else if(termInp(pBufname, prompt, ArgNotNull1 | ArgNil1, 0, &termInpCtrl) != Success || disnil(pBufname))
+	else if(termInp(pNewName, prompt, ArgNotNull1 | ArgNil1, 0, &termInpCtrl) != Success || disnil(pNewName))
 		return sess.rtn.status;
 
 	// Valid buffer name?
-	if(!isBufname(pBufname->str)) {
+	if(!isBufname(pNewName->str)) {
 		if(sess.opFlags & OpScript)
-			return rsset(Failure, 0, text447, text128, pBufname->str);
+			return rsset(Failure, 0, text447, text128, pNewName->str);
 				// "Invalid %s '%s'", "buffer name"
-		sprintf(askStr, text447, text128, pBufname->str);
+		sprintf(askStr, text447, text128, pNewName->str);
 				// "Invalid %s '%s'", "buffer name"
 		strcat(askStr, text324);
 				// ".  New name"
@@ -2096,26 +2204,27 @@ Ask:
 		}
 
 	// Check for duplicate name.
-	pArray = &bufTable;
-	while((pDatum = aeach(&pArray)) != NULL) {
-		pBuf = bufPtr(pDatum);
+	heachinit(&each, &buf.table);
+	while((pNode = heach(&each)) != NULL) {
+		pBuf = bufPtr(pNode->pVal);
 		if(pBuf != pTargBuf) {
 
 			// Other buffer with this name?
-			if(strcmp(pBufname->str, pBuf->bufname) == 0) {
+			if(strcmp(pNewName->str, pBuf->bufname) == 0) {
 				if(sess.opFlags & OpScript)
-					return rsset(Failure, 0, text181, text58, pBufname->str);
-						// "%s name '%s' already in use", "Buffer"
-				prompt = text25;
-					// "That name is already in use.  New name"
+					return rsset(Failure, 0, text181, text58, pNewName->str, text109);
+							// "%s name '%s'%s", "Buffer", " already in use"
+				sprintf(askStr, text25, text109, text324);
+					// "That name is%s%s", " already in use", ".  New name"
+				prompt = askStr;
 				goto Ask;		// Try again.
 				}
 
 			// Command or function buffer name?
-			if((*pTargBuf->bufname == BCmdFuncLead) != (*pBufname->str == BCmdFuncLead)) {
+			if((*pTargBuf->bufname == BCmdFuncLead) != (*pNewName->str == BCmdFuncLead)) {
 				if(sess.opFlags & OpScript)
-					return rsset(Failure, 0, *pBufname->str == BCmdFuncLead ? text268 : text270, text275,
-					 pBufname->str, BCmdFuncLead);
+					return rsset(Failure, 0, *pNewName->str == BCmdFuncLead ? text268 : text270, text275,
+					 pNewName->str, BCmdFuncLead);
 						// "Cannot %s buffer: name '%s' cannot begin with %c", "rename"
 					// "Cannot %s command or function buffer: name '%s' must begin with %c", "rename"
 				sprintf(askStr, "%s'%c'%s", text273, BCmdFuncLead, text324);
@@ -2127,14 +2236,14 @@ Ask:
 		}
 
 	// Valid name?
-	if(*pBufname->str == BCmdFuncLead) {
-		char *str = pBufname->str + 1;
+	if(*pNewName->str == BCmdFuncLead) {
+		char *str = pNewName->str + 1;
 		Symbol sym = getIdent(&str, NULL);
 		if((sym != s_ident && sym != s_identQuery) || *str != '\0') {
 			if(sess.opFlags & OpScript)
-				return rsset(Failure, 0, text447, text286, pBufname->str + 1);
+				return rsset(Failure, 0, text447, text286, pNewName->str + 1);
 					// "Invalid %s '%s'", "identifier"
-			sprintf(askStr, text447, text286, pBufname->str + 1);
+			sprintf(askStr, text447, text286, pNewName->str + 1);
 					// "Invalid %s '%s'", "identifier"
 			strcat(askStr, text324);
 					// ".  New name"
@@ -2144,26 +2253,24 @@ Ask:
 		}
 SetNew:
 	// New name is unique and valid.  Rename the buffer.
-	if((pTargBuf->flags & BFCmdFunc) &&
+	if(pTargBuf->flags & BFCmdFunc &&
 	 execFind(pTargBuf->bufname + 1, OpDelete, 0, NULL) != Success)	// Remove old command or function name from execTable...
 		return sess.rtn.status;
-	pDatum = delistBuf(pTargBuf);				// remove from buffer list...
-	strcpy(pTargBuf->bufname, pBufname->str);		// copy new buffer name to structure...
-	(void) bsrch(pTargBuf->bufname, &index);		// get index of new name...
-	if(enlistBuf(pDatum, index) != Success)			// put it back in the right place...
+	pDatum = bdel(pTargBuf);				// remove from buffer table...
+	if(badd(pDatum, pNewName->str) != Success)		// put it back in the right place...
 		return sess.rtn.status;
 	if(pTargBuf->flags & BFCmdFunc) {			// add new command or function name to execTable...
-		UnivPtr univ = {
-			.type = (pTargBuf->flags & BFCommand) ? PtrUserCmd : PtrUserFunc,
+		ExecPtr exec = {
+			.type = pTargBuf->flags & BFCommand ? PtrUserCmd : PtrUserFunc,
 			.u.pBuf = pTargBuf};
-		if(execFind(pTargBuf->bufname + 1, OpCreate, univ.type, &univ) != Success)
+		if(execFind(pTargBuf->bufname + 1, OpCreate, exec.type, &exec) != Success)
 			return sess.rtn.status;
 		}
 	supd_windFlags(pTargBuf, WFMode);			// and update all affected mode lines.
 	if(!(sess.opFlags & OpScript))
 		(void) mlerase(0);
 	if(pRtnVal != NULL)
-		dxfer(pRtnVal, pBufname);
+		dxfer(pRtnVal, pNewName);
 
 	return sess.rtn.status;
 LibFail:
@@ -2171,18 +2278,17 @@ LibFail:
 	}
 
 // Rename current buffer (if interactive and default n) or a named buffer.  Return status.
-int renameBuf(Datum *pRtnVal, int n, Datum **args) {
+int renameBuf(Datum *pRtnVal, long n, Datum **args) {
 	Buffer *pBuf;
 	ushort flags = 0;
 
 	// Get buffer.
-	if(n == INT_MIN && !(sess.opFlags & OpScript)) {
+	if(n == DefN && !(sess.opFlags & OpScript)) {
 		pBuf = sess.cur.pBuf;
 		flags = BR_Current;
 		}
-	else if(getBufname(pRtnVal, text29, (pBuf = bdefault()) != NULL ? pBuf->bufname : NULL, ArgFirst | OpDelete, &pBuf,
+	else if(getBufname(pRtnVal, text29, ArgFirst | OpDelete | OpDefBName, &pBuf, NULL) != Success || pBuf == NULL)
 				// "Rename"
-	 NULL) != Success || pBuf == NULL)
 		return sess.rtn.status;
 
 	return brename(pRtnVal, flags, pBuf);
@@ -2238,16 +2344,4 @@ int bappend(Buffer *pBuf, const char *text) {
 		}
 
 	return sess.rtn.status;
-	}
-
-// Read the nth next line from a buffer and store in pRtnVal.  Return status.
-int bgets(Datum *pRtnVal, int n, Datum **args) {
-
-	if(n == INT_MIN)
-		n = 1;
-	else if(n < 0)
-		return rsset(Failure, 0, text39, text137, n, 0);
-				// "%s (%d) must be %d or greater", "Repeat count"
-
-	return bufOp(pRtnVal, n, NULL, BO_ReadBuf, 0);
 	}

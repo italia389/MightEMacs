@@ -1,4 +1,4 @@
-// (c) Copyright 2022 Richard W. Marinelli
+// (c) Copyright 2026 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -12,7 +12,6 @@
 #include <sys/stat.h>
 #include "cxl/lib.h"
 #include "bind.h"
-#include "cmd.h"
 #include "exec.h"
 #include "file.h"
 #include "search.h"
@@ -26,10 +25,10 @@
 #define	FMTplus		0x0002		// Force plus (+) sign.
 #define	FMTspc		0x0004		// Use ' ' for plus sign.
 #define FMThash		0x0008		// Alternate conversion.
-#define	FMTlong		0x0010		// 'l' flag.
-#define FMT0pad		0x0020		// '0' flag.
-#define FMTprec		0x0040		// Precision was specified.
-#define FMTxuc		0x0080		// Use upper case hex letters.
+#define FMT0pad		0x0010		// '0' flag.
+#define FMTprec		0x0020		// Precision was specified.
+#define FMTxuc		0x0040		// Use upper case hex letters.
+#define FMTthouSep	0x0080		// Use (comma) thousands' separator in numbers.
 
 // Control record used to process array arguments.
 typedef struct {
@@ -71,6 +70,7 @@ struct CCMap {
 		{"xdigit", &isxdigit_func},
 		{NULL, NULL}};
 
+// Character class helper function.
 bool (*getCC(const char *name))(short) {
 	struct CCMap *item = ccMap;
 	do {
@@ -85,10 +85,10 @@ bool toBool(Datum *pDatum) {
 
 	// Check for numeric truth (!= 0).
 	if(pDatum->type == dat_int)
-		return pDatum->u.intNum != 0;
+		return dgetint(pDatum) != 0;
 
 	// Check for logical false values (false and nil).  All other datum types and values (including null strings) are true.
-	return pDatum->type != dat_false && pDatum->type != dat_nil;
+	return distrue(pDatum);
 	}
 
 // Check if given Datum object is nil or null and return Boolean result.
@@ -97,94 +97,40 @@ bool isNN(Datum *pDatum) {
 	return disnil(pDatum) || disnull(pDatum);
 	}
 
-// Create an array in pRtnVal, given optional size and initializer.  Return status.
-int array(Datum *pRtnVal, int n, Datum **args) {
-	Array *pArray;
-	ArraySize len = 0;
-	Datum *pInitializer = NULL;
-
-	// Get array size and initializer, if present.
-	if(*args != NULL) {
-		len = (*args++)->u.intNum;
-		if(*args != NULL)
-			pInitializer = *args;
-		}
-	if((pArray = anew(len, pInitializer)) == NULL)
-		return libfail();
-	agStash(pRtnVal, pArray);
-	return sess.rtn.status;
-	}
-
-// Split a string into an array and save in pRtnVal, given delimiter and optional limit value.  If n argument, strip all array
-// elements by passing n to stripStr().  Return status.
-int strSplit(Datum *pRtnVal, int n, Datum **args) {
-	Array *pArray;
-	short delimChar;
-	const char *str;
-	int limit = 0;
-
-	// Get delimiter, string, and optional limit.
-	if(disnil(*args))
-		delimChar = '\0';
-	else if(!isCharVal(*args))
-		return sess.rtn.status;
-	else
-		delimChar = (*args)->u.intNum;
-	str = (*++args)->str;
-	if(*++args != NULL)
-		limit = (*args)->u.intNum;
-
-	if((pArray = asplit(delimChar, str, limit)) == NULL)
-		return libfail();
-	agStash(pRtnVal, pArray);
-
-	// Strip the elements if requested.
-	if(n != INT_MIN) {
-		Array *pArray1 = pArray;
-		Datum *pDatum;
-
-		while((pDatum = aeach(&pArray1)) != NULL)
-			if(dsetstr(stripStr(pDatum->str, n), pDatum) != 0)
-				return libfail();
-		}
-
-	return sess.rtn.status;
-	}
-
 // Force NULL pointer to null string.
 char *fixNull(char *s) {
 
 	return (s == NULL) ? "" : s;
 	}
 
-// Do range check for hard or soft tab size.
-int checkTabSize(int size, bool hard) {
+// Do range check on hard or soft tab size.
+int checkTabSize(long size, bool hard) {
 
 	return ((size != 0 || hard) && (size < 2 || size > MaxTabSize)) ?
 	 rsset(Failure, 0, text256, hard ? text49 : text50, size, MaxTabSize) :
-		// "%s tab size %d must be between 2 and %d", "Hard", "Soft"
+		// "%s tab size %ld must be in range 2 - %d", "Hard", "Soft"
 	 sess.rtn.status;
 	}
 
 // Set hard or soft tab size and do range check.
-int setTabSize(int size, bool hard) {
+int setTabSize(long size, bool hard) {
 
 	// Check if new tab size is valid.
 	if(checkTabSize(size, hard) == Success) {
 
 		// Set new size.
 		if(hard)
-			sess.cur.pScrn->hardTabSize = size;
+			sess.pCurScrn->hardTabSize = size;
 		else
-			sess.cur.pScrn->softTabSize = size;
+			sess.pCurScrn->softTabSize = size;
 		(void) rsset(Success, 0, text332, hard ? text49 : text50, size);
-				// "%s tab size set to %d", "Hard", "Soft"
+				// "%s tab size set to %ld", "Hard", "Soft"
 		}
 
 	return sess.rtn.status;
 	}
 
-// Strip white space off the beginning (op == -1), the end (op == 1), or both ends (op == 0) of a string.
+// Strip white space off the beginning (op <= 0), the end (op >= 0), or both ends (op == 0) of a string.
 char *stripStr(char *src, int op) {
 
 	// Trim beginning, if applicable...
@@ -220,7 +166,7 @@ static int replCopy(Match *pMatch, DFab *result) {
 
 // Substitute first occurrence (or all if n > 1) of "subPat" in "pSrc" with replacement pattern in "pMatch" and store results in
 // "pRtnVal".  Ignore case in comparisons if flag set in "flags".  Return status.
-static int strsub(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match *pMatch, ushort flags) {
+static int strsub(Datum *pRtnVal, long n, Datum *pSrc, const char *subPat, Match *pMatch, ushort flags) {
 	DFab result;
 	char *(*strsrch)(const char *s1, const char *s2);
 	char *str = pSrc->str;
@@ -244,15 +190,10 @@ static int strsub(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match 
 			goto LibFail;
 		str = s + subPatLen;
 
-		// If RRegical flag set, then no metacharacters were found in the search pattern (because this routine was
-		// called), but at least one backslash was found in the replacement pattern.  In this case, we need to set up
-		// the match in a MatchLoc object and save it so that replCopy() will do the replacement properly (from
-		// group 0).
-		if(pMatch->flags & RRegical) {
-			matchLoc.strLoc.strPoint = s;
-			if(saveMatch(pMatch, &matchLoc, NULL) != Success)
-				return sess.rtn.status;
-			}
+		// Save match for replCopy() and matchGroup() functions.
+		matchLoc.strLoc.strPoint = s;
+		if(saveMatch(pMatch, &matchLoc, NULL) != Success)
+			return sess.rtn.status;
 
 		// Copy replacement pattern.
 		if(replCopy(pMatch, &result) != 0)
@@ -273,9 +214,9 @@ LibFail:
 	}
 
 // Perform RE substitution(s) in string 'pSrc' using search and replacement patterns in given Match object, and save result in
-// 'pRtnVal'.  Do all occurrences of the search pattern if n > 1, otherwise first only.  Return status.  'subPat' argument
-// (needed for plain text substitutions) is not used.
-static int regsub(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match *pMatch, ushort flags) {
+// 'pRtnVal'.  Do all occurrences of the search pattern if n > 1, otherwise first only.  Return status.  'subPat' and 'flags'
+// arguments (needed for plain text substitutions) are not used.
+static int regsub(Datum *pRtnVal, long n, Datum *pSrc, const char *subPat, Match *pMatch, ushort flags) {
 	DFab result;
 	regmatch_t group0;
 	int scanOffset;
@@ -290,6 +231,7 @@ static int regsub(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match 
 		if(regcmp(pSrc, scanOffset, pMatch, &group0) != Success)
 			break;
 		if(group0.rm_so >= 0) {
+
 			// Match found.  Error if we matched an empty string and scan position did not advance; otherwise, we'll
 			// go into an infinite loop.
 			if(++loopCount > 2 && group0.rm_eo == group0.rm_so && strlen(pSrc->str + scanOffset) == lastScanLen) {
@@ -340,7 +282,7 @@ LibFail:
 	}
 
 // Do "sub" function and return status.  Any of its three arguments may be null and the third may also be nil.
-int substitute(Datum *pRtnVal, int n, Datum **args) {
+int substitute(Datum *pRtnVal, long n, Datum **args) {
 
 	// Return null string if empty source string, and return source string if empty "from" string.
 	if(disnull(args[0]))
@@ -349,47 +291,44 @@ int substitute(Datum *pRtnVal, int n, Datum **args) {
 		dxfer(pRtnVal, args[0]);
 	else {
 		ushort flags = 0;
-		int (*sub)(Datum *pRtnVal, int n, Datum *pSrc, const char *subPat, Match *pMatch, ushort flags);
-		Match match;
+		int (*sub)(Datum *pRtnVal, long n, Datum *pSrc, const char *subPat, Match *pMatch, ushort flags);
 
 		// Check if real RE pattern given.
-		minit(&match);
 		(void) checkOpts(args[1]->str, &flags);
 		if(flags & SOpt_Regexp) {
-			if(newSearchPat(args[1]->str, &match, &flags, false) != Success)
+			if(newSearchPat(args[1]->str, &strMatch, &flags, false) != Success ||
+			 compileRE(&strMatch, SCpl_ForwardRE) != Success)
 				goto Retn;
-			if(compileRE(&match, SCpl_ForwardRE) != Success)
-				goto SFree;
-			if(match.flags & SRegical) {
+			grpFree(&strMatch);
+			if(strMatch.flags & SRegical) {
 				sub = regsub;
 				goto PrepRepl;
 				}
+
+			// No RE metacharacters in pattern.  Clear RE flags.
+#if FuzzySearch
+			strMatch.flags &= ~(SOpt_Regexp | SOpt_Multi | SOpt_Fuzzy);
+#else
+			strMatch.flags &= ~(SOpt_Regexp | SOpt_Multi);
+#endif
 			}
 
 		// Have plain text pattern or non-SRegical RE pattern.
 		sub = strsub;
 PrepRepl:
 		// Save and compile replacement pattern.
-		if(newReplPat(disnil(args[2]) ? "" : args[2]->str, &match, false) != Success)
+		if(newReplPat(disnil(args[2]) ? "" : args[2]->str, &strMatch, false) != Success ||
+		 compileRepl(&strMatch) != Success)
 			goto Retn;
-		if(compileRepl(&match) != Success)
-			goto RFree;
 
 		// Call strsub() or regsub() function.
-		(void) sub(pRtnVal, n <= 1 ? 1 : n, args[0], args[1]->str, &match, flags);
-
-		// Finis.  Free pattern space and return.
-RFree:
-		freeReplPat(&match);
-SFree:
-		freeSearchPat(&match);
-		grpFree(&match);
+		(void) sub(pRtnVal, n <= 1 ? 1 : n, args[0], args[1]->str, &strMatch, flags);
 		}
 Retn:
 	return sess.rtn.status;
 	}
 
-// Expand character ranges and escaped characters (if any) in a string.  Return status.
+// Expand character ranges and escaped literal characters (if any) in a string.  Return status.
 int strExpand(DFab *pFab, const char *src) {
 	short c1, c2;
 	const char *str;
@@ -448,14 +387,14 @@ static int trPrep(Datum *pFrom, Datum *pTo) {
 
 		if((lenFrom = strlen(pFrom->str)) > (lenTo = strlen(pTo->str))) {
 			short c = pTo->str[lenTo - 1];
-			int n = lenFrom - lenTo;
+			int i = lenFrom - lenTo;
 
 			if(dopenwith(&fab, pTo, FabAppend) != 0)
 				goto LibFail;
 			do {
 				if(dputc(c, &fab, 0) != 0)
 					goto LibFail;
-				} while(--n > 0);
+				} while(--i > 0);
 			if(dclose(&fab, FabStr) != 0)
 				goto LibFail;
 			}
@@ -512,12 +451,12 @@ LibFail:
 	}
 
 // Concatenate all arguments on a script line into pRtnVal in string form and return status.  minRequired is the number of
-// required arguments.  ArgFirst flag is set on first argument.  Nil arguments are skipped if DCvtSkipNil flag is set;
-// otherwise, they are kept.  Boolean arguments are always output as "false" and "true" and arrays are processed (recursively)
-// as if each element was specified as an argument.
-int catArgs(Datum *pRtnVal, int minRequired, Datum *pDelim, ushort cflags) {
+// required arguments.  ArgFirst flag is set on first argument.  Nil arguments are skipped if CvtSkipNil flag is set; otherwise,
+// they are kept.  Boolean arguments are always output as "false" and "true" and arrays and hashes are processed (recursively)
+// as if each element or node value was specified as an argument.
+int catArgs(Datum *pRtnVal, int minRequired, Datum *pDelim, uint cflags) {
 	int rtnCode;
-	uint argFlags = ArgFirst | ArgBool1 | ArgArray1 | ArgNIS1;
+	uint argFlags = ArgFirst | ArgBool1 | ArgArray1 | ArgHash1 | ArgNIS1;
 	DFab fab;
 	Datum *pDatum;		// For arguments.
 	bool firstWrite = true;
@@ -528,7 +467,7 @@ int catArgs(Datum *pRtnVal, int minRequired, Datum *pDelim, ushort cflags) {
 	 minRequired == 0)
 		return sess.rtn.status;
 
-	if(dnewtrack(&pDatum) != 0 || dopenwith(&fab, pRtnVal, FabClear) != 0)
+	if((pDatum = dnewtrack()) == NULL || dopenwith(&fab, pRtnVal, FabClear) != 0)
 		goto LibFail;
 
 	for(;;) {
@@ -543,7 +482,7 @@ int catArgs(Datum *pRtnVal, int minRequired, Datum *pDelim, ushort cflags) {
 		--minRequired;
 
 		// Skip nil argument if appropriate.
-		if(disnil(pDatum) && (cflags & ACvtSkipNil))
+		if(disnil(pDatum) && cflags & CvtSkipNil)
 			goto Onward;
 
 		// Write optional delimiter and value.
@@ -555,7 +494,7 @@ int catArgs(Datum *pRtnVal, int minRequired, Datum *pDelim, ushort cflags) {
 			return sess.rtn.status;
 		firstWrite = false;
 Onward:
-		argFlags = ArgBool1 | ArgArray1 | ArgNIS1;
+		argFlags = ArgBool1 | ArgArray1 | ArgHash1 | ArgNIS1;
 		}
 
 	// Return result.
@@ -582,14 +521,15 @@ static int strFunc(Datum *pRtnVal, CmdFuncId cmdFuncId) {
 	if(!haveSym(s_any, true))
 		return sess.rtn.status;
 	if(sess.opFlags & OpEval) {
-		if(dnewtrack(&pOldVarVal) != 0)
+		if((pOldVarVal = dnewtrack()) == NULL)
 			goto LibFail;
-		if(findVar(str1 = pLastParse->tok.str, &varDesc, OpDelete) != Success)
+		if(vfind(str1 = pLastParse->tok.str, &varDesc, OpDelete) != Success)
 			return sess.rtn.status;
-		if((varDesc.type == VTyp_SysVar && (varDesc.p.pSysVar->flags & V_RdOnly)) ||
-		 (varDesc.type == VTyp_NumVar && varDesc.i.argNum == 0))
-			return rsset(Failure, RSTermAttr, text164, str1);
-				// "Cannot modify read-only variable '~b%s~B'"
+		if(immutable(&varDesc))
+			return sess.rtn.status;
+		if(varDesc.type == VTyp_NumVar && varDesc.i.index == 0)
+			return rsset(Failure, RSTermAttr, text100, str1);
+				// "Cannot coerce integer variable '~b%s~B' to string"
 		if(vderefv(pOldVarVal, &varDesc) != Success)
 			return sess.rtn.status;
 
@@ -601,7 +541,7 @@ static int strFunc(Datum *pRtnVal, CmdFuncId cmdFuncId) {
 		}
 
 	// Get delimiter into pDelim and also delimChar if single byte (strShift and strPop).
-	if(dnewtrack(&pDelim) != 0)
+	if((pDelim = dnewtrack()) == NULL)
 		goto LibFail;
 	if(getSym() < NotFound || funcArg(pDelim, (cmdFuncId == cf_strShift || cmdFuncId == cf_strPop) ?
 	 (ArgInt1 | ArgNil1 | ArgMay) : ArgNil1) != Success)
@@ -612,7 +552,7 @@ static int strFunc(Datum *pRtnVal, CmdFuncId cmdFuncId) {
 				delimChar = '\0';
 			else if(!isCharVal(pDelim))
 				return sess.rtn.status;
-			else if((delimChar = pDelim->u.intNum) == ' ')
+			else if((delimChar = dgetint(pDelim)) == ' ')
 				spaceDelim = true;
 			}
 		else if(disnil(pDelim))
@@ -621,7 +561,7 @@ static int strFunc(Datum *pRtnVal, CmdFuncId cmdFuncId) {
 
 	// Get value argument into pArg for strPush and strUnshift functions.
 	if(cmdFuncId == cf_strPush || cmdFuncId == cf_strUnshift) {
-		if(dnewtrack(&pArg) != 0)
+		if((pArg = dnewtrack()) == NULL)
 			goto LibFail;
 		if(funcArg(pArg, ArgNIS1) != Success)
 			return sess.rtn.status;
@@ -710,26 +650,20 @@ Paste:
 			}
 
 	// Update variable and return status.
-	(void) setVar(pNewVar, &varDesc);
+	(void) setVar(&varDesc, pNewVar);
 Retn:
 	return sess.rtn.status;
 LibFail:
 	return libfail();
 	}
 
-#if (MMDebug & Debug_Token) && 0
-static void showSym(const char *name) {
-
-	fprintf(logfile, "%s(): last is str \"%s\" (%d)\n", name, pLastParse->tok.str, pLastParse->sym);
-	}
-#endif
-
 // Insert, overwrite, or replace the text in src to a buffer n times and return status.  This routine's job is to set the given
-// buffer as the current edit buffer, set current edit face and window accordingly, call iorStr() with src, n, and style to
-// insert the text (via the core editing routines), then restore the current edit buffer, face, and window to their previous
-// settings.  If pBuf is NULL, the current buffer is used.
-int iorText(const char *src, int n, ushort style, Buffer *pBuf) {
-	BufCtrl oldEdit = {NULL};
+// buffer as the current edit buffer, set current edit face accordingly, call iorStr() with src, n, and insertType to insert the
+// text (via the core editing routines), then restore the current edit buffer and face to their previous settings.  If pBuf is
+// NULL, the current buffer is used.
+int iorText(const char *src, long n, uint insertType, Buffer *pBuf) {
+	EScreen *pScrn = sess.pCurScrn;
+	DispCtrl oldEdit = {NULL};
 
 	// If the target buffer is not the current buffer and is being displayed in another window, remember current window and
 	// use face from other one; otherwise, use buffer's face.
@@ -740,24 +674,21 @@ int iorText(const char *src, int n, ushort style, Buffer *pBuf) {
 
 			// Target buffer is not being displayed in any window... use buffer's face for editing.
 			sess.edit.pFace = &pBuf->face;
-			sess.edit.pScrn = (EScreen *) (sess.edit.pWind = NULL);
+			pScrn = NULL;
 			}
 		else {
 			// Target buffer is being displayed.  Get window and screen.
-			EScreen *pScrn;
 			EWindow *pWind = findWind(pBuf, &pScrn);
 
 			// Use window's face for editing.
-			sess.edit.pFace = &(sess.edit.pWind = pWind)->face;
-			if(pScrn == sess.cur.pScrn)
+			sess.edit.pFace = &pWind->face;
+			if(pScrn == sess.pCurScrn)
 				supd_windFlags(pBuf, WFMode);
-			else
-				sess.edit.pScrn = pScrn;
 			}
 		}
 
 	// Edit pointers set.  Now insert, overwrite, or replace the text in src n times.
-	if(iorStr(src, n, style, NULL) == Success) {
+	if(iorStr(src, n, insertType, pScrn, NULL) == Success) {
 
 		// Restore old edit pointers, if needed.
 		if(oldEdit.pBuf != NULL)
@@ -768,18 +699,18 @@ int iorText(const char *src, int n, ushort style, Buffer *pBuf) {
 	}
 
 // Concatenate script arguments into pRtnVal and insert, overwrite, or replace the resulting text to a buffer n times, given
-// text insertion style and buffer pointer.  If pBuf is NULL, use current buffer.  If n == 0, do one repetition and don't move
+// text insertion type and buffer pointer.  If pBuf is NULL, use current buffer.  If n == 0, do one repetition and don't move
 // point.  If n < 0, do one repetition and process all newline characters literally (don't create a new line).  Return status.
-static int chgText(Datum *pRtnVal, int n, ushort style, Buffer *pBuf) {
+static int chgText(Datum *pRtnVal, long n, ushort insertType, Buffer *pBuf) {
 	int rtnCode;
 	Datum *pArg;
 	DFab text;
 
-	if(dnewtrack(&pArg) != 0)
+	if((pArg = dnewtrack()) == NULL)
 		goto LibFail;
 
 	// Get first argument.  Skip fab creation if its the only one and is a string.
-	if(funcArg(pArg, ArgFirst | ArgBool1 | ArgArray1 | ArgNIS1) != Success)
+	if(funcArg(pArg, ArgFirst | ArgBool1 | ArgArray1 | ArgHash1 | ArgNIS1) != Success)
 		return sess.rtn.status;
 	if(!haveSym(s_comma, false) && dtypstr(pArg))
 		dxfer(pRtnVal, pArg);
@@ -793,7 +724,7 @@ static int chgText(Datum *pRtnVal, int n, ushort style, Buffer *pBuf) {
 		for(;;) {
 			if(!haveSym(s_comma, false))
 				break;						// No arguments left.
-			if(funcArg(pArg, ArgBool1 | ArgArray1 | ArgNIS1) != Success)
+			if(funcArg(pArg, ArgBool1 | ArgArray1 | ArgHash1 | ArgNIS1) != Success)
 				return sess.rtn.status;
 First:
 			if(disempty(pArg))
@@ -808,13 +739,13 @@ First:
 		}
 
 	// We have all the text in pRtnVal.  Now insert, overwrite, or replace it n times.
-	return iorText(pRtnVal->str, n, style, pBuf);
+	return iorText(pRtnVal->str, n, insertType, pBuf);
 LibFail:
 	return libfail();
 	}
 
 // Process stat? function.  Return status.
-static int fileTest(Datum *pRtnVal, int n, Datum *pFilename, Datum *pTestCodes) {
+static int fileTest(Datum *pRtnVal, long n, Datum *pFilename, Datum *pTestCodes) {
 
 	if(disnull(pTestCodes))
 		(void) rsset(Failure, 0, text187, text335);
@@ -837,7 +768,7 @@ static int fileTest(Datum *pRtnVal, int n, Datum *pFilename, Datum *pTestCodes) 
 		else {
 			int flag;
 			bool match;
-			result = (n != INT_MIN);
+			result = (n != DefN);
 
 			// Loop through test codes.
 			for(str = pTestCodes->str; *str != '\0'; ++str) {
@@ -869,12 +800,12 @@ TypChk:
 						match = (s.st_mode & S_IFMT) == S_IFREG && s.st_nlink > 1;
 					}
 				if(match) {
-					if(n == INT_MIN) {
+					if(n == DefN) {
 						result = true;
 						break;
 						}
 					}
-				else if(n != INT_MIN) {
+				else if(n != DefN) {
 					result = false;
 					break;
 					}
@@ -888,7 +819,7 @@ TypChk:
 
 // Return next argument to strFormat(), "flattening" arrays in the process.  "argFlags" will always be either ArgInt1 or
 // ArgNil1.  Return status.
-static int formatArg(Datum *pRtnVal, uint argFlags, ArrayState *pArrayState) {
+static int nextFmtArg(Datum *pRtnVal, uint argFlags, ArrayState *pArrayState) {
 
 	for(;;) {
 		if(pArrayState->pArray == NULL) {
@@ -896,7 +827,7 @@ static int formatArg(Datum *pRtnVal, uint argFlags, ArrayState *pArrayState) {
 				return sess.rtn.status;
 			if(!dtyparray(pRtnVal))
 				break;
-			pArrayState->pArray = pRtnVal->u.pArray;
+			pArrayState->pArray = dgetarrayptr(pRtnVal);
 			pArrayState->i = 0;
 			}
 		else {
@@ -922,27 +853,27 @@ static int formatArg(Datum *pRtnVal, uint argFlags, ArrayState *pArrayState) {
 // Build string from "printf" format string and argument(s).  If pArg is not NULL, process binary operator (%)
 // expression using pArg as the argument; otherwise, process bprintf, insertf, printf, or sprintf function.  Return status.
 int strFormat(Datum *pRtnVal, Datum *pFormat, Datum *pArg) {
-	short c;
-	int specCount;
+	char *prefix, *fmt, *str, *src;
+	Datum *pFmtArg;
 	ulong ul;
-	char *prefix, *fmt;
+	int specCount;
 	int prefLen;		// Length of prefix string.
 	int width;		// Field width.
 	int padding;		// # of chars to pad (on left or right).
 	int precision;
-	char *str;
-	int sLen;		// Length of formatted string s.
+	int sLen;		// Length of formatted string.
 	int flags;		// FMTxxx.
 	int base;		// Number base (decimal, octal, etc.).
-	Datum *pFmtArg;
+	int digitCount;		// Digit counter for inserting comma thousands' separator.
+	short c;
 	DFab result;
 	ArrayState aryState = {NULL, 0};
 	char workBuf[FMTBufSz];
 
 	fmt = pFormat->str;
 
-	// Create fabrication object for result and work Datum object for formatArg() calls.
-	if(dopenwith(&result, pRtnVal, FabClear) != 0 || (pArg == NULL && dnewtrack(&pFmtArg) != 0))
+	// Create fabrication object for result and work Datum object for nextFmtArg() calls.
+	if(dopenwith(&result, pRtnVal, FabClear) != 0 || (pArg == NULL && (pFmtArg = dnewtrack()) == NULL))
 		goto LibFail;
 
 	// Loop through format string.
@@ -955,40 +886,42 @@ int strFormat(Datum *pRtnVal, Datum *pFormat, Datum *pArg) {
 			}
 
 		// Check for prefix(es).
-		prefix = NULL;					// Assume no prefix.
-		flags = 0;					// Reset.
+		prefix = NULL;						// Assume no prefix.
+		flags = 0;						// Reset.
 		while((c = *fmt++) != '\0') {
 			switch(c) {
 				case '0':
-					flags |= FMT0pad; 	// Pad with 0's.
+					flags |= FMT0pad; 		// Pad with 0's.
 					break;
 				case '-':
-					flags |= FMTleft; 	// Left-justify.
+					flags |= FMTleft; 		// Left-justify.
+					break;
+				case '\'':
+					flags |= FMTthouSep; 		// Insert thousands' separator.
 					break;
 				case '+':
-					flags |= FMTplus; 	// Do + or - sign.
+					flags |= FMTplus; 		// Do + or - sign.
 					break;
 				case ' ':
-					flags |= FMTspc;	// Space flag.
+					flags |= FMTspc;		// Space flag.
 					break;
 				case '#':
-					flags |= FMThash; 	// Alternate form.
+					flags |= FMThash; 		// Alternate form.
 					break;
 				default:
 					goto GetWidth;
 				}
 			}
-
-		// Get width.
 GetWidth:
+		// Get width.
 		width = 0;
 		if(c == '*') {
-			if(pArg != NULL)			// Error if format op (%).
+			if(pArg != NULL)				// Error if format op (%).
 				goto TooMany;
-			if(formatArg(pFmtArg, ArgInt1, &aryState) != Success)	// Get next (int) argument for width.
+			if(nextFmtArg(pFmtArg, ArgInt1, &aryState) != Success)	// Get next (int) argument for width.
 				return sess.rtn.status;
-			if((width = pFmtArg->u.intNum) < 0) {		// Negative field width?
-				flags |= FMTleft;		// Yes, left justify field.
+			if((width = dgetint(pFmtArg)) < 0) {		// Negative field width?
+				flags |= FMTleft;			// Yes, left justify field.
 				width = -width;
 				}
 			c = *fmt++;
@@ -1005,11 +938,11 @@ GetWidth:
 		if(c == '.') {
 			c = *fmt++;
 			if(c == '*') {
-				if(pArg != NULL)		// Error if format op (%).
+				if(pArg != NULL)			// Error if format op (%).
 					goto TooMany;
-				if(formatArg(pFmtArg, ArgInt1, &aryState) != Success)
+				if(nextFmtArg(pFmtArg, ArgInt1, &aryState) != Success)
 					return sess.rtn.status;
-				if((precision = pFmtArg->u.intNum) < 0)
+				if((precision = dgetint(pFmtArg)) < 0)
 					precision = 0;
 				else
 					flags |= FMTprec;
@@ -1023,28 +956,26 @@ GetWidth:
 				}
 			}
 
-		// Get pArrayEl flag.
-		if(c == 'l') {
-			flags |= FMTlong;
+		// Get el flag (and ignore it).
+		if(c == 'l')
 			c = *fmt++;
-			}
 
 		// Get spec.
 		switch(c) {
 		case 's':
-			if(pArg != NULL) {			// Check pArg type.
+			if(pArg != NULL) {				// Check pArg type.
 				if(!disnil(pArg) && !isStrVal(pArg))
 					return sess.rtn.status;
-				if(++specCount > 1)		// Check spec count.
+				if(++specCount > 1)			// Check spec count.
 					goto TooMany;
 				pFmtArg = pArg;
 				}
-			else if(formatArg(pFmtArg, ArgNil1, &aryState) != Success)
+			else if(nextFmtArg(pFmtArg, ArgNil1, &aryState) != Success)
 				return sess.rtn.status;
 			if(disnil(pFmtArg))
 				dsetnull(pFmtArg);
-			sLen = strlen(str = pFmtArg->str);	// Length of string.
-			if(flags & FMTprec) {			// If there is a precision...
+			sLen = strlen(str = pFmtArg->str);		// Length of string.
+			if(flags & FMTprec) {				// If there is a precision...
 				if(precision < sLen)
 					if((sLen = precision) < 0)
 						sLen = 0;
@@ -1055,15 +986,15 @@ GetWidth:
 			goto SaveCh;
 		case 'c':
 			if(pArg != NULL) {
-				if(!isIntVal(pArg))		// Check pArg type.
+				if(!isIntVal(pArg))			// Check pArg type.
 					return sess.rtn.status;
-				if(++specCount > 1)		// Check spec count.
+				if(++specCount > 1)			// Check spec count.
 					goto TooMany;
 				pFmtArg = pArg;
 				}
-			else if(formatArg(pFmtArg, ArgInt1, &aryState) != Success)
+			else if(nextFmtArg(pFmtArg, ArgInt1, &aryState) != Success)
 				return sess.rtn.status;
-			workBuf[0] = pFmtArg->u.intNum;
+			workBuf[0] = dgetint(pFmtArg);
 SaveCh:
 			str = workBuf;
 			sLen = 1;
@@ -1071,17 +1002,17 @@ SaveCh:
 		case 'd':
 		case 'i':
 			if(pArg != NULL) {
-				if(!isIntVal(pArg))		// Check pArg type.
+				if(!isIntVal(pArg))			// Check pArg type.
 					return sess.rtn.status;
-				if(++specCount > 1)		// Check spec count.
+				if(++specCount > 1)			// Check spec count.
 					goto TooMany;
 				pFmtArg = pArg;
 				}
-			else if(formatArg(pFmtArg, ArgInt1, &aryState) != Success)
+			else if(nextFmtArg(pFmtArg, ArgInt1, &aryState) != Success)
 				return sess.rtn.status;
 			base = 10;
-			ul = labs(pFmtArg->u.intNum);
-			prefix = pFmtArg->u.intNum < 0 ? "-" : (flags & FMTplus) ? "+" : (flags & FMTspc) ? " " : "";
+			ul = labs(dgetint(pFmtArg));
+			prefix = dgetint(pFmtArg) < 0 ? "-" : flags & FMTplus ? "+" : flags & FMTspc ? " " : "";
 			goto ULFmt;
 		case 'b':
 			base = 2;
@@ -1093,33 +1024,33 @@ SaveCh:
 			base = 10;
 GetUns:
 			if(pArg != NULL) {
-				if(!isIntVal(pArg))		// Check pArg type.
+				if(!isIntVal(pArg))			// Check pArg type.
 					return sess.rtn.status;
-				if(++specCount > 1)		// Check spec count.
+				if(++specCount > 1)			// Check spec count.
 					goto TooMany;
 				pFmtArg = pArg;
 				}
-			else if(formatArg(pFmtArg, ArgInt1, &aryState) != Success)
+			else if(nextFmtArg(pFmtArg, ArgInt1, &aryState) != Success)
 				return sess.rtn.status;
-			ul = (ulong) pFmtArg->u.intNum;
+			ul = (ulong) dgetint(pFmtArg);
 			goto ULFmt;
 		case 'X':
 			flags |= FMTxuc;
 		case 'x':
 			if(pArg != NULL) {
-				if(!isIntVal(pArg))		// Check pArg type.
+				if(!isIntVal(pArg))			// Check pArg type.
 					return sess.rtn.status;
-				if(++specCount > 1)		// Check spec count.
+				if(++specCount > 1)			// Check spec count.
 TooMany:
 					return rsset(Failure, RSNoFormat, text320);
 						// "More than one spec in '%' format string"
 				pFmtArg = pArg;
 				}
-			else if(formatArg(pFmtArg, ArgInt1, &aryState) != Success)
+			else if(nextFmtArg(pFmtArg, ArgInt1, &aryState) != Success)
 				return sess.rtn.status;
 			base = 16;
-			ul = (ulong) pFmtArg->u.intNum;
-			if((flags & FMThash) && ul)
+			ul = (ulong) dgetint(pFmtArg);
+			if(flags & FMThash && ul)
 				prefix = (c == 'X') ? "0X" : "0x";
 
 			// Fall through.
@@ -1130,17 +1061,23 @@ ULFmt:
 
 			str = workBuf + (FMTBufSz - 1);
 			if(ul) {
+				digitCount = 4;
 				for(;;) {
+					if(base == 10 && flags & FMTthouSep && --digitCount == 0) {
+						for(src = sess.thouSep + sess.thouSepLen; --src >= sess.thouSep;)
+							*str-- = *src;
+						digitCount = 3;
+						}
 					*str = (ul % base) + '0';
 					if(*str > '9')
-						*str += (flags & FMTxuc) ? 'A' - '0' - 10 : 'a' - '0' - 10;
+						*str += flags & FMTxuc ? 'A' - '0' - 10 : 'a' - '0' - 10;
 					if((ul /= base) == 0)
 						break;
 					--str;
 					}
 				sLen = workBuf + FMTBufSz - str;
 				}
-			else if((flags & FMTprec) && precision == 0)
+			else if(flags & FMTprec && precision == 0)
 				sLen = 0;
 			else {
 				*str = '0';
@@ -1154,22 +1091,22 @@ ULFmt:
 					*--str = '0';
 					} while(++sLen < precision);
 				}
-			else if(sLen > 0 && c == 'o' && (flags & FMThash) && *str != '0') {
+			else if(sLen > 0 && c == 'o' && flags & FMThash && *str != '0') {
 				*--str = '0';
 				++sLen;
 				}
 			break;
 		default:
 			return rsset(Failure, 0, text321, c == '\0' ? "" : vizc(c, VizBaseDef));
-				// "Unknown format spec '%%%s'"
+				// "Unknown conversion spec '%%%s'"
 		}
 
 		// Concatenate the pieces, which are padding, prefix, more padding, the string, and trailing padding.
-		prefLen = (prefix == NULL) ? 0 : strlen(prefix); // Length of prefix string.
-		padding = width - (prefLen + sLen);		// # of chars to pad.
+		prefLen = (prefix == NULL) ? 0 : strlen(prefix);	// Length of prefix string.
+		padding = width - (prefLen + sLen);			// # of chars to pad.
 
 		// If 0 padding, store prefix (if any).
-		if((flags & FMT0pad) && prefix != NULL) {
+		if(flags & FMT0pad && prefix != NULL) {
 			if(dputs(prefix, &result, 0) != 0)
 				goto LibFail;
 			prefix = NULL;
@@ -1178,7 +1115,7 @@ ULFmt:
 		// If right-justified and chars to pad, store prefix string.
 		if(padding > 0) {
 			if(!(flags & FMTleft)) {
-				short c1 = (flags & FMT0pad) ? '0' : ' ';
+				short c1 = flags & FMT0pad ? '0' : ' ';
 				while(--padding >= 0)
 					if(dputc(c1, &result, 0) != 0)
 						goto LibFail;
@@ -1207,7 +1144,7 @@ ULFmt:
 			// "Missing spec in '%' format string"
 	if(aryState.pArray != NULL && aryState.i < aryState.pArray->used)
 		return rsset(Failure, RSNoFormat, text204);
-			// "Too many arguments for 'printf' or 'sprintf' function"
+			// "Too many arguments for printf-formatting function"
 	if(dclose(&result, FabStr) != 0)
 LibFail:
 		(void) libfail();
@@ -1216,7 +1153,7 @@ LibFail:
 	}
 
 // Get a kill specified by n (of unlimited size) and save in pRtnVal.  May be a null string.  Return status.
-static int getKill(Datum *pRtnVal, int n) {
+static int getKill(Datum *pRtnVal, long n) {
 	RingEntry *pRingEntry;
 
 	// Which kill?
@@ -1230,18 +1167,17 @@ Buffer *findBuf(Datum *pBufname) {
 	Buffer *pBuf;
 
 	if((pBuf = bsrch(pBufname->str, NULL)) == NULL)
-		(void) rsset(Failure, 0, text118, pBufname->str);
-			// "No such buffer '%s'"
+		(void) rsset(Failure, 0, text52, text83, pBufname->str);
+				// "No such %s \"%s\"", "buffer"
 	return pBuf;
 	}
 
-//  Do mode? function (check if a mode is set) and return status.
-int modeQ(Datum *pRtnVal, int n, Datum **args) {
+//  Do modeActive? function (check if a mode is set) and return status.
+int modeActiveQ(Datum *pRtnVal, long n, Datum **args) {
 	ModeSpec *pModeSpec;
 	char *modeName;
 	Buffer *pBuf;
 	bool strict = n > 0;
-	bool result = false;
 
 	// Get buffer if specified.
 	if(args[1] == NULL)
@@ -1251,29 +1187,29 @@ int modeQ(Datum *pRtnVal, int n, Datum **args) {
 
 	// Search mode table for a match.
 	modeName = args[0]->str;
-	if((pModeSpec = msrch(modeName, NULL)) != NULL) {
+	if((pModeSpec = msrch(modeName)) != NULL) {
 
 		// Match found.  Set result.
-		result = (pModeSpec->flags & MdGlobal) ? pModeSpec->flags & MdEnabled : isBufModeSet(pBuf, pModeSpec);
+		dsetbool(pModeSpec->flags & MdGlobal ? pModeSpec->flags & MdActive : isBufModeSet(pBuf, pModeSpec), pRtnVal);
 		}
 	else {
-		// Unknown mode name.  Error if "strict" in effect.
+		// Unknown mode name.  Return error if "strict" in effect, otherwise nil.
 		if(strict)
 			return rsset(Failure, 0, text66, modeName);
 				// "Unknown or ambiguous mode '%s'"
+		dsetnil(pRtnVal);
 		}
 
 	// Return result.
-	dsetbool(result, pRtnVal);
 	return sess.rtn.status;
 	}
 
 // Check if a mode in given group is set and return its name if so, otherwise nil.  Return status.
-int groupModeQ(Datum *pRtnVal, int n, Datum **args) {
+int grpModeActiveQ(Datum *pRtnVal, long n, Datum **args) {
 	ModeSpec *pModeSpec;
 	ModeGrp *pModeGrp;
-	Array *pArray;
-	Datum *pArrayEl;
+	HashNode *pNode;
+	HashEach each;
 	ushort count;
 	Buffer *pBuf;
 	ModeSpec *pResultSpec = NULL;
@@ -1289,23 +1225,23 @@ int groupModeQ(Datum *pRtnVal, int n, Datum **args) {
 	if(!mgsrch(args[0]->str, NULL, &pModeGrp)) {
 		if(!strict)
 			goto SetNil;
-		return rsset(Failure, 0, text395, text390, args[0]->str);
-				// "No such %s '%s'", "group"
+		return rsset(Failure, 0, text52, text390, args[0]->str);
+				// "No such %s \"%s\"", "group"
 		}
 
 	// If group has members, check them.
 	if(pModeGrp->useCount > 0) {
 
 		// Scan mode table and check if any mode in group is enabled.
-		pArray = &modeInfo.modeTable;
 		count = 0;
-		while((pArrayEl = aeach(&pArray)) != NULL) {
-			pModeSpec = modePtr(pArrayEl);
+		heachinit(&each, &mode.idx.table);
+		while((pNode = heach(&each)) != NULL) {
+			pModeSpec = modePtr(pNode->pVal);
 			if(pModeSpec->pModeGrp == pModeGrp) {
 
 				// Found mode in group.  Enabled?
 				if(pModeSpec->flags & MdGlobal) {
-					if(pModeSpec->flags & MdEnabled)
+					if(pModeSpec->flags & MdActive)
 						goto Enabled;
 					}
 				else if(isBufModeSet(pBuf, pModeSpec)) {
@@ -1330,36 +1266,25 @@ SetNil:
 	return sess.rtn.status;
 	}
 
-// Clone an array.  Return status.
-int arrayClone(Datum *pDest, Datum *pSrc) {
-	Array *pArray;
-
-	if((pArray = aclone(pSrc->u.pArray)) == NULL)
-		return libfail();
-	agStash(pDest, pArray);
-
-	return sess.rtn.status;
-	}
-
 // Check if proposed wrap column is in range.  Return status.
-int checkWrapCol(int col) {
+int checkWrapCol(long col) {
 
-	return col < 0 ? rsset(Failure, 0, text39, text59, col, 0) : sess.rtn.status;
-				// "%s (%d) must be %d or greater", "Wrap column"
+	return col < 0 || col > INT_MAX ? rsset(Failure, 0, text12, text59, col, 0, (long) INT_MAX) : sess.rtn.status;
+					// "%s (%'ld) must be in range %d - %'ld", "Wrap column"
 	}
 
 // Set wrap column to col.  Return status.
-int setWrapCol(int col) {
+int setWrapCol(long col) {
 
-	if(checkWrapCol(col) == Success && col != sess.cur.pScrn->wrapCol) {
-		sess.cur.pScrn->prevWrapCol = sess.cur.pScrn->wrapCol;
-		sess.cur.pScrn->wrapCol = col;
+	if(checkWrapCol(col) == Success && col != sess.pCurScrn->wrapCol) {
+		sess.pCurScrn->prevWrapCol = sess.pCurScrn->wrapCol;
+		sess.pCurScrn->wrapCol = col;
 		}
 	return sess.rtn.status;
 	}
 
 // Convert a string to title case.  Return status.
-int titleCaseStr(Datum *pRtnVal, int n, Datum **args) {
+int titleCaseStr(Datum *pRtnVal, long n, Datum **args) {
 	char *src, *dest;
 	short c;
 	bool inWord = false;
@@ -1394,8 +1319,8 @@ static int backForwTab(int n) {
 static int isCC(Datum *pClass, Datum *pVal) {
 	bool (*func)(short) = getCC(pClass->str);
 	if(func == NULL) {
-		(void) rsset(Failure, 0, text136, pClass->str);
-				// "No such character class '%s'"
+		(void) rsset(Failure, 0, text52, text240, pClass->str);
+				// "No such %s \"%s\"", "character class"
 		return -1;
 		}
 	if(dtypstr(pVal)) {
@@ -1409,26 +1334,88 @@ static int isCC(Datum *pClass, Datum *pVal) {
 	else if(!isCharVal(pVal))
 		return -1;
 	else
-		return func(pVal->u.intNum) ? 1 : 0;
+		return func(dgetint(pVal)) ? 1 : 0;
 	}
 
-// Execute a system command or function, given result pointer, n argument, pointer into the command-function table
-// (cmdFuncTable), and minimum and maximum number of arguments.  Return status.  This is the execution routine for all commands
-// and functions.  When script mode is active, arguments (if any) are preloaded and validated per descriptors in the
-// cmdFuncTable table, then made available to the code for the specific command or function (which is here or in a separate
-// routine).  If not evaluating (OpEval not set), arguments are "consumed" only and the execution code is bypassed if the
-// maximum number of arguments for the command or function has been loaded.  Note that (1), if not evaluating, this routine will
-// only be called if the CFSpecArgs flag is set; and (2), any command or function with CFNCount flag set must handle a zero n so
-// that execCmdFunc() calls from routines other than fcall() will always work (for any value of n).
-int execCmdFunc(Datum *pRtnVal, int n, CmdFunc *pCmdFunc, int minArgs, int maxArgs) {
+// Do substr() operation.  Return status.
+int substr(Datum *pRtnVal, Datum *pStr, long i1, long i2) {
+	long len;
+
+	if(i2 != 0 && (len = strlen(pStr->str)) > 0 && (i1 < 0 ? -i1 - 1 : i1) < len) {
+		if(i1 < 0)					// Negative offset.
+			i1 += len;
+		len -= i1;					// Maximum bytes can copy.
+		if(i2 > 0 || (i2 += len) > 0) {
+			if(dsetsubstr(pStr->str + i1, (size_t) (i2 <= len ? i2 : len), pRtnVal) != 0)
+				return libfail();
+			}
+		else
+			goto SetNull;
+		}
+	else
+SetNull:
+		dsetnull(pRtnVal);
+
+	return sess.rtn.status;
+	}
+
+// Do bufMatchGrp and strMatchGrp functions.
+static int matchGroup(Datum *pRtnVal, Datum **args, bool strGrp) {
+	Match *pMatch = strGrp ? &strMatch : &bufSearch.match;
+	int grpNum;
+
+	// Single group requested?
+	if(args[0] != NULL) {
+		if((grpNum = dgetint(args[0])) < 0)
+			return rsset(Failure, 0, text5, text390, (long) grpNum);
+				// "No such %s '%'ld'", "group"
+		if(grpNum >= pMatch->grpMatch.size)
+			dsetnil(pRtnVal);
+		else if(dsetstr(pMatch->grpMatch.groups[grpNum].str, pRtnVal) != 0)
+			goto LibFail;
+		}
+	else if(pMatch->grpMatch.size == 0)
+		dsetnil(pRtnVal);
+	else {
+		// Return array of all group strings.
+		Array *pArray;
+		Datum *pGrp, *pGrpEnd, **ppArrayEl;
+
+		if(makeArray(pRtnVal, pMatch->grpMatch.size, &pArray) == Success) {
+			pGrpEnd = (pGrp = pMatch->grpMatch.groups) + pMatch->grpMatch.size;
+			ppArrayEl = pArray->elements;
+			do {
+ 				if(dsetstr(pGrp->str, *ppArrayEl++) != 0)
+					goto LibFail;
+				} while(++pGrp < pGrpEnd);
+			}
+		}
+
+	return sess.rtn.status;
+LibFail:
+	return libfail();
+	}
+
+// Execute a system command or function, given result pointer, n argument, pointer into the command-function table, and minimum
+// and maximum number of arguments.  Return status.
+//
+// This is the execution routine for all built-in commands and functions.  When script mode is active, arguments (if any) are
+// preloaded and validated per descriptors in the cmdFuncTable table, then made available to the code for the specific command
+// or function (which is here or in a separate routine).  If not evaluating (OpEval not set), arguments are "consumed" only and
+// the execution code is bypassed if the maximum number of arguments for the command or function has been loaded.  Note that
+// (1), if not evaluating, this routine will only be called if the CFSpecArgs flag is set; and (2), any command or function with
+// CFNCount flag set must handle a zero n so that execCmdFunc() calls from functions other than callCFA() will always work (for
+// any value of n).
+int execCmdFunc(Datum *pRtnVal, long n, CmdFunc *pCmdFunc, int minArgs, int maxArgs) {
 	Datum *args[CFMaxArgs + 1];	// Argument values plus NULL terminator.
 	int argCount = 0;		// Number of arguments loaded into args array.
+	CmdFuncId cmdFuncId = pCmdFunc - cmdFuncTable;
 
 	// If script mode and CFNoLoad is not set, retrieve the minimum number of arguments specified in cmdFuncTable, up to the
-	// maximum, and save in args.  If CFSpecArgs flag is set or the maximum is negative, use the minimum for the maximum;
-	// otherwise, if CFShortLoad flag is set, decrease the maximum by one.
+	// maximum, and save in args.  If CFSpecArgs or CFMinLoad flag is set or the maximum is negative, use the minimum for
+	// the maximum; otherwise, if CFShortLoad flag is set, decrease the maximum by one.
 	args[0] = NULL;
-	if((sess.opFlags & (OpScript | OpNoLoad)) == OpScript && !(pCmdFunc->attrFlags & CFNoLoad) &&
+	if(sess.opFlags & OpScript && !(pCmdFunc->attrFlags & CFNoLoad) &&
 	 (!(sess.opFlags & OpParens) || !haveSym(s_rightParen, false))) {
 		if(pCmdFunc->attrFlags & CFShortLoad)
 			--minArgs;
@@ -1437,114 +1424,193 @@ int execCmdFunc(Datum *pRtnVal, int n, CmdFunc *pCmdFunc, int minArgs, int maxAr
 		else if(pCmdFunc->attrFlags & CFShortLoad)
 			--maxArgs;
 
-		// Proceed if at least one argument is allowed and either have a symbol or at least one argument is required.
-		if(maxArgs > 0 && (haveSym(s_any, false) || minArgs > 0)) {
-			Datum **args1 = args;
+		// Proceed if at least one argument is allowed and either (1), at least one argument is required; or (2), have a
+		// symbol.
+		if(maxArgs > 0 && (minArgs > 0 || haveSym(s_any, false))) {
+			Datum **pArgs = args;
 			uint argFlags = ArgFirst | (pCmdFunc->argFlags & ArgPath);
 			do {
-				if(dnewtrack(args1) != 0)
+				if((*pArgs = dnewtrack()) == NULL)
 					goto LibFail;
-				if(funcArg(*args1++, argFlags | (((pCmdFunc->argFlags & (ArgNotNull1 << argCount)) |
+				if(funcArg(*pArgs++, argFlags | (((pCmdFunc->argFlags & (ArgNotNull1 << argCount)) |
 				 (pCmdFunc->argFlags & (ArgNil1 << argCount)) | (pCmdFunc->argFlags & (ArgBool1 << argCount)) |
 				 (pCmdFunc->argFlags & (ArgInt1 << argCount)) | (pCmdFunc->argFlags & (ArgArray1 << argCount)) |
+				 (pCmdFunc->argFlags & (ArgHash1 << argCount)) |
 				 (pCmdFunc->argFlags & (ArgNIS1 << argCount))) >> argCount) |
 				 (pCmdFunc->argFlags & ArgMay)) != Success)
 					return sess.rtn.status;
 				argFlags = 0;
 				} while(++argCount < minArgs || (argCount < maxArgs && haveSym(s_comma, false)));
-			*args1 = NULL;
+			*pArgs = NULL;
 			}
 		}
 
+	// Have zero to CFMaxArgs arguments in "args" array.  Get options if able to.
+	if(pCmdFunc->pOptHdr != NULL) {
+		OptHdr *pOptHdr = pCmdFunc->pOptHdr;
+		Datum *pOptArg = NULL;
+		long n1 = n;
+		char workBuf[48];
+
+		// Routine accepts options.  Set cmd-func flag if needed (for error reporting).
+		if(pOptHdr->ctrlFlags & OHdrShared && pOptHdr->type == NULL) {
+			if(pCmdFunc->attrFlags & CFFunc)
+				pOptHdr->ctrlFlags |= OHdrFunc;
+			else
+				pOptHdr->ctrlFlags &= ~OHdrFunc;
+			}
+
+		// Do preprocessing if requested.
+		if(pOptHdr->ctrlFlags & OHdrPrep) {
+			switch(cmdFuncId) {
+				case cf_chgBufAttr:
+					pOptHdr->ctrlFlags &= ~OHdrSpecial;
+
+					// If script mode, a "clear" operation, and attribute is "*", skip options processing
+					// and set flag.
+					if(sess.opFlags & OpScript && n < 0 && n != DefN &&
+					 strcmp(stripStr(args[0]->str, 0), "*") == 0) {
+						pCmdFunc->pOptHdr->ctrlFlags |= OHdrSpecial;
+						goto SetNone;
+						}
+
+					// If interactive and default n, toggle one attribute.
+					if(!(sess.opFlags & OpScript) && n == DefN) {
+						n1 = 1;
+						pOptHdr->ctrlFlags |= OHdrSingle;
+						}
+					else
+						pOptHdr->ctrlFlags &= ~OHdrSingle;
+					break;
+				case cf_delBuf:
+					// Skip options processing unless n > 0.
+					if(n <= 0)
+						goto SetNone;
+					break;
+				case cf_popBuf:
+					// Get buffer.
+					{Buffer *pBuf;
+
+					if(sess.opFlags & OpScript)
+						dxfer(pRtnVal, args[0]);	// Buffer name.
+					if(getBufname(pRtnVal, text27, ArgFirst | OpDelete | OpDefBName | OpHaveBName, &pBuf,
+							// "Pop"
+					 NULL) != Success || pBuf == NULL)
+						return sess.rtn.status;
+					dsetmemref(pBuf, 0, pRtnVal);
+					pOptHdr->optTable[0].ctrlFlags |= OptIgnore;
+					}
+					break;
+				case cf_popFile:
+					// Get filename.
+					if(sess.opFlags & OpScript)
+						dxfer(pRtnVal, args[0]);	// Filename.
+					else if(getFilename(pRtnVal, text27, NULL, 0) != Success || disnil(pRtnVal))
+								// "Pop"
+						return sess.rtn.status;
+					pOptHdr->optTable[0].ctrlFlags &= ~OptIgnore;
+				}
+			}
+
+		// Set results to zero if options unavailable or not requested.
+		if(sess.opFlags & OpScript) {
+			if(pOptHdr->argNum < 0) {
+				if(argCount != pCmdFunc->maxArgs)
+					goto SetNone;
+				pOptArg = args[argCount - 1];
+				}
+			else if(pOptHdr->argNum == 0) {
+				if(n1 == DefN)
+					goto SetNone;
+
+				// Routine requires options as first argument.
+				pOptArg = args[0];		// Will be loaded by parseOpts() if NULL.
+				}
+			else {
+				if(argCount < pOptHdr->argNum)
+					goto SetNone;
+				pOptArg = args[pOptHdr->argNum - 1];
+				}
+			}
+		else if(n1 == DefN) {
+
+			// Interactive and default n.  Set "no options selected" state, which includes setting flag results to
+			// zero or defaults (which may not be zero).
+SetNone:
+			deselectOpts(pOptHdr);
+			pOptHdr->selFlags = pOptHdr->ctrlFlags & OHdrNoSel ? 0 : getFlagOpts(pOptHdr);
+			pOptHdr->ctrlFlags &= ~OHdrFound;
+			goto Eval;
+			}
+
+		// Conditions met for options processing.  Initialize OptIgnore flags in options' array if shared.
+		if(pOptHdr->ctrlFlags & OHdrShared) {
+			Option *pOpt, *pOptEnd;
+
+			pOptEnd = (pOpt = pOptHdr->optTable) + pOptHdr->optCount;
+			do {
+				// If flag set in ctrlFlags, ignore option.
+				if(pOptHdr->ctrlFlags & pOpt->u.value)
+					pOpt->ctrlFlags |= OptIgnore;
+				else
+					pOpt->ctrlFlags &= ~OptIgnore;
+				} while(++pOpt < pOptEnd);
+			}
+
+		// Build custom prompt if interactive and flag set.
+		if(!(sess.opFlags & OpScript) && pOptHdr->ctrlFlags & OHdrBuild) {
+			switch(cmdFuncId) {
+				case cf_chgBufAttr:
+					n1 = n == DefN ? 0 : n;
+					sprintf(workBuf, "%s %s %s",
+					 n1 < 0 ? text65 : n1 == 0 ? text231 : n1 == 1 ? text64 : text296, text83, text186);
+						// "Clear", "Toggle", "Set", "Clear all and set"	"buffer", "attribute"
+					break;
+				case cf_delBuf:
+					sprintf(workBuf, "%s %ss", text26, text83);
+							// "Delete", "buffer"
+					break;
+				case cf_showBuffers:
+					sprintf(workBuf, "%s %ss", text250, text83);
+							// "Show", "buffer"
+					break;
+				case cf_apropos:
+				case cf_showConstVars:
+				case cf_showRoutines:
+					sprintf(workBuf, "%s %s", text24, text546);
+							// "Select", "type"
+				}
+			pOptHdr->prompt = workBuf;
+			}
+
+		// Parse options.
+		if(parseOpts(pOptHdr, pOptArg) != Success)
+			return sess.rtn.status;
+		pOptHdr->selFlags = pOptHdr->ctrlFlags & OHdrNoSel ? 0 : getFlagOpts(pOptHdr);
+		}
+Eval:
 	// Evaluate the command or function.
 	if(pCmdFunc->func != NULL) {
+
+		// Routine has its own handler function defined.  Call it with standard argument triplet.
 #if MMDebug & Debug_Expr
-		fprintf(logfile, "execCmdFunc(): Calling %s() with n = %d, and %d arguments...\n", pCmdFunc->name, n, argCount);
+		fprintf(logfile, "execCmdFunc(): Calling %s() with n = %ld, and %d arguments...\n",
+		 pCmdFunc->name, n, argCount);
 #endif
 		(void) pCmdFunc->func(pRtnVal, n, args);
 		}
+	else if(pCmdFunc->attrFlags & CFExecAH)
+		(void) execAH(pRtnVal, n, args, pCmdFunc);
 	else {
-		int i;
+		// No special handler for routine.  Process it here.
 		const char *prompt;
 		long longVal;
-		Array *pArray;
 		Buffer *pBuf = NULL;
-		int cmdFuncId = pCmdFunc - cmdFuncTable;
+		int i;
 
 		switch(cmdFuncId) {
 			case cf_abs:
-				dsetint(labs(args[0]->u.intNum), pRtnVal);
-				break;
-			case cf_aclone:
-				(void) arrayClone(pRtnVal, args[0]);
-				break;
-			case cf_acompact:
-				i = n != INT_MIN ? AOpInPlace : 0;
-				if((pArray = acompact(args[0]->u.pArray, i)) == NULL)
-					goto LibFail;
-				if(i == 0)
-					agStash(pRtnVal, pArray);
-				else
-					dxfer(pRtnVal, args[0]);
-				break;
-			case cf_adelete:
-				if(args[2] == NULL) {
-
-					// Delete an element.
-					Datum *pDatum = adelete(args[0]->u.pArray, args[1]->u.intNum);
-					if(pDatum == NULL)
-						goto LibFail;
-					if(dtyparray(pDatum))
-						agTrack(pDatum);	// Have array reference.
-					dxfer(pRtnVal, pDatum);
-					}
-				else {
-					// Cut a slice.
-					if((pArray = aslice(args[0]->u.pArray, args[1]->u.intNum, args[2]->u.intNum,
-					 AOpCut)) == NULL)
-						goto LibFail;
-					agStash(pRtnVal, pArray);
-					}
-				break;
-			case cf_adeleteif:
-				dsetint(adeleteif(args[0]->u.pArray, args[1], 0), pRtnVal);
-				break;
-			case cf_afill:
-				(void) doFill(pRtnVal, args);
-				break;
-			case cf_aincludeQ:
-				dsetbool(ainclude(args[0]->u.pArray, args[1], 0), pRtnVal);
-				break;
-			case cf_aindex:
-				if((i = aindex(args[0]->u.pArray, args[1], n > 0 ? AOpLast : 0)) < 0)
-					dsetnil(pRtnVal);
-				else
-					dsetint(i, pRtnVal);
-				break;
-			case cf_ainsert:
-				i = args[2]->u.intNum;
-				goto AInsert;
-			case cf_apop:
-			case cf_ashift:
-				pArray = args[0]->u.pArray;
-				if((args[1] = (cmdFuncId == cf_apop) ? apop(pArray) : ashift(pArray)) == NULL)
-					dsetnil(pRtnVal);
-				else {
-					dxfer(pRtnVal, args[1]);
-					if(dtyparray(pRtnVal))
-						agTrack(pRtnVal);
-					}
-				break;
-			case cf_apush:
-				i = args[0]->u.pArray->used;
-				goto AInsert;
-			case cf_aunshift:
-				i = 0;
-AInsert:
-				if(ainsert(args[0]->u.pArray, args[1], i, 0) != 0)
-					goto LibFail;
-				duntrack(args[1]);
-				dxfer(pRtnVal, args[0]);
+				dsetint(labs(dgetint(args[0])), pRtnVal);
 				break;
 			case cf_appendFile:
 				i = 'a';
@@ -1559,25 +1625,25 @@ AInsert:
 				break;
 			case cf_backTab:
 				// Move the point backward "n" tab stops.
-				(void) backForwTab(n == INT_MIN ? -1 : -n);
+				(void) backForwTab(n == DefN ? -1 : -n);
 				break;
 			case cf_backspace:;
 				// Delete char or soft tab backward.  Return status.
 				Point *pPoint = &sess.cur.pFace->point;
-				(void) (sess.cur.pScrn->softTabSize > 0 && pPoint->offset > 0 ?
-				 delTab(n == INT_MIN ? -1 : -n, true) : edelc(n == INT_MIN ? -1 : -n, 0));
+				(void) (sess.pCurScrn->softTabSize > 0 && pPoint->offset > 0 ?
+				 delTab(n == DefN ? -1 : -n, true) : edelc(n == DefN ? -1 : -n, 0));
 				break;
 			case cf_basename:
-				if(dsetstr(fbasename(args[0]->str, n == INT_MIN || n > 0), pRtnVal) != 0)
+				if(dsetstr(cname(args[0]->str, n == DefN || n > 0 ? CNBasename : CNName), pRtnVal) != 0)
 					goto LibFail;
 				break;
 			case cf_beep:
 				// Beep the beeper n times.
-				if(n == INT_MIN)
+				if(n == DefN)
 					n = 1;
 				else if(n < 0 || n > 10)
-					return rsset(Failure, 0, text12, text137, n, 0, 10);
-						// "%s (%d) must be between %d and %d", "Repeat count"
+					return rsset(Failure, 0, text12, text137, n, 0, 10L);
+						// "%s (%'ld) must be in range %d - %'ld", "Repeat count"
 				while(n-- > 0)
 					tbeep();
 				break;
@@ -1593,31 +1659,54 @@ AInsert:
 				break;
 			case cf_beginWhite:
 				// Move the point to the beginning of white space surrounding point.
-				(void) spanWhite(false);
+				(void) spanWhite(pRtnVal, false);
 				break;
 			case cf_bemptyQ:
 
 				// Get buffer pointer.
-				if(n == INT_MIN)
+				if(haveArg(n, args, false))
 					pBuf = sess.cur.pBuf;
-				else if((pBuf = bsrch(args[0]->str, NULL)) == NULL)
-					return rsset(Failure, 0, text118, args[0]->str);
-						// "No such buffer '%s'"
+				else if((pBuf = findBuf(args[0])) == NULL)
+					break;
 
-				// Return Boolean result.
-				dsetbool(bempty(pBuf), pRtnVal);
+				// Activate buffer if needed.
+				if(pBuf->flags & BFActive || bactivate(pBuf) == Success) {
+
+					// Return Boolean result.
+					dsetbool(bempty(pBuf), pRtnVal);
+					}
+				break;
+			case cf_bgets:
+				if(n == DefN)
+					n = 1;
+				else if(n < 0)
+					return rsset(Failure, 0, text39, text137, n, 0);
+							// "%s (%'ld) must be %d or greater", "Repeat count"
+				(void) bigBufMove(pRtnVal, n, NULL, BM_ReadBuf, 0);
+				break;
+			case cf_binding:
+				i = true;
+				goto Binding;
+			case cf_bindingsof:
+				i = false;
+Binding:
+				(void) binding(pRtnVal, args, i);
 				break;
 			case cf_bprint:
 			case cf_bprintf:
 
 				// Get buffer pointer.
-				if((pBuf = bsrch(args[0]->str, NULL)) == NULL)
-					return rsset(Failure, 0, text118, args[0]->str);
-						// "No such buffer '%s'"
+				if((pBuf = findBuf(args[0])) == NULL)
+					break;
 
+				// Activate buffer if needed.
+				if(!(pBuf->flags & BFActive) && bactivate(pBuf) != Success)
+					break;
+
+				// Skip over comma and branch off if bprint.
 				if(cmdFuncId == cf_bprint) {
 					if(!needSym(s_comma, true))
-						return sess.rtn.status;
+						break;
 					i = Txt_Insert;
 					goto ChgText;
 					}
@@ -1626,25 +1715,51 @@ AInsert:
 				if(strFormat(pRtnVal, args[1], NULL) == Success)
 					(void) iorText(pRtnVal->str, n, Txt_Insert, pBuf);
 				break;
+			case cf_btoa:
+				i = true;
+				goto CvtBuf;
+			case cf_btos:
+				i = false;
+CvtBuf:
+				(void) cvtBuf(pRtnVal, args, i);
+				break;
 			case cf_bufBoundQ:
-				if(n != INT_MIN)
+				if(n != DefN)
 					n = n > 0 ? 1 : n < 0 ? -1 : 0;
 				i = bufEnd(NULL) ? 1 : bufBegin(NULL) ? -1 : 0;
-				dsetbool((n == INT_MIN && i != 0) || i == n, pRtnVal);
+				dsetbool((n == DefN && i != 0) || i == n, pRtnVal);
 				break;
+			case cf_bufMatchGrp:
+				i = 1;
+				goto MatchGroup;
 			case cf_bufWind:
 				{EWindow *pWind;
 
 				if((pBuf = bsrch(args[0]->str, NULL)) != NULL &&
-				 (pWind = windDispBuf(pBuf, n != INT_MIN)) != NULL)
+				 (pWind = windDispBuf(pBuf, n != DefN)) != NULL)
 					dsetint((long) getWindNum(pWind), pRtnVal);
 				else
 					dsetnil(pRtnVal);
 				}
 				break;
+			case cf_chdir:
+			case cf_mkdir:
+			case cf_rmdir:
+				(void) dirFunc(pRtnVal, n, args, cmdFuncId);
+				break;
+			case cf_chomp:
+				if(isCharVal(args[1])) {
+					char *str;
+
+					dxfer(pRtnVal, args[0]);
+					str = strchr(pRtnVal->str, '\0') - 1;
+					if(str >= pRtnVal->str && *str == dgetint(args[1]))
+						*str = '\0';
+					}
+				break;
 			case cf_chr:
 				if(isCharVal(args[0]))
-					dconvchr(args[0]->u.intNum, pRtnVal);
+					dconvchr(dgetint(args[0]), pRtnVal);
 				break;
 			case cf_clearMsgLine:
 				(void) mlerase(MLForce);
@@ -1672,7 +1787,7 @@ AInsert:
 				goto KDCText;
 			case cf_copyWord:
 				// Copy word(s) to kill ring without moving point.
-				(void) (n == INT_MIN ? kdcForwWord(1, 1) : n < 0 ? kdcBackWord(-n, 1) : kdcForwWord(n, 1));
+				(void) (n == DefN ? kdcForwWord(1, 1) : n < 0 ? kdcBackWord(-n, 1) : kdcForwWord(n, 1));
 				break;
 			case cf_metaPrefix:
 			case cf_negativeArg:
@@ -1683,11 +1798,11 @@ AInsert:
 				break;
 			case cf_delBackChar:
 				// Delete char backward.  Return status.
-				(void) edelc(n == INT_MIN ? -1 : -n, 0);
+				(void) edelc(n == DefN ? -1 : -n, 0);
 				break;
 			case cf_delBackTab:
 				// Delete tab backward.  Return status.
-				(void) delTab(n == INT_MIN ? -1 : -n, false);
+				(void) delTab(n == DefN ? -1 : -n, false);
 				break;
 			case cf_delFencedRegion:
 				// Delete text without saving in kill ring.
@@ -1695,7 +1810,7 @@ AInsert:
 				goto KDCFenced;
 			case cf_delForwChar:
 				// Delete char forward.  Return status.
-				(void) edelc(n == INT_MIN ? 1 : n, 0);
+				(void) edelc(n == DefN ? 1 : n, 0);
 				break;
 			case cf_delForwTab:
 				// Delete tab forward.  Return status.
@@ -1717,20 +1832,26 @@ AInsert:
 				// Delete white space surrounding or immediately before point on current line.
 				(void) nukeWhite(n, true);
 				break;
+			case cf_delWind:
+			case cf_joinWind:
+				(void) delJoinWind(n, pCmdFunc);
+				break;
 			case cf_delWord:
 				// Delete word(s) without saving text in kill ring.
-				(void) (n == INT_MIN ? kdcForwWord(1, 0) : n < 0 ? kdcBackWord(-n, 0) : kdcForwWord(n, 0));
+				(void) (n == DefN ? kdcForwWord(1, 0) : n < 0 ? kdcBackWord(-n, 0) : kdcForwWord(n, 0));
 				break;
 			case cf_dirname:
-				if(dsetstr(fdirname(args[0]->str, n), pRtnVal) != 0)
+				if(dsetstr(cname(args[0]->str, n == DefN ? CNDirname : CNDirname | CNDefaultDir),
+				 pRtnVal) != 0)
 					goto LibFail;
 				break;
 			case cf_emptyQ:
 				if(args[0]->type != dat_int || isCharVal(args[0]))
 					dsetbool(disnil(args[0]) ? true :
-					 args[0]->type == dat_int ? args[0]->u.intNum == 0 :
+					 args[0]->type == dat_int ? dgetint(args[0]) == 0 :
 					 dtypstr(args[0]) ? *args[0]->str == '\0' :
-					 args[0]->u.pArray->used == 0, pRtnVal);
+					 dtyparray(args[0]) ? dgetarrayptr(args[0])->used == 0 :
+					 dgethashptr(args[0])->nodeCount == 0, pRtnVal);
 				break;
 			case cf_endBuf:
 				// Move to the end of the buffer.
@@ -1738,7 +1859,7 @@ AInsert:
 					// "End"
 				i = true;
 BEBuf:
-				(void) bufOp(pRtnVal, n, prompt, BO_BeginEnd, i);
+				(void) bigBufMove(pRtnVal, n, prompt, BM_BeginEnd, i);
 				break;
 			case cf_endLine:
 				// Move the point to the end of the [-]nth line.
@@ -1746,7 +1867,7 @@ BEBuf:
 				break;
 			case cf_endWhite:
 				// Move the point to the end of white space surrounding point.
-				(void) spanWhite(true);
+				(void) spanWhite(pRtnVal, true);
 				break;
 			case cf_env:
 				if(dsetstr(fixNull(getenv(args[0]->str)), pRtnVal) != 0)
@@ -1754,6 +1875,10 @@ BEBuf:
 				break;
 			case cf_expandPath:
 				(void) expandPath(pRtnVal, args[0]);
+				break;
+			case cf_extension:
+				if(dsetstr(cname(args[0]->str, CNExtension), pRtnVal) != 0)
+					goto LibFail;
 				break;
 			case cf_findFile:
 				i = false;
@@ -1768,13 +1893,22 @@ BEBuf:
 				break;
 			case cf_forwTab:
 				// Move the point forward "n" tab stops.
-				(void) backForwTab(n == INT_MIN ? 1 : n);
+				(void) backForwTab(n == DefN ? 1 : n);
 				break;
 			case cf_growWind:
 				// Grow (enlarge) the current window.  If n is negative, take lines from the upper window;
 				// otherwise, lower.
 				i = 1;
 				goto GSWind;
+			case cf_indentLine:
+				i = ShLineSelect;
+				goto IODent;
+			case cf_indentRegion:
+				i = ShRegion;
+				goto IODent;
+			case cf_index:
+				(void) strIndex(pRtnVal, pCmdFunc->pOptHdr->selFlags, args[0], args[1], NULL);
+				break;
 			case cf_insert:
 				i = Txt_Insert;
 				goto ChgText;
@@ -1792,22 +1926,37 @@ BEBuf:
 				(void) insertNLSpace(n, EditSpace | EditHoldPoint);
 				break;
 			case cf_interactiveQ:
-				dsetbool((sess.opFlags & (OpStartup | OpUserCmd)) == OpUserCmd, pRtnVal);
+				dsetbool(sess.opFlags & OpUserCmd, pRtnVal);
 				break;
 			case cf_isClassQ:
 				if((i = isCC(args[0], args[1])) >= 0)
 					dsetbool(i, pRtnVal);
 				break;
+			case cf_isMacroQ:
+				dsetbool(hsearch(&macro.index.table, args[0]->str) != NULL, pRtnVal);
+				break;
+			case cf_isShortcutQ:
+				if(isCharVal(args[0])) {
+					HashNode *pNode;
+
+					dconvchr(dgetint(args[0]), args[0]);
+					if((pNode = hsearch(&macro.shortcuts, args[0]->str)) == NULL)
+						dsetnil(pRtnVal);
+					else if(dcpy(pRtnVal, pNode->pVal) != 0)
+						goto LibFail;
+					}
+				break;
 			case cf_join:
 				if(needSym(s_comma, true))
-					(void) catArgs(pRtnVal, 1, args[0], n <= 0 && n != INT_MIN ? ACvtSkipNil : 0);
+					(void) catArgs(pRtnVal, 1, args[0], n <= 0 && n != DefN ? CvtSkipNil : 0);
+				break;
 				break;
 			case cf_keyPendingQ:
 				if(typahead(&i) == Success)
 					dsetbool(i > 0, pRtnVal);
 				break;
 			case cf_kill:
-				(void) getKill(pRtnVal, (int) args[0]->u.intNum);
+				(void) getKill(pRtnVal, dgetint(args[0]));
 				break;
 			case cf_killFencedRegion:
 				// Delete text and save in kill ring.
@@ -1825,7 +1974,7 @@ KDCLine:
 				// Delete region and save text in kill ring.
 				i = true;
 DKReg:
-				(void) delKillRegion(n, i);
+				(void) delKillRegion(i);
 				break;
 			case cf_killToBreak:
 				// Delete text and save in kill ring.
@@ -1835,24 +1984,30 @@ KDCText:
 				break;
 			case cf_killWord:
 				// Delete word(s) and save text in kill ring.
-				(void) (n == INT_MIN ? kdcForwWord(1, -1) : n < 0 ? kdcBackWord(-n, -1) : kdcForwWord(n, -1));
+				(void) (n == DefN ? kdcForwWord(1, -1) : n < 0 ? kdcBackWord(-n, -1) : kdcForwWord(n, -1));
 				break;
 			case cf_lastBuf:
-				if(sess.cur.pScrn->pLastBuf != NULL) {
+				if(sess.pCurScrn->pLastBuf != NULL) {
 					Buffer *pOldBuf = sess.cur.pBuf;
-					if(render(pRtnVal, 1, sess.cur.pScrn->pLastBuf, 0) == Success && n < 0 &&
-					 n != INT_MIN) {
-						char bufname[MaxBufname + 1];
-
-						strcpy(bufname, pOldBuf->bufname);
-					 	if(bdelete(pOldBuf, 0) == Success)
-							(void) rsset(Success, RSHigh, text372, bufname);
-									// "Buffer '%s' deleted"
+					if(render(pRtnVal, 1, sess.pCurScrn->pLastBuf, 0) == Success && n < 0 && n != DefN)
+						(void) bdelete(pOldBuf, BD_RtnMsg);
+					}
+				break;
+			case cf_lastScreen:
+				if(sess.pLastScrn != NULL) {
+					EScreen *pOldScrn = sess.pCurScrn;
+					if(sswitch(sess.pLastScrn, 0) == Success) {
+						dsetint(sess.pCurScrn->num, pRtnVal);
+						if(n < 0 && n != DefN)
+							(void) sdelete(pOldScrn, true);
+						else
+							newWorkDir(pOldScrn);
 						}
 					}
 				break;
 			case cf_length:
-				dsetint(dtyparray(args[0]) ? (long) args[0]->u.pArray->used :
+				dsetint(dtyparray(args[0]) ? (long) dgetarrayptr(args[0])->used :
+				 dtyphash(args[0]) ? (long) dgethashptr(args[0])->nodeCount :
 				 (long) strlen(args[0]->str), pRtnVal);
 				break;
 			case cf_lowerCaseLine:
@@ -1867,30 +2022,18 @@ KDCText:
 			case cf_lowerCaseWord:
 				i = CaseWord | CaseLower;
 				goto CvtCase;
-			case cf_match:
-				{Match *pMatch = (n == INT_MIN) ? &matchRE : &bufSearch.match;
-				longVal = args[0]->u.intNum;
-				if(longVal < 0)
-					return rsset(Failure, 0, text5, longVal);
-						// "No such group, %ld"
-				if(longVal >= pMatch->grpMatch.size)
-					dsetnil(pRtnVal);
-				else if(dsetstr(pMatch->grpMatch.groups[longVal].str, pRtnVal) != 0)
-					goto LibFail;
-				}
-				break;
 			case cf_moveWindDown:
 				// Move the current window down by "n" lines and compute the new top line in the window.
-				(void) moveWindUp(pRtnVal, n == INT_MIN ? -1 : -n, args);
+				(void) moveWindUp(pRtnVal, n == DefN ? -1 : -n, args);
 				break;
 			case cf_newline:
 				i = EditWrap;
 				goto InsNLSPC;
 			case cf_nextBuf:
-				i = 0;
+				i = BT_Homed;
 				goto PNBuf;
 			case cf_nextScreen:
-				i = SWB_Repeat | SWB_Forw;
+				i = SWB_RepeatCount | SWB_Forw;
 				goto PNScreen;
 			case cf_nilQ:
 				dsetbool(disnil(args[0]), pRtnVal);
@@ -1899,10 +2042,10 @@ KDCText:
 				dsetbool(disnull(args[0]), pRtnVal);
 				break;
 			case cf_numericQ:
-				dsetbool(ascToLong(args[0]->str, NULL, true), pRtnVal);
+				dsetbool(ascToLong(args[0]->str, args[1] == NULL ? 0 : dgetint(args[1]), NULL, true), pRtnVal);
 				break;
 			case cf_openLine:
-				if(insertNLSpace(n, EditHoldPoint) == Success && n < 0 && n != INT_MIN) {
+				if(insertNLSpace(n, EditHoldPoint) == Success && n < 0 && n != DefN) {
 
 					// Move point to first empty line if possible.
 					Point *pPoint = &sess.cur.pFace->point;
@@ -1913,6 +2056,12 @@ KDCText:
 			case cf_ord:
 				dsetint((long) args[0]->str[0], pRtnVal);
 				break;
+			case cf_outdentLine:
+				i = ShLineSelect | ShOutdent;
+				goto IODent;
+			case cf_outdentRegion:
+				i = ShRegion | ShOutdent;
+				goto IODent;
 			case cf_overwriteChar:
 				i = Txt_Replace;
 				goto ChgText;
@@ -1922,10 +2071,11 @@ ChgText:
 				(void) chgText(pRtnVal, n, i, pBuf);
 				break;
 			case cf_pause:
-				if((i = args[0]->u.intNum) < 0)
-					return rsset(Failure, 0, text39, text119, i, 0);
-						// "%s (%d) must be %d or greater", "Pause duration"
-				centiPause(n == INT_MIN ? i * 100 : i);
+				i = n == DefN ? MaxExecPause : MaxExecPause * 100;
+				if((longVal = dgetint(args[0])) < 0 || longVal > i)		// 10 minutes max.
+					return rsset(Failure, 0, text12, text119, longVal, 0, (long) i);
+						// "%s (%'ld) must be in range %d - %'ld", "Pause duration"
+				centiPause(n == DefN ? longVal * 100 : longVal);
 				break;
 			case cf_pipeBuf:
 				prompt = text306;
@@ -1933,29 +2083,25 @@ ChgText:
 				i = PipeWrite;
 				goto PipeCmd;
 			case cf_popBuf:
-				i = true;
-				goto PopIt;
 			case cf_popFile:
-				i = false;
-PopIt:
-				(void) doPop(pRtnVal, n, i);
+				(void) doPop(pRtnVal, n, pCmdFunc);
 				break;
 			case cf_prevBuf:
-				i = BT_Backward;
+				i = BT_Homed | BT_Backward;
 PNBuf:
-				// Switch to the previous or next buffer in the buffer list.  If n >= 0, consider buffers having
-				// same directory as current screen (only) as candidates.  If n <= 0, delete current buffer
-				// after switch.
-				if(n != INT_MIN) {
+				// Switch to the previous or next buffer in the buffer list having same directory as current
+				// screen (only).  If n >= 0, consider all visible buffers as candidates.  If n <= 0, delete
+				// current buffer after switch.
+				if(n != DefN) {
 					if(n >= 0)
-						i |= BT_HomeDir;
+						i &= ~BT_Homed;
 					if(n <= 0)
 						i |= BT_Delete;
 					}
 				(void) prevNextBuf(pRtnVal, i);
 				break;
 			case cf_prevScreen:
-				i = SWB_Repeat;
+				i = SWB_RepeatCount;
 PNScreen:
 				(void) gotoScreen(n, i);
 				break;
@@ -1968,10 +2114,16 @@ PNScreen:
 				// Build message in pRtnVal and write result to message line.
 				if(strFormat(pRtnVal, args[0], NULL) == Success) {
 PrintMsg:
-					(void) mlputs(n == INT_MIN ? MLHome | MLFlush | MLForce :
-					 MLHome | MLFlush | MLForce | MLTermAttr, pRtnVal->str);
+					(void) mlputs(pRtnVal->str, n == DefN ? MLHome | MLFlush | MLForce :
+					 MLHome | MLFlush | MLForce | MLTermAttr);
 					dsetnil(pRtnVal);
 					}
+				break;
+			case cf_pwd:
+				if(dsetstr(sess.pCurScrn->workDir, pRtnVal) != 0)
+					goto LibFail;
+				if(!(sess.opFlags & OpScript))
+					(void) rsset(Success, RSNoFormat | RSNoWrap, sess.pCurScrn->workDir);
 				break;
 			case cf_queryReplace:
 				// Search and replace with query.
@@ -1980,18 +2132,18 @@ PrintMsg:
 			case cf_quickExit:
 				// Quick exit from MightEMacs.  If any buffer has changed, do a save on that buffer first.
 				sess.exitNArg = n;
-				if(saveBufs(1, BS_QuickExit) == Success)
+				if(saveBufs(1, BW_QuickExit) == Success)
 					(void) rsset(UserExit, RSForce, NULL);
 				break;
 			case cf_quote:
 				// Convert any value to a string form which will resolve to the original value.
-				if((i = dtos(pRtnVal, args[0], NULL, DCvtLang)) < 0)
+				if((i = dtos(pRtnVal, args[0], NULL, CvtLang)) < 0)
 					(void) libfail();
 				else if(n <= 0)
 					(void) endless(i);
 				break;
 			case cf_rand:
-				dsetint(urand(args[0]->u.intNum), pRtnVal);
+				dsetint(urand(dgetint(args[0])), pRtnVal);
 				break;
 			case cf_readPipe:
 				prompt = text170;
@@ -2002,10 +2154,10 @@ PrintMsg:
 				// Reposition point in current window per the standard redisplay subsystem.  Row defaults to
 				// zero to center current line in window.  If in script mode, also do partial screen update so
 				// that the window is repositioned.
-				sess.cur.pWind->reframeRow = (n == INT_MIN) ? 0 : n;
-				sess.cur.pWind->flags |= WFReframe;
+				sess.pCurWind->reframeRow = (n == DefN) ? 0 : n;
+				sess.pCurWind->face.wflags |= WFReframe;
 				if(sess.opFlags & OpScript)
-					(void) wupd_reframe(sess.cur.pWind);
+					(void) wupd_reframe(sess.pCurWind);
 				break;
 			case cf_replace:
 				// Search and replace.
@@ -2045,10 +2197,10 @@ Repl:
 				pWind = sess.windHead;
 				do {
 					if(pWind == sess.pSavedWind) {
-						sess.cur.pWind->flags |= WFMode;
+						sess.pCurWind->face.wflags |= WFMode;
 						(void) wswitch(pWind, 0);
-						sess.cur.pWind->flags |= WFMode;
-						dsetint((long) getWindNum(sess.cur.pWind), pRtnVal);
+						sess.pCurWind->face.wflags |= WFMode;
+						dsetint((long) getWindNum(sess.pCurWind), pRtnVal);
 						return sess.rtn.status;
 						}
 					} while((pWind = pWind->next) != NULL);
@@ -2072,37 +2224,37 @@ Repl:
 				break;
 			case cf_saveScreen:
 				// Save pointer to current screen.
-				sess.pSavedScrn = sess.cur.pScrn;
+				sess.pSavedScrn = sess.pCurScrn;
 				break;
 			case cf_saveWind:
 				// Save pointer to current window.
-				sess.pSavedWind = sess.cur.pWind;
+				sess.pSavedWind = sess.pCurWind;
 				break;
 			case cf_setWrapCol:
 				// Set wrap column to N... or swap with previous value if n >= 0; display values if n < 0
 				// and interactive.
-				if(interactive() && n < 0 && n != INT_MIN)
+				if(interactive() && n < 0 && n != DefN)
 					goto ShowWrapCol;
 				if(n >= 0) {
-					if(sess.cur.pScrn->prevWrapCol < 0)
+					if(sess.pCurScrn->prevWrapCol < 0)
 						return rsset(Failure, RSNoFormat, text298);
 							// "No previous wrap column set"
-					n = sess.cur.pScrn->prevWrapCol;
+					n = sess.pCurScrn->prevWrapCol;
 					}
 				else {
 					if(getNArg(pRtnVal, text59) != Success || disnil(pRtnVal))
 							// "Wrap column"
-						return sess.rtn.status;
-					if((n = pRtnVal->u.intNum) == sess.cur.pScrn->wrapCol)
+						break;
+					if((n = dgetint(pRtnVal)) == sess.pCurScrn->wrapCol)
 ShowWrapCol:
-						return rsset(Success, RSNoWrap | RSTermAttr, text496, sess.cur.pScrn->wrapCol,
-								// "~bCurrent wrap col:~B %d, ~bprevious wrap col:~B %d"
-						 sess.cur.pScrn->prevWrapCol);
+						return rsset(Success, RSNoWrap | RSTermAttr, text496, sess.pCurScrn->wrapCol,
+								// "~bCurrent wrap col:~B %'d, ~bprevious wrap col:~B %'d"
+						 sess.pCurScrn->prevWrapCol);
 					}
 				if(setWrapCol(n) == Success)
-					(void) rsset(Success, RSNoWrap, "%s %s %d (%s: %d)", text59, text278, n, text498,
-							// "Wrap column", "changed to", "previous"
-					 sess.cur.pScrn->prevWrapCol);
+					(void) rsset(Success, RSNoWrap, "%s %s %'ld (%s: %'d)", text59, text278, n, text498,
+										// "Wrap column", "changed to", "previous"
+					 sess.pCurScrn->prevWrapCol);
 				break;
 			case cf_shellCmd:
 				prompt = "> ";
@@ -2110,10 +2262,10 @@ ShowWrapCol:
 PipeCmd:
 				(void) pipeCmd(pRtnVal, n, prompt, i);
 				break;
-			case cf_showDir:
-				if(dsetstr(sess.cur.pScrn->workDir, pRtnVal) != 0)
-					goto LibFail;
-				(void) rsset(Success, RSNoFormat | RSNoWrap, sess.cur.pScrn->workDir);
+			case cf_shiftLine:
+				i = ShHoldPoint;
+IODent:
+				(void) shiftLineBlock(pRtnVal, n, args, i);
 				break;
 			case cf_shQuote:
 				if(toStr(args[0]) == Success && dshquote(args[0]->str, pRtnVal) != 0)
@@ -2144,15 +2296,20 @@ InsNLSPC:
 			case cf_statQ:
 				(void) fileTest(pRtnVal, n, args[0], args[1]);
 				break;
-			case cf_strFit:
-				if(args[1]->u.intNum < 0)
-					(void) rsset(Failure, 0, text39, text290, (int) args[1]->u.intNum, 0);
-							// "%s (%d) must be %d or greater", "Length argument"
+			case cf_strfit:
+				if(dgetint(args[1]) < 0 || dgetint(args[1]) > INT_MAX)
+					(void) rsset(Failure, 0, text12, text290, dgetint(args[1]), 0, (long) INT_MAX);
+							// "%s (%'ld) must be in range %d - %'ld", "Length argument"
 				else {
-					if(dsalloc(pRtnVal, args[1]->u.intNum + 1) != 0)
+					if(dsalloc(pRtnVal, dgetint(args[1]) + 1) != 0)
 						goto LibFail;
-					strfit(pRtnVal->str, args[1]->u.intNum, args[0]->str, 0);
+					strfit(pRtnVal->str, dgetint(args[1]) + 1, args[0]->str, 0);
 					}
+				break;
+			case cf_strMatchGrp:
+				i = 0;
+MatchGroup:
+				(void) matchGroup(pRtnVal, args, i == 0);
 				break;
 			case cf_strPop:
 			case cf_strPush:
@@ -2161,12 +2318,12 @@ InsNLSPC:
 				(void) strFunc(pRtnVal, cmdFuncId);
 				break;
 			case cf_strip:
-				if(dsetstr(stripStr(args[0]->str, n == INT_MIN ? 0 : n), pRtnVal) != 0)
+				if(dsetstr(stripStr(args[0]->str, n == DefN ? 0 : n), pRtnVal) != 0)
 					goto LibFail;
 				break;
 			case cf_subline:
-				{long longVal2 = argCount < 2 ? LONG_MAX : args[1]->u.intNum;
-				longVal = args[0]->u.intNum;
+				{long longVal2 = argCount < 2 ? LONG_MAX : dgetint(args[1]);
+				longVal = dgetint(args[0]);
 				if(longVal2 != 0 && (i = sess.cur.pFace->point.pLine->used) > 0) {
 
 					// Determine line offset and length and validate them.  Offset is position relative to
@@ -2188,28 +2345,11 @@ InsNLSPC:
 				}
 				break;
 			case cf_substr:
-				{long longVal2 = args[1]->u.intNum;
-				long longVal3 = argCount < 3 ? LONG_MAX : args[2]->u.intNum;
-				if(longVal3 != 0 && (longVal = strlen(args[0]->str)) > 0 && (longVal2 < 0 ? -longVal2 - 1 :
-				 longVal2) < longVal) {
-					if(longVal2 < 0)					// Negative offset.
-						longVal2 += longVal;
-					longVal -= longVal2;					// Maximum bytes can copy.
-					if(longVal3 > 0 || (longVal3 += longVal) > 0) {
-						if(dsetsubstr(args[0]->str + longVal2, (size_t) (longVal3 <= longVal ?
-						 longVal3 : longVal), pRtnVal) != 0)
-							goto LibFail;
-						}
-					else
-						dsetnull(pRtnVal);
-					}
-				else
-					dsetnull(pRtnVal);
-				}
+				(void) substr(pRtnVal, args[0], dgetint(args[1]), argCount < 3 ? LONG_MAX : dgetint(args[2]));
 				break;
 			case cf_tab:
 				// Process a tab.  Normally bound to ^I.
-				(void) edInsertTab(n == INT_MIN ? 1 : n);
+				(void) edInsertTab(n == DefN ? 1 : n);
 				break;
 			case cf_titleCaseLine:
 				i = CaseLine | CaseTitle;
@@ -2220,9 +2360,15 @@ InsNLSPC:
 			case cf_titleCaseWord:
 				i = CaseWord | CaseTitle;
 				goto CvtCase;
-			case cf_toInt:
+			case cf_toint:
+				i = 0;
+				if(argCount > 1) {
+					if(!isIntVal(args[1]))
+						break;
+					i = dgetint(args[1]);
+					}
 				dxfer(pRtnVal, args[0]);
-				(void) toInt(pRtnVal);
+				(void) toInt(pRtnVal, i);
 				break;
 			case cf_tr:
 				(void) tr(pRtnVal, args[0], args[1], args[2]);
@@ -2234,8 +2380,8 @@ InsNLSPC:
 				// No-op if currently at buffer boundary.
 				{long bytes;
 				bool yep;
-				bool forw = n == INT_MIN || n > 0;
-				bool confirm = n == INT_MIN || (n >= -1 && n <= 1);
+				bool forw = n == DefN || n > 0;
+				bool confirm = n == DefN || (n >= -1 && n <= 1);
 				if(forw) {
 					if(bufEnd(NULL))
 						break;
@@ -2244,7 +2390,7 @@ InsNLSPC:
 				else {
 					if(bufBegin(NULL))
 						break;
-					bytes = LONG_MIN + 1;
+					bytes = DefN + 1;
 					}
 
 				// Get confirmation if no n-override and interactive.
@@ -2253,7 +2399,7 @@ InsNLSPC:
 
 					sprintf(workBuf, text463, forw ? text465 : text464);
 						// "Truncate to %s of buffer", "end", "beginning"
-					if(terminpYN(workBuf, &yep) != Success || !yep)
+					if(termInpYN(workBuf, &yep) != Success || !yep)
 						break;
 					}
 
@@ -2262,12 +2408,12 @@ InsNLSPC:
 					(void) edelc(bytes, EditDel);
 				}
 				break;
-			case cf_typeQ:
+			case cf_typeof:
 				(void) dsetstr(dtype(args[0], true), pRtnVal);
 				break;
 			case cf_undelete:
 				// Yank text from the delete ring.
-				(void) iorStr(NULL, n, Txt_Insert, ringTable + RingIdxDel);
+				(void) iorStr(NULL, n, Txt_Insert, sess.pCurScrn, ringTable + RingIdxDel);
 				break;
 			case cf_undeleteCycle:
 				(void) ycycle(pRtnVal, n, ringTable + RingIdxDel, SF_Undel, cf_undelete);
@@ -2296,6 +2442,14 @@ CvtCase:
 FVFile:
 				(void) findViewFile(pRtnVal, n, i);
 				break;
+			case cf_writeLine:
+				i = 0x0;
+				goto WriteBuf;
+			case cf_writeRegion:
+				i = n <= 0 && n != DefN ? 0x3 : 0x1;
+WriteBuf:
+				(void) writeBuf(pRtnVal, n, i);
+				break;
 			case cf_writeFile:
 				i = 'w';
 AWFile:
@@ -2303,15 +2457,25 @@ AWFile:
 						// "Write to: ", "Append to"
 				break;
 			case cf_yank:
+				i = 0;
+				goto Yank;
+			case cf_yankDel:
+				i = 1;
+Yank:
 				// Yank text from the kill ring.
-				(void) iorStr(NULL, n, Txt_Insert, ringTable + RingIdxKill);
+				if(iorStr(NULL, n, Txt_Insert, sess.pCurScrn, ringTable + RingIdxKill) != Success || i == 0)
+					break;
+
+				// Delete kill entry.
+				(void) rdelete(ringTable + RingIdxKill, n >= 0 ? 1 : n);
 				break;
 			case cf_yankCycle:
 				(void) ycycle(pRtnVal, n, ringTable + RingIdxKill, SF_Yank, cf_yank);
 			}
 		}
 
-	// Command or function call completed.  Extra arguments in script mode are checked in fcall() so no need to do it here.
+	// Command or function call completed.  Extra arguments in script mode are checked by callCFA() function, so no need to
+	// do it here.
 	return sess.rtn.status == Success ? rssave() : sess.rtn.status;
 LibFail:
 	return libfail();
@@ -2448,7 +2612,7 @@ int evalStrLit(Datum *pRtnVal, char *src) {
 			Datum *pDatum;
 
 			// "#{" found.  Execute what follows to "}" as a command line.
-			if(dnewtrack(&pDatum) != 0)
+			if((pDatum = dnewtrack()) == NULL)
 				goto LibFail;
 			if(execExprStmt(pDatum, src + 2, ParseExprEnd | ParseStmtEnd, &src) != Success)
 				return sess.rtn.status;

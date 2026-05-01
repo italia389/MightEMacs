@@ -1,4 +1,4 @@
-// (c) Copyright 2022 Richard W. Marinelli
+// (c) Copyright 2026 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -11,123 +11,128 @@
 #include "search.h"
 #include "var.h"
 
-// MightEMacs operator precedence (highest to lowest):
-//	Precedence	Operator	Description						Associativity
-//	==============	==============	======================================================	=============
-//			++		Suffix increment					Left-to-right
-//			--		Suffix decrement
-//	1		()		Function call
-//			<whitespace>	Function call
-//			[]		Array subscripting
-//	-----------------------------------------------------------------------------------------------------
-//			++		Prefix increment					Right-to-left
-//			--		Prefix decrement
-//			+		Unary plus
-//	2		-		Unary minus
-//			!		Logical NOT
-//			~		Bitwise NOT (one's complement)
-//	-----------------------------------------------------------------------------------------------------
-//			*		Multiplication (if first operand is integer)		Left-to-right
-//	3		/		Division
-//			%		Modulo (if first operand is integer)
-//	-----------------------------------------------------------------------------------------------------
-//	4		+		Addition						Left-to-right
-//			-		Subtraction (if first operand is integer)
-//	-----------------------------------------------------------------------------------------------------
-//	5		=>		Numeric prefix (n)					Left-to-right
-//	-----------------------------------------------------------------------------------------------------
-//	6		<<		Bitwise left shift					Left-to-right
-//			>>		Bitwise right shift
-//	-----------------------------------------------------------------------------------------------------
-//	7		&		Bitwise AND (if first operand is integer)		Left-to-right
-//	-----------------------------------------------------------------------------------------------------
-//	8		|		Bitwise OR (inclusive or; if first operand is integer)	Left-to-right
-//			^		Bitwise XOR (exclusive or)
-//	-----------------------------------------------------------------------------------------------------
-//	9		%		String formatting (if first operand is string)		Left-to-right
-//	-----------------------------------------------------------------------------------------------------
-//	10		*		Intersection (if first operand is array)		Left-to-right
-//			-		Exclusion (if first operand is array)
-//	-----------------------------------------------------------------------------------------------------
-//	11		|		Union (if first operand is array)			Left-to-right
-//	-----------------------------------------------------------------------------------------------------
-//	12		&		Concatenation (if first operand is string)		Left-to-right
-//	-----------------------------------------------------------------------------------------------------
-//			<		Less than						Left-to-right
-//	13		<=		Less than or equal to
-//			>		Greater than
-//			>=		Greater than or equal to
-//	-----------------------------------------------------------------------------------------------------
-//			<=>		Comparison						Left-to-right
-//			==		Equal to
-//	14		!=		Not equal to
-//			=~		RE equal to
-//			!~		RE not equal to
-//	-----------------------------------------------------------------------------------------------------
-//	15		&&		Logical AND						Left-to-right
-//	-----------------------------------------------------------------------------------------------------
-//	16		||		Logical OR						Left-to-right
-//	-----------------------------------------------------------------------------------------------------
-//	17		?:		Ternary conditional					Right-to-left
-//	-----------------------------------------------------------------------------------------------------
-//			=		Direct assignment					Right-to-left
-//			+=		Assignment by sum
-//			-=		Assignment by difference (or exclusion if first operand is array)
-//			*=		Assignment by product (or intersection if first operand is array)
-//			/=		Assignment by quotient
-//	18		%=		Assignment by remainder
-//			<<=		Assignment by bitwise left shift
-//			>>=		Assignment by bitwise right shift
-//			&=		Assignment by bitwise AND (or concatenation if first operand is array)
-//			|=		Assignment by bitwise OR (or union if first operand is array)
-//			^=		Assignment by bitwise XOR
-//	-----------------------------------------------------------------------------------------------------
-//	19		not		Logical NOT (low precedence)				Right-to-left
-//	-----------------------------------------------------------------------------------------------------
-//	20		or		Logical OR (low precedence)				Left-to-right
-//			and		Logical AND (low precedence)
-//	-----------------------------------------------------------------------------------------------------
+/* MightEMacs operator precedence (highest to lowest):
+	Precedence	Operator	Description						Associativity
+	==============	==============	======================================================	=============
+			++		Suffix increment					Left-to-right
+			--		Suffix decrement
+	1		()		Function call
+			<whitespace>	Function call
+			[]		Array subscripting and hash lookup
+	-----------------------------------------------------------------------------------------------------
+			++		Prefix increment					Right-to-left
+			--		Prefix decrement
+			+		Unary plus
+	2		-		Unary minus
+			!		Logical NOT
+			~		Bitwise NOT (one's complement)
+	-----------------------------------------------------------------------------------------------------
+			*		Multiplication (if first operand is integer)		Left-to-right
+	3		/		Division
+			%		Modulo (if first operand is integer)
+	-----------------------------------------------------------------------------------------------------
+	4		+		Addition						Left-to-right
+			-		Subtraction (if first operand is integer)
+	-----------------------------------------------------------------------------------------------------
+	5		=>		Numeric prefix (n) or hash key/value delimiter		Left-to-right
+	-----------------------------------------------------------------------------------------------------
+	6		<<		Bitwise left shift					Left-to-right
+			>>		Bitwise right shift
+	-----------------------------------------------------------------------------------------------------
+	7		&		Bitwise AND (if first operand is integer)		Left-to-right
+	-----------------------------------------------------------------------------------------------------
+	8		|		Bitwise OR (inclusive or; if first operand is integer)	Left-to-right
+			^		Bitwise XOR (exclusive or)
+	-----------------------------------------------------------------------------------------------------
+	9		%		String formatting (if first operand is string)		Left-to-right
+	-----------------------------------------------------------------------------------------------------
+	10		*		Intersection (if first operand is array)		Left-to-right
+			-		Exclusion (if first operand is array)
+	-----------------------------------------------------------------------------------------------------
+	11		|		Union (if first operand is array)			Left-to-right
+	-----------------------------------------------------------------------------------------------------
+	12		&		Concatenation (if first operand is string)		Left-to-right
+	-----------------------------------------------------------------------------------------------------
+			<		Less than						Left-to-right
+	13		<=		Less than or equal to
+			>		Greater than
+			>=		Greater than or equal to
+	-----------------------------------------------------------------------------------------------------
+			<=>		Comparison						Left-to-right
+			==		Equal to
+	14		!=		Not equal to
+			=~		RE equal to
+			!~		RE not equal to
+	-----------------------------------------------------------------------------------------------------
+	15		&&		Logical AND						Left-to-right
+	-----------------------------------------------------------------------------------------------------
+	16		||		Logical OR						Left-to-right
+	-----------------------------------------------------------------------------------------------------
+	17		?:		Ternary conditional					Right-to-left
+	-----------------------------------------------------------------------------------------------------
+			=		Direct assignment					Right-to-left
+			+=		Assignment by sum
+			-=		Assignment by difference (or exclusion if first operand is array)
+			*=		Assignment by product (or intersection if first operand is array)
+			/=		Assignment by quotient
+	18		%=		Assignment by remainder
+			<<=		Assignment by bitwise left shift
+			>>=		Assignment by bitwise right shift
+			&=		Assignment by bitwise AND (or concatenation if first operand is array)
+			|=		Assignment by bitwise OR (or union if first operand is array)
+			^=		Assignment by bitwise XOR
+	-----------------------------------------------------------------------------------------------------
+	19		not		Logical NOT (low precedence)				Right-to-left
+	-----------------------------------------------------------------------------------------------------
+	20		or		Logical OR (low precedence)				Left-to-right
+			and		Logical AND (low precedence)
+	-----------------------------------------------------------------------------------------------------
 
-// Array Management Notes:
-//
-// Arrays are managed differently than other data types in MightEMacs.  Non-array types, including strings, are always copied
-// from place to place (by value) when an expression is evaluated.  For example, when a variable containing a string is
-// dereferenced, a copy of the string is placed into the expression node and the variable retains its own copy.  This is not the
-// case for arrays.  Except for a few special cases, arrays are always copied by reference instead of by value.  So for example,
-// when a variable containing an array is dereferenced, a pointer to that array is placed into the expression node.  If the
-// array in the node is subsequently modified, the variable becomes modified as well.  This technique is used is avoid making
-// multiple copies of an array during expression evaluation, which would have a significant performance and memory-consumption
-// impact.
-//
-// Passing pointers for arrays creates a problem, however.  It is extremely difficult to determine when an array (which is
-// allocated from heap space, like all data types) is no longer being used during expression evaluation and can be freed.  To
-// solve this problem, the following method is used:
-//   1. Any time an array is created, it is saved in a Datum object and pushed onto a "garbage collection" list pointed to by
-//	"arrayGarbHead".  This is done recursively so that any nested arrays are pushed onto the list also.
-//   2. An Array object contains a Boolean member, "tagged", which is used to determine which arrays to keep and which to free
-//	(later) and also to prevent endless recursion when an array contains itself.
-//   3. Freeing of array space is not attempted at all during expression evaluation, simply because there is no safe time at
-//	which to do so.  It is not done until just before control is returned to the user, in editLoop(), via a call to the
-//	agFree() function.
-//   4. The job of agFree() is to scan the arrayGarbHead list, freeing arrays which are not associated with a global
-//	variable.  To accomplish this, it first checks the list.  If it is empty, it does nothing; otherwise, it (a), scans the
-//	global variable list and adds any arrays found to the garbage list via the agTrack() function (which also adds nested
-//	arrays) so that all existing arrays will be examined; (b), scans the garbage list and sets "tagged" to false in each
-//	array; (c), scans the global variable list again and sets tagged to true in any arrays and nested arrays found via the
-//	agTag() function, which also uses "tagged" during recursion to prevent an endless loop if an array contains itself; and
-//	(d), scans the garbage list again and frees any arrays which have "tagged" set to false.
-//   5. When agFree() is done, the only arrays left in the list will be those contained in global variables.  This will also
-//	include nested arrays.  "arrayGarbHead" is set to NULL at this point so that the list will not be scanned every time the
-//	user presses a key.
-//   6. Lastly, to deal with the arrays contained in global variables, the agTag() function is called whenever a new value
-//	is assigned to one of those variables, or one of their elements that contains an array.  It puts the old array and any
-//	arrays it contains back onto the garbage list.
-//
-// Given the fact that arrays are passed around by reference, it is the responsibility of the user to clone arrays where needed
-// (via the "aclone" function).  However, there are a couple places where it is done automatically:
-//	* If the initializer of the "array" function is itself an array, it is cloned for each element of the array created.
-//	* If the first item in a concatenation expression is an array and is an lvalue (a variable or array element), it is
-//	  cloned so that the value of the variable or array element is not changed.
+Array and Hash Management Notes:
+
+Arrays and hashes are managed differently than other data types in MightEMacs.  Non-array-hash types, including strings, are
+always copied from place to place (by value) when an expression is evaluated.  For example, when a variable containing a string
+is dereferenced, a copy of the string is placed into the expression node and the variable retains its own copy.  This is not the
+case for arrays and hashess.  Except for a few special cases, arrays and hashess are always copied by reference instead of by
+value.  So for example, when a variable containing an array or hash is dereferenced, a pointer to that array or hash is placed
+into the expression node.  If the array or hash in the node is subsequently modified, the variable becomes modified as well.
+This technique is used is avoid making multiple copies of an array or hash during expression evaluation, which would have a
+significant performance and memory-consumption impact.
+
+Passing pointers for arrays and hashes creates a problem, however.  It is extremely difficult to determine when an array or hash
+(which is allocated from heap space, like all data types) is no longer being used during expression evaluation and can be freed.
+To solve this problem, the following method is used:
+ 1. Any time an array or hash is created, it is saved in a Datum object and pushed onto a tracking list pointed to by
+    "ahTrackHead".  This is done recursively so that any nested arrays and hashes are pushed onto the list also.
+ 2. Array and Hash objects contain a "user flags" member, "uflags", which is used to identify the object type, determine which
+    arrays and hashes to keep and which to free (later), and also to prevent endless recursion when an array or hash contains
+    itself, either directly or indirectly.
+ 3. Freeing of array and hash space is not attempted at all during expression evaluation, simply because there is no safe time
+    at which to do so.  It is not done until just before control is returned to the user, in editLoop(), via a call to the
+    ahfree() function.
+ 4. The job of ahfree() is to scan the ahTrackHead list, freeing arrays and hashes which are not associated with a global
+    constant or variable.  To accomplish this, it first checks the list.  If it is empty, it does nothing; otherwise, it (a),
+    scans the global constant/variable list and adds any arrays and hashes found to the tracking list via the ahtrack() function
+    (which also adds nested arrays and hashes) so that all existing arrays and hashes will be examined; (b), scans the tracking
+    list and sets the Tag bit of uflags to zero in each array and hash; (c), scans the global constant/variable list again and
+    sets the Tag bit of uflags in any arrays and hashes and nested arrays and hashes found via the ahTag() function, which also
+    uses uflags during recursion to prevent an endless loop if an array or hash contains itself; and (d), scans the tracking
+    list again and frees any arrays or hashes which are not tagged.
+ 5. When ahfree() is done, the only arrays and hashes left in the list will be those contained in global constants and
+    variables.  This will also include nested arrays and hashes.  "ahTrackHead" is set to NULL at this point so that the list
+    will not be scanned every time the user presses a key.
+ 6. Lastly, to deal with the arrays and hashes contained in global constants and variables, the ahTag() function is called
+    whenever a new value is assigned to one of those variables, or one of their elements or nodes that contains an array or
+    hash.  It puts the old array or hash and any arrays or hashes it contains back onto the tracking list.
+
+Given the fact that arrays and hashes are passed around by reference, it is the responsibility of the user to clone arrays and
+hashes where needed (via the "aclone" and "hclone" functions).  However, there are a couple places where it is done
+automatically:
+	* If the initializer of the "array" function is itself an array, it is cloned for each element of the array created.
+	* If the first item in a concatenation expression is an array or hash and is an lvalue (a variable, array element
+	  reference, or hash node reference), it is cloned so that the value of the variable, array element reference, or hash
+	  node reference is not changed.
+*/
 
 /*** Local declarations ***/
 
@@ -153,374 +158,102 @@ typedef struct {
 #define FF_Cond		0x0800		// Conditional (hook).
 #define FF_Assign	0x1000		// Straight assignment (=).
 
-#define Str_Left	0x4000		// Convert left operand to string.
-#define Str_Right	0x8000		// Convert right operand to string.
-
-// forceFit() table for nil, Boolean (true or false), int, string, and array coersion combinations.
+// forceFit() table for validating data types of a binary operation and optionally, coercing right operand to string.  Data
+// types are: nil, Boolean (true or false), int, string, array, and hash.
 static struct ForceFit {
 	ushort legal;			// Legal operations (FF_XXX flags)
-	ushort strOp;			// Operations which cause call to toStr().  High bits determine left and/or right side.
-	} forceFitTable[][5] = {
+	ushort strOp;			// Operations which cause call to toStr() on right node.
+	} forceFitTable[][6] = {
 		{ /* nil */
 /* nil */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
 /* bool */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
 /* int */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
 /* string */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
-/* array */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0}},
+/* array */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
+/* hash */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0}},
 
 		{ /* bool */
 /* nil */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
 /* bool */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
 /* int */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
 /* string */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
-/* array */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0}},
+/* array */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
+/* hash */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0}},
 
 		{ /* int */
 /* nil */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
 /* bool */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
 /* int */	{~(FF_Concat | FF_Format | FF_REQNE),					0},
 /* string */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
-/* array */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0}},
+/* array */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
+/* hash */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0}},
 
 		{ /* string */
-/* nil */	{FF_Assign | FF_Concat | FF_Format | FF_EQNE | FF_LogAndOr | FF_Cond,	FF_Concat | Str_Right},
-/* bool */	{FF_Assign | FF_Concat | FF_Format | FF_EQNE | FF_LogAndOr | FF_Cond,	FF_Concat | Str_Right},
-/* int */	{FF_Assign | FF_Concat | FF_Format | FF_EQNE | FF_LogAndOr | FF_Cond,	FF_Concat | Str_Right},
+/* nil */	{FF_Assign | FF_Concat | FF_Format | FF_EQNE | FF_LogAndOr | FF_Cond,	FF_Concat},
+/* bool */	{FF_Assign | FF_Format | FF_EQNE | FF_LogAndOr | FF_Cond,		0},
+/* int */	{FF_Assign | FF_Concat | FF_Format | FF_EQNE | FF_LogAndOr | FF_Cond,	FF_Concat},
 /* string */	{FF_Assign | FF_Concat | FF_Format | FF_Rel | FF_REQNE | FF_EQNE | FF_LogAndOr | FF_Cond,	0},
-/* array */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0}},
+/* array */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
+/* hash */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0}},
 
 		{ /* array */
 /* nil */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
 /* bool */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
 /* int */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
 /* string */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
-/* array */	{FF_Assign | FF_SetMatch | FF_Union | FF_Concat | FF_EQNE | FF_LogAndOr | FF_Cond,	0}}
-		};
+/* array */	{FF_Assign | FF_SetMatch | FF_Union | FF_Concat | FF_EQNE | FF_LogAndOr | FF_Cond,	0},
+/* hash */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0}},
 
-static Array
-	*arrayGarbHead = NULL,		// Head of array garbage collection list.
-	*arrayGarbTail = NULL;		// Tail of array garbage collection list.
+		{ /* hash */
+/* nil */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
+/* bool */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
+/* int */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
+/* string */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
+/* array */	{FF_Assign | FF_EQNE | FF_LogAndOr | FF_Cond,				0},
+/* hash */	{FF_Assign | FF_Concat | FF_EQNE | FF_LogAndOr | FF_Cond,		0}}
+		};
 
 #if MMDebug & Debug_Expr
 static int indent = -1;
 #endif
 
-#if MMDebug & Debug_ArrayLog
-// Write array-usage report to log file.
-static int agUsage(int step) {
-
-	if(arrayGarbHead != NULL) {
-		Array *pGarb = arrayGarbHead;
-		Array *pArray;
-		Datum **ppArrayEl, **ppArrayElEnd, datum;
-		ArraySize i;
-
-		dinit(&datum);
-		if(step > 1)
-			fputc('\n', logfile);
-		fprintf(logfile, "agFree(): Array List: STEP %d\n\n", step);
-		do {
-			fprintf(logfile, "\tFound array %.8x\n", (uint) pGarb);
-			fprintf(logfile, "\t tagged: %d\n", pGarb->tagged);
-			if(pGarb->elements == NULL)
-				fputs("\t\tEMPTY\n", logfile);
-			else {
-				ppArrayElEnd = (ppArrayEl = pGarb->elements) + pGarb->used;
-				i = 0;
-				while(ppArrayEl < ppArrayElEnd) {
-					fprintf(logfile, "\t\t%2ld [%.4hx]: ", i++, (*ppArrayEl)->type);
-					if(dtyparray(*ppArrayEl)) {
-						pArray = (*ppArrayEl)->u.pArray;
-						fprintf(logfile, "ARRAY [%.8x], size %ld\n", (uint) pArray, pArray->used);
-						}
-					else if(dtos(&datum, *ppArrayEl, NULL, DCvtEscChar | DCvtQuote | DCvtShowNil) < 0)
-						return libfail();
-					else
-						fprintf(logfile, "%s\n", datum.str);
-					++ppArrayEl;
-					}
-				}
-			} while((pGarb = pGarb->next) != NULL);
-		dclear(&datum);
-		}
-	return sess.rtn.status;
-	}
-#endif
-
-#if MMDebug & Debug_ArrayBuf
-// Write array contents to a fabrication object in abbreviated form.  Return status.
-static int agUsage1(ArrayWrapper *pArray, DFab *pFab) {
-	Datum **ppArrayEl = pArray->pArray->elements;
-	Datum **ppArrayElEnd = ppArrayEl + pArray->pArray->used;
-	bool first = true;
-
-	if(dputc('[', pFab, 0) != 0)
-		goto LibFail;
-	while(ppArrayEl < ppArrayElEnd) {
-		if(first)
-			first = false;
-		else if(dputc(', ', pFab, 0) != 0)
-			goto LibFail;
-		if(dtyparray(*ppArrayEl)) {
-			Array *pArray = (*ppArrayEl)->u.pArray;
-			if(dputf(pFab, 0, "[%.8x:%.8x:%d]", (uint) (*ppArrayEl), (uint) pArray, pArray->used) != 0)
-				goto LibFail;
-			}
-		else if(dputd(*ppArrayEl, pFab, NULL, DCvtLang) < 0)
-			goto LibFail;
-		++ppArrayEl;
-		}
-	if(dputc(']', pFab, 0) != 0)
-LibFail:
-		(void) libfail();
-
-	return sess.rtn.status;
-	}
-
-// Write array-usage report to a buffer.
-static int agUsage(DFab *pFab, int step) {
-
-	if(step <= 0) {
-		UserVar *pUserVar;
-		ArrayWrapper *pArray = arrayGarbHead;
-
-		// Dump array info.
-		if((step < 0 && dopentrack(pFab) != 0) ||
-		 dputf(pFab, 0, "agFree(): Array List: *%s*\n\n", step < 0 ? "BEFORE" : "AFTER") != 0)
-			goto LibFail;
-		do {
-			if(dputf(pFab, 0, "%.8x   %.8x   %c", (uint) pArray, (uint) pArray->pArray,
-			 pArray->tagged ? '*' : ' ') != 0)
-				goto LibFail;
-			if(agUsage1(pArray, pFab) != Success)
-				return sess.rtn.status;
-			if(dputc('\n', pFab, 0) != 0)
-				goto LibFail;
-			} while((pArray = pArray->next) != NULL);
-
-		if(dputs("\nGLOBAL VARIABLES\n\n", pFab, 0) != 0)
-			goto LibFail;
-		for(pUserVar = globalVarRoot; pUserVar != NULL; pUserVar = pUserVar->next) {
-			if(dtyparray(pUserVar->pValue)) {
-				pArray = pUserVar->pValue->u.pArray;
-				if(dputf(pFab, 0, "%-18s %.8x   %.8x   %c", pUserVar->name, (uint) pArray,
-				 (uint) pArray->pArray, pArray->tagged ? '*' : ' ') != 0)
-					goto LibFail;
-				if(agUsage1(pUserVar->pValue->u.pArray), pFab) != Success)
-					return sess.rtn.status;
-				if(dputc('\n', pFab, 0) != 0)
-					goto LibFail;
-				}
-			}
-		}
-	else {
-		Buffer *pBuf;
-		bool created;
-
-		if(dclose(pFab, FabStr) != 0)
-			goto LibFail;
-
-		// Create debug buffer, clear it, and append results.
-		if(bfind("Debug", BS_Create, 0, &pBuf, &created) != Success ||
-		 (!created && bclear(pBuf, BC_IgnChgd) != Success))
-			return sess.rtn.status;
-		if(bappend(pBuf, pFab->pDatum->str) == Success) {
-			Datum d;
-
-			dinit(&d);
-			(void) render(&d, 2, pBuf, RendRewind);
-			dclear(agRelease(&d));
-			}
-		}
-	return sess.rtn.status;
-LibFail:
-	return libfail();
-	}
-#endif
-
-// Add an array and any nested arrays recursively to the garbage list (for subsequent garbage collection) if not already there.
-// An array that contains itself is allowed.
-void agTrack(Datum *pDatum) {
-	Array *pArray = pDatum->u.pArray;
-#if MMDebug & (Debug_ArrayBuf | Debug_ArrayLog | Debug_Datum)
-	fprintf(logfile, "agTrack(%.8x): array %.8x, next %.8x, garbHead %.8x, garbTail %.8x\n",
-	 (uint) pDatum, (uint) pArray, (uint) pArray->next, (uint) arrayGarbHead, (uint) arrayGarbTail);
-#endif
-	// Convert and add array if it's not already on the list.
-	if(pArray->next == NULL && pArray != arrayGarbTail) {
-		(void) drelease(pDatum);
-		if(arrayGarbHead == NULL)
-			arrayGarbHead = arrayGarbTail = pArray;
-		else {
-			pArray->next = arrayGarbHead;
-			arrayGarbHead = pArray;
-			}
-
-		// Convert and add any array elements, too.
-		if(pArray->elements != NULL) {
-			Datum **ppArrayEl, **ppArrayElEnd;
-			ppArrayElEnd = (ppArrayEl = pArray->elements) + pArray->used;
-			while(ppArrayEl < ppArrayElEnd) {
-				if(dtyparray(*ppArrayEl))
-					agTrack(*ppArrayEl);
-				++ppArrayEl;
-				}
-			}
-#if MMDebug & (Debug_ArrayBuf | Debug_ArrayLog | Debug_Datum)
-		fprintf(logfile, "  array %.8x -> next %.8x, garbHead %.8x, garbTail %.8x\nASTACK:",
-		 (uint) pArray, (uint) pArray->next, (uint) arrayGarbHead, (uint) arrayGarbTail);
-		pArray = arrayGarbHead;
-		do {
-			fprintf(logfile, "\t%.8x -> %.8x\n", (uint) pArray, (uint) pArray->next);
-			} while((pArray = pArray->next) != NULL);
-#endif
-		}
-	}
-
-// Stash a new array in a datum and add it to the garbage list.
-void agStash(Datum *pDatum, Array *pArray) {
-
-#if MMDebug & (Debug_ArrayBuf | Debug_ArrayLog | Debug_Datum)
-	fprintf(logfile, "agStash(): array %.8x\n", (uint) pArray);
-#endif
-	dsetarrayref(pArray, pDatum);			// Store array in Datum object...
-	agTrack(pDatum);				// and add it to garbage list.
-	}
-
-// Scan the array garbage collection list and clear all the tags.
-static void agClearTags(void) {
-	Array *pArray = arrayGarbHead;
-	while(pArray != NULL) {
-		pArray->tagged = false;
-		pArray = pArray->next;
-		}
-	}
-
-// Tag given array and all nested arrays (if any).  An array that contains itself is allowed.
-static void agTag(Datum *pDatum) {
-	Array *pArray = pDatum->u.pArray;
-	if(!pArray->tagged) {
-		pArray->tagged = true;
-		if(pArray->elements != NULL) {
-			Datum **ppArrayEl, **ppArrayElEnd;
-			ppArrayElEnd = (ppArrayEl = pArray->elements) + pArray->used;
-			while(ppArrayEl < ppArrayElEnd) {
-				if(dtyparray(*ppArrayEl))
-					agTag(*ppArrayEl);
-				++ppArrayEl;
-				}
-			}
-		}
-	}
-
-// Free all unused arrays; that is, any array not tied to a global variable.
-int agFree(void) {
-
-	if(arrayGarbHead != NULL) {
-		Array *pArray;
-		UserVar *pUserVar;
-		bool foundGlobal;
-#if MMDebug & Debug_ArrayBuf
-		DFab fab;
-#endif
-#if MMDebug & Debug_ArrayLog
-		if(agUsage(0) != Success)
-			return sess.rtn.status;
-#endif
-
-		// Step 1: Scan global variable table and add any arrays found to garbage list to complete the list of all known
-		// arrays.  This is necessary because a global array currently not on the list may have had an array added to it
-		// (for example) that would then not be tagged as a "keeper" and would be freed in error.
-		foundGlobal = false;
-		for(pUserVar = globalVarRoot; pUserVar != NULL; pUserVar = pUserVar->next)
-			if(dtyparray(pUserVar->pValue)) {
-				agTrack(pUserVar->pValue);
-				foundGlobal = true;
-				}
-
-		// Step 2: Clear all tags in array list, which now contains all known arrays "flattened".
-		agClearTags();
-
-#if MMDebug & Debug_ArrayLog
-		if(agUsage(2) != Success)
-			return sess.rtn.status;
-#elif MMDebug & Debug_ArrayBuf
-		if(agUsage(&fab, -1) != Success)
-			return sess.rtn.status;
-#endif
-		// Step 3: If any arrays were found in global variable table, scan table again and tag them as "keepers".
-		if(foundGlobal) {
-			for(pUserVar = globalVarRoot; pUserVar != NULL; pUserVar = pUserVar->next)
-				if(dtyparray(pUserVar->pValue))
-					agTag(pUserVar->pValue);
-#if MMDebug & Debug_ArrayLog
-			if(agUsage(3) != Success)
-				return sess.rtn.status;
-#elif MMDebug & Debug_ArrayBuf
-			if(agUsage(&fab, 0) != Success)
-				return sess.rtn.status;
-#endif
-			}
-
-		// Step 4: Do final scan of garbage list, freeing any non-keeper arrays, and clearing list.
-		do {
-			pArray = arrayGarbHead;
-			arrayGarbHead = arrayGarbHead->next;
-			if(pArray->tagged) {
-
-				// Keeper array found.  Reset controls for next agFree() call.
-				pArray->next = NULL;
-				pArray->tagged = false;
-				}
-			else {
-				// Non-keeper array found.  Nuke it.
-#if MMDebug & Debug_ArrayLog
-				fprintf(logfile, "Freeing array %.8x...\n", (uint) pArray);
-#elif MMDebug & Debug_ArrayBuf
-				if(dputf(&fab, 0, "Freeing array %.8x...\n", (uint) pArray) != 0)
-					return libfail();
-#endif
-				afree(pArray);
-				}
-			} while(arrayGarbHead != NULL);
-		arrayGarbTail = NULL;
-#if MMDebug & Debug_ArrayBuf
-		(void) agUsage(&fab, 1);
-#endif
-		}
-
-	return sess.rtn.status;
-	}
-
-// Pop datGarbHead to given pointer, releasing allocated memory for Datum objects, preserving any arrays.
-void dgPop(Datum *pDatum) {
+// Pop datTrackHead to given pointer, releasing allocated memory for Datum objects, preserving any arrays and hashes.
+void dtpop(Datum *pDatum) {
 	Datum *pDatum1;
 
 #if MMDebug & Debug_Datum
-	fprintf(logfile, "dgPop(%.8x): datGarbHead %.8x...\n", (uint) pDatum, (uint) datGarbHead);
+	fprintf(logfile, "dtpop(%.8x): datTrackHead %.8x...\n", (uint) pDatum, (uint) datTrackHead);
 #endif
-	while(datGarbHead != pDatum) {
-		pDatum1 = datGarbHead;
-		datGarbHead = datGarbHead->next;
+	while(datTrackHead != pDatum) {
+		pDatum1 = datTrackHead;
+		datTrackHead = datTrackHead->next;
 
 #if MMDebug & Debug_Datum
 		fprintf(logfile, "  freeing datum %.8x, type %.4hx...\n", (uint) pDatum1, pDatum1->type);
 #endif
-		// Don't free arrays.
+		// Don't free actual arrays and hashes (which are "ref" types in datum).
 		dfree(pDatum1);
 		}
 #if MMDebug & Debug_Datum
-	fputs("dgPop(): EXIT\n", logfile);
+	fputs("dtpop(): EXIT\n", logfile);
 #endif
 	}
 
 // Initialize an expression node with given Datum object.
-void nodeInit(ExprNode *pNode, Datum *pRtnVal, bool topLevel) {
+static void nodeClear(ExprNode *pNode) {
 
-	dsetnil(pRtnVal);
-	pNode->pValue = pRtnVal;
-	pNode->flags = topLevel ? EN_TopLevel : 0;
-	pNode->nArg = INT_MIN;
+	dsetnil(pNode->pVal);
+	pNode->flags = 0;
+	pNode->nArg = DefN;
+	pNode->i.pKey = NULL;
+	}
+
+// Initialize an expression node with given Datum object.
+void nodeInit(ExprNode *pNode, Datum *pRtnVal, ushort flags) {
+
+	pNode->pVal = pRtnVal;
+	nodeClear(pNode);
+	pNode->flags = flags;
 	}
 
 // Return true if b is true; otherwise, set given error message and return false.
@@ -535,7 +268,7 @@ static bool isTrue(bool b, const char *msg) {
 // Return true if a Datum object is a character (8-bit unsigned integer); otherwise, set an error and return false.
 bool isCharVal(Datum *pDatum) {
 
-	return isTrue(pDatum->type == dat_int && pDatum->u.intNum >= 0 && pDatum->u.intNum <= 0xFF, text288);
+	return isTrue(pDatum->type == dat_int && dgetint(pDatum) >= 0 && dgetint(pDatum) <= 0xff, text288);
 			// "Character expected"
 	}
 
@@ -560,16 +293,29 @@ bool isArrayVal(Datum *pDatum) {
 			// "Array expected"
 	}
 
+// Return true if Datum object is a hash; otherwise, set an error and return false.
+static bool isHashVal(Datum *pDatum) {
+
+	return isTrue(dtyphash(pDatum), text509);
+			// "Hash expected"
+	}
+
+// Return true if Datum object is an array, hash, or string; otherwise, set an error and return false.
+bool isAryHshStrVal(Datum *pDatum) {
+
+	return isTrue(pDatum->type & (DArrayMask | DHashMask | DStrMask), text510);
+							// "Array, hash, or string expected"
+	}
+
 // Return true if node value is an lvalue; otherwise, set an error if "required" is true and return false.
 static bool lvalue(ExprNode *pNode, bool required) {
 
-	if((pNode->flags & EN_HaveGNVar) || ((pNode->flags & EN_HaveIdent) && findUserVar(pNode->pValue->str) != NULL) ||
-	 (pNode->flags & EN_ArrayRef))
+	if(pNode->flags & EN_HaveLValue || (pNode->flags & EN_HaveIdent && findLocalVar(pNode->pVal->str) != NULL))
 		return true;
 	if(required) {
 		if(pNode->flags & EN_HaveIdent)
-			(void) rsset(Failure, 0, text52, pNode->pValue->str);
-					// "No such variable '%s'"
+			(void) rsset(Failure, 0, text52, text239, pNode->pVal->str);
+					// "No such %s \"%s\"", "variable"
 		else
 			(void) rsset(Failure, 0, text4, text82, pLastParse->tok.str);
 					// "%s expected (at token '%s')", "Variable name"
@@ -577,40 +323,56 @@ static bool lvalue(ExprNode *pNode, bool required) {
 	return false;
 	}
 
-#if MMDebug & Debug_Expr
-// Write integer or string value to log file, given Datum object.
-void dumpVal(Datum *pDatum) {
+#if MMDebug & (Debug_ArrayHash | Debug_AryHshBuf | Debug_AryHshLog | Debug_Expr | Debug_UserVars)
+// Write a value to log file, given Datum object and newline flag.
+void dumpVal(Datum *pDatum, bool newln) {
 	char *str;
+	Datum datum;
+	long size;
+	uint bufLen = term.cols * 2 / 3 - 28 + 1;
+	char workBuf[bufLen];
 
-	fprintf(logfile, "(%.8x typ %hu) ", (uint) pDatum, pDatum->type);
+	fprintf(logfile, " (%.8x typ %.4hx) ", (uint) pDatum, pDatum->type);
 	switch(pDatum->type) {
 		case dat_nil:
 			str = viz_nil;
 			break;
 		case dat_false:
 			str = viz_false;
+			break;
 		case dat_true:
 			str = viz_true;
 			break;
 		case dat_int:
-			fprintf(logfile, "%ld", pDatum->u.intNum);
-			return;
+			fprintf(logfile, "%ld", dgetint(pDatum));
+			goto Newline;
 		case dat_miniStr:
 		case dat_longStr:
 			fprintf(logfile, "\"%s\"", pDatum->str);
-			return;
+			goto Newline;
+		case dat_array:
+		case dat_arrayRef:
+			str = "array";
+			size = dgetarrayptr(pDatum)->used;
+			goto PrintAH;
 		default:
-			fprintf(logfile, "[array] len %ld", pDatum->u.pArray->used);
-			return;
+			str = "hash";
+			size = dgethashptr(pDatum)->nodeCount;
+PrintAH:
+			dinit(&datum);
+			(void) dtos(&datum, pDatum, NULL, CvtLang);
+			strfit(workBuf, bufLen, datum.str, 0);
+			fprintf(logfile, "[%s %.8x] size %ld %s", str, (uint) dgetptr(pDatum), size, workBuf);
+			dclear(&datum);
+			goto Newline;
 		}
-
 	fputs(str, logfile);
+Newline:
+	if(newln)
+		fputc('\n', logfile);
 	}
-
-// Write integer or string value to log file, given node.
-static void ge_dumpVal(ExprNode *pNode) {
-	dumpVal(pNode->pValue);
-	}
+#endif
+#if MMDebug & Debug_Expr
 
 // Write expression parsing info to log file.
 static void ge_dump(const char *funcName, short nodeNum, ExprNode *pNode1, ExprNode *pNode2, bool begin) {
@@ -619,14 +381,14 @@ static void ge_dump(const char *funcName, short nodeNum, ExprNode *pNode1, ExprN
 		fputs("  ", logfile);
 	fprintf(logfile, "%s %s(%hd): %s '%s' (%d), cur val ", begin ? "BEGIN" : "END", funcName, nodeNum, begin ? "parsing" :
 	 "returning at", pLastParse->tok.str, pLastParse->sym);
-	ge_dumpVal(pNode1);
+	dumpVal(pNode1->pVal, false);
 	fprintf(logfile, ", nflags %.4hx", pNode1->flags);
 	if(pNode2 != NULL) {
 		fputs(", val2 ", logfile);
-		ge_dumpVal(pNode2);
+		dumpVal(pNode2->pVal, false);
 		fprintf(logfile, ", nflags %.4hx", pNode2->flags);
 		}
-	fprintf(logfile, ", EvalMode %x", sess.opFlags & OpEval);
+	fprintf(logfile, ", opFlags %.4hx", sess.opFlags);
 	if(begin)
 		fputs("...\n", logfile);
 	else
@@ -646,25 +408,27 @@ static int ge_debug1(const char *funcName, short nodeNum, ExprNode *pNode1, Expr
 	}
 #endif
 
-// Dereference an lvalue (variable name or array element reference) in pNode if present and evaluating.  Return status.
+// Dereference an lvalue (variable name, array element reference, or hash node reference) in pNode if present and evaluating.
+// Return status.
 static int ge_deref(ExprNode *pNode) {
 
 	if(!(sess.opFlags & OpEval))
 
 		// Not evaluating.  Just clear flags.
-		pNode->flags &= ~(EN_TopLevel | EN_ArrayRef | EN_HaveIdent | EN_HaveGNVar | EN_HaveWhite);
+		pNode->flags &= ~(EN_TopLevel | EN_HaveLValue | EN_HaveIdent | EN_HaveWhite);
 	else {
 		// Evaluating.  Dereference and clear flags.
-		if(pNode->flags & (EN_HaveGNVar | EN_HaveIdent)) {
-			(void) vderefn(pNode->pValue, pNode->pValue->str);
-			pNode->flags &= ~(EN_TopLevel | EN_HaveIdent | EN_HaveGNVar | EN_HaveWhite);
+		if(pNode->flags & EN_HaveIdent) {
+			if(vderefn(pNode->pVal, pNode->pVal->str) == Success)
+				pNode->flags &= ~(EN_TopLevel | EN_HaveIdent | EN_GNConstVar | EN_HaveWhite);
 			}
-		else if(pNode->flags & EN_ArrayRef) {
+		else if(pNode->flags & (EN_AryElRef | EN_HshNodRef)) {
 			VarDesc varDesc;
+			int (*cvtRef)(VarDesc *pVarDesc, ExprNode *pNode, uint oflags) = pNode->flags & EN_AryElRef ?
+			 cvtAryElRef : cvtHshNodRef;
 
-			if(getArrayRef(pNode, &varDesc, false) == Success)
-				(void) vderefv(pNode->pValue, &varDesc);
-			pNode->flags &= ~(EN_TopLevel | EN_ArrayRef);
+			if(cvtRef(&varDesc, pNode, OpQuery) == Success && vderefv(pNode->pVal, &varDesc) == Success)
+				pNode->flags &= ~(EN_TopLevel | EN_AryElRef | EN_HshNodRef);
 			}
 		}
 
@@ -672,51 +436,34 @@ static int ge_deref(ExprNode *pNode) {
 	}
 
 // Coerce Datum objects passed into compatable types for given operation flag(s) and return status.  If illegal fit, return
-// error.  "kind" contains operation flag (FF_XXX) and "op" is operator token (for error reporting).
-static int forceFit(ExprNode *pNode1, ExprNode *pNode2, ushort kind, const char *op) {
+// error.  "op" contains operation flag (FF_XXX) and "tok" is operator token (for error reporting).
+static int forceFit(ExprNode *pNode1, ExprNode *pNode2, ushort op, const char *tok) {
+	struct ForceFit *pFitInfo;
 
 	// Get info from table.
-	struct ForceFit *pInfo = forceFitTable[disnil(pNode1->pValue) ? 0 : dtypbool(pNode1->pValue) ? 1 :
-	 pNode1->pValue->type == dat_int ? 2 : dtyparray(pNode1->pValue) ? 4 : 3] +
-	 (disnil(pNode2->pValue) ? 0 : dtypbool(pNode2->pValue) ? 1 : pNode2->pValue->type == dat_int ? 2 :
-	 dtyparray(pNode2->pValue) ? 4 : 3);
+	pFitInfo = forceFitTable[disnil(pNode1->pVal) ? 0 : dtypbool(pNode1->pVal) ? 1 :
+	 pNode1->pVal->type == dat_int ? 2 : dtypstr(pNode1->pVal) ? 3 : dtyparray(pNode1->pVal) ? 4 : 5] +
+	 (disnil(pNode2->pVal) ? 0 : dtypbool(pNode2->pVal) ? 1 : pNode2->pVal->type == dat_int ? 2 :
+	 dtypstr(pNode2->pVal) ? 3 : dtyparray(pNode2->pVal) ? 4 : 5);
 #if MMDebug & Debug_Expr
-	fprintf(logfile, "### forceFit(): checking operands, types %.4hx:%.4hx, legal %.4hx, kind %.4hx...\n",
-	 pNode1->pValue->type, pNode2->pValue->type, pInfo->legal, kind);
+	fprintf(logfile, "### forceFit(): checking operands, types %.4hx:%.4hx, legal %.4hx, op %.4hx...\n",
+	 pNode1->pVal->type, pNode2->pVal->type, pFitInfo->legal, op);
 #endif
 	// Valid operand types?
-	if(!(pInfo->legal & kind))
+	if(!(pFitInfo->legal & op))
 #if MMDebug & Debug_Expr
-		return rsset(Failure, 0, "Wrong operand type for '%s' (legal %.4hx, kind %.4hx, node types %.4hx:%.4hx)",
-		 op, pInfo->legal, kind, pNode1->pValue->type, pNode2->pValue->type);
+		return rsset(Failure, 0, "Wrong operand type for '%s' (legal %.4hx, op %.4hx, node types %.4hx:%.4hx)",
+		 tok, pFitInfo->legal, op, pNode1->pVal->type, pNode2->pVal->type);
 #else
-		return rsset(Failure, 0, text191, op);
+		return rsset(Failure, 0, text191, tok);
 				// "Wrong type of operand for '%s'"
 #endif
-	// Coerce one operand to string if needed.
-	if(pInfo->strOp & kind) {
+	// Coerce right operand to string if needed.
+	if(pFitInfo->strOp & op) {
 #if MMDebug & Debug_Expr
-		ExprNode *pNode;
-		char *str;
-		if(pInfo->strOp & Str_Left) {
-			pNode = pNode1;
-			str = "left";
-			}
-		else {
-			pNode = pNode2;
-			str = "right";
-			}
-		fprintf(logfile, "### forceFit(): coercing %s operand...\n", str);
-		if(toStr(pNode->pValue) == Success &&
-		 (pInfo->strOp & (Str_Left | Str_Right)) == (Str_Left | Str_Right)) {
-			fputs("### forceFit(): coercing right operand...\n", logfile);
-			(void) toStr(pNode2->pValue);
-			}
-#else
-		if(toStr((pInfo->strOp & Str_Left) ? pNode1->pValue : pNode2->pValue) == Success &&
-		 (pInfo->strOp & (Str_Left | Str_Right)) == (Str_Left | Str_Right))
-			(void) toStr(pNode2->pValue);
+		fputs("### forceFit(): coercing right operand to string...\n", logfile);
 #endif
+		(void) toStr(pNode2->pVal);
 		}
 #if MMDebug & Debug_Expr
 	fputs("### forceFit(): EXIT\n", logfile);
@@ -726,11 +473,14 @@ static int forceFit(ExprNode *pNode1, ExprNode *pNode2, ushort kind, const char 
 
 // Parse a primary expression and save the value in pNode.  If an identifier is found, save its name and set appropriate flags
 // in pNode as well.  Return status.  Primary expressions are any of:
-//	number
+//	[-]number
 //	"?" char-lit
 //	string
 //	identifier
+//	"$"[identifier | number]
 //	"true" | "false" | "nil" | "defn"
+//	[and-or-expression, ...]
+//	{string-expression => and-or-expression, ...}
 //	(and-or-expression)
 static int ge_primary(ExprNode *pNode) {
 	bool b;
@@ -739,11 +489,19 @@ static int ge_primary(ExprNode *pNode) {
 		case s_numLit:
 			// Numeric literal.
 			if(sess.opFlags & OpEval) {
-				long longVal;
+				long i;
+				char *str, workBuf[strlen(pLastParse->tok.str) + 2];
 
-				if(ascToLong(pLastParse->tok.str, &longVal, false) != Success)
-					return sess.rtn.status;
-				dsetint(longVal, pNode->pValue);
+				if(pNode->flags & EN_HaveNegSign) {
+					workBuf[0] = '-';
+					strcpy(workBuf + 1, pLastParse->tok.str);
+					str = workBuf;
+					}
+				else
+					str = pLastParse->tok.str;
+				if(ascToLong(str, 0, &i, false) != Success)
+					break;
+				dsetint(i, pNode->pVal);
 				}
 			goto NextSym;
 		case s_charLit:
@@ -752,14 +510,14 @@ static int ge_primary(ExprNode *pNode) {
 				short c;
 				char *str = pLastParse->tok.str + 1;	// Past '?'.
 				if((c = *str) == '\\' && evalCharLit(&str, &c, true) != Success)
-					return sess.rtn.status;
-				dsetint(c, pNode->pValue);
+					break;
+				dsetint(c, pNode->pVal);
 				}		
 			goto NextSym;
 		case s_strLit:
 			// String literal.
-			if((sess.opFlags & OpEval) && evalStrLit(pNode->pValue, pLastParse->tok.str) != Success)
-				return sess.rtn.status;
+			if(sess.opFlags & OpEval && evalStrLit(pNode->pVal, pLastParse->tok.str) != Success)
+				break;
 			goto NextSym;
 		case kw_true:					// Convert to true value.
 			b = true;
@@ -768,35 +526,33 @@ static int ge_primary(ExprNode *pNode) {
 			b = false;
 IsBool:
 			if(sess.opFlags & OpEval)
-				dsetbool(b, pNode->pValue);
+				dsetbool(b, pNode->pVal);
 			goto NextSym;
 		case kw_nil:					// Convert to nil value.
 			if(sess.opFlags & OpEval)
-				dsetnil(pNode->pValue);
+				dsetnil(pNode->pVal);
 			goto NextSym;
 		case kw_defn:					// Convert to defn value.
 			if(sess.opFlags & OpEval)
-				dsetint(defn, pNode->pValue);
+				dsetint(defn, pNode->pVal);
 			goto NextSym;
+		case s_globalConst:
 		case s_globalVar:
 		case s_numVar:
-			pNode->flags |= EN_HaveGNVar;
+			pNode->flags |= EN_GNConstVar;
 			// Fall through.
 		case s_ident:
 		case s_identQuery:
 			pNode->flags |= EN_HaveIdent;
 
 			// Save identifier name in pNode.
-			if(dsetstr(pLastParse->tok.str, pNode->pValue) != 0)
+			if(dsetstr(pLastParse->tok.str, pNode->pVal) != 0)
 				goto LibFail;
-
-			// Set "white-space-after-identifier" flag for caller.
-			if(haveWhite())
-				pNode->flags |= EN_HaveWhite;
 			goto NextSym;
 		case s_leftParen:
 			// Parenthesized expression.
 			{ushort oldFlags = pNode->flags;
+			nodeClear(pNode);
 			pNode->flags = EN_TopLevel;
 #if MMDebug & Debug_Expr
 			if(getSym() < NotFound || ge_debug1("ge_andOr", 0, pNode, NULL, ge_andOr) != Success ||
@@ -804,7 +560,7 @@ IsBool:
 #else
 			if(getSym() < NotFound || ge_andOr(pNode) != Success || !haveSym(s_rightParen, true))
 #endif
-				return sess.rtn.status;
+				break;
 			pNode->flags = oldFlags;
 			}
 			goto NextSym;
@@ -818,34 +574,108 @@ IsBool:
 			if(sess.opFlags & OpEval) {
 				dinit(&result);
 				if(makeArray(&result, 0, &pArray) != Success)
-					return sess.rtn.status;
+					break;
 				}
 			if(getSym() < NotFound)
-				return sess.rtn.status;
+				break;
 
 			// Get element list, if any.
-			pNode->flags &= ~EN_TopLevel;
-			for(;;) {
-				if(haveSym(s_rightBracket, false))
-					break;
+			while(!haveSym(s_rightBracket, false)) {
 				if(!first && !needSym(s_comma, true))
-					return sess.rtn.status;
+					goto Retn;
 
 				// Get next expression.
+				nodeClear(pNode);
 				if(ge_andOr(pNode) != Success)
-					return sess.rtn.status;
-				if((sess.opFlags & OpEval) && apush(pArray, pNode->pValue, AOpCopy) != 0)
+					goto Retn;
+				if(sess.opFlags & OpEval && apush(pArray, pNode->pVal, OpXfer) != 0)
 					goto LibFail;
-
-				// Reset node.
-				nodeInit(pNode, pNode->pValue, false);
 				first = false;
 				}
 			if(sess.opFlags & OpEval)
-				dxfer(pNode->pValue, &result);
+				dxfer(pNode->pVal, &result);
 			pNode->flags = oldFlags;
 			}
+			goto NextSym;
+		case s_leftBrace:
+			// Braced expression list.  Create hash.
+			{Hash *pHash;
+			HashNode *pHashNode;
+			Datum result;
+			ushort oldFlags = pNode->flags;
+			bool first = true;
+
+			if(sess.opFlags & OpEval) {
+				dinit(&result);
+				if(makeHash(&result, 0, &pHash) != Success)
+					goto Retn;
+				}
+			if(getSym() < NotFound)
+				break;
+
+			// Get key-value list, if any.
+			while(!haveSym(s_rightBrace, false)) {
+				if(!first && !needSym(s_comma, true))
+					goto Retn;
+
+				// Get hash key.
+				nodeClear(pNode);
+				pNode->flags = EN_HashExpr;
+				if(ge_assign(pNode) != Success)
+					goto Retn;
+				if(sess.opFlags & OpEval) {
+					if(!isStrVal(pNode->pVal))
+						goto Retn;
+					if((pHashNode = hnewnode(pHash, pNode->pVal->str, NULL)) == NULL)
+						goto LibFail;
+					}
+
+				// Get '=>' and node value.
+				nodeClear(pNode);
+				if(!needSym(s_bind, true) || ge_andOr(pNode) != Success)
+					goto Retn;
+				if(sess.opFlags & OpEval)
+					dxfer(pHashNode->pVal, pNode->pVal);
+
+				first = false;
+				}
+
+			// Finished parsing hash initializer.  Adjust hash size if evaluating.
+			if(sess.opFlags & OpEval) {
+				dxfer(pNode->pVal, &result);
+				if(pHash->nodeCount > 0)
+					if(hconfig(pHash, CfgSize,
+					 (HashSize)(pHash->nodeCount * (1 + HashGrowPct / 100.0))) != 0)
+						goto LibFail;
+				}
+			pNode->flags = oldFlags;
+
+			// Check for trailing "ignore case" flag: {...}:'i'
+			if(nextChar(':')) {
+				(void) getSym();		// Colon.
+				(void) getSym();		// Past colon.
+				if(haveSym(s_any, true)) {
+					ExprNode node2;
+					Datum *pValue2;
+
+					if((pValue2 = dnewtrack()) == NULL)
+						goto LibFail;
+					nodeInit(&node2, pValue2, 0);
+					if(ge_primary(&node2) == Success && sess.opFlags & OpEval && isStrVal(pValue2)) {
+						if(strcmp(pValue2->str, "i") != 0)
+							return rsset(Failure, 0, text511, pValue2->str);
+									// "Unknown hash property flag(s) \"%s\""
+						if(hconfig(pHash, CfgProp, PropIgnoreCase) != 0)
+							goto LibFail;
+						}
+					}
+				goto Retn;
+				}
+			}
 NextSym:
+			// Set "white-space-after-identifier" flag for caller.
+			if(haveWhite())
+				pNode->flags |= EN_HaveWhite;
 			(void) getSym();
 			break;
 		default:
@@ -856,54 +686,69 @@ NextSym:
 				(void) rsset(Failure, 0, text289, pLastParse->tok.str);
 						// "Unexpected token '%s'"
 		}
-
+Retn:
 	return sess.rtn.status;
 LibFail:
 	return libfail();
 	}
 
 // Handle a command, function, or alias call.
-static int callCFA(ExprNode *pNode, bool needRightParen, bool *found) {
-	UnivPtr univ;
+static int callCFA(ExprNode *pNode, bool *found) {
+	ExecPtr exec;
+	int minArgs, maxArgs;
 
 	// Is identifier a command, function, or alias?
 #if MMDebug & (Debug_Datum | Debug_Expr)
-	fprintf(logfile, "callCFA(): identifying '%s'... ", pNode->pValue->str);
+	fprintf(logfile, "callCFA(): identifying '%s'... ", pNode->pVal->str);
 #endif
-	if(execFind(pNode->pValue->str, OpQuery, PtrSysCmdFunc | PtrAlias | PtrUserCmdFunc, &univ)) {
+	if(!execFind(pNode->pVal->str, OpQuery, PtrSysCmdFunc | PtrAlias | PtrUserCmdFunc, &exec)) {
+
+		// Unknown CFA.
+#if MMDebug & (Debug_Datum | Debug_Expr)
+		fputs("UNKNOWN.\n", logfile);
+#endif
+		if(found == NULL)
+			return rsset(Failure, 0, text52, text118, pNode->pVal->str);
+				// "No such %s \"%s\"", "command, function, or alias"
+		*found = false;
+#if MMDebug & (Debug_Datum | Debug_Expr)
+		fputs("not a FAB.\n", logfile);
+#endif
+		}
+	else {
+		// Yes.  Resolve any alias.
 #if MMDebug & (Debug_Datum | Debug_Expr)
 		fputs("found '", logfile);
-		switch(univ.type) {
+		switch(exec.type) {
 			case PtrAliasSysCmd:
 			case PtrAliasSysFunc:
 			case PtrAliasUserCmd:
 			case PtrAliasUserFunc:
-				fprintf(logfile, "%s' ALIAS", univ.u.pAlias->name);
+				fprintf(logfile, "%s' ALIAS", exec.u.pAlias->name);
 				break;
 			case PtrUserCmd:
 			case PtrUserFunc:
-				fprintf(logfile, "%s' USER %s", univ.u.pBuf->bufname,
-				 univ.type == PtrUserCmd ? "COMMAND" : "FUNCTION");
+				fprintf(logfile, "%s' USER %s", exec.u.pBuf->bufname,
+				 exec.type == PtrUserCmd ? "COMMAND" : "FUNCTION");
 				break;
 			case PtrSysCmd:
 			case PtrSysFunc:
-				fprintf(logfile, "%s' %s", univ.u.pCmdFunc->name,
-				 univ.type == PtrSysCmd ? "COMMAND" : "FUNCTION");
+				fprintf(logfile, "%s' %s", exec.u.pCmdFunc->name,
+				 exec.type == PtrSysCmd ? "COMMAND" : "FUNCTION");
 			}
-		fprintf(logfile, " (type %hu) for token '%s'\n", univ.type, pNode->pValue->str);
+		fprintf(logfile, " (type %hu) for token '%s'\n", exec.type, pNode->pVal->str);
 #endif
-		// Yes.  Resolve any alias.
-		if(univ.type & PtrAlias)
-			univ = univ.u.pAlias->targ;
+		if(exec.type & PtrAlias)
+			exec = exec.u.pAlias->targ;
 
 		// Check if interactive-only command.
-		if(univ.type == PtrSysCmd) {
-			if(univ.u.pCmdFunc->attrFlags & CFTerm)
-				return rsset(Failure, RSTermAttr, text282, univ.u.pCmdFunc->name);
-					// "Cannot invoke '~b%s~B' command directly in a script (use '~brun~B')"
+		if(exec.type == PtrSysCmd) {
+			if(exec.u.pCmdFunc->attrFlags & CFTerm)
+				return rsset(Failure, RSTermAttr, text282, exec.u.pCmdFunc->name);
+					// "Cannot invoke ~b%s~B command directly in a script (use ~brun~B)"
 
 			// If "alias" command (which uses "alias xxx = yyy" syntax), parentheses not allowed.
-			if(needRightParen && univ.u.pCmdFunc->func == alias)
+			if(pNode->flags & EN_HaveLParen && exec.u.pCmdFunc->func == alias)
 				return rsset(Failure, 0, text289, "(");
 						// "Unexpected token '%s'"
 			}
@@ -911,151 +756,134 @@ static int callCFA(ExprNode *pNode, bool needRightParen, bool *found) {
 			*found = true;
 
 		// Have command, function, user command, or user function at this point.  Determine minimum number of required
-		// arguments, if possible.  Set to -1 if unknown.
-		short minArgs = (univ.type & PtrUserCmdFunc) ? univ.u.pBuf->pCallInfo->minArgs :
-		 !(univ.u.pCmdFunc->attrFlags & (CFAddlArg | CFNoArgs)) ? univ.u.pCmdFunc->minArgs : !(sess.opFlags & OpEval) ?
-		 -1 : pNode->nArg == INT_MIN ? univ.u.pCmdFunc->minArgs : (univ.u.pCmdFunc->attrFlags & CFNoArgs) ? 0 :
-		 univ.u.pCmdFunc->minArgs + 1;
+		// arguments.
+		minArgs = exec.type & PtrUserCmdFunc ? exec.u.pBuf->pCallHdr->minArgs : exec.u.pCmdFunc->minArgs;
 
 		// "xxx()" form?
-		if(needRightParen && haveSym(s_rightParen, false)) {
+		if(pNode->flags & EN_HaveLParen && haveSym(s_rightParen, false)) {
 
 			// Yes.  Error if argument(s) required (whether or not evaluating).
 			if(minArgs > 0)
 				goto Wrong;
-			if(!(univ.type & PtrUserCmdFunc)) {
-				if((univ.u.pCmdFunc->attrFlags & CFNoArgs) && !(pNode->flags & EN_HaveNArg))
-					goto Wrong;
-				if(!(sess.opFlags & OpEval) && !(univ.u.pCmdFunc->attrFlags & CFSpecArgs))
-					goto Retn;
-				}
+
+			// No arguments required.  If not user routine, not evaluating, and not special invocation, we're done.
+			if(!(exec.type & PtrUserCmdFunc) && !(sess.opFlags & OpEval) &&
+			 !(exec.u.pCmdFunc->attrFlags & CFSpecArgs))
+				goto Retn;
 			}
 
-		// Not "xxx()" call, zero required arguments, or argument requirement cannot be determined.  Proceed with
-		// execution or argument consumption.  Note that unusual expressions such as "false && x => seti(5)" where the
-		// "seti(5)" is likely an error are not checked here because the numeric prefix is not known when not
-		// evaluating.  The specific command or function routine will do the validation.
-		short maxArgs;
+		// Not "xxx()" call, zero required arguments, or special-invocation routine.  Proceed with execution or argument
+		// consumption.  Note that unusual expressions such as "false && x => seti(5)" where the "seti(5)" is likely an
+		// error are not checked here because the numeric prefix is not known when not evaluating.  The specific command
+		// or function routine will do the validation.
+		if(exec.type & PtrUserCmdFunc)
+			maxArgs = exec.u.pBuf->pCallHdr->maxArgs < 0 ? INT_MAX : exec.u.pBuf->pCallHdr->maxArgs;
+		else
+			maxArgs = exec.u.pCmdFunc->maxArgs < 0 ? INT_MAX : exec.u.pCmdFunc->maxArgs;
+		// Save calling form in operation flags.
+		sess.opFlags = (sess.opFlags & ~OpParens) | (pNode->flags & EN_HaveLParen ? OpParens : 0);
 
-		if(univ.type & PtrUserCmdFunc)
-			maxArgs = (univ.u.pBuf->pCallInfo->maxArgs < 0) ? SHRT_MAX : univ.u.pBuf->pCallInfo->maxArgs;
-		else {
-			maxArgs = univ.u.pCmdFunc->maxArgs;
-			if(maxArgs < 0)
-				maxArgs = SHRT_MAX;
-			else if((sess.opFlags & OpEval) && (univ.u.pCmdFunc->attrFlags & (CFAddlArg | CFNoArgs))) {
-				if((univ.u.pCmdFunc->attrFlags & CFNoArgs) && pNode->nArg != INT_MIN)
-					maxArgs = 0;
-				else if((univ.u.pCmdFunc->attrFlags & CFAddlArg) && pNode->nArg == INT_MIN)
-					--maxArgs;
-				}
-			}
-		sess.opFlags = (sess.opFlags & ~OpParens) | (needRightParen ? OpParens : 0);
-
-		// Call the execution object if it's a command or function and CFSpecArgs is set, or evaluating and (1), it's a
-		// user command or function; or (2), it's a command or function and the n argument is not zero or not just a
-		// repeat count.
-		if(((univ.type & (PtrSysCmdFunc)) && (univ.u.pCmdFunc->attrFlags & CFSpecArgs)) ||
-		 ((sess.opFlags & OpEval) && ((univ.type & PtrUserCmdFunc) || pNode->nArg != 0 ||
-		 !(univ.u.pCmdFunc->attrFlags & CFNCount)))) {
-			bool cmdFuncCall = false;
+		// Call the execution object if it's a system command or function and CFSpecArgs is set, or evaluating and (1),
+		// it's a user command or function; or (2), it's a system command or function and the n argument is not zero or
+		// not a repeat count.
+		if((exec.type & PtrSysCmdFunc && exec.u.pCmdFunc->attrFlags & CFSpecArgs) ||
+		 (sess.opFlags & OpEval && (exec.type & PtrUserCmdFunc || pNode->nArg != 0 ||
+		 !(exec.u.pCmdFunc->attrFlags & CFNCount)))) {
+			bool sysCall = false;
 #if MMDebug & (Debug_Datum | Debug_Expr)
 			char funcName[32];
-			strcpy(funcName, pNode->pValue->str);
+			strcpy(funcName, pNode->pVal->str);
 #endif
-			// Clear node flags.
-			pNode->flags &= (EN_Format | EN_Concat);
-
 			// Call command or function.
-			dsetnil(pNode->pValue);			// Set default return value.
-			if(univ.type & PtrUserCmdFunc) {
+			dsetnil(pNode->pVal);			// Set default return value.
+			if(exec.type & PtrUserCmdFunc) {
 #if MMDebug & Debug_Expr
-				fprintf(logfile, "callCFA(): calling user command or function %s(%d)...\n",
-				 funcName, (int) pNode->nArg);
+				fprintf(logfile, "callCFA(): calling user command or function %s(%ld)...\n",
+				 funcName, pNode->nArg);
 #endif
 #if MMDebug & Debug_Script
-				(void) debug_execBuf(pNode->pValue, (int) pNode->nArg, univ.u.pBuf, NULL,
-				 needRightParen ? ArgFirst | SRun_Parens : ArgFirst, "fcall");
+				(void) debug_execBuf(pNode->pVal, pNode->nArg, exec.u.pBuf, NULL,
+				 pNode->flags & EN_HaveLParen ? ArgFirst | SRun_Parens : ArgFirst, "fcall");
 #else
-				(void) execBuf(pNode->pValue, (int) pNode->nArg, univ.u.pBuf, NULL,
-				 needRightParen ? ArgFirst | SRun_Parens : ArgFirst);
+				(void) execBuf(pNode->pVal, pNode->nArg, exec.u.pBuf, NULL,
+				 pNode->flags & EN_HaveLParen ? ArgFirst | SRun_Parens : ArgFirst);
 #endif
 				}
 			else {
-				CmdFunc *pCmdFunc = univ.u.pCmdFunc;
+				CmdFunc *pCmdFunc = exec.u.pCmdFunc;
 				if(!(sess.opFlags & OpEval) || allowEdit(pCmdFunc->attrFlags & CFEdit) == Success) {
 #if MMDebug & Debug_Expr
-					fprintf(logfile, "callCFA(): calling cmd/func %s(%d): minArgs %d, maxArgs %d...\n",
-					 funcName, (int) pNode->nArg, (int) minArgs, (int) maxArgs);
+					fprintf(logfile, "callCFA(): calling cmd/func %s(%ld): minArgs %d, maxArgs %d...\n",
+					 funcName, pNode->nArg, minArgs, maxArgs);
 #endif
-					execCmdFunc(pNode->pValue, (int) pNode->nArg, pCmdFunc, minArgs, maxArgs);
-					cmdFuncCall = true;
+					execCmdFunc(pNode->pVal, pNode->nArg, pCmdFunc, minArgs, maxArgs);
+					sysCall = true;
 #if MMDebug & (Debug_Datum | Debug_Expr)
 					fprintf(logfile, "callCFA(): %s() returned... '%s' [%d]\n", funcName,
-					 dtype(pNode->pValue, true), sess.rtn.status);
+					 dtype(pNode->pVal, true), sess.rtn.status);
 #endif
 					}
 				}
 			if(sess.rtn.status != Success)
 				return sess.rtn.status;
-			if((sess.opFlags & OpEval) && !cmdFuncCall)
+			if(sess.opFlags & OpEval && !sysCall)
 				(void) rssave();
 			}
 		else {
-			// Not evaluating or repeat count is zero... consume arguments.
-			pNode->flags &= (EN_Format | EN_Concat);
-			if(maxArgs > 0 && ((!haveSym(s_rightParen, false) && haveSym(s_any, false)) ||
-			 ((sess.opFlags & OpEval) && minArgs > 0))) {
+			// Not evaluating or repeat count is zero.  Consume arguments if maxArgs > 0 and (1), next
+			// symbol exists and is not a right paren; or (2), evaluating and minArgs > 0.
+			if(maxArgs > 0 && ((haveSym(s_any, false) && !haveSym(s_rightParen, false)) ||
+			 (sess.opFlags & OpEval && minArgs > 0))) {
+				ExprNode node2;
+				Datum *pValue2;
 				bool first = true;
-				short argCount = 0;
+				int argCount = 0;
+				if((pValue2 = dnewtrack()) == NULL)
+					return libfail();
+				nodeInit(&node2, pValue2, 0);
+
+				// Get initial argument and following arguments until no comma delimiter found; that is, get
+				// "actual" arguments, ignoring minArgs and maxArgs (which are checked afterward).
 				for(;;) {
 #if MMDebug & Debug_Expr
 					fprintf(logfile,
-					 "### callCFA(): consuming (minArgs %hd, maxArgs %hd): examing token '%s'...\n",
+					 "### callCFA(): consuming (minArgs %d, maxArgs %d): examing token '%s'...\n",
 					 minArgs, maxArgs, pLastParse->tok.str);
 #endif
 					if(first)
 						first = false;
 					else if(!needSym(s_comma, false))
-						break;			// Error or no arguments left.
+						break;					// Error or no arguments left.
 #if MMDebug & Debug_Expr
-					if(ge_debug1("ge_andOr", 1, pNode, NULL, ge_andOr) != Success)
+					if(ge_debug1("ge_andOr", 1, &node2, NULL, ge_andOr) != Success)
 #else
-					if(ge_andOr(pNode) != Success)	// Get next expression.
+					nodeClear(&node2);
+					if(ge_andOr(&node2) != Success)			// Get next expression.
 #endif
 						break;
 					++argCount;
 					}
 				if(sess.rtn.status != Success)
-					return sess.rtn.status;
-				if((minArgs >= 0 && argCount < minArgs) || argCount > maxArgs)
+					goto Retn;
+				if(argCount < minArgs || argCount > maxArgs)
 					goto Wrong;
 				}
 			}
 
-		// Check for extra command or function argument.
+		// Check for extra argument(s).
 		if(maxArgs > 0 && haveSym(s_comma, false))
 Wrong:
 			return rsset(Failure, 0, text69, pLastParse->tok.str);
 				// "Wrong number of arguments (at token '%s')"
 		}
-	else {
-#if MMDebug & (Debug_Datum | Debug_Expr)
-		fputs("UNKNOWN.\n", logfile);
-#endif
-		// Unknown CFA.
-		if(found == NULL)
-			return rsset(Failure, 0, text267, pNode->pValue->str);
-					// "No such command, function, or alias '%s'"
-		*found = false;
-#if MMDebug & (Debug_Datum | Debug_Expr)
-		fputs("not a FAB.\n", logfile);
-#endif
-		}
 Retn:
 	// Get right paren, if applicable.
-	if(needRightParen && haveSym(s_rightParen, true))
-		(void) getSym();
+	if(pNode->flags & EN_HaveLParen) {
+		if(haveWhite())
+			pNode->flags |= EN_HaveWhite;
+		if(needSym(s_rightParen, true))
+			pNode->flags &= ~EN_HaveLParen;
+		}
 
 	return sess.rtn.status;
 	}
@@ -1064,9 +892,9 @@ Retn:
 //	primary
 //	postfix++
 //	postfix--
+//	postfix(...)
 //	postfix[expression[,expression]]
 static int ge_postfix(ExprNode *pNode) {
-	bool needRightParen;
 	uint oldParens = sess.opFlags & OpParens;
 
 #if MMDebug & Debug_Expr
@@ -1085,109 +913,156 @@ static int ge_postfix(ExprNode *pNode) {
 	//	3 => myMac myVar => gotoMark		 Will be evaluated as 3 => myMac(myVar => gotoMark())
 	//	index('ba', 'a') => setMark
 	for(;;) {
-		// Get postfix operator, if any.
-		needRightParen = false;
+		// Process postfix operator, if any.
 		switch(pLastParse->sym) {
 			case s_incr:
 			case s_decr:
 				if(pNode->flags & EN_HaveNArg)
 					goto NoFunc;
+				if(pNode->flags & EN_HaveWhite)
+					return rsset(Failure, 0, text512, pLastParse->tok.str);
+							// "Unexpected white space (at token '%s')"
 
 				// Perform ++ or -- operation if evaluating.
-				if((sess.opFlags & OpEval) &&
+				if(sess.opFlags & OpEval &&
 				 (!lvalue(pNode, true) || bumpVar(pNode, pLastParse->sym == s_incr, false) != Success))
-					return sess.rtn.status;
+					goto Retn;
 				if(getSym() < NotFound)
-					return sess.rtn.status;
-				pNode->flags &= (EN_Format | EN_Concat);
+					goto Retn;
+				pNode->flags &= (EN_Format | EN_Concat | EN_HashExpr);
 				break;
 			case s_leftParen:
 				// A function call.  Error if primary was not an identifier or was an lvalue (variable).
 				if(!(pNode->flags & EN_HaveIdent))
 					return rsset(Failure, 0, text4, text68, pLastParse->tok.str);
 							// "%s expected (at token '%s')", "Identifier"
-				if(pNode->flags & EN_HaveGNVar)
-					return rsset(Failure, 0, text267, pNode->pValue->str);
-							// "No such command, function, or alias '%s'"
+				if(pNode->flags & EN_GNConstVar)
+					return rsset(Failure, 0, text52, text118, pNode->pVal->str);
+						// "No such %s \"%s\"", "command, function, or alias"
 
-				// Primary was an identifier and not a '$' variable.  Assume "function" type.  If white space
-				// preceded the '(', the '(' is assumed to be the beginning of a primary expression and hence,
-				// the first function argument "f (...), ..."; otherwise, the "f(..., ...)" form is assumed. 
-				// Move past the '(' if no preceding white space and check tables.
-				if(!(pNode->flags & EN_HaveWhite)) {
+				// Primary was an identifier and not a '$' constant or variable.  Assume "function" type.  If
+				// white space preceded the '(', the '(' is assumed to be the beginning of a primary expression
+				// and hence, the first function argument "f (...), ..."; otherwise, the "f(..., ...)" form is
+				// assumed.  Move past the '(' if no preceding white space and call the routine.
+				if(pNode->flags & EN_HaveWhite)
+					pNode->flags &= ~EN_HaveWhite;
+				else {
 					if(getSym() < NotFound)			// Past '('.
-						return sess.rtn.status;
-					needRightParen = true;
+						goto Retn;
+					pNode->flags |= EN_HaveLParen;
 					}
 
 				// Call the function.
-				if(callCFA(pNode, needRightParen, NULL) != Success)
-					return sess.rtn.status;
+				if(callCFA(pNode, NULL) != Success)
+					goto Retn;
 				goto Clear;
 			case s_leftBracket:
-				// Possible array reference; e.g., "[9, [[[0, 1], 2], 3], 8][0, 2] [1][0][0][1] = 5".
-				if(!(pNode->flags & EN_HaveWhite)) {
+				// Possible string, hash, or array reference; e.g.,
+				// "[9, [[[0, 1], 2], 3], 8][0, 2] [1][0][0][1] = 5"
+
+				// Skip if white space precedes '['.
+				if(pNode->flags & EN_HaveWhite)
+					pNode->flags &= ~EN_HaveWhite;
+				else {
 					long i1;
 					Datum *pValue2;
 					ExprNode node2;
 					bool haveTwo = false;
 
-					// If evaluating, check if current node is an array (otherwise, assume so).
+					// If evaluating, check if current node is an array, hash, or string (otherwise,
+					// assume so).
 					if(pNode->flags & EN_HaveIdent) {
 						if(sess.opFlags & OpEval) {
 
-							// Find and dereference variable.  Error if not an array.
-							if(vderefn(pNode->pValue, pNode->pValue->str) != Success)
-								return sess.rtn.status;
-							if(!isArrayVal(pNode->pValue))
+							// Find and dereference variable.  Error if not array, hash, or string.
+							if(vderefn(pNode->pVal, pNode->pVal->str) != Success)
+								goto Retn;
+							if(!isAryHshStrVal(pNode->pVal))
 								goto Retn;
 							}
-						pNode->flags &= ~(EN_HaveIdent | EN_HaveGNVar);
+						pNode->flags &= ~(EN_HaveIdent | EN_GNConstVar);
 						}
-					else if((sess.opFlags & OpEval) && !isArrayVal(pNode->pValue))
+					else if(ge_deref(pNode) != Success || (sess.opFlags & OpEval &&
+					 !isAryHshStrVal(pNode->pVal)))
 						goto Retn;
 
-					// Get first index.
-					if(dnewtrack(&pValue2) != 0)
+					// Get first index or hash key.
+					if((pValue2 = dnewtrack()) == NULL)
 						goto LibFail;
-					nodeInit(&node2, pValue2, false);
-					if(getSym() < NotFound || ge_andOr(&node2) != Success)
-						return sess.rtn.status;
+					nodeInit(&node2, pValue2, 0);
+					if(getSym() < NotFound || ge_assign(&node2) != Success)
+						goto Retn;
 					if(sess.opFlags & OpEval) {
-						if(!isIntVal(node2.pValue))
-							return sess.rtn.status;
-						i1 = node2.pValue->u.intNum;
+						if(!dtyphash(pNode->pVal)) {
+							if(!isIntVal(node2.pVal))
+								goto Retn;
+							i1 = dgetint(node2.pVal);
+							}
+						else if(!isStrVal(node2.pVal))
+							goto Retn;
 						}
 
 					// Get second index, if present.
-					if(needSym(s_comma, false)) {
+					if((!(sess.opFlags & OpEval) || !dtypstr(node2.pVal)) && needSym(s_comma, false)) {
 						haveTwo = true;
-						if(ge_andOr(&node2) != Success)
-							return sess.rtn.status;
-						if((sess.opFlags & OpEval) && !isIntVal(node2.pValue))
-							return sess.rtn.status;
+						nodeClear(&node2);
+
+						// If [i,] form, primary node must be a string.
+						if(haveSym(s_rightBracket, false)) {
+							if(sess.opFlags & OpEval && !dtypstr(pNode->pVal)) {
+
+								// Force "Integer expected" error.
+								(void) isIntVal(pNode->pVal);
+								goto Retn;
+								}
+
+							// Leave node2.pVal as nil to indicate unspecified index2.
+							}
+						else if(ge_assign(&node2) != Success ||
+						 (sess.opFlags & OpEval && !isIntVal(node2.pVal)))
+							goto Retn;
 						}
+
+					// Move past right bracket.
+					if(haveWhite())
+						pNode->flags |= EN_HaveWhite;
 					if(!needSym(s_rightBracket, true))
-						return sess.rtn.status;
+						goto Retn;
 
-					// Evaluate if array slice; otherwise, save index in node for (possible use as an
-					// lvalue) later.
-					if(ge_deref(pNode) != Success)
-						return sess.rtn.status;
+					// Evaluate if string element, substring, or array slice; otherwise, save index or key
+					// in node for possible use as an lvalue later.
 					if(sess.opFlags & OpEval) {
-						if(!isArrayVal(pNode->pValue))
-							return sess.rtn.status;
 						if(haveTwo) {
-							Array *pArray;
+							if(dtypstr(pNode->pVal)) {
+								if(disnil(node2.pVal))
+									dsetint(LONG_MAX, node2.pVal);
+								if(substr(pNode->pVal, pNode->pVal, i1,
+								 dgetint(node2.pVal)) != Success)
+									goto Retn;
+								}
+							else {
+								Array *pArray;
 
-							if((pArray = aslice(pNode->pValue->u.pArray, i1,
-							 node2.pValue->u.intNum, 0)) == NULL)
-								goto LibFail;
-							agStash(pNode->pValue, pArray);
+								if((pArray = aslice(dgetarrayptr(pNode->pVal), i1,
+								 dgetint(node2.pVal), 0)) == NULL)
+									goto LibFail;
+								astash(pNode->pVal, pArray);
+								}
+							}
+						else if(dtypstr(pNode->pVal)) {
+							long len = strlen(pNode->pVal->str);
+							if(len == 0 || i1 >= len || labs(i1) > len)
+								return rsset(Failure, 0, text524, i1, len);
+									// "No such string element %'ld (string length %'ld)"
+							dsetint(pNode->pVal->str[i1 < 0 ? len + i1 : i1], pNode->pVal);
+							}
+						else if(dtyphash(pNode->pVal)) {
+							pNode->i.pKey = node2.pVal;
+							pNode->flags |= EN_HshNodRef | EN_LValue;
 							}
 						else {
-							pNode->index = i1;
-							pNode->flags |= EN_ArrayRef | EN_LValue;
+							pNode->i.index = i1;
+							pNode->flags |= EN_AryElRef | EN_LValue;
 							}
 						}
 					break;
@@ -1195,14 +1070,15 @@ static int ge_postfix(ExprNode *pNode) {
 				// Fall through.
 			default:
 				// Was primary a non-variable identifier?
-				if((pNode->flags & (EN_HaveIdent | EN_HaveGNVar)) == EN_HaveIdent) {
+				if((pNode->flags & (EN_HaveIdent | EN_GNConstVar)) == EN_HaveIdent) {
 					bool found;
-					if(callCFA(pNode, false, &found) != Success)
-						return sess.rtn.status;
+
+					if(callCFA(pNode, &found) != Success)
+						goto Retn;
 					if(found) {
 Clear:
-						// Clear flag(s) obviated by a function call.
-						pNode->flags &= (EN_Format | EN_Concat);
+						// Clear all flags, except ones not obviated by a function call.
+						pNode->flags &= (EN_HaveWhite | EN_Format | EN_Concat | EN_HashExpr);
 						break;
 						}
 					}
@@ -1210,15 +1086,17 @@ Clear:
 				// Not a function call.  Was last symbol a numeric prefix operator?
 				if(pNode->flags & EN_HaveNArg)
 NoFunc:
-					return rsset(Failure, 0, text4, text67, pNode->pValue->str);
+					return rsset(Failure, 0, text4, text67, pLastParse->tok.str);
 							// "%s expected (at token '%s')", "Function call"
 
 				// No postfix operators left.  Bail out.
-				goto Retn;
+				pNode->flags &= ~EN_HaveWhite;
+				goto LoopExit;
 			}
 		}
-Retn:
+LoopExit:
 	sess.opFlags = (sess.opFlags & ~OpParens) | oldParens;
+Retn:
 	return sess.rtn.status;
 LibFail:
 	return libfail();
@@ -1236,12 +1114,17 @@ static int ge_unary(ExprNode *pNode) {
 	Symbol sym;
 
 	switch(sym = pLastParse->sym) {
+		case s_minus:
+			// If next character is a digit, set node flag so that LONG_MIN can be converted to an integer correctly
+			// by ge_primary().
+			if(is_digit(*pLastParse->src))
+				pNode->flags |= EN_HaveNegSign;
+			// Fall through.
+		case s_plus:
 		case s_decr:
 		case s_incr:
-		case s_minus:
-		case s_plus:
 		case s_not:
-		case s_bitNot:
+		case s_bitCompl:
 #if MMDebug & Debug_Expr
 			if(getSym() < NotFound || ge_debug1("ge_unary", 1, pNode, NULL, ge_unary) != Success)
 #else
@@ -1251,9 +1134,9 @@ static int ge_unary(ExprNode *pNode) {
 			if(sym == s_incr || sym == s_decr) {
 
 				// Perform ++ or -- operation if evaluating.
-				if((sess.opFlags & OpEval) && lvalue(pNode, true))
+				if(sess.opFlags & OpEval && lvalue(pNode, true))
 					(void) bumpVar(pNode, sym == s_incr, true);
-				pNode->flags &= (EN_Format | EN_Concat);
+				pNode->flags &= (EN_Format | EN_Concat | EN_HashExpr);
 				}
 
 			else {
@@ -1265,14 +1148,15 @@ static int ge_unary(ExprNode *pNode) {
 #endif
 					return sess.rtn.status;
 				if(sess.opFlags & OpEval) {
-					if(sym != s_not && !isIntVal(pNode->pValue))
+					if(sym != s_not && !isIntVal(pNode->pVal))
 						return sess.rtn.status;
 					if(sym == s_not)
-						dsetbool(toBool(pNode->pValue) == false, pNode->pValue);
-					else if(sym != s_plus)
-						dsetint(sym == s_minus ? -pNode->pValue->u.intNum :
-						 ~pNode->pValue->u.intNum, pNode->pValue);
+						dsetbool(toBool(pNode->pVal) == false, pNode->pVal);
+					else if(sym != s_plus && (sym != s_minus || !(pNode->flags & EN_HaveNegSign)))
+						dsetint(sym == s_minus ? -dgetint(pNode->pVal) : ~dgetint(pNode->pVal),
+						 pNode->pVal);
 					}
+				pNode->flags &= ~EN_HaveNegSign;
 				}
 			break;
 		default:
@@ -1285,34 +1169,46 @@ static int ge_unary(ExprNode *pNode) {
 	return sess.rtn.status;
 	}
 
-// Perform operation in "opFlags" on two array nodes.  If "clone" is true, clone array in *pNode1 first.
+// Perform operation per "sym" on two array nodes.  If "clone" is true, clone array in *pNode1 first.  Also, if union or
+// concatenation operation (which copy elements), force object copy if *pNode2 is an lvalue.
 static int arrayOp(ExprNode *pNode1, ExprNode *pNode2, Symbol sym, bool clone) {
 	Array *pArray1;
 
-	if(clone && arrayClone(pNode1->pValue, pNode1->pValue) != Success)
+	if(clone && arrayClone(pNode1->pVal, pNode1->pVal) != Success)
 		return sess.rtn.status;
-	pArray1 = pNode1->pValue->u.pArray;
+	pArray1 = dgetarrayptr(pNode1->pVal);
 
 	// Perform operation per sym.
 	switch(sym) {
 		case s_mult:		// Intersection.
 		case s_assignMult:
-			if(amatch(pArray1, pNode2->pValue->u.pArray, AOpInPlace) == NULL)
+			if(amatch(pArray1, dgetarrayptr(pNode2->pVal), OpInPlace) == NULL)
 				goto LibFail;
 			break;
 		case s_minus:		// Exclusion.
 		case s_assignSub:
-			if(amatch(pArray1, pNode2->pValue->u.pArray, AOpInPlace | AOpNonMatching) == NULL)
+			if(amatch(pArray1, dgetarrayptr(pNode2->pVal), OpInPlace | OpNonMatching) == NULL)
 				goto LibFail;
 			break;
 		case s_bitOr:		// Union.
 		case s_assignBitOr:
-			if(auniq(pArray1, pNode2->pValue->u.pArray, AOpInPlace) == NULL)
+			if(auniq(pArray1, dgetarrayptr(pNode2->pVal),
+			 pNode2->flags & EN_LValue ? OpInPlace | OpObjCopy : OpInPlace) == NULL)
 				goto LibFail;
+			goto AHTrack;
 			break;
 		default:		// s_bitAnd, s_assignBitAnd - Concatenation.
-			if(acat(pArray1, pNode2->pValue->u.pArray, AOpInPlace) == NULL)
+			if(acat(pArray1, dgetarrayptr(pNode2->pVal),
+			 pNode2->flags & EN_LValue ? OpInPlace | OpObjCopy : OpInPlace) == NULL)
 				goto LibFail;
+AHTrack:;
+			// Add any new arrays or hashes (after object copy) to tracking list.
+			if(pNode2->flags & EN_LValue) {
+#if MMDebug & (Debug_ArrayHash | Debug_AryHshBuf | Debug_AryHshLog | Debug_Datum)
+				fputs("arrayOp(): tracking object-copy arrays and hashes...\n", logfile);
+#endif
+				ahtrack(pNode1->pVal, true);
+				}
 			break;
 		}
 	return sess.rtn.status;
@@ -1320,17 +1216,28 @@ LibFail:
 	return libfail();
 	}
 
-// Concatenate two string nodes and return status.
-static int concat(ExprNode *pNode1, ExprNode *pNode2) {
+// Concatenate two string or hash nodes and return status.
+static int concat(ExprNode *pNode1, ExprNode *pNode2, bool clone) {
 
-	if(!disnil(pNode2->pValue)) {
+	if(dtyphash(pNode1->pVal)) {
+		if(!clone || hashClone(pNode1->pVal, pNode1->pVal) == Success) {
+			if(hcat(dgethashptr(pNode1->pVal), dgethashptr(pNode2->pVal),
+			 pNode2->flags & EN_LValue ? OpInPlace | OpObjCopy : OpInPlace) == NULL)
+				goto LibFail;
+			if(pNode2->flags & EN_LValue)
+				ahtrack(pNode1->pVal, true);
+			}
+		}
+	else if(!disnil(pNode2->pVal)) {
 		DFab fab;
 
-		if(dopenwith(&fab, pNode1->pValue, FabAppend) != 0 || dputs(pNode2->pValue->str, &fab, 0) != 0 ||
+		if(dopenwith(&fab, pNode1->pVal, FabAppend) != 0 || dputs(pNode2->pVal->str, &fab, 0) != 0 ||
 		 dclose(&fab, FabStr) != 0)
-			return libfail();
+			goto LibFail;
 		}
 	return sess.rtn.status;
+LibFail:
+	return libfail();
 	}
 
 // Common routine to handle all of the legwork and error checking for all of the binary operators.
@@ -1351,7 +1258,7 @@ static int ge_binaryOp(ExprNode *pNode, OpInfo *pOpInfo) {
 #endif
 		return sess.rtn.status;
 
-	if(dnewtrack(&pOp) != 0 || dnewtrack(&pValue2) != 0)
+	if((pOp = dnewtrack()) == NULL || (pValue2 = dnewtrack()) == NULL)
 		goto LibFail;
 
 	// Loop until no operator(s) at this level remain.
@@ -1362,10 +1269,10 @@ static int ge_binaryOp(ExprNode *pNode, OpInfo *pOpInfo) {
 				break;
 			if(*pSym == s_any) {
 
-				// No operators left.  Clear EN_Format / EN_Concat flag if format / concatenate op.
-				if((pOpInfo->flags & FF_Format) && (pNode->flags & EN_Format))
+				// No operators left.  Clear EN_Format or EN_Concat flag if format or concatenate op.
+				if(pOpInfo->flags & FF_Format && pNode->flags & EN_Format)
 					pNode->flags &= ~EN_Format;
-				else if((pOpInfo->flags & FF_Concat) && (pNode->flags & EN_Concat))
+				else if(pOpInfo->flags & FF_Concat && pNode->flags & EN_Concat)
 					pNode->flags &= ~EN_Concat;
 				goto Retn;
 				}
@@ -1388,7 +1295,7 @@ static int ge_binaryOp(ExprNode *pNode, OpInfo *pOpInfo) {
 
 				// If "modulus" and either EN_Format flag is set (processing second node of format op) or
 				// first operand is string (allow format processing on return), bail out.
-				if((pOpInfo->flags & FF_Math) && ((pNode->flags & EN_Format) || dtypstr(pNode->pValue)))
+				if(pOpInfo->flags & FF_Math && (pNode->flags & EN_Format || dtypstr(pNode->pVal)))
 					goto Retn;
 				}
 			else if(*pSym == s_mult ||
@@ -1396,21 +1303,21 @@ static int ge_binaryOp(ExprNode *pNode, OpInfo *pOpInfo) {
 
 				// If "multiplication" or "subtraction" and first operand is array (allow set operation on
 				// return), bail out.
-				if((pOpInfo->flags & FF_Math) && dtyparray(pNode->pValue))
+				if(pOpInfo->flags & FF_Math && dtyparray(pNode->pVal))
 					goto Retn;
 				}
 			else if(*pSym == s_bitOr) {	// Have '|' op.
 
 				// If "bitwise or" and first operand is array (allow set operation on return), bail out.
-				if((pOpInfo->flags & FF_BitOp) && dtyparray(pNode->pValue))
+				if(pOpInfo->flags & FF_BitOp && dtyparray(pNode->pVal))
 					goto Retn;
 				}
 			if(*pSym == s_bitAnd) {		// Have '&' op.
 
 				// If "bitwise and" and either EN_Concat flag is set (processing second node of concat op) or
-				// first operand is string or array (allow concat processing on return), bail out.
-				if((pOpInfo->flags & FF_BitOp) && ((pNode->flags & EN_Concat) ||
-				 (pNode->pValue->type & (DStrMask | DArrayMask))))
+				// first operand is string, array, or hash (allow concat processing on return), bail out.
+				if(pOpInfo->flags & FF_BitOp && (pNode->flags & EN_Concat ||
+				 (pNode->pVal->type & (DStrMask | DArrayMask | DHashMask))))
 					goto Retn;
 				}
 			}
@@ -1419,9 +1326,9 @@ static int ge_binaryOp(ExprNode *pNode, OpInfo *pOpInfo) {
 		dxfer(pOp, &pLastParse->tok);
 
 		// Set operator overload flag in second node if applicable, and call function at next higher level.
-		nodeInit(&node2, pValue2, false);
+		nodeInit(&node2, pValue2, 0);
 		if(pOpInfo->flags & (FF_Format | FF_Concat))
-			node2.flags = (pOpInfo->flags & FF_Format) ? EN_Format : EN_Concat;
+			node2.flags = pOpInfo->flags & FF_Format ? EN_Format : EN_Concat;
 #if MMDebug & Debug_Expr
 		if(getSym() < NotFound || ge_debug1(funcName, 2, pNode, &node2, pOpInfo->upFunc) != Success)
 #else
@@ -1448,68 +1355,68 @@ static int ge_binaryOp(ExprNode *pNode, OpInfo *pOpInfo) {
 				case s_bitAnd:
 					// If FF_Concat flag is set, do concatenation, otherwise bitwise and.
 					if(!(pOpInfo->flags & FF_Concat))
-						dsetint(pNode->pValue->u.intNum & node2.pValue->u.intNum, pNode->pValue);
-					else if(dtyparray(pNode->pValue))
+						dsetint(dgetint(pNode->pVal) & dgetint(node2.pVal), pNode->pVal);
+					else if(dtyparray(pNode->pVal))
 						goto ArrayOp;
-					else if(concat(pNode, &node2) != Success)
+					else if(concat(pNode, &node2, pNode->flags & EN_LValue) != Success)
 						return sess.rtn.status;
 					break;
 				case s_bitOr:
 					// If FF_Union flag is set, do set union, otherwise bitwise or.
 					if(pOpInfo->flags & FF_Union)
 						goto ArrayOp;
-					dsetint(pNode->pValue->u.intNum | node2.pValue->u.intNum, pNode->pValue);
+					dsetint(dgetint(pNode->pVal) | dgetint(node2.pVal), pNode->pVal);
 					break;
 				case s_bitXOr:
-					dsetint(pNode->pValue->u.intNum ^ node2.pValue->u.intNum, pNode->pValue);
+					dsetint(dgetint(pNode->pVal) ^ dgetint(node2.pVal), pNode->pVal);
 					break;
 				case s_leftShift:
-					dsetint((ulong) pNode->pValue->u.intNum << (ulong) node2.pValue->u.intNum,
-					 pNode->pValue);
+					dsetint((ulong) dgetint(pNode->pVal) << (ulong) dgetint(node2.pVal),
+					 pNode->pVal);
 					break;
 				case s_rightShift:
-					dsetint((ulong) pNode->pValue->u.intNum >> (ulong) node2.pValue->u.intNum,
-					 pNode->pValue);
+					dsetint((ulong) dgetint(pNode->pVal) >> (ulong) dgetint(node2.pVal),
+					 pNode->pVal);
 					break;
 
 				// Multiplicative and additive.
 				case s_div:
-					if(node2.pValue->u.intNum == 0)
+					if(dgetint(node2.pVal) == 0)
 						goto DivZero;
-					dsetint(pNode->pValue->u.intNum / node2.pValue->u.intNum, pNode->pValue);
+					dsetint(dgetint(pNode->pVal) / dgetint(node2.pVal), pNode->pVal);
 					break;
 				case s_mod:
 					// If FF_Format flag is set, do string formatting, otherwise modulus.
 					if(pOpInfo->flags & FF_Format) {
 						Datum *pFormat;
 
-						if(dnewtrack(&pFormat) != 0)
+						if((pFormat = dnewtrack()) == NULL)
 							goto LibFail;
-						dxfer(pFormat, pNode->pValue);
-						if(strFormat(pNode->pValue, pFormat, node2.pValue) != Success)
+						dxfer(pFormat, pNode->pVal);
+						if(strFormat(pNode->pVal, pFormat, node2.pVal) != Success)
 							return sess.rtn.status;
 						}
 					else {
-						if(node2.pValue->u.intNum == 0)
+						if(dgetint(node2.pVal) == 0)
 DivZero:
-						return rsset(Failure, 0, text245, pNode->pValue->u.intNum);
+						return rsset(Failure, 0, text245, dgetint(pNode->pVal));
 								// "Division by zero is undefined (%ld/0)"
-						dsetint(pNode->pValue->u.intNum % node2.pValue->u.intNum, pNode->pValue);
+						dsetint(dgetint(pNode->pVal) % dgetint(node2.pVal), pNode->pVal);
 						}
 					break;
 				case s_mult:
 					// If FF_SetMatch flag is set, do set intersection, otherwise multiplication.
 					if(pOpInfo->flags & FF_SetMatch)
 						goto ArrayOp;
-					dsetint(pNode->pValue->u.intNum * node2.pValue->u.intNum, pNode->pValue);
+					dsetint(dgetint(pNode->pVal) * dgetint(node2.pVal), pNode->pVal);
 					break;
 				case s_plus:
-					dsetint(pNode->pValue->u.intNum + node2.pValue->u.intNum, pNode->pValue);
+					dsetint(dgetint(pNode->pVal) + dgetint(node2.pVal), pNode->pVal);
 					break;
 				case s_minus:
 					// If FF_SetMatch flag is set, do set union, otherwise subtraction.
 					if(!(pOpInfo->flags & FF_SetMatch))
-						dsetint(pNode->pValue->u.intNum - node2.pValue->u.intNum, pNode->pValue);
+						dsetint(dgetint(pNode->pVal) - dgetint(node2.pVal), pNode->pVal);
 					else
 ArrayOp:
 						if(arrayOp(pNode, &node2, *pSym, pNode->flags & EN_LValue) != Success)
@@ -1518,16 +1425,18 @@ ArrayOp:
 				case s_eq:
 				case s_ne:
 					{bool b = true;		// Default if two nil, false, or true operands.
-					if(pNode->pValue->type != node2.pValue->type)
+					if(pNode->pVal->type != node2.pVal->type)
 						b = false;
-					else if(!disnil(pNode->pValue) && !dtypbool(pNode->pValue)) {
-						b = dtyparray(pNode->pValue) ?
-						 aeq(pNode->pValue->u.pArray, node2.pValue->u.pArray, 0) :
-						 pNode->pValue->type == dat_int ?
-						 pNode->pValue->u.intNum == node2.pValue->u.intNum :
-						 strcmp(pNode->pValue->str, node2.pValue->str) == 0;
+					else if(!disnil(pNode->pVal) && !dtypbool(pNode->pVal)) {
+						b = dtyphash(pNode->pVal) ?
+						 heq(dgethashptr(pNode->pVal), dgethashptr(node2.pVal), 0) :
+						 dtyparray(pNode->pVal) ?
+						 aeq(dgetarrayptr(pNode->pVal), dgetarrayptr(node2.pVal), 0) :
+						 pNode->pVal->type == dat_int ?
+						 dgetint(pNode->pVal) == dgetint(node2.pVal) :
+						 strcmp(pNode->pVal->str, node2.pVal->str) == 0;
 						}
-					dsetbool(b == (*pSym == s_eq), pNode->pValue);
+					dsetbool(b == (*pSym == s_eq), pNode->pVal);
 					}
 					break;
 				case s_ge:
@@ -1536,38 +1445,38 @@ ArrayOp:
 				case s_lt:
 					{long longVal1, longVal2;
 
-					if(pNode->pValue->type == dat_int) {	// Both operands are integer.
-						longVal1 = pNode->pValue->u.intNum;
-						longVal2 = node2.pValue->u.intNum;
+					if(pNode->pVal->type == dat_int) {	// Both operands are integer.
+						longVal1 = dgetint(pNode->pVal);
+						longVal2 = dgetint(node2.pVal);
 						}
 					else {					// Both operands are string.
-						longVal1 = strcmp(pNode->pValue->str, node2.pValue->str);
+						longVal1 = strcmp(pNode->pVal->str, node2.pVal->str);
 						longVal2 = 0L;
 						}
 					dsetbool(*pSym == s_lt ? longVal1 < longVal2 : *pSym == s_le ? longVal1 <= longVal2 :
-					 *pSym == s_gt ? longVal1 > longVal2 : longVal1 >= longVal2, pNode->pValue);
+					 *pSym == s_gt ? longVal1 > longVal2 : longVal1 >= longVal2, pNode->pVal);
 					}
 					break;
 
 				// RE equality: s_regEQ, s_regNE
 				default:
-					if(disnull(node2.pValue))
+					if(disnull(node2.pVal))
 						return rsset(Failure, 0, text187, text266);
 							// "%s cannot be null", "Regular expression"
 
 					// Compile the RE pattern.
-					if(newSearchPat(node2.pValue->str, &matchRE, NULL, false) == Success) {
-						if(matchRE.flags & SOpt_Plain)
+					if(newSearchPat(node2.pVal->str, &strMatch, NULL, false) == Success) {
+						if(strMatch.flags & SOpt_Plain)
 							return rsset(Failure, 0, text36, OptCh_Plain, pOp->str);
 								// "Invalid pattern option '%c' for '%s' operator"
-						grpFree(&matchRE);
-						if(compileRE(&matchRE, SCpl_ForwardRE) == Success) {
+						grpFree(&strMatch);
+						if(compileRE(&strMatch, SCpl_ForwardRE) == Success) {
 							regmatch_t group0;
 
 							// Perform operation.
-							if(regcmp(pNode->pValue, 0, &matchRE, &group0) == Success)
+							if(regcmp(pNode->pVal, 0, &strMatch, &group0) == Success)
 								dsetbool((group0.rm_so >= 0) == (*pSym == s_regEQ),
-								 pNode->pValue);
+								 pNode->pVal);
 							}
 						}
 				}
@@ -1604,7 +1513,8 @@ static int ge_add(ExprNode *pNode) {
 #endif
 	}
 
-// Process numeric prefix (n) operator =>.
+// Process numeric prefix (n) operator:
+//	add-expression => postfix
 static int ge_numPrefix(ExprNode *pNode) {
 
 	// Call function at next higher level.
@@ -1616,20 +1526,27 @@ static int ge_numPrefix(ExprNode *pNode) {
 		return sess.rtn.status;
 
 	// Loop until no operator at this level remains.
-	while(pLastParse->sym == s_nArg) {
+	while(pLastParse->sym == s_bind) {
 
-		// Last expression was an n argument.  Verify that it was an integer and save it in the node so that the next
-		// expression (a function call) can grab it.
+		// Last expression was an n argument or hash key.  Do nothing if the latter and not evaluating or node type
+		// is string.
+		if(pNode->flags & EN_HashExpr && !(sess.opFlags & OpEval))
+			break;
 #if MMDebug & Debug_Expr
 		if(ge_debug1("ge_deref", 0, pNode, NULL, ge_deref) != Success)
 #else
 		if(ge_deref(pNode) != Success)
 #endif
-			return sess.rtn.status;
+			break;
+
+		// Stop here if evaluating hash key and node type is string; otherwise (have n argument), verify that value is
+		// an integer and save it in the node so that the next expression (a function call) can grab it.
 		if(sess.opFlags & OpEval) {
-			if(!isIntVal(pNode->pValue))
-				return sess.rtn.status;
-			pNode->nArg = pNode->pValue->u.intNum;
+			if(pNode->flags & EN_HashExpr && dtypstr(pNode->pVal))
+				break;
+			if(!isIntVal(pNode->pVal))
+				break;
+			pNode->nArg = dgetint(pNode->pVal);
 			}
 		pNode->flags |= EN_HaveNArg;
 
@@ -1639,7 +1556,7 @@ static int ge_numPrefix(ExprNode *pNode) {
 #else
 		if(getSym() < NotFound || ge_postfix(pNode) != Success)
 #endif
-			return sess.rtn.status;
+			break;
 		}
 
 	return sess.rtn.status;
@@ -1771,7 +1688,7 @@ static int ge_logical(ExprNode *pNode, int (*func)(ExprNode *pNode)) {
 #endif
 		return sess.rtn.status;
 
-	if(dnewtrack(&pValue2) != 0)
+	if((pValue2 = dnewtrack()) == NULL)
 		return libfail();
 
 	// Loop until no operator(s) at this level remain.
@@ -1789,7 +1706,7 @@ static int ge_logical(ExprNode *pNode, int (*func)(ExprNode *pNode)) {
 AndOr:
 				if(getSym() < NotFound)				// Past '&&' or '||'.
 					goto Retn;
-				nodeInit(&node2, pValue2, false);
+				nodeInit(&node2, pValue2, 0);
 #if MMDebug & Debug_Expr
 				if(ge_debug1("ge_deref", 0, pNode, NULL, ge_deref) != Success)
 #else
@@ -1804,9 +1721,9 @@ AndOr:
 #endif
 						goto Retn;
 					}
-				else if(toBool(pNode->pValue) == b) {		// No, does first argument determine outcome?
-					dsetbool(b, pNode->pValue);			// Yes, convert to logical...
-					sess.opFlags &= ~OpEval;			// and eat second argument.
+				else if(toBool(pNode->pVal) == b) {		// No, does first argument determine outcome?
+					dsetbool(b, pNode->pVal);		// Yes, convert to logical...
+					sess.opFlags &= ~OpEval;		// and eat second argument.
 #if MMDebug & Debug_Expr
 					(void) ge_debug1(funcName, 2, pNode, &node2, func);
 #else
@@ -1825,7 +1742,7 @@ AndOr:
 					 ge_deref(&node2) != Success)		// dereference var if needed...
 #endif
 						goto Retn;
-					dsetbool(toBool(node2.pValue), pNode->pValue); // and convert to logical.
+					dsetbool(toBool(node2.pVal), pNode->pVal); // and convert to logical.
 					}
 				break;
 			default:
@@ -1881,8 +1798,8 @@ static int ge_cond(ExprNode *pNode) {
 #endif
 			return sess.rtn.status;
 		if(sess.opFlags & OpEval) {
-			eat = !toBool(pNode->pValue);
-			if(dnewtrack(&pValue2) != 0)
+			eat = !toBool(pNode->pVal);
+			if((pValue2 = dnewtrack()) == NULL)
 				return libfail();
 			}
 
@@ -1894,7 +1811,7 @@ static int ge_cond(ExprNode *pNode) {
 			// Don't evaluate one of the arguments if "evaluate mode" was true when we started.
 			if(sess.opFlags & OpEval) {
 				if(eat) {
-					nodeInit(&node2, pValue2, false);
+					nodeInit(&node2, pValue2, 0);
 					sess.opFlags &= ~OpEval;
 #if MMDebug & Debug_Expr
 					(void) ge_debug1("ge_cond", 2, &node2, NULL, ge_cond);
@@ -1910,7 +1827,7 @@ static int ge_cond(ExprNode *pNode) {
 				else
 					eat = true;
 				}
-			nodeInit(pNode, pNode->pValue, false);
+			nodeInit(pNode, pNode->pVal, 0);
 #if MMDebug & Debug_Expr
 			if(ge_debug1("ge_cond", 1, pNode, NULL, ge_cond) != Success ||
 			 ge_debug1("ge_deref", 0, pNode, NULL, ge_deref) != Success)
@@ -1947,41 +1864,46 @@ int ge_assign(ExprNode *pNode) {
 #endif
 		return sess.rtn.status;
 
-	// Assignment?
+	// Error if doing parallel assignment and symbol not '=' or ','.
+	if(pNode->flags & EN_ParAssign && (pLastParse->sym != s_assign && pLastParse->sym != s_comma))
+		return rsset(Failure, 0, text4, "'='", pLastParse->tok.str);
+			// "%s expected (at token '%s')"
+
+	// Have assignment operator?
 	if((pLastParse->sym < s_assign || pLastParse->sym > s_assignBitOr) &&
 	 (pLastParse->sym != s_comma || !(pNode->flags & (EN_TopLevel | EN_ParAssign)))) {
 
-		// No, dereference any identifier or array reference and return.
+		// No, dereference any identifier or array or hash reference and return.
 #if MMDebug & Debug_Expr
-		fprintf(logfile, "### ge_assign(): Dereferencing '%s'...\n", dtype(pNode->pValue, false));
+		fprintf(logfile, "### ge_assign(): Dereferencing '%s'...\n", dtype(pNode->pVal, false));
 #endif
 		return ge_deref(pNode);
 		}
 
-	// Have assignment operator.  Valid?
-	if((pNode->flags & EN_ParAssign) && (pLastParse->sym != s_assign && pLastParse->sym != s_comma))
-		return rsset(Failure, 0, text4, "'='", pLastParse->tok.str);
-			// "%s expected (at token '%s')"
-
 	// Have valid operator.  Check if node is an lvalue and build a VarDesc object from it if evaluating.
 	if(sess.opFlags & OpEval) {
-		if(!(pNode->flags & (EN_HaveIdent | EN_ArrayRef)))
+		if(!(pNode->flags & (EN_HaveIdent | EN_AryElRef | EN_HshNodRef)))
 			goto BadLValue;
 		if(pNode->flags & EN_HaveIdent) {
 
 			// Error if name matches an existing command, pseudo-command, function, or alias.
-			if(execFind(pNode->pValue->str, OpQuery, PtrAny, NULL))
+			if(execFind(pNode->pVal->str, OpQuery, PtrAny, NULL))
 BadLValue:
 				return rsset(Failure, 0, text4, text82, pLastParse->tok.str);
 					// "%s expected (at token '%s')", "Variable name"
-			if(findVar(pNode->pValue->str, &varDesc, pLastParse->sym == s_assign ||
+			if(vfind(pNode->pVal->str, &varDesc, pLastParse->sym == s_assign ||
 			 pLastParse->sym == s_comma ? OpCreate : OpDelete) != Success)
 				return sess.rtn.status;
 			}
-		else if(getArrayRef(pNode, &varDesc, pLastParse->sym == s_assign || pLastParse->sym == s_comma) != Success)
-			return sess.rtn.status;
+		else {
+			int (*cvtRef)(VarDesc *pVarDesc, ExprNode *pNode, uint oflags) = pNode->flags & EN_AryElRef ?
+			 cvtAryElRef : cvtHshNodRef;
+			if(cvtRef(&varDesc, pNode, pLastParse->sym == s_assign || pLastParse->sym == s_comma ? OpCreate :
+			 OpUpdate) != Success)
+				return sess.rtn.status;
+			}
 		}
-	pNode->flags &= ~(EN_HaveIdent | EN_HaveGNVar | EN_HaveWhite | EN_ArrayRef);
+	pNode->flags &= ~(EN_HaveIdent | EN_HaveLValue);
 
 	// Set coercion flags.
 	switch(sym = pLastParse->sym) {
@@ -1990,7 +1912,7 @@ BadLValue:
 			break;
 		case s_assignSub:		// -=
 		case s_assignMult:		// *=
-			if((sess.opFlags & OpEval) && !isIntVar(&varDesc)) {
+			if(sess.opFlags & OpEval && !isIntVar(&varDesc)) {
 
 				// Assume lvalue is an array, hence doing a set operation.
 				f = FF_SetMatch;
@@ -2008,7 +1930,7 @@ BadLValue:
 			break;
 		case s_assignBitAnd:		// &=
 		case s_assignBitOr:		// |=
-			if((sess.opFlags & OpEval) && !isIntVar(&varDesc)) {
+			if(sess.opFlags & OpEval && !isIntVar(&varDesc)) {
 				f = sym == s_assignBitAnd ? FF_Concat : FF_Union;
 				break;
 				}
@@ -2019,7 +1941,7 @@ BadLValue:
 
 	// If evaluating, save assign op (for error reporting).
 	if(sess.opFlags & OpEval) {
-		if(dnewtrack(&pOp) != 0)
+		if((pOp = dnewtrack()) == NULL)
 			goto LibFail;
 		dxfer(pOp, &pLastParse->tok);
 		}
@@ -2027,11 +1949,11 @@ BadLValue:
 	// Move past operator and prepare to get value expression.
 	if(getSym() < NotFound)
 		return sess.rtn.status;
-	if(dnewtrack(&pValue2) != 0)
+	if((pValue2 = dnewtrack()) == NULL)
 		goto LibFail;
-	nodeInit(&node2, pValue2, sym == s_comma);
+	nodeInit(&node2, pValue2, 0);
 
-	// If doing parallel assignment, set array index in node2.nArg for next recursive call.
+	// If doing parallel assignment, use nArg in node for array index, and set it for next recursive call.
 	if(sym == s_comma) {
 		node2.flags = EN_ParAssign;
 		if(pNode->flags & EN_ParAssign)
@@ -2045,107 +1967,111 @@ BadLValue:
 
 	// Get value.
 #if MMDebug & Debug_Expr
-	if(ge_debug1("ge_assign", 2, pNode, &node2, ge_assign) != Success ||
-	 ge_debug1("ge_deref", 0, pNode, &node2, ge_deref) != Success)
+	if(ge_debug1("ge_assign", 2, pNode, &node2, ge_assign) != Success)
 #else
-	if(ge_assign(&node2) != Success || ge_deref(&node2) != Success)
+	if(ge_assign(&node2) != Success)
 #endif
 		return sess.rtn.status;
 
 	// If evaluating...
 	if(sess.opFlags & OpEval) {
 
-		// Get current variable value or array element into pNode if not straight assignment, and coerce operands into a
-		// compatible type.
+		// Get current variable value, array element, or hash node into *pNode if not straight assignment, and coerce
+		// operands into a compatible type.
 		if(sym != s_assign && sym != s_comma)
-			if(vderefv(pNode->pValue, &varDesc) != Success || forceFit(pNode, &node2, f, pOp->str) != Success)
+			if(vderefv(pNode->pVal, &varDesc) != Success || forceFit(pNode, &node2, f, pOp->str) != Success)
 				return sess.rtn.status;
 
-		// Do operation and put result into pNode.  pNode contains left side and node2 contains right.
+		// Do operation and put result into *pNode.  *pNode contains left side and node2 contains right.
 		switch(sym) {
 			case s_assign:
 				// Value must be an array if doing parallel assignment.
 				if(pNode->flags & EN_ParAssign) {
-					if(!isArrayVal(node2.pValue))
+					if(!isArrayVal(node2.pVal))
 						return sess.rtn.status;
 					pNode->flags &= ~EN_ParAssign;
 					goto PAssign;
 					}
-				if(dtyparray(pNode->pValue))
-					agTrack(pNode->pValue);
-				dxfer(pNode->pValue, node2.pValue);
+				if(dtypah(pNode->pVal))
+					ahtrack(pNode->pVal, false);
+				dxfer(pNode->pVal, node2.pVal);
 				break;
 			case s_comma:
 PAssign:
 				// Set lvalue to array element, or nil if element does not exist.  Return whole array in node.
-				{Array *pArray = node2.pValue->u.pArray;
+				{Array *pArray = dgetarrayptr(node2.pVal);
 				if(pNode->nArg >= pArray->used) {
-					Datum d;
-					dinit(&d);
-					(void) setVar(&d, &varDesc);
+					Datum nilVal;
+					dinit(&nilVal);
+					(void) setVar(&varDesc, &nilVal);
 					}
 				else
-					(void) setVar(pArray->elements[pNode->nArg], &varDesc);
+					(void) setVar(&varDesc, pArray->elements[pNode->nArg]);
 				}
-				dxfer(pNode->pValue, node2.pValue);
+				dxfer(pNode->pVal, node2.pVal);
 				goto Retn;
 			case s_assignAdd:
-				pNode->pValue->u.intNum += node2.pValue->u.intNum;
+				dgetint(pNode->pVal) += dgetint(node2.pVal);
 				break;
 			case s_assignSub:
 				if(f & FF_SetMatch)
 					goto ArrayOp;
-				pNode->pValue->u.intNum -= node2.pValue->u.intNum;
+				dgetint(pNode->pVal) -= dgetint(node2.pVal);
 				break;
 			case s_assignMult:
 				if(f & FF_SetMatch)
 					goto ArrayOp;
-				pNode->pValue->u.intNum *= node2.pValue->u.intNum;
+				dgetint(pNode->pVal) *= dgetint(node2.pVal);
 				break;
 			case s_assignDiv:
-				if(node2.pValue->u.intNum == 0L)
+				if(dgetint(node2.pVal) == 0L)
 					goto DivZero;
-				pNode->pValue->u.intNum /= node2.pValue->u.intNum;
+				dgetint(pNode->pVal) /= dgetint(node2.pVal);
 				break;
 			case s_assignMod:
-				if(node2.pValue->u.intNum == 0L)
+				if(dgetint(node2.pVal) == 0L)
 DivZero:
-					return rsset(Failure, 0, text245, pNode->pValue->u.intNum);
+					return rsset(Failure, 0, text245, dgetint(pNode->pVal));
 						// "Division by zero is undefined (%ld/0)"
-				pNode->pValue->u.intNum %= node2.pValue->u.intNum;
+				dgetint(pNode->pVal) %= dgetint(node2.pVal);
 				break;
 			case s_assignLeftShift:
-				pNode->pValue->u.intNum <<= node2.pValue->u.intNum;
+				dgetint(pNode->pVal) <<= dgetint(node2.pVal);
 				break;
 			case s_assignRightShift:
-				pNode->pValue->u.intNum >>= (ulong) node2.pValue->u.intNum;
+				dgetint(pNode->pVal) >>= (ulong) dgetint(node2.pVal);
 				break;
 			case s_assignBitAnd:
 				if(!(f & FF_Concat))
-					pNode->pValue->u.intNum &= node2.pValue->u.intNum;
-				else if(dtyparray(pNode->pValue))
+					dgetint(pNode->pVal) &= dgetint(node2.pVal);
+				else if(dtyparray(pNode->pVal))
 					goto ArrayOp;
-				else if(concat(pNode, &node2) != Success)
-					return sess.rtn.status;
+				else {
+					if(concat(pNode, &node2, false) != Success)
+						return sess.rtn.status;
+
+					// If left node is a hash, the lvalue was modified directly by concat(), so skip
+					// (redundant) call to setVar().
+					if(dtyphash(pNode->pVal))
+						goto Retn;
+					}
 				break;
 			case s_assignBitXOr:
-				pNode->pValue->u.intNum ^= node2.pValue->u.intNum;
+				dgetint(pNode->pVal) ^= dgetint(node2.pVal);
 				break;
 			default:	// s_assignBitOr
 				if(f & FF_BitOp)
-					pNode->pValue->u.intNum |= node2.pValue->u.intNum;
+					dgetint(pNode->pVal) |= dgetint(node2.pVal);
 				else {
 ArrayOp:
 					if(arrayOp(pNode, &node2, sym, false) != Success)
 						return sess.rtn.status;
 
-					// If left node is an array, the lvalue was modified directly by arrayOp(), so skip
-					// (redundant) call to setVar().
-					if(dtyparray(pNode->pValue))
-						goto Retn;
+					// Lvalue was modified directly by arrayOp(), so skip (redundant) call to setVar().
+					goto Retn;
 					}
 			}
-		(void) setVar(pNode->pValue, &varDesc);
+		(void) setVar(&varDesc, pNode->pVal);
 		}
 Retn:
 	return sess.rtn.status;
@@ -2166,7 +2092,7 @@ static int ge_not(ExprNode *pNode) {
 
 		// Perform operation.
 		if(sess.opFlags & OpEval)
-			dsetbool(!toBool(pNode->pValue), pNode->pValue);
+			dsetbool(!toBool(pNode->pVal), pNode->pVal);
 		}
 	else
 #if MMDebug & Debug_Expr
@@ -2192,14 +2118,14 @@ int ge_andOr(ExprNode *pNode) {
 #endif
 		return sess.rtn.status;
 
-	if(dnewtrack(&pValue2) != 0)
+	if((pValue2 = dnewtrack()) == NULL)
 		return libfail();
 	eval = (sess.opFlags & OpEval) != 0;
 
 	// Loop until no operator(s) at this level remain.  If we weren't evaluating initially (eval is false), then all ops
 	// evaluate to false.
 	for(;;) {
-		priorTruth = toBool(pNode->pValue);
+		priorTruth = toBool(pNode->pVal);
 		switch(pLastParse->sym) {		// true or false or true
 			case kw_and:			// false and true and false
 				curTruth = false;	// true or false and EVAL
@@ -2209,7 +2135,7 @@ int ge_andOr(ExprNode *pNode) {
 AndOr:
 				if(getSym() < NotFound)				// Past 'and' or 'or'.
 					goto Retn;
-				nodeInit(&node2, pValue2, false);
+				nodeInit(&node2, pValue2, 0);
 				if(!(sess.opFlags & OpEval)) {			// Eating arguments?
 					if(eval && curTruth != priorTruth) {	// Yes, stop the gluttony?
 						sess.opFlags |= OpEval;		// Yes, enough already.
@@ -2223,7 +2149,7 @@ AndOr:
 						goto Retn;
 					}
 				else if(priorTruth == curTruth) {		// No, does prior argument determine outcome?
-					dsetbool(curTruth, pNode->pValue);	// Yes, convert to logical...
+					dsetbool(curTruth, pNode->pVal);	// Yes, convert to logical...
 					sess.opFlags &= ~OpEval;		// and eat next argument.
 #if MMDebug & Debug_Expr
 					(void) ge_debug1("ge_not", 2, pNode, &node2, ge_not);
@@ -2242,7 +2168,7 @@ Eval:
 					if(ge_not(&node2) != Success)
 #endif
 						goto Retn;
-					dsetbool(toBool(node2.pValue), pNode->pValue);
+					dsetbool(toBool(node2.pVal), pNode->pVal);
 					}
 				break;
 			default:
@@ -2272,35 +2198,43 @@ char *dtype(Datum *pDatum, bool terse) {
 		case dat_longStr:
 			str = "string";
 			break;
-		default:
+		case dat_array:
+		case dat_arrayRef:
 			str = "array";
+			break;
+		default:
+			str = "hash";
 		}
 	return str;
 	}
 
 // Validate a value per flags.  Return status.
-int validateArg(Datum *pDatum, uint argFlags) {
+static int validateArg(Datum *pDatum, uint argFlags) {
 
 	if((argFlags & (ArgInt1 | ArgMay)) == ArgInt1)					// 'int' flag set without "may be"?
 		(void) isIntVal(pDatum);						// Yes, must be integer.
+	else if((argFlags & (ArgHash1 | ArgNIS1 | ArgMay)) == ArgHash1)			// No, 'hash' set without other types?
+		(void) isHashVal(pDatum);						// Yes, must be hash.
 	else if((argFlags & (ArgArray1 | ArgNIS1 | ArgMay)) == ArgArray1)		// No, 'array' set without other types?
 		(void) isArrayVal(pDatum);						// Yes, must be array.
-	else if(!(argFlags & (ArgNil1 | ArgBool1 | ArgInt1 | ArgArray1 | ArgNIS1))) {	// No, non-string flags not set?
-		if(isStrVal(pDatum) && (argFlags & ArgNotNull1) && disnull(pDatum))	// Yes, must be string.  Check if null
-			goto NotNull;							// string is an error.
+	else if(!(argFlags & (ArgNil1 | ArgBool1 | ArgInt1 | ArgArray1 | ArgHash1 | ArgNIS1))) {
+											// No, non-string flags not set?
+		if(isStrVal(pDatum) && argFlags & ArgNotNull1 && disnull(pDatum))	// Yes, must be string.  Also check if
+			goto NotNull;							// null string is an error.
 		}
-	else if((!(argFlags & ArgArray1) && dtyparray(pDatum)) ||		// No required types.  Check if found type
-	 (!(argFlags & ArgBool1) && dtypbool(pDatum)) ||			// is allowed.
+	else if((!(argFlags & ArgHash1) && dtyphash(pDatum)) ||			// No required types.  Check if found type
+	 (!(argFlags & ArgArray1) && dtyparray(pDatum)) ||			// is allowed.
+	 (!(argFlags & ArgBool1) && dtypbool(pDatum)) ||
 	 (!(argFlags & ArgNIS1) && (
 	 (!(argFlags & ArgNil1) && disnil(pDatum)) ||
 	 (!(argFlags & ArgInt1) && pDatum->type == dat_int))))
 		return rsset(Failure, 0, text329, dtype(pDatum, false));
 				// "Unexpected %s argument"
-	else if(dtypstr(pDatum) && (argFlags & ArgNotNull1) &&	// Null string error?
+	else if(dtypstr(pDatum) && argFlags & ArgNotNull1 &&	// Null string error?
 	 disnull(pDatum))
 NotNull:
 		return rsset(Failure, 0, text187, text285);
-			// "%s cannot be null", "Call argument"
+			// "%s cannot be null", "Argument"
 	return sess.rtn.status;							// No, all is well.
 	}
 
@@ -2310,12 +2244,12 @@ int funcArg(Datum *pRtnVal, uint argFlags) {
 	ExprNode node;
 
 #if MMDebug & Debug_Expr
-	fprintf(logfile, "funcArg(...,%.8x): BEGIN at token '%s', remainder '%s'...\n", argFlags, pLastParse->tok.str,
+	fprintf(logfile, "funcArg(..., %.8x): BEGIN at token '%s', remainder '%s'...\n", argFlags, pLastParse->tok.str,
 	 pLastParse->src);
 #endif
 	if(!(argFlags & ArgFirst) && !needSym(s_comma, true))
 		return sess.rtn.status;
-	nodeInit(&node, pRtnVal, false);
+	nodeInit(&node, pRtnVal, 0);
 #if MMDebug & Debug_Expr
 	if(ge_debug1("ge_andOr", -1, &node, NULL, ge_andOr) != Success)
 #else
@@ -2324,8 +2258,8 @@ int funcArg(Datum *pRtnVal, uint argFlags) {
 		return sess.rtn.status;
 
 	// If evaluating, validate value and expand pathname, if applicable.
-	if((sess.opFlags & OpEval) && validateArg(pRtnVal, argFlags) == Success && (argFlags & ArgPath) && dtypstr(pRtnVal))
-		expandPath(pRtnVal, NULL);
+	if(sess.opFlags & OpEval && validateArg(pRtnVal, argFlags) == Success && argFlags & ArgPath && dtypstr(pRtnVal))
+		(void) expandPath(pRtnVal, NULL);
 	return sess.rtn.status;
 	}
 
@@ -2333,10 +2267,10 @@ int funcArg(Datum *pRtnVal, uint argFlags) {
 // Simulate a series of calls to funcArg() routine by getting next "argument" from a comma-delimited string or an array, given
 // indirect pointer to result, indirect pointer to input Datum object, work Datum object (used when input is a string), indirect
 // string pointer (for managing a string input), indirect array pointer and indirect array length (for managing an array input).
-// *ppInput is assumed to point to either a string or array Datum object, and is set to NULL after the first call to this
-// routine.  Routine is called repeatedly to obtain next argument until NotFound is returned or a non-Success status.  *ppRtnVal
-// is set to either "work" or the next array element for each extracted argument; however, if argument does not conform to
-// validation flags, an error is returned.  All arguments are assumed to be optional, including the first.
+// *ppInput is assumed to point to either a string or array, and is set to NULL after the first call to this routine.  Routine
+// is called repeatedly to obtain next argument until NotFound is returned or a non-Success status.  *ppRtnVal is set to either
+// "work" or the next array element for each extracted argument; however, if argument does not conform to validation flags, an
+// error is returned.  All arguments are assumed to be optional, including the first.
 int nextArg(Datum **ppRtnVal, Datum **ppInput, Datum *pWork, char **keywordList, Datum ***pppArrayEl, ArraySize *pElCount) {
 
 	for(;;) {
@@ -2345,7 +2279,7 @@ int nextArg(Datum **ppRtnVal, Datum **ppInput, Datum *pWork, char **keywordList,
 			if(dtyparray(*ppInput)) {
 
 				// Set up for array processing.
-				Array *pArray = (*ppInput)->u.pArray;
+				Array *pArray = dgetarrayptr((*ppInput));
 				*pppArrayEl = pArray->elements;
 				*pElCount = pArray->used;
 				*keywordList = NULL;

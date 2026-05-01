@@ -22,9 +22,9 @@ dismissed.
 
 Pop-up windows are used extensively in MightEMacs for many purposes, including
 the display of help and state information by all of the "show" commands.  For
-example, you can use the ~bshowVariables~B (~#uC-h v~U) command now to display a pop-up
+example, you can use the ~bshowConstVars~B (~#uC-h v~U) command now to display a pop-up
 window and figure out how to move around in it.  Remember that ~u?~U displays the
-available commands and ~uq~U or ~uESC~U exits.
+available navigation commands and ~uq~U or ~uESC~U exits.
 
 
 <home>    <exit>

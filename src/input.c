@@ -1,4 +1,4 @@
-// (c) Copyright 2022 Richard W. Marinelli
+// (c) Copyright 2026 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -21,7 +21,6 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include "cxl/lib.h"
-#include "cmd.h"
 #include "bind.h"
 #include "exec.h"
 #include "search.h"
@@ -69,15 +68,15 @@ typedef struct {
 typedef struct {
 	int force;
 	InpCtrl *pInpCtrl;
-	Array *pArray;			// Buffer table.
+	HashNode **pAry;		// Buffer table array (created from hash).
 	} CompBuf;
 
-// Completion object for a command, function, or alias name..
+// Completion object for a command, function, or alias name.
 typedef struct {
 	uint selector;			// Selector flags.
-	HashRec **ppHashRec;		// Sorted HashTable records.
-	HashRec **ppHashRecEnd;
-	HashRec **ppHashRec1;
+	HashNode **ppHashNode;		// Sorted Hash records.
+	HashNode **ppHashNodeEnd;
+	HashNode **ppHashNode1;
 	} CompCFA;
 
 // Completion object for a filename.
@@ -88,9 +87,9 @@ typedef struct {
 
 // Completion object for a macro name.
 typedef struct {
-	int n;				// Number of ring items left to process.
-	RingEntry *pEntry;		// Current ring entry.
-	char name[MaxMacroName + 1];	// Current macro name.
+	HashNode **ppHashNode;		// Sorted Hash records.
+	HashNode **ppHashNodeEnd;
+	HashNode **ppHashNode1;
 	} CompMacro;
 
 // Completion object for a ring name.
@@ -101,13 +100,13 @@ typedef struct {
 
 // Completion object for a variable.
 typedef struct {
-	const char **varList;		// Variable array.
+	const char **cvList;		// Variable array.
 	const char **pVar;		// Current variable name.
 	const char **pVarEnd;		// End of variable array.
 	} CompVar;
 
-// "Unget" a key from getkey() for reprocessing in editLoop().
-void ungetkey(ushort extKey) {
+// "Unget" a key from getkey() for reprocessing in getkey() and editLoop().
+void ungetkey(ExtKey extKey) {
 
 	keyEntry.charPending = extKey;
 	keyEntry.isPending = true;
@@ -115,8 +114,8 @@ void ungetkey(ushort extKey) {
 
 // Get one keystroke from the terminal driver, resolve any macro action, and return it in *pExtKey as an extended key.  The
 // legal prefixes here are the FKey and Ctrl.  If saveKey is true, store extended key in keyEntry.lastKeySeq.  Return status.
-int getkey(bool msgLine, ushort *pExtKey, bool saveKey) {
-	ushort extKey;
+int getkey(bool msgLine, ExtKey *pExtKey, bool saveKey) {
+	ExtKey extKey;
 
 	// If a character is pending...
 	if(keyEntry.isPending) {
@@ -128,34 +127,35 @@ int getkey(bool msgLine, ushort *pExtKey, bool saveKey) {
 		}
 
 	// Otherwise, if we are playing a macro back...
-	if(curMacro.state == MacPlay) {
+	if(macro.state == MacPlaying) {
+		Macro *pActive = macro.pActiveMacro;
 
 		// End of macro?
-		if(curMacro.pMacSlot == curMacro.pMacEnd) {
+		if(pActive->pMacSlot == pActive->pMacEnd) {
 
 			// Yes, check if last iteration.
-			if(--curMacro.n <= 0) {
+			if(--macro.n <= 0) {
 
 				// Non-positive counter.  Error if infinite reps and hit loop maximum.
-				if(curMacro.n < 0 && maxLoop > 0 && abs(curMacro.n) > maxLoop)
+				if(macro.n < 0 && maxLoop > 0 && labs(macro.n) > maxLoop)
 					return rsset(Failure, 0, text112, maxLoop);
-						// "Maximum number of loop iterations (%d) exceeded!"
-				if(curMacro.n == 0) {
+						// "Maximum number of loop iterations (%'d) exceeded!"
+				if(macro.n == 0) {
 
 					// Finished last repetition.  Stop playing and update screen.
-					curMacro.state = MacStop;
-					if(update(INT_MIN) != Success)
+					macro.state = MacStopped;
+					if(update(DefN) != Success)
 						return sess.rtn.status;
 					goto Fetch;
 					}
 				}
 
 			// Not last rep.  Reset the macro to the begining for the next one.
-			curMacro.pMacSlot = curMacro.pMacBuf;
+			pActive->pMacSlot = pActive->pMacBuf;
 			}
 
 		// Return the next key.
-		extKey = *curMacro.pMacSlot++;
+		extKey = *pActive->pMacSlot++;
 		goto Retn;
 		}
 Fetch:
@@ -164,13 +164,14 @@ Fetch:
 		return sess.rtn.status;
 
 	// Save it if we need to...
-	if(curMacro.state == MacRecord) {
+	if(macro.state == MacRecording) {
+		Macro *pStage = macro.pStageMacro;
 
 		// Don't overrun the buffer.
-		if(curMacro.pMacSlot == curMacro.pMacBuf + curMacro.size)
-			if(growMacro() != Success)
+		if(pStage->pMacSlot == pStage->pMacBuf + pStage->size)
+			if(growMacro(pStage) != Success)
 				return sess.rtn.status;
-		*curMacro.pMacSlot++ = extKey;
+		*pStage->pMacSlot++ = extKey;
 		}
 Retn:
 	// and finally, return the extended key.
@@ -183,10 +184,10 @@ Retn:
 // Get a key sequence from the keyboard and return it in *pExtKey.  Process all applicable prefix keys.  If ppKeyBind is not
 // NULL, set *ppKeyBind to the getBind() return pointer.  If saveKey is true, store extended key in keyEntry.lastKeySeq.  Return
 // status.
-int getKeySeq(bool msgLine, ushort *pExtKey, KeyBind **ppKeyBind, bool saveKey) {
-	ushort extKey;		// Fetched keystroke.
-	ushort p;		// Prefix mask.
-	KeyBind *pKeyBind;		// Pointer to a key entry.
+int getKeySeq(bool msgLine, ExtKey *pExtKey, KeyBind **ppKeyBind, bool saveKey) {
+	ExtKey extKey;		// Fetched keystroke.
+	ExtKey prefix;		// Prefix mask.
+	KeyBind *pKeyBind;	// Pointer to binding entry.
 
 	// Get initial key.
 	if(getkey(msgLine, &extKey, false) != Success)
@@ -194,25 +195,25 @@ int getKeySeq(bool msgLine, ushort *pExtKey, KeyBind **ppKeyBind, bool saveKey) 
 	pKeyBind = getBind(extKey);
 
 	// Get another key if first one was a prefix.
-	if(pKeyBind != NULL && pKeyBind->targ.type == PtrPseudo) {
-		switch((CmdFuncId) (pKeyBind->targ.u.pCmdFunc - cmdFuncTable)) {
+	if(pKeyBind != NULL && pKeyBind->cmd.type == PtrPseudo) {
+		switch((CmdFuncId) (pKeyBind->cmd.u.pCmdFunc - cmdFuncTable)) {
 			case cf_metaPrefix:
-				p = Meta;
+				prefix = Meta;
 				goto Next;
 			case cf_prefix1:
-				p = Pref1;
+				prefix = Pref1;
 				goto Next;
 			case cf_prefix2:
-				p = Pref2;
+				prefix = Pref2;
 				goto Next;
 			case cf_prefix3:
-				p = Pref3;
+				prefix = Pref3;
 Next:
 				if(getkey(msgLine, &extKey, false) != Success)
 					return sess.rtn.status;
-				extKey |= p;				// Add prefix.
+				extKey |= prefix;			// Add prefix.
 				if(ppKeyBind != NULL) {
-					pKeyBind = getBind(extKey);		// Get new binding if requested.
+					pKeyBind = getBind(extKey);	// Get new binding if requested.
 					goto Retn;
 					}
 				break;
@@ -226,7 +227,7 @@ Retn:
 		*ppKeyBind = pKeyBind;
 		}
 
-	// Return it.
+	// Return key sequence.
 	*pExtKey = extKey;
 	if(saveKey)
 		keyEntry.lastKeySeq = extKey;
@@ -234,37 +235,19 @@ Retn:
 	}
 
 // Do "getKey" function.  Return status.
-int fGetKey(Datum *pRtnVal, int n, Datum **args) {
-	ushort extKey;
+int fGetKey(Datum *pRtnVal, long n, Datum **args) {
+	ExtKey extKey;
 	char keyBuf[16];
-	static bool keySeq;		// Get key sequence, otherwise one keystroke.
-	static bool keyLit;		// Return key literal, otherwise ASCII character (integer).
-	static bool doAbort;		// Abort key aborts function; otherwise, processed as any other key.
-	static Option options[] = {
-		{"^KeySeq", NULL, 0, .u.ptr = (void *) &keySeq},
-		{"^Char", NULL, OptFalse, .u.ptr = (void *) &keyLit},
-		{"^LitAbort", NULL, OptFalse, .u.ptr = (void *) &doAbort},
-		{NULL, NULL, 0, 0}};
-	static OptHdr optHdr = {
-		0, text451, false, options};
-			// "function option"
-
-	// Get options and set flags.
-	initBoolOpts(options);
-	if(args[0] != NULL) {
-		if(parseOpts(&optHdr, NULL, args[0], NULL) != Success)
-			return sess.rtn.status;
-		setBoolOpts(options);
-		}
+	uint flags = cmdFuncTable[cf_getKey].pOptHdr->selFlags;
 
 	// Get key or key sequence and return it.
-	if((keySeq ? getKeySeq(true, &extKey, NULL, true) : getkey(true, &extKey, true)) != Success)
+	if((flags & GK_KeySeq ? getKeySeq(true, &extKey, NULL, true) : getkey(true, &extKey, true)) != Success)
 		return sess.rtn.status;
-	if(doAbort && extKey == coreKeys[CK_Abort].extKey)
+	if(flags & GK_DoAbort && extKey == coreKeys[CK_Abort].extKey)
 		return abortInp();
-	if(!keyLit)
+	if(!(flags & GK_KeyLit))
 		dsetint(ektoc(extKey, true), pRtnVal);
-	else if(dsetstr(ektos(extKey, keyBuf, false), pRtnVal) != 0)
+	else if(dsetstr(ektos(keyBuf, extKey, false), pRtnVal) != 0)
 		return libfail();
 
 	return sess.rtn.status;
@@ -286,8 +269,8 @@ int fGetKey(Datum *pRtnVal, int n, Datum **args) {
 // reached.  Return status.
 static int mli_write(InpCtrl *pInpCtrl, int beginCol, ushort bufOffset, bool extChar, const char *str, int endCol) {
 
-#if MMDebug & Debug_MsgLine
-	fprintf(logfile, "mli_write(...,beginCol: %d, bufOffset: %hu,%s,\"%s\", endCol: %d): curInpPos: '%s'...\n",
+#if MMDebug & Debug_MsgLnInp
+	fprintf(logfile, "mli_write(..., beginCol: %d, bufOffset: %hu,%s,\"%s\", endCol: %d): curInpPos: '%s'...\n",
 	 beginCol, bufOffset, extChar ? "true" : "false", str, endCol, pInpCtrl->curInpPos == pInpCtrl->endInpPos ? "EOL" :
 	 vizc(pInpCtrl->curInpPos[-bufOffset].c, VizBaseDef));
 #endif
@@ -295,19 +278,19 @@ static int mli_write(InpCtrl *pInpCtrl, int beginCol, ushort bufOffset, bool ext
 	if(beginCol != term.msgLineCol && mlmove(beginCol) != Success)
 		return sess.rtn.status;
 	if(extChar)
-		mlputc(MLRaw, LineExt);
+		mlputc(LineExt, MLRaw);
 
 	// Display string.
 	if(str == NULL) {
 		InpChar *pInpChar = pInpCtrl->curInpPos - bufOffset;
 		while(pInpChar < pInpCtrl->endInpPos) {
-			mlputc(0, pInpChar->c);
+			mlputc(pInpChar->c, 0);
 			if(term.msgLineCol >= term.cols)
 				goto Finish;
 			++pInpChar;
 			}
 		}
-	else if(mlputs(MLRaw | MLFlush | MLForce, extChar ? str + 1 : str) != Success)
+	else if(mlputs(extChar ? str + 1 : str, MLRaw | MLFlush | MLForce) != Success)
 		return sess.rtn.status;
 
 	if(term.msgLineCol < term.cols)
@@ -332,7 +315,7 @@ static int mli_update(InpCtrl *pInpCtrl, bool force) {
 	int colPos1, colPos2;
 	InpChar *pInpChar;
 
-#if MMDebug & Debug_MsgLine
+#if MMDebug & Debug_MsgLnInp
 	fputs("mli_update()...\n", logfile);
 #endif
 	// Calculate new cursor position and determine if moving the cursor (only) is sufficient.  colPos1 is cursor position in
@@ -343,7 +326,7 @@ static int mli_update(InpCtrl *pInpCtrl, bool force) {
 		colPos1 += pInpChar->len;
 	colPos2 = colPos1 - pInpCtrl->leftShift;
 	if(!force && (colPos2 > 0 || (colPos2 == 0 && pInpCtrl->leftShift == 0)) && colPos2 < pInpCtrl->inpSize - 1) {
-#if MMDebug & Debug_MsgLine
+#if MMDebug & Debug_MsgLnInp
 		fprintf(logfile, "\tMoving cursor to column %d...\n", colPos2 + pInpCtrl->beginInpCol);
 #endif
 		// Cursor will still be in visible range... just move it.
@@ -358,7 +341,7 @@ static int mli_update(InpCtrl *pInpCtrl, bool force) {
 		// character currently in input buffer (e.g., "<ESC>").  NOTE: Need two extra bytes instead of one for
 		// terminating null for some reason -- program crashes otherwise!  Perhaps a bug in stpcpy() called below?
 
-#if MMDebug & Debug_MsgLine
+#if MMDebug & Debug_MsgLnInp
 		fprintf(logfile, "\tRedisplaying line (inpSize %d, jumpCols %d, workBuf %lu)...\n",
 		 pInpCtrl->inpSize, pInpCtrl->jumpCols, sizeof(workBuf));
 #endif
@@ -399,7 +382,7 @@ static int mli_update(InpCtrl *pInpCtrl, bool force) {
 			str = stpcpy(str, vizc(pInpChar->c, VizBaseDef));
 			++pInpChar;
 			}
-#if MMDebug & Debug_MsgLine
+#if MMDebug & Debug_MsgLnInp
 		fprintf(logfile, "\tleftShift: %d, partialLen: %d\n", pInpCtrl->leftShift, pInpCtrl->partialLen);
 #endif
 		if(str > workBuf)
@@ -425,10 +408,10 @@ static char *inpToStr(char *dest, InpCtrl *pInpCtrl) {
 // Delete a character from the message line input buffer.
 static int mli_del(InpCtrl *pInpCtrl, LineEdit cmd) {
 	InpChar *pInpChar1, *pInpChar2;
-	int n;
+	int len;
 
-#if MMDebug & Debug_MsgLine
-	fprintf(logfile, "mli_del(...,cmd: %d)...\n", cmd);
+#if MMDebug & Debug_MsgLnInp
+	fprintf(logfile, "mli_del(..., cmd: %d)...\n", cmd);
 #endif
 	if(cmd == ed_bs) {				// Backspace key.
 		if(pInpCtrl->curInpPos == pInpCtrl->inpBuf)
@@ -447,7 +430,7 @@ DelChar:
 
 	// Save display length of character being nuked, then remove it from buffer by left-shifting
 	// characters that follow it (if any).
-	n = pInpChar1->len;
+	len = pInpChar1->len;
 	pInpChar2 = pInpChar1 + 1;
 	while(pInpChar2 < pInpCtrl->endInpPos)
 		*pInpChar1++ = *pInpChar2++;
@@ -459,37 +442,37 @@ DelChar:
 
 		// At or near beginning or end of line?
 		if(cmd == ed_bs) {
-			if(pInpCtrl->leftShift > 0 && term.msgLineCol - n <= pInpCtrl->beginInpCol) {
+			if(pInpCtrl->leftShift > 0 && term.msgLineCol - len <= pInpCtrl->beginInpCol) {
 				if(mli_update(pInpCtrl, false) != Success)
 					return sess.rtn.status;
 				goto Flush;
 				}
 			if(pInpCtrl->curInpPos == pInpCtrl->endInpPos && (pInpCtrl->leftShift == 0 ||
 			 pInpCtrl->partialLen > 0 || term.msgLineCol - pInpCtrl->beginInpCol > 1)) {
-#if MMDebug & Debug_MsgLine
-				fprintf(logfile, "mli_del(): quick delete of %d char(s).\n", n);
+#if MMDebug & Debug_MsgLnInp
+				fprintf(logfile, "mli_del(): quick delete of %d char(s).\n", len);
 #endif
 				do {
-					mlputc(MLRaw, '\b');
-					mlputc(MLRaw, ' ');
-					mlputc(MLRaw, '\b');
-					} while(--n > 0);
+					mlputc('\b', MLRaw);
+					mlputc(' ', MLRaw);
+					mlputc('\b', MLRaw);
+					} while(--len > 0);
 				goto Flush;
 				}
-			n = term.msgLineCol - n;
+			len = term.msgLineCol - len;
 			}
 		else {
-			if(pInpCtrl->curInpPos == pInpCtrl->endInpPos && n == 1 && (pInpCtrl->leftShift == 0 ||
+			if(pInpCtrl->curInpPos == pInpCtrl->endInpPos && len == 1 && (pInpCtrl->leftShift == 0 ||
 			 pInpCtrl->partialLen > 0 || term.msgLineCol - pInpCtrl->beginInpCol > 1)) {
-				mlputc(MLRaw, ' ');
-				mlputc(MLRaw, '\b');
+				mlputc(' ', MLRaw);
+				mlputc('\b', MLRaw);
 				goto Flush;
 				}
-			n = term.msgLineCol;
+			len = term.msgLineCol;
 			}
 
 		// Not simple adjustment or special case... redo-from-cursor needed.
-		if(mli_write(pInpCtrl, n, 0, n == pInpCtrl->beginInpCol && pInpCtrl->leftShift > 0, NULL, n) == Success)
+		if(mli_write(pInpCtrl, len, 0, len == pInpCtrl->beginInpCol && pInpCtrl->leftShift > 0, NULL, len) == Success)
 Flush:
 			(void) mlflush();
 		}
@@ -499,8 +482,8 @@ Flush:
 // Insert a character into the message line input buffer.  If echoing and "update" is true, update virtual message line also.
 static int mli_putc(short c, InpCtrl *pInpCtrl, bool update) {
 
-	if(pInpCtrl->endInpPos < pInpCtrl->endBufPos && c < 0x7F) {
-#if MMDebug & Debug_MsgLine
+	if(pInpCtrl->endInpPos < pInpCtrl->endBufPos && c < 0x7f) {
+#if MMDebug & Debug_MsgLnInp
 		fprintf(logfile, "mli_putc('%s', ...)...\n", vizc(c, VizBaseDef));
 #endif
 		// Shift input buffer right one position if insertion point not at end.
@@ -609,8 +592,8 @@ Trunc:
 static int mli_prompt(InpCtrl *pInpCtrl) {
 
 	// Clear message line, display prompt, and save "home" column.
-	if(mlputs((pInpCtrl->flags & Term_Attr) ? MLHome | MLTermAttr | MLFlush | MLForce :
-	 MLHome | MLFlush | MLForce, pInpCtrl->prompt) == Success)
+	if(mlputs(pInpCtrl->prompt, pInpCtrl->flags & Term_Attr ? MLHome | MLTermAttr | MLFlush | MLForce :
+	 MLHome | MLFlush | MLForce) == Success)
 		pInpCtrl->beginInpCol = term.msgLineCol;
 	return sess.rtn.status;
 	}
@@ -622,13 +605,13 @@ static int mli_reset(InpCtrl *pInpCtrl) {
 		return sess.rtn.status;
 	pInpCtrl->curInpPos = pInpCtrl->endInpPos;
 	pInpCtrl->leftShift = 0;
-	return (pInpCtrl->flags & Term_NoKeyEcho) ? sess.rtn.status : mli_update(pInpCtrl, true);
+	return pInpCtrl->flags & Term_NoKeyEcho ? sess.rtn.status : mli_update(pInpCtrl, true);
 	}
 
 // Initialize given InpCtrl object.  Return status.
 static int mli_open(InpCtrl *pInpCtrl, const char *prompt, InpChar *pInpChar, const char *defVal, uint maxLen, uint flags) {
 
-#if MMDebug & Debug_MsgLine
+#if MMDebug & Debug_MsgLnInp
 	fprintf(logfile, "mli_open(...,prompt: \"%s\", defVal: \"%s\"): horzJumpPct %d, horzJumpCols: %d\n",
 	 prompt, defVal, vTerm.horzJumpPct, vTerm.horzJumpCols);
 #endif
@@ -654,11 +637,11 @@ static int mli_open(InpCtrl *pInpCtrl, const char *prompt, InpChar *pInpChar, co
 // Convert input buffer to a string and save in *ppDatum.
 static int mli_close(InpCtrl *pInpCtrl, Datum **ppDatum) {
 
-#if MMDebug & Debug_MsgLine
+#if MMDebug & Debug_MsgLnInp
 	fprintf(logfile, "mli_close(): curInpPos: +%lu, endInpPos: +%lu\n",
 	 pInpCtrl->curInpPos - pInpCtrl->inpBuf, pInpCtrl->endInpPos - pInpCtrl->inpBuf);
 #endif
-	if(dnewtrack(ppDatum) != 0 || dsalloc(*ppDatum, (pInpCtrl->endInpPos - pInpCtrl->inpBuf) + 1) != 0)
+	if((*ppDatum = dnewtrack()) == NULL || dsalloc(*ppDatum, (pInpCtrl->endInpPos - pInpCtrl->inpBuf) + 1) != 0)
 		return libfail();
 	inpToStr((*ppDatum)->str, pInpCtrl);
 	return sess.rtn.status;
@@ -730,7 +713,7 @@ static int buildPrompt(char *dest, const char *prompt1, int maxPct, short defVal
 	// Make sure prompt fits on the screen.
 	maxLen = maxPct * term.cols / 100;
 	promptLen = strlen(str);
-	strfit(dest, maxLen + (ctrlFlags & Term_Attr ? attrCount(str, promptLen, maxLen) : 0), str, promptLen);
+	strfit(dest, maxLen + (ctrlFlags & Term_Attr ? attrCount(str, promptLen, maxLen) + 1 : 1), str, promptLen);
 	return sess.rtn.status;
 LibFail:
 	return libfail();
@@ -850,16 +833,19 @@ static int cList(InpCtrl *pInpCtrl, Buffer *pBuf, Completion *pComp) {
 	return sess.rtn.status;
 	}
 
-// Helper routine for cMatch() and cList().  Return next buffer name, or NotFound status if none left.
+// Helper routine for cMatch() and cList().  Store next buffer name in *pItem and return status, or NotFound if none left.
 static int nextBufname(bool reset, void *context, const char **pItem) {
 	CompBuf *pCompBuf = context;
-	if(reset)
-		pCompBuf->pArray = &bufTable;
+	if(reset) {
+		if(ohAryPrep(&buf, &pCompBuf->pAry) != 0)
+			return libfail();
+		}
 	else {
-		Datum *pArrayEl;
+		HashNode *pNode;
 		Buffer *pBuf;
-		while((pArrayEl = aeach(&pCompBuf->pArray)) != NULL) {
-			pBuf = bufPtr(pArrayEl);
+
+		while((pNode = *pCompBuf->pAry++) != NULL) {
+			pBuf = bufPtr(pNode->pVal);
 
 			// Is this buffer a candidate?  Skip hidden buffers if no partial name.
 			if(pCompBuf->force || pCompBuf->pInpCtrl->endInpPos > pCompBuf->pInpCtrl->inpBuf ||
@@ -889,19 +875,19 @@ static int cListBuf(InpCtrl *pInpCtrl, Buffer *pBuf, bool forceAll) {
 	return cList(pInpCtrl, pBuf, &comp);
 	}
 
-// Helper routine for cMatch() and cList().  Return next command or alias name, or NotFound status if none left.
+// Helper routine for cMatch() and cList().  Return next command, function, or alias name, or NotFound status if none left.
 static int nextCFA(bool reset, void *context, const char **pItem) {
 	CompCFA *pCompCFA = context;
 	if(reset)
-		pCompCFA->ppHashRec1 = pCompCFA->ppHashRec;
+		pCompCFA->ppHashNode1 = pCompCFA->ppHashNode;
 	else {
-		HashRec **ppHashRec1;
-		UnivPtr *pUniv;
-		while(pCompCFA->ppHashRec1 < pCompCFA->ppHashRecEnd) {
-			ppHashRec1 = pCompCFA->ppHashRec1++;
-			pUniv = univPtr(*ppHashRec1);
-			if(pUniv->type & pCompCFA->selector) {
-				*pItem = (*ppHashRec1)->key;
+		HashNode **ppHashNode1;
+		ExecPtr *pExec;
+		while(pCompCFA->ppHashNode1 < pCompCFA->ppHashNodeEnd) {
+			ppHashNode1 = pCompCFA->ppHashNode1++;
+			pExec = execPtr(*ppHashNode1);
+			if(pExec->type & pCompCFA->selector) {
+				*pItem = (*ppHashNode1)->key;
 				goto Retn;
 				}
 			}
@@ -911,18 +897,18 @@ Retn:
 	return sess.rtn.status;
 	}
 
-// Attempt a completion on a command or alias name via cMatch(), given pointer to InpCtrl object, selector mask, and sorted hash
-// table.  Return status.
-static int cMatchCFA(InpCtrl *pInpCtrl, uint selector, HashRec **ppHashRec) {
-	CompCFA compCFA = {selector, ppHashRec, ppHashRec + execTable->recCount};
+// Attempt a completion on a command, function, or alias name via cMatch(), given pointer to InpCtrl object, selector mask, and
+// sorted hash table.  Return status.
+static int cMatchCFA(InpCtrl *pInpCtrl, uint selector, HashNode **ppHashNode) {
+	CompCFA compCFA = {selector, ppHashNode, ppHashNode + execTable.nodeCount};
 	Completion comp = {nextCFA, inpcmp, &compCFA};
 	return cMatch(pInpCtrl, &comp);
 	}
 
 // Make a completion list based on a partial name via cList(), given pointer to InpCtrl object, indirect result buffer pointer,
 // selector mask, and sorted hash table.  Return status.
-static int cListCFA(InpCtrl *pInpCtrl, Buffer *pBuf, uint selector, HashRec **ppHashRec) {
-	CompCFA compCFA = {selector, ppHashRec, ppHashRec + execTable->recCount};
+static int cListCFA(InpCtrl *pInpCtrl, Buffer *pBuf, uint selector, HashNode **ppHashNode) {
+	CompCFA compCFA = {selector, ppHashNode, ppHashNode + execTable.nodeCount};
 	Completion comp = {nextCFA, inpcmp, &compCFA};
 	return cList(pInpCtrl, pBuf, &comp);
 	}
@@ -974,34 +960,32 @@ static int cListFile(InpCtrl *pInpCtrl, Buffer *pBuf) {
 // Helper routine for cMatch() and cList().  Return next macro name, or NotFound status if none left.
 static int nextMacro(bool reset, void *context, const char **pItem) {
 	CompMacro *pCompMacro = context;
-	if(reset) {
-		pCompMacro->pEntry = ringTable[RingIdxMacro].pEntry;
-		pCompMacro->n = ringTable[RingIdxMacro].size;
-		}
+	if(reset)
+		pCompMacro->ppHashNode1 = pCompMacro->ppHashNode;
 	else {
-		if(pCompMacro->n-- == 0)
+		HashNode **ppHashNode1;
+		if(pCompMacro->ppHashNode1 < pCompMacro->ppHashNodeEnd) {
+			ppHashNode1 = pCompMacro->ppHashNode1++;
+			*pItem = (*ppHashNode1)->key;
+			}
+		else
 			return NotFound;
-
-		char *macro = pCompMacro->pEntry->data.str;
-		pCompMacro->pEntry = pCompMacro->pEntry->prev;
-		macSplit(pCompMacro->name, macro);
-		*pItem = pCompMacro->name;
 		}
 
 	return sess.rtn.status;
 	}
 
 // Attempt a completion on a macro name via cMatch(), given pointer to InpCtrl object.  Return status.
-static int cMatchMacro(InpCtrl *pInpCtrl) {
-	CompMacro compMacro;
+static int cMatchMacro(InpCtrl *pInpCtrl, HashNode **ppHashNode) {
+	CompMacro compMacro = {ppHashNode, ppHashNode + macro.index.table.nodeCount};
 	Completion comp = {nextMacro, inpcmp, &compMacro};
 	return cMatch(pInpCtrl, &comp);
 	}
 
 // Make a completion list based on a partial name via cList(), given pointer to InpCtrl object and indirect result buffer
 // pointer.  Return status.
-static int cListMacro(InpCtrl *pInpCtrl, Buffer *pBuf) {
-	CompMacro compMacro;
+static int cListMacro(InpCtrl *pInpCtrl, Buffer *pBuf, HashNode **ppHashNode) {
+	CompMacro compMacro = {ppHashNode, ppHashNode + macro.index.table.nodeCount};
 	Completion comp = {nextMacro, inpcmp, &compMacro};
 	return cList(pInpCtrl, pBuf, &comp);
 	}
@@ -1039,13 +1023,15 @@ static int cListRing(InpCtrl *pInpCtrl, Buffer *pBuf) {
 // Helper routine for cMatch() and cList().  Return next buffer or global mode name, or NotFound status if none left.
 static int nextMode(bool reset, void *context, const char **pItem) {
 
-	if(reset)
-		*((Array **) context) = &modeInfo.modeTable;
+	if(reset) {
+		if(ohAryPrep(&mode.idx, (HashNode ***) context) != 0)
+			return libfail();
+		}
 	else {
-		Datum *pArrayEl = aeach((Array **) context);
-		if(pArrayEl == NULL)
+		HashNode *pNode = *(*((HashNode ***) context))++;
+		if(pNode == NULL)
 			return NotFound;
-		*pItem = modePtr(pArrayEl)->name;
+		*pItem = modePtr(pNode->pVal)->name;
 		}
 
 	return sess.rtn.status;
@@ -1053,16 +1039,16 @@ static int nextMode(bool reset, void *context, const char **pItem) {
 
 // Attempt a completion on a mode name via cMatch(), given pointer to InpCtrl object.  Return status.
 static int cMatchMode(InpCtrl *pInpCtrl) {
-	Array *pArray = NULL;
-	Completion comp = {nextMode, inpcasecmp, &pArray};
+	HashNode **pAry = NULL;
+	Completion comp = {nextMode, inpcasecmp, &pAry};
 	return cMatch(pInpCtrl, &comp);
 	}
 
 // Make a completion list based on a partial mode name via cList(), given pointer to InpCtrl object and indirect result buffer
 // pointer.  Return status.
 static int cListMode(InpCtrl *pInpCtrl, Buffer *pBuf) {
-	Array *pArray = NULL;
-	Completion comp = {nextMode, inpcasecmp, &pArray};
+	HashNode **pAry = NULL;
+	Completion comp = {nextMode, inpcasecmp, &pAry};
 	return cList(pInpCtrl, pBuf, &comp);
 	}
 
@@ -1071,7 +1057,7 @@ static int nextVar(bool reset, void *context, const char **pItem) {
 	CompVar *pCompVar = context;
 
 	if(reset)
-		pCompVar->pVar = pCompVar->varList;
+		pCompVar->pVar = pCompVar->cvList;
 	else {
 		if(pCompVar->pVar == pCompVar->pVarEnd)
 			return NotFound;
@@ -1083,23 +1069,23 @@ static int nextVar(bool reset, void *context, const char **pItem) {
 
 // Attempt a completion on a variable name via cMatch(), given pointer to InpCtrl object, variable list vector, and size.
 // Return status.
-static int cMatchVar(InpCtrl *pInpCtrl, const char *varList[], uint varListSize) {
-	CompVar compVar = {varList, NULL, varList + varListSize};
+static int cMatchVar(InpCtrl *pInpCtrl, const char *cvList[], uint cvListSize) {
+	CompVar compVar = {cvList, NULL, cvList + cvListSize};
 	Completion comp = {nextVar, inpcmp, &compVar};
 	return cMatch(pInpCtrl, &comp);
 	}
 
 // Make a completion list based on a partial variable name via cList(), given pointer to InpCtrl object, indirect result buffer
 // pointer, variable list vector, and size.  Return status.
-static int cListVar(InpCtrl *pInpCtrl, Buffer *pBuf, const char *varList[], uint varListSize) {
-	CompVar compVar = {varList, NULL, varList + varListSize};
+static int cListVar(InpCtrl *pInpCtrl, Buffer *pBuf, const char *cvList[], uint cvListSize) {
+	CompVar compVar = {cvList, NULL, cvList + cvListSize};
 	Completion comp = {nextVar, inpcmp, &compVar};
 	return cList(pInpCtrl, pBuf, &comp);
 	}
 
 // Get one key from terminal and save in pRtnVal as a key literal or character (int).  Return status.
 static int termInp1(Datum *pRtnVal, const char *defVal, short delimChar, uint delim2, uint argFlags, uint ctrlFlags) {
-	ushort extKey;
+	ExtKey extKey;
 	bool quote = false;
 
 	if(((ctrlFlags & Term_KeyMask) == Term_OneKeySeq ?
@@ -1138,7 +1124,7 @@ SetKey:
 	else {
 		char keyBuf[16];
 
-		ektos(extKey, keyBuf, false);
+		ektos(keyBuf, extKey, false);
 		if(dsetstr(keyBuf, pRtnVal) != 0)
 			return libfail();
 		}
@@ -1191,7 +1177,7 @@ Beep:
 // Get input from the terminal, possibly with completion, and return in "pRtnVal" as a string (or nil) given result pointer,
 // prompt, argument flags, control flags, and parameters pointer.  If last argument is NULL, default parameter (TermInpCtrl)
 // values are used.  Recognized argument flags are ArgNil1, ArgNIS1, and ArgNotNull1.  Control flags are prompt options + type
-// of completion + selector mask for Term_C_CFA calls.  If completion is requested, the delimiter is forced to be "return";
+// of completion + selector mask for TermC_CFA calls.  If completion is requested, the delimiter is forced to be "return";
 // otherwise, if delimiter is "return" or "newline", it's partner is also accepted as a delimiter; otherwise, "return" is
 // converted to "newline".  If maxLen is zero, it is set to the maximum.  Return status and value per the following table:
 //
@@ -1209,7 +1195,7 @@ int termInp(Datum *pRtnVal, const char *basePrompt, uint argFlags, uint ctrlFlag
 		termInpCtrl = *pTermInp;
 
 	// Error if doing a completion but echo is off.
-	if(ctrlFlags & Term_C_Mask) {
+	if(ctrlFlags & TermC_Mask) {
 		if(ctrlFlags & Term_NoKeyEcho)
 			return rsset(Failure, RSNoFormat, text54);
 				// "Key echo required for completion"
@@ -1221,17 +1207,17 @@ int termInp(Datum *pRtnVal, const char *basePrompt, uint argFlags, uint ctrlFlag
 		termInpCtrl.maxLen = MaxTermInp;
 	if(termInpCtrl.defVal != NULL && !(ctrlFlags & Term_NoDef)) {
 		size_t defLen = strlen(termInpCtrl.defVal);
-		uint max = (ctrlFlags & Term_KeyMask) ? 1 : termInpCtrl.maxLen;
+		uint max = ctrlFlags & Term_KeyMask ? 1 : termInpCtrl.maxLen;
 		if(defLen > max)
 			return rsset(Failure, 0, text110, defLen, max);
 				// "Default value length (%lu) exceeds maximum input length (%u)"
 		}
 
 	// If delimiter is CR or NL, accept it's partner as a delimiter also.
-	delim2 = (termInpCtrl.delimKey == RtnKey) ? AltRtnKey : (termInpCtrl.delimKey == AltRtnKey) ? RtnKey : 0xFFFF;
+	delim2 = (termInpCtrl.delimKey == RtnKey) ? AltRtnKey : (termInpCtrl.delimKey == AltRtnKey) ? RtnKey : 0xffff;
 
 	// Build prompt.
-	if(buildPrompt(prompt, basePrompt, (ctrlFlags & Term_LongPrmt) ? 90 : term.maxPromptPct,
+	if(buildPrompt(prompt, basePrompt, ctrlFlags & Term_LongPrmt ? 90 : term.maxPromptPct,
 	 (ctrlFlags & Term_KeyMask) == Term_OneChar && termInpCtrl.defVal != NULL ? *termInpCtrl.defVal : -1,
 	 termInpCtrl.delimKey, ctrlFlags) != Success)
 		return sess.rtn.status;
@@ -1240,41 +1226,41 @@ int termInp(Datum *pRtnVal, const char *basePrompt, uint argFlags, uint ctrlFlag
 	if(ctrlFlags & Term_KeyMask) {
 
 		// Display prompt and get a key.
-		if(mlputs((ctrlFlags & Term_Attr) ? MLHome | MLTermAttr | MLFlush | MLForce :
-		 MLHome | MLFlush | MLForce, prompt) != Success)
+		if(mlputs(prompt, ctrlFlags & Term_Attr ? MLHome | MLTermAttr | MLFlush | MLForce :
+		 MLHome | MLFlush | MLForce) != Success)
 			return sess.rtn.status;
 		return termInp1(pRtnVal, termInpCtrl.defVal, termInpCtrl.delimKey, delim2, argFlags, ctrlFlags);
 		}
 
 	// Not a single-key request.  Get multiple characters, with completion if applicable.
-	ushort extKey;			// Current extended input character.
-	int n;
+	ExtKey extKey;			// Current extended input character.
+	int r;				// Return code.
+	long e;				// Ring entry.
 	bool forceAll;			// Show hidden buffers?
 	bool quoteNext = false;		// Quoting next character?
 	bool popup = false;		// Completion pop-up window being displayed?
-	bool scrRefresh = false;	// Update screen before getting next key.
+	bool scrnRefresh = false;	// Update screen before getting next key.
 	bool cycleRing = false;		// Don't cycle search or replacement ring for first C-p key.
 	LineEdit cmd;
-	uint varListSize;		// Variable list size.
+	uint cvListSize;		// Variable list size.
 	Datum *pDatum;
-	HashRec **ppHashRec;		// For command completion.
+	HashNode **ppHashNode;		// For macro and command completion.
 	int (*func)(InpCtrl *pInpCtrl, LineEdit cmd);
 	InpCtrl inpCtrl;
 	InpChar inpBuf[MaxTermInp];	// Input buffer.
-	const char *varList[varListSize = ctrlFlags & (Term_C_Var | Term_C_MutVar) ?
-	 varCount(ctrlFlags) : 1];	// Variable name list.
-	HashRec *cmdNameList[ctrlFlags & Term_C_CFA ?
-	 execTable->recCount : 1];	// Command name list.
+	const char *cvList[cvListSize = ctrlFlags & TermC_AllConstVar ? cvcount(ctrlFlags) : 1];	// Variable name list.
+	HashNode *macCFANameList[ctrlFlags & TermC_Macro ? macro.index.table.nodeCount + 1 : ctrlFlags & TermC_CFA ?
+	 execTable.nodeCount : 1];	// Macro or command name list.
 
 	// Get ready for terminal input.
-	if(mli_open(&inpCtrl, prompt, inpBuf, (ctrlFlags & Term_NoDef) ? NULL : termInpCtrl.defVal, termInpCtrl.maxLen,
+	if(mli_open(&inpCtrl, prompt, inpBuf, ctrlFlags & Term_NoDef ? NULL : termInpCtrl.defVal, termInpCtrl.maxLen,
 	 ctrlFlags & (Term_Attr | Term_NoKeyEcho)) != Success)
 		return sess.rtn.status;
-	if(ctrlFlags & (Term_C_Var | Term_C_MutVar))
-		varSort(varList, varListSize, ctrlFlags);
-	else if(ctrlFlags & Term_C_CFA) {
-		ppHashRec = cmdNameList;
-		if(hsort(execTable, hcmp, &ppHashRec) != 0)
+	if(ctrlFlags & TermC_AllConstVar)
+		cvsort(cvList, cvListSize, ctrlFlags);
+	else if(ctrlFlags & (TermC_Macro | TermC_CFA)) {
+		ppHashNode = macCFANameList;
+		if(hsort(ctrlFlags & TermC_Macro ? &macro.index.table : &execTable, hcmp, &ppHashNode) != 0)
 			return libfail();
 		}
 
@@ -1284,12 +1270,12 @@ int termInp(Datum *pRtnVal, const char *basePrompt, uint argFlags, uint ctrlFlag
 	goto JumpStart;
 	for(;;) {
 		// Update screen if pop-up window is being displayed (from a completion) and refresh requested.
-		if(popup && scrRefresh) {
+		if(popup && scrnRefresh) {
 			if(update(1) != Success || mlrestore() != Success)
 				return sess.rtn.status;
 			popup = false;
 			}
-		scrRefresh = false;
+		scrnRefresh = false;
 JumpStart:
 		// Get a keystroke and decode it.
 		if(getkey(true, &extKey, false) != Success)
@@ -1321,8 +1307,8 @@ JumpStart:
 			break;
 			}
 
-#if MMDebug & Debug_MsgLine
-		fprintf(logfile, "termInp(): Got extended key 0x%.4X '%s'\n", (uint) extKey, vizc(extKey & 0x7F, VizBaseDef));
+#if MMDebug & Debug_MsgLnInp
+		fprintf(logfile, "termInp(): Got extended key 0x%.4X '%s'\n", (uint) extKey, vizc(extKey & 0x7f, VizBaseDef));
 #endif
 		// If not in quote mode, check key that was entered.
 		if(!quoteNext) {
@@ -1349,7 +1335,7 @@ DelChar:
 				case Ctrl | 'P':			// ^P, or up arrow... get previous ring entry or
 				case FKey | 'P':			// move cursor to BOL.
 					if(termInpCtrl.pRing != NULL) {
-						n = 1;
+						e = 1;
 						goto GetRing;
 						}
 					// Fall through.
@@ -1359,17 +1345,24 @@ DelChar:
 				case Ctrl | 'N':			// ^N, or down arrow... get next ring entry or
 			 	case FKey | 'N':			// move cursor to EOL.
 					if(termInpCtrl.pRing != NULL) {
-						n = -1;
+						e = -1;
 GetRing:
 						if(termInpCtrl.pRing->size == 0)
 							goto BadKey;
-						if(cycleRing || n != 1)
-							(void) rcycle(termInpCtrl.pRing, n, false);	// Can't fail.
+						if(cycleRing || e != 1)
+							(void) rcycle(termInpCtrl.pRing, e, false);	// Can't fail.
 						cycleRing = true;
+
+						// If ring entry is a byte string (which indicates it contains at least one
+						// embedded null byte), treat as a null-terminated string and ignore whatever
+						// bytes are beyond the null because embedded nulls are not supported in string
+						// data types.
 						if(mli_trunc(&inpCtrl, ed_erase) != Success ||
-						 mli_puts(termInpCtrl.pRing->pEntry->data.str, &inpCtrl) != Success)
+						 mli_puts(termInpCtrl.pRing->pEntry->data.type == dat_byteStr ?
+						 termInpCtrl.pRing->pEntry->data.u.mem.ptr :
+						 termInpCtrl.pRing->pEntry->data.str, &inpCtrl) != Success)
 							return sess.rtn.status;
-						scrRefresh = true;
+						scrnRefresh = true;
 						continue;
 						}
 					// Fall through.
@@ -1384,7 +1377,7 @@ Nav:
 				case Ctrl | 'U':			// ^U... erase buffer and continue.
 					cmd = ed_erase;
 Trunc:
-					scrRefresh = true;
+					scrnRefresh = true;
 					func = mli_trunc;
 Call:
 					if(func(&inpCtrl, cmd) != Success)
@@ -1401,39 +1394,38 @@ Call:
 				extKey = AltRtnKey;
 
 			// Check completion special keys.
-			else if(ctrlFlags & Term_C_Mask) {
+			else if(ctrlFlags & TermC_Mask) {
 				if(extKey == (Ctrl | 'I')) {		// Tab... attempt a completion.
-					switch(ctrlFlags & Term_C_Mask) {
-						case Term_C_Buffer:
-							n = cMatchBuf(&inpCtrl);
+					switch(ctrlFlags & TermC_Mask) {
+						case TermC_Buffer:
+							r = cMatchBuf(&inpCtrl);
 							break;
-						case Term_C_CFA:
-							n = cMatchCFA(&inpCtrl, ctrlFlags, ppHashRec);
+						case TermC_CFA:
+							r = cMatchCFA(&inpCtrl, ctrlFlags, ppHashNode);
 							break;
-						case Term_C_Filename:
-							n = cMatchFile(&inpCtrl);
+						case TermC_Filename:
+							r = cMatchFile(&inpCtrl);
 							break;
-						case Term_C_Macro:
-							n = cMatchMacro(&inpCtrl);
+						case TermC_Macro:
+							r = cMatchMacro(&inpCtrl, ppHashNode);
 							break;
-						case Term_C_Ring:
-							n = cMatchRing(&inpCtrl);
+						case TermC_Ring:
+							r = cMatchRing(&inpCtrl);
 							break;
-						case Term_C_MutVar:
-						case Term_C_Var:
-							n = cMatchVar(&inpCtrl, varList, varListSize);
+						case TermC_Mode:
+							r = cMatchMode(&inpCtrl);
 							break;
-						default:	// Term_C_Mode
-							n = cMatchMode(&inpCtrl);
+						default:	// TermC_*Var*
+							r = cMatchVar(&inpCtrl, cvList, cvListSize);
 						}
-					if(n == Success && !(ctrlFlags & Term_C_NoAuto)) {	// Success!
+					if(r == Success && !(ctrlFlags & TermC_NoAuto)) {	// Success!
 						centiPause(sess.fencePause);
 						break;
 						}
 					forceAll = false;
 					goto CompList;
 					}
-				if(extKey == '/' && (ctrlFlags & Term_C_Filename) && inpCtrl.curInpPos == inpCtrl.endInpPos) {
+				if(extKey == '/' && ctrlFlags & TermC_Filename && inpCtrl.curInpPos == inpCtrl.endInpPos) {
 					size_t size = inpCtrl.curInpPos - inpCtrl.inpBuf;
 					if((size > 0 && inpCtrl.inpBuf->c == '~') || (size > 1 && inpCtrl.inpBuf->c == '$')) {
 						if(expandVar(&inpCtrl) != Success)
@@ -1441,7 +1433,7 @@ Call:
 						continue;
 						}
 					}
-				if(extKey == '?') {
+				if(extKey == (Shift | Ctrl | 'I')) {	// S-TAB... pop list of all items unconditionally.
 					Buffer *pBuf;
 					forceAll = true;
 CompList:
@@ -1449,33 +1441,32 @@ CompList:
 					if(sysBuf(text125, &pBuf, 0) != Success)
 							// "Completions"
 						return sess.rtn.status;
-					switch(ctrlFlags & Term_C_Mask) {
-						case Term_C_Buffer:
-							n = cListBuf(&inpCtrl, pBuf, forceAll);
+					switch(ctrlFlags & TermC_Mask) {
+						case TermC_Buffer:
+							r = cListBuf(&inpCtrl, pBuf, forceAll);
 							break;
-						case Term_C_CFA:
-							n = cListCFA(&inpCtrl, pBuf, ctrlFlags, ppHashRec);
+						case TermC_CFA:
+							r = cListCFA(&inpCtrl, pBuf, ctrlFlags, ppHashNode);
 							break;
-						case Term_C_Filename:
-							n = cListFile(&inpCtrl, pBuf);
+						case TermC_Filename:
+							r = cListFile(&inpCtrl, pBuf);
 							break;
-						case Term_C_Macro:
-							n = cListMacro(&inpCtrl, pBuf);
+						case TermC_Macro:
+							r = cListMacro(&inpCtrl, pBuf, ppHashNode);
 							break;
-						case Term_C_Ring:
-							n = cListRing(&inpCtrl, pBuf);
+						case TermC_Ring:
+							r = cListRing(&inpCtrl, pBuf);
 							break;
-						case Term_C_MutVar:
-						case Term_C_Var:
-							n = cListVar(&inpCtrl, pBuf, varList, varListSize);
+						case TermC_Mode:
+							r = cListMode(&inpCtrl, pBuf);
 							break;
-						default:	// Term_C_Mode
-							n = cListMode(&inpCtrl, pBuf);
+						default:	// TermC_*Var
+							r = cListVar(&inpCtrl, pBuf, cvList, cvListSize);
 						}
 					popup = true;
 
 					// Check status, delete the pop-up buffer, and reprompt the user.
-					if(n != Success || bpop(pBuf, RendShift) != Success || bdelete(pBuf, 0) != Success ||
+					if(r != Success || bpop(pBuf, RendShift) != Success || bdelete(pBuf, 0) != Success ||
 					 mli_reset(&inpCtrl) != Success)
 						return sess.rtn.status;
 					continue;
@@ -1514,37 +1505,48 @@ BadKey:
 
 // Ask a yes or no question on the message line and set *result to the answer (true or false).  Used any time a confirmation is
 // required.  Return status, including UserAbort, if user pressed the abort key.
-int terminpYN(const char *basePrompt, bool *result) {
+static int termInpQ(const char *basePrompt, uint flags, bool *result) {
 	Datum *pDatum;
-	DFab prompt;
 	TermInpCtrl termInpCtrl = {"n", RtnKey, 0, NULL};
-
-
+	char prompt[strlen(basePrompt) + strlen(text162) + 1];
+					// " (y/n)?"
 	// Build prompt.
-	if(dnewtrack(&pDatum) != 0 || dopentrack(&prompt) != 0 ||
-	 dputs(basePrompt, &prompt, 0) != 0 || dputs(text162, &prompt, 0) != 0 || dclose(&prompt, FabStr) != 0)
-						// " (y/n)?"
-		return libfail();
+	sprintf(prompt, "%s%s", basePrompt, text162);
 
 	// Prompt user, get the response, and check it.
+	if((pDatum = dnewtrack()) == NULL)
+		return libfail();
 	for(;;) {
-		if(termInp(pDatum, prompt.pDatum->str, 0, Term_OneChar, &termInpCtrl) != Success)
+		if(termInp(pDatum, prompt, 0, flags, &termInpCtrl) != Success)
 			return sess.rtn.status;
-		if(pDatum->u.intNum == 'y') {
+		if(dgetint(pDatum) == 'y') {
 			*result = true;
 			break;
 			}
-		if(pDatum->u.intNum == 'n') {
+		if(dgetint(pDatum) == 'n') {
 			*result = false;
 			break;
 			}
 		tbeep();
 		}
+
 	return sess.rtn.status;
 	}
 
-// Get a required numeric argument (via prompt if interactive) and save in pRtnVal as an integer.  Return status.  If script
-// mode, prompt may be NULL.  If interactive and nothing was entered, pRtnVal will be nil.
+// Ask a yes or no question on message line.
+int termInpYN(const char *basePrompt, bool *result) {
+
+	return termInpQ(basePrompt, Term_OneChar, result);
+	}
+
+// Ask a yes or no question on message line with terminal attributes enabled in prompt.
+int termInpAttrYN(const char *basePrompt, bool *result) {
+
+	return termInpQ(basePrompt, Term_OneChar | Term_Attr, result);
+	}
+
+// Get a required numeric argument for a command (via prompt if interactive) and save in pRtnVal as an integer.  Return status.
+// If script mode, prompt may be NULL.  If interactive and nothing was entered, pRtnVal will be nil.
 int getNArg(Datum *pRtnVal, const char *prompt) {
 
 	if(sess.opFlags & OpScript) {
@@ -1555,68 +1557,84 @@ int getNArg(Datum *pRtnVal, const char *prompt) {
 		return sess.rtn.status;
 
 	// Convert to integer.
-	return toInt(pRtnVal);
+	return toInt(pRtnVal, 10);
 	}
 
 // Get a completion from the user for a command, function, or alias name, given prompt, selector mask, result pointer, and "not
-// found" error message.
-int getCFA(const char *prompt, uint selector, UnivPtr *pUniv, const char *errorMsg) {
+// found" error item.
+int getCFA(const char *prompt, uint selector, ExecPtr *pExec, const char *errItem) {
 	Datum *pDatum;
 
-	if(dnewtrack(&pDatum) != 0)
+	if((pDatum = dnewtrack()) == NULL)
 		return libfail();
 	if(sess.opFlags & OpScript) {
 		if(funcArg(pDatum, ArgFirst | ArgNotNull1) != Success)
 			return sess.rtn.status;
 		}
-	else if(termInp(pDatum, prompt, ArgNotNull1 | ArgNil1, Term_C_CFA | selector, NULL) != Success || mlerase(0) != Success)
+	else if(termInp(pDatum, prompt, ArgNotNull1 | ArgNil1, TermC_CFA | selector, NULL) != Success || mlerase(0) != Success)
 		return sess.rtn.status;
 
 	if(!disnil(pDatum)) {
 
 		// Get pointer object for name and return status.
-		return execFind(pDatum->str, OpQuery, selector, pUniv) ? sess.rtn.status :
-		 rsset(Failure, 0, errorMsg, pDatum->str);
+		return execFind(pDatum->str, OpQuery, selector, pExec) ? sess.rtn.status :
+		 rsset(Failure, 0, text52, errItem, pDatum->str);
+				// "No such %s \"%s\""
 		}
 
 	// User cancelled (no error).
-	pUniv->type = PtrNull;
-	pUniv->u.pVoid = NULL;
+	pExec->type = PtrNull;
+	pExec->u.ptr = NULL;
 
 	return sess.rtn.status;
 	}
 
-// Get a buffer name, given result pointer, prompt prefix, default value (which may be NULL), operation flags (which may contain
-// ArgFirst), buffer-return pointer, and "buffer was created" pointer (which also may be NULL).  "created" is passed to bfind().
-// If interactive and nothing is entered, *ppBuf is set to NULL.  It is assumed that the OpQuery flag will never be set (always
-// OpDelete or OpCreate).  Return status.
-int getBufname(Datum *pRtnVal, const char *prompt, const char *defName, uint flags, Buffer **ppBuf, bool *created) {
+// Get a buffer name, given result pointer, prompt prefix, operation flags (which may contain ArgFirst or TermC_NoAuto),
+// buffer-return pointer, and "buffer was created" pointer (which may be NULL).  "created" is passed to bfind().  If OpCurBName
+// flag set, current buffer name is used as a default; if OpDefBName flag set, bdefault() is called instead.  If interactive,
+// TermC_NoAuto flag is passed to termInp() and, if nothing is entered, *ppBuf is set to NULL.  If script mode and OpHaveBName
+// flag set, funcArg() call is skipped.  If OpCreate flag is set, home new buffer to current screen.  It is assumed that the
+// OpQuery flag will never be set (always OpDelete or OpCreate).  Return status.
+int getBufname(Datum *pRtnVal, const char *prompt, uint flags, Buffer **ppBuf, bool *created) {
 
 	// Get buffer name.
 	if(!(sess.opFlags & OpScript)) {
+		Buffer *pBuf;
+		const char *defName = NULL;
+
+		if(flags & OpCurBName)
+			defName = sess.cur.pBuf->bufname;
+		else if(flags & OpDefBName) {
+			if((pBuf = bdefault()) != NULL)
+				defName = pBuf->bufname;
+			}
 		TermInpCtrl termInpCtrl = {defName, RtnKey, MaxBufname, NULL};
 		char promptBuf[WorkBufSize];
 		sprintf(promptBuf, "%s %s", prompt, text83);
-				// "buffer"
-		if(termInp(pRtnVal, promptBuf, ArgNotNull1 | ArgNil1, Term_C_Buffer, &termInpCtrl) != Success)
+						// "buffer"
+		if(termInp(pRtnVal, promptBuf, ArgNotNull1 | ArgNil1, TermC_Buffer | (flags & TermC_NoAuto),
+		 &termInpCtrl) != Success)
 			return sess.rtn.status;
 		if(disnil(pRtnVal)) {
 			*ppBuf = NULL;
 			goto Retn;
 			}
 		}
-	else if(funcArg(pRtnVal, (flags & ArgFirst) | ArgNotNull1) != Success)
-		return sess.rtn.status;
+	else if(!(flags & OpHaveBName))
+		if(funcArg(pRtnVal, (flags & ArgFirst) | ArgNotNull1) != Success)
+			return sess.rtn.status;
 
-	// Got buffer name.  Find it or create it.  If OpCreate flag not set, returned status is a Boolean.
-	int status = bfind(pRtnVal->str, flags & OpCreate ? (flags & OpConfirm ? BS_Confirm | BS_Create | BS_CreateHook :
-	 BS_Create | BS_CreateHook) : BS_Query, 0, ppBuf, created);
+	// Have buffer name in pRtnVal.  Find it or create it.  Note that if OpCreate flag not set, returned status is Boolean.
+	int status = bfind(pRtnVal->str, flags & OpCreate ? (flags & OpConfirm ? BN_Confirm | BN_Create | BN_CreateHook :
+	 BN_Create | BN_CreateHook) : BS_Query, 0, ppBuf, created);
 	if(!(flags & OpCreate) && !status) {
 
 		// Buffer not found.  Return error.
-		return rsset(Failure, 0, text118, pRtnVal->str);
-			// "No such buffer '%s'"
+		return rsset(Failure, 0, text52, text83, pRtnVal->str);
+				// "No such %s \"%s\"", "buffer"
 		}
+	if(flags & OpCreate && status == Success)
+		(*ppBuf)->homeDir = sess.pCurScrn->workDir;
 Retn:
 	if(!(sess.opFlags & OpScript))
 		(void) mlerase(0);
@@ -1631,21 +1649,21 @@ Retn:
 #define Prm_NoEcho		4
 
 // Prompt option types.
-#define Typ_Buffer		0
-#define Typ_Char		1
-#define Typ_DelRing		2
-#define Typ_File		3
-#define Typ_Key			4
-#define Typ_KeySeq		5
-#define Typ_KillRing		6
-#define Typ_Macro		7
-#define Typ_Mode		8
-#define Typ_MutableVar		9
-#define Typ_ReplaceRing		10
-#define Typ_RingName		11
-#define Typ_SearchRing		12
-#define Typ_String		13
-#define Typ_Var			14
+#define PTypBuffer		0
+#define PTypChar		1
+#define PTypConstVar		2
+#define PTypDelRing		3
+#define PTypFile		4
+#define PTypKey			5
+#define PTypKeySeq		6
+#define PTypKillRing		7
+#define PTypMacro		8
+#define PTypMode		9
+#define PTypMutableVar		10
+#define PTypReplaceRing		11
+#define PTypRingName		12
+#define PTypSearchRing		13
+#define PTypString		14
 
 // binSearch() helper function for returning an option keyword, given table (array) and index.
 static const char *optKeyword(const void *table, ssize_t i) {
@@ -1654,22 +1672,22 @@ static const char *optKeyword(const void *table, ssize_t i) {
 	}
 
 // Process "prompt" function.  Save result in pRtnVal and return status.
-int userPrompt(Datum *pRtnVal, int n, Datum **args) {
+int userPrompt(Datum *pRtnVal, long n, Datum **args) {
 	Datum *pOptStr;				// Unmodified option string (for error reporting).
 	Datum *pPrompt, *defVal;
 	char *str0, *str1, *str2, *option;
 	const char **pKeyword;
 	ssize_t i;
 	uint id;
-	uint typeFlag = 0;			// Prompt type flag.
+	uint typeFlags = 0;			// Prompt type flags.
 	uint ctrlFlags = 0;			// Other control flags.
 	bool delimAllowed = true;		// "Delim" option allowed (not a completion prompt type)?
 	TermInpCtrl termInpCtrl = {NULL, RtnKey, 0, NULL};	// Default value, delimiter, maximum input length, Ring pointer.
 	static const char *keywordList[] = {"Type", "Delim", "TermAttr", "NoAuto", "NoEcho", NULL};
-	static const char *types[] = {"Buffer", "Char", "DelRing", "File", "Key", "KeySeq", "KillRing", "Macro", "Mode",
-	 "MutableVar", "ReplaceRing", "RingName", "SearchRing", "String", "Var"};
+	static const char *types[] = {"Buffer", "Char", "ConstVar", "DelRing", "File", "Key", "KeySeq", "KillRing", "Macro",
+	 "Mode", "MutableVar", "ReplaceRing", "RingName", "SearchRing", "String"};
 
-	if(dnewtrack(&pOptStr) != 0)
+	if((pOptStr = dnewtrack()) == NULL)
 		goto LibFail;
 
 	// Set pPrompt to prompt string (which may be NULL or nil).
@@ -1718,53 +1736,52 @@ FoundKW:
 
 					// Have valid type... process it.
 					switch(i) {
-						case Typ_Char:
-							typeFlag = Term_OneChar;
+						case PTypChar:
+							typeFlags = Term_OneChar;
 							break;
-						case Typ_String:
+						case PTypString:
 							break;
-						case Typ_Buffer:
-							typeFlag = Term_C_Buffer;
+						case PTypBuffer:
+							typeFlags = TermC_Buffer;
 							termInpCtrl.maxLen = MaxBufname;
 							goto PromptComp;
-						case Typ_File:
-							typeFlag = Term_C_Filename;
+						case PTypFile:
+							typeFlags = TermC_Filename;
 							termInpCtrl.maxLen = MaxPathname;
 							goto PromptComp;
-						case Typ_Key:
-							typeFlag = Term_OneKey;
+						case PTypKey:
+							typeFlags = Term_OneKey;
 							break;
-						case Typ_KeySeq:
-							typeFlag = Term_OneKeySeq;
+						case PTypKeySeq:
+							typeFlags = Term_OneKeySeq;
 							break;
-						case Typ_KillRing:
+						case PTypKillRing:
 							termInpCtrl.pRing = ringTable + RingIdxKill;
 							break;
-						case Typ_Macro:
-							termInpCtrl.pRing = ringTable + RingIdxMacro;
-							typeFlag = Term_C_Macro;
+						case PTypMacro:
+							typeFlags = TermC_Macro;
 							termInpCtrl.maxLen = MaxMacroName;
 							goto PromptComp;;
-						case Typ_Mode:
-							typeFlag = Term_C_Mode;
+						case PTypMode:
+							typeFlags = TermC_Mode;
 							goto PromptComp;
-						case Typ_ReplaceRing:
+						case PTypReplaceRing:
 							termInpCtrl.pRing = ringTable + RingIdxRepl;
 							break;
-						case Typ_RingName:
-							typeFlag = Term_C_Ring;
+						case PTypRingName:
+							typeFlags = TermC_Ring;
 							goto PromptComp;
-						case Typ_SearchRing:
+						case PTypSearchRing:
 							termInpCtrl.pRing = ringTable + RingIdxSearch;
 							break;
-						case Typ_DelRing:
+						case PTypDelRing:
 							termInpCtrl.pRing = ringTable + RingIdxDel;
 							break;
-						case Typ_MutableVar:
-							typeFlag = Term_C_MutVar;
+						case PTypMutableVar:
+							typeFlags = TermC_MutVar;
 							goto PromptVar;
-						default:	// Typ_Var
-							typeFlag = Term_C_Var;
+						default:	// PTypConstVar
+							typeFlags = TermC_AllConstVar;
 PromptVar:
 							termInpCtrl.maxLen = MaxVarName;
 PromptComp:
@@ -1773,14 +1790,14 @@ PromptComp:
 						}
 					break;
 				case Prm_Delim:
-					if(stoek(str2, &termInpCtrl.delimKey) != Success)
+					if(stoek(&termInpCtrl.delimKey, str2) != Success)
 						return sess.rtn.status;
 					if(termInpCtrl.delimKey & Prefix) {
 						char workBuf[16];
 
 						return rsset(Failure, RSTermAttr, text341,
 							// "Cannot use key sequence ~#u%s~U as %s delimiter"
-						 ektos(termInpCtrl.delimKey, workBuf, true), text342);
+						 ektos(workBuf, termInpCtrl.delimKey, true), text342);
 											// "prompt"
 						}
 					break;
@@ -1788,7 +1805,7 @@ PromptComp:
 					ctrlFlags |= Term_Attr;
 					break;
 				case Prm_NoAuto:
-					ctrlFlags |= Term_C_NoAuto;
+					ctrlFlags |= TermC_NoAuto;
 					break;
 				default:	// Prm_NoEcho
 					ctrlFlags |= Term_NoKeyEcho;
@@ -1798,10 +1815,10 @@ PromptComp:
 
 	// Validate and prepare default value, if any.
 	if((defVal = *args) != NULL && !disnil(defVal)) {
-		if(typeFlag == Term_OneChar) {
+		if(typeFlags == Term_OneChar) {
 			if(!isCharVal(defVal))
 				return sess.rtn.status;
-			dconvchr(defVal->u.intNum, defVal);
+			dconvchr(dgetint(defVal), defVal);
 			}
 		else if(toStr(defVal) != Success)
 			return sess.rtn.status;
@@ -1810,12 +1827,12 @@ PromptComp:
 
 	// Do final validation checks.
 	if((termInpCtrl.delimKey != RtnKey && !delimAllowed) ||
-	 ((typeFlag & Term_KeyMask) >= Term_OneKey && (termInpCtrl.defVal != NULL || termInpCtrl.delimKey != RtnKey)))
+	 ((typeFlags & Term_KeyMask) >= Term_OneKey && (termInpCtrl.defVal != NULL || termInpCtrl.delimKey != RtnKey)))
 		return rsset(Failure, RSNoFormat, text242);
 			// "Option(s) conflict with prompt type"
 
 	// All is well... prompt for input.
-	return termInp(pRtnVal, pPrompt == NULL || disnil(pPrompt) ? "" : pPrompt->str, ArgNil1, typeFlag | ctrlFlags,
+	return termInp(pRtnVal, pPrompt == NULL || disnil(pPrompt) ? "" : pPrompt->str, ArgNil1, typeFlags | ctrlFlags,
 	 &termInpCtrl);
 ErrRtn:
 	return rsset(Failure, 0, text447, text457, pOptStr->str);

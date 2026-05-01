@@ -23,13 +23,13 @@ hidden.  Modes are created, deleted, and edited with the ~beditMode~B (~#uC-x m~
 command.
 
 Sometimes it is desirable to prevent more than one mode of the same kind from
-being enabled at the same time; for example, a buffer mode like "Ruby" or "C"
+being activated at the same time; for example, a buffer mode like "Ruby" or "C"
 for a programming language.  This is accomplished by using a ~bmode group~B.  Mode
 groups may contain zero or more modes.  All modes in a group must be of the same
-type (global or buffer), and are mutually exclusive (only one may be enabled at
-a given time).  And like modes, mode groups can be built-in or user defined and
-have attributes.  They are created, deleted, and edited with the ~beditModeGroup~B
-(~#uC-x g~U) command.
+type (global or buffer), and are mutually exclusive (only one may be activated
+at a given time).  And like modes, mode groups can be built-in or user defined
+and have attributes.  They are created, deleted, and edited with the
+~beditModeGrp~B (~#uC-x g~U) command.
 
 To see all available modes and mode groups, use the ~bshowModes~B (~#uC-h m~U) command,
 which will display all global and buffer mode names, group names, their current

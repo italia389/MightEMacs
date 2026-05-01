@@ -4,12 +4,12 @@
 ~bHelp and Information~B
 C-h ?		Display help for key(s) entered at prompt.
 ESC a		Apropos: display help for search pattern entered at prompt.
-C-h c		Apropos command name.
-C-h v		Apropos variable name.
+C-h r		Apropos command name (and other routines).
+C-h v		Apropos variable or constant name.
 C-h n		Apropos key binding literal.
 ESC ?		Enter Help System.
 C-h t		Begin, resume, or save MightEMacs Tutorial.
-C-h e		Display or hide cheat sheet (this document).
+C-h c		Display or hide cheat sheet (this document).
 
 NOTE: press ~uTAB~U at any name prompt to do name completion.
 
@@ -57,7 +57,7 @@ C-- C-z		Move backward 1/2 a window.
 C-o		Open a new line at point.
 ESC d		Duplicate current line.
 C-u 5 ESC d	Duplicate five lines.
-ESC \		Delete white space surrounding point.
+C-x SPC		Delete white space surrounding point.
 C-x C-\		Trim white space from end of line.
 ESC C-\		Trim white space from end of all lines in buffer.
 C-x C-o		Delete all blank lines above and below point, or immediately
@@ -68,22 +68,22 @@ C-u n ESC C-j	Join n lines forward with one space in between.
 C-- n C-x C-j	Join n lines backward with no space in between.
 ESC w		Set wrap column to value entered at prompt ($wrapCol variable).
 C-u n ESC RTN	Rewrap n lines forward at wrap column.
-ESC .		Rewrap lines in current comment block or line block delimited by
-		blank lines.
+ESC .		Rewrap lines in current comment block, bullet item,  or line
+		block delimited by blank lines.
 C-j		Start a new line with same indentation as previous one.
 C-x o		Insert and indent a line before current line.
-ESC "		Wrap fence characters or other character around current word.
+ESC C-w		Wrap fence characters or other character around current word.
 ESC u		Undelete: restore most recently deleted text at point.
-ESC U		Undelete cycle: restore next older deleted text at point.
+C-c u		Undelete cycle: restore next older deleted text at point.
 
 ~bMarking Text~B
 C-SPC		Set region mark '.' at point.
 C-u C-SPC	Set mark entered at prompt at point.
 C-x C-x		Swap point with mark entered at prompt.
-ESC SPC		Jump to mark entered at prompt.
+ESC C-SPC	Jump to mark entered at prompt.
 C-x C-SPC	Delete mark entered at prompt.
-ESC C-SPC	Mark whole buffer as a region.
-C-h SPC		List buffer marks.
+C-c C-SPC	Mark whole buffer as a region.
+C-h C-SPC	List buffer marks.
 
 NOTES:	a mark is a single visible character, like 'a' or ','.
 	a region is text between point and mark '.', and always exists.
@@ -92,7 +92,8 @@ NOTES:	a mark is a single visible character, like 'a' or ','.
 C-\		Delete forward one word (characters from point to beginning of
 		next word).
 C-- C-\		Delete backward one word (characters from point to beginning of
-		current word).
+		current word or to beginning of previous word if point not in a
+		word).
 C-k		Delete to end of line (n == 1).
 C-u C-k		Delete to end of next line (n == 2).
 C-u C-u C-k	Delete to beginning of line (n == 0).
@@ -114,9 +115,12 @@ precede with ~uC-c~U to ~bcopy~B text instead of deleting it.  For example:
 C-y		Yank (insert) top entry from kill ring at point and mark as
 		region.
 C-- C-y		Yank -1th entry (second from top).
-ESC C-y		Replace yanked text just inserted with next ring entry and
+C-c C-y		Replace yanked text just inserted with next ring entry and
 		cycle ring.
 C-x C-y		Remove yanked text just inserted (revert).
+C-u C-y		Yank top entry twice (n == 2).
+C-h C-y		Yank top entry and delete it from kill ring.
+C-- C-h C-y	Yank -1th entry and delete it from kill ring.
 C-h k		Display kill ring.
 C-c k		Cycle kill ring.
 C-x k		Delete top entry from kill ring (n == 1).
@@ -140,12 +144,16 @@ C-h s		List search patterns (search ring).
 C-- n C-x s	Delete -nth entry from search ring (or all entries if n == 0).
 ESC r		Replace "from" pattern entered at prompt with "to" one entered
 		at prompt from point to end of buffer.
+C-- n ESC r	Replace "from" pattern with "to" from point to end of nth line
+		going forward, where -1 is current line, -2 is next line, etc.
 C-u n ESC r	Replace n occurrences of "from" pattern with "to".
 ESC q		Query: replace "from" pattern with "to" to end of buffer with
 		confirmation at each occurrence.
+C-- n ESC q	Query: replace "from" pattern with "to" to end of nth line going
+		forward with confirmation.
 ESC C-q		Query all: do query replace on all visible buffers (also see use
 		in Multiple Files below).
-C-h r		List replace patterns (replace ring).
+C-h R		List replace patterns (replace ring).
 C-u n C-x r	Delete n entries from top of replace ring (or all entries if
 		n == 0).
 
@@ -195,7 +203,7 @@ xxx		Plain text.
 
 ~bSearch and Replace in Multiple Files~B
 C-x f		Search for pattern and glob entered at prompt in multiple files.
-C-- C-x f	Skip pattern prompt; open all files matching shell glob.
+C-u C-x f	Display options before search.
 C-c ]		Switch to next file found.
 C-c [		Switch to previous file found.
 C-- ESC C-q	Do query replace in all files (buffers) that were found.
@@ -204,7 +212,7 @@ C-- ESC C-q	Do query replace in all files (buffers) that were found.
 C-x C-f		Find file: open a file in a new buffer (or existing one if
 		already opened).
 C-x C-v		View file: same as find file but open in read-only mode.
-C-x ]		Switch to the next buffer.
+C-x ]		Switch to the next buffer (homed to current screen).
 C-- C-x ]	Switch to the next buffer and delete current one.
 C-x [		Switch to the previous buffer.
 C-x \		Switch to last buffer exited from.
@@ -247,15 +255,20 @@ C-u C-x 0	Delete current window with "options" prompt.
 C-x 1		Delete all other windows.
 
 ~bWorking with Multiple Screens~B
-ESC s		Switch to screen no. entered at prompt.  If zero, create screen
+ESC S		Switch to screen no. entered at prompt.  If zero, create screen
 		and switch to it.
 C-x C-g		Find (get) a file in different directory and open it in a new
 		screen.
 ESC ]		Switch to next screen.
 ESC [		Switch to previous screen.
-ESC C-d		Delete screen no. entered at prompt.
-C-h S		List screens.
-C-c D		Change working directory.
+ESC \		Switch to last screen exited from.
+C-- ESC \	Switch to last screen exited from and delete current one and all
+		buffers homed to it.
+C-x S		Delete screen no. entered at prompt.
+C-- C-x S	Delete screen no. entered at prompt and all buffers homed to it.
+C-c S		Swap two screen numbers entered at prompt (to reorder them).
+C-h S		List screens and homed buffers.
+C-c D		Change working directory of current screen.
 C-h D		Show working directory on message line.
 
 NOTE: each screen maintains its own working directory and state.
@@ -287,11 +300,15 @@ depending on value of $softTabSize system variable.
 ~bKey Macro~B
 C-x (		Begin recording keystrokes.
 C-x )		End recording and give macro a name.
-C-x e		Run current macro once.
-C-u n C-x e	Run current macro n times (or repeatedly until a failed
-		operation if n == 0).
+C-x e		Run active macro once.
+C-u n C-x e	Run active macro (or selected shortcut) n times (or repeatedly
+		until a failed operation if n == 0).
 C-- C-x e	Run named macro once (abs(n) times, n == -1).
-C-h M		List macros (macro ring).
+ESC ,		Create shortcut for active macro.
+C-u ESC ,	Create shortcut for named macro.
+C-x ,		Delete shortcut.
+C-h M		List macros and shortcuts.
+C-c C-s		Save macros to disk.
 
 NOTE: press ~uTAB~U at any macro name prompt to do name completion.
 
@@ -323,9 +340,9 @@ Commonly-used buffer modes:
 
 NOTE: press ~uTAB~U at any mode name prompt to do name completion.
 
-~bVariables~B
+~bConstants and Variables~B
 ESC =		Set a variable.
-C-h =		Display a variable and its value.
-C-h v		Apropos variable name.
+C-h =		Display a constant or variable and its value.
+C-h v		Apropos constant or variable name.
 
-NOTE: press ~uTAB~U at any variable name prompt to do name completion.
+NOTE: press ~uTAB~U at any constant or variable name prompt to do name completion.

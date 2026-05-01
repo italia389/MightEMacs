@@ -2,16 +2,17 @@
 
 Several data types are supported in the scripting language:
 
-  * Variables and expressions are one of nil, Boolean, integer, string, or array
-    type.  There is also a pseudo "char" type, implemented as an 8-bit integer.
-    With few exceptions, values are not automatically converted from one type to
-    another when expressions are evaluated (like in the Perl language, for
-    example).  However, you can use the ~btoInt~B function to convert a numeric
-    string literal to an integer, and the ~btoStr~B function to convert any value
-    to a string.  nil and Boolean types are coded using the keywords ~unil~U, ~utrue~U,
-    and ~ufalse~U.  ~unil~U represents a "nothing" value and is different from a null
-    string.  Additionally, the ~udefn~U keyword exists, which holds an integer value
-    equal to the default n argument.
+  * Variables, constants, and expressions are one of nil, Boolean, integer,
+    string, array, or hash type.  There is also a pseudo "char" type,
+    implemented as an 8-bit integer.  With few exceptions, values are not
+    automatically converted from one type to another when expressions are
+    evaluated (like in the Perl language, for example).  However, you can use
+    the ~btoint~B function to convert a numeric string literal to an integer, and
+    the ~btostr~B function to convert any value to a string.  nil and Boolean types
+    are coded using the keywords ~unil~U, ~utrue~U, and ~ufalse~U.  ~unil~U represents a
+    "nothing" value and is different from a null string.  Additionally, the ~udefn~U
+    keyword exists, which holds an integer value equal to the default n
+    argument.
 
   * Integers may be coded in any form which is permitted by the strtol()
     function of the Standard C Library where the base is zero.

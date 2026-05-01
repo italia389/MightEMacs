@@ -2,7 +2,7 @@
 
 Part of MightEMacs's startup processing is to map its screen to the size of the
 terminal window.  The number of columns and rows being used are saved in the
-$TermSize constant.
+TermSize constant.
 
 The editor can also re-map its screen during an editing session if the size of
 the terminal window changes; for example, when resizing the terminal window with

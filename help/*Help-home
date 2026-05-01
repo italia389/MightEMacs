@@ -26,8 +26,8 @@ basics of navigating, editing text, moving text around, search and replace, etc.
 To open the tutorial at any time (or resume one you already started), press
 ~#uC-h t~U.
 
-To display the MightEMacs "cheat sheet"  at any time, press ~#uC-h e~U.  To return to
-your editing session, press ~#uC-h e~U again.
+To display the MightEMacs "cheat sheet"  at any time, press ~#uC-h c~U.  To return to
+your editing session, press ~#uC-h c~U again.
 
 HELP TOPICS (in recommended order):
 

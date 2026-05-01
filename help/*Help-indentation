@@ -38,10 +38,14 @@ Following are all the commands that are used for managing tabs and indentation:
     ~#uTAB~U         tab             Insert hard or soft tab n times (or set soft tab
                                 size to abs(n) if n <= 0).
 
-    ~#uESC )~U       indentRegion    Indent lines in region by n tab stops
+    ~#uESC )~U       indentRegion
+    ~#uESC (~U       outdentRegion   Indent or outdent lines in region by n tab stops
                                 (default 1).
-    ~#uESC (~U       outdentRegion   Outdent lines in region by n tab stops
-                                (default 1).
+    ~#uC-c )~U       indentLine
+    ~#uC-c (~U       outdentLine     Indent or outdent line block selected by n.
+                                User is prompted for number of tab stops.
+    ~#uC-c TAB~U     shiftLine       Change indentation of current line without
+                                moving point.
 
     ~#uC-x C-d~U     detabLine       Change hard tabs to spaces in [-]n lines
                                 (default 1, region lines if n == 0).  Tab size

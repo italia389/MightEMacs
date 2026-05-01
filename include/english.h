@@ -1,4 +1,4 @@
-// (c) Copyright 2022 Richard W. Marinelli
+// (c) Copyright 2026 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -31,25 +31,22 @@ Command switches and arguments:\n\
   -e, -exec stmt    Specify an expression statement to be executed.  Switch may\n\
 		    be repeated.\n\
   -G, -global-mode [^]m[, ...]\n\
-  		    Specify one or more global modes to disable (^) or enable\n\
-		    (no ^), separated by commas.  Mode names may be abbreviated\n\
-		    and switch may be repeated.\n\
+		    Specify one or more global modes to inactivate (^) or\n\
+		    activate (no ^), separated by commas.  Mode names may be\n\
+		    abbreviated and switch may be repeated.\n\
   -help		    Display detailed help and exit.\n\
-  -i, -inp-delim d  Specify one or two characters (processed as a double-quoted\n\
-		    \"...\" string) to use as file input record delimiter(s),\n\
-		    otherwise the first NL, CR-LF, or CR found when a file is\n\
-		    read is used.\n\
+  -i, -inp-delim d  Specify line delimiter to use on input (as symbol NL, CRLF,\n\
+		    CR, or NUL), otherwise the first NL, CR-LF, or CR\n\
+		    character(s) found when a file is read.\n\
   -N, -no-user-startup\n\
 		    Do not load the user startup file.\n\
   -n, -no-startup   Do not load the site or user startup files.\n\
-  -o, -otp-delim d  Specify one or two characters (processed as a double-quoted\n\
-		    \"...\" string) to use as file output record delimiter(s),\n\
-		    otherwise delimiter(s) found in input file ($BufInpDelim)\n\
-		    is used.\n\
+  -o, -otp-delim d  Specify line delimiter to use on output (as symbol NL, CRLF,\n\
+		    CR, or NUL), otherwise input delimiter.\n\
   -path list	    Specify colon-separated list of directories to set as script\n\
 		    execution path.\n\
   -R, -no-read	    Do not read first file at startup.\n\
-  -r		    Enable \"ReadOnly\" global mode at startup.\n\
+  -r		    Activate \"ReadOnly\" global mode at startup.\n\
   -S, -shell	    Denote file (beginning with \"#!/usr/local/bin/memacs -S\")\n\
 		    as an executable " ProgName " script.  Shell arguments are\n\
 		    passed to script when file is executed.\n\
@@ -63,9 +60,9 @@ Argument switches:\n\
   {+|-}line	    Go to specified line number from beginning (+) or end (-) of\n\
 		    data file, or to end of file if line number is zero.\n\
   -B, -buf-mode [^]m[, ...]\n\
-		    Specify one or more buffer modes to disable (^) or enable\n\
-		    (no ^) on data file, separated by commas.  Mode names may be\n\
-		    abbreviated and switch may be repeated.\n\
+		    Specify one or more buffer modes to inactivate (^) or\n\
+		    activate (no ^) on data file, separated by commas.  Mode\n\
+		    names may be abbreviated and switch may be repeated.\n\
   -r		    Read-only: open data file with \"ReadOnly\" buffer attribute\n\
 		    ON.\n\
   -rw		    Read-write: open data file with \"ReadOnly\" buffer attribute\n\
@@ -91,34 +88,34 @@ const char
  text0[] = "Error",
  text1[] = "-r and -rw switch conflict",
  text2[] = "Invalid character range '%.3s' in string '%s'",
- text3[] = "%s(): Unknown ID %d for variable '%s'!",
+ text3[] = "current",
  text4[] = "%s expected (at token '%s')",
- text5[] = "No such group, %ld",
+ text5[] = "No such %s '%'ld'",
  text6[] = "About",
  text7[] = "Go to",
  text8[] = "Aborted",
  text9[] = "Mark ",
  text10[] = "deleted",
- text11[] = "No mark ~u%c~U in this buffer",
- text12[] = "%s (%d) must be between %d and %d",
+ text11[] = "No mark ~u%s~U in this buffer",
+ text12[] = "%s (%'ld) must be in range %d - %'ld",
  text13[] = "Show key ",
  text14[] = "~#u%s~U not bound",
  text15[] = "Bind key ",
  text16[] = "%s(): No such entry '%s' to update or delete!",
- text17[] = "Cannot bind key sequence ~#u%s~U to '~b%s~B' command",
+ text17[] = "Cannot bind ~#u%s~U to ~b%s~B command -- must be bound to a single key",
  text18[] = "Unbind key ",
- text19[] = "No such ring entry %d (max %d)",
+ text19[] = "No such ring entry %'ld (max %'d)",
  text20[] = "Apropos",
  text21[] = "system variable",
  text22[] = "Extraneous token '%s'",
  text23[] = "Missing '=' in ~b%s~B command (at token '%s')",
  text24[] = "Select",
- text25[] = "That name is already in use.  New name",
+ text25[] = "That name is%s%s",
  text26[] = "Delete",
  text27[] = "Pop",
  text28[] = "%s is being displayed",
  text29[] = "Rename",
- text30[] = "AHUPNTBRC   Size      Buffer              File",
+ text30[] = "AHUPNTBRC     Size        Buffer              File",
  text31[] = "Active",
  text32[] = "Discard changes",
  text33[] = "Cannot get %s of file \"%s\": %s",
@@ -127,20 +124,20 @@ const char
  text36[] = "Invalid pattern option '%c' for '%s' operator",
  text37[] = "pathname",
  text38[] = "Invalid number '%s'",
- text39[] = "%s (%d) must be %d or greater",
+ text39[] = "%s (%'ld) must be %d or greater",
  text40[] = "Line overflow, wrapping descriptive text for name '~b%.*s~B'",
  text41[] = "Only one buffer exists",
  text42[] = "%s ring cycled",
  text43[] = "Ring name",
  text44[] = "calling %s() from %s() function",
  text45[] = "Multiple \"-\" arguments",
- text46[] = "Input",
- text47[] = "Output",
+ text46[] = "input",
+ text47[] = "output",
  text48[] = "[Not bound]",
  text49[] = "Hard",
  text50[] = "Soft",
  text51[] = "Assign variable",
- text52[] = "No such variable '%s'",
+ text52[] = "No such %s \"%s\"",
  text53[] = "Value",
  text54[] = "Key echo required for completion",
  text55[] = "Insert",
@@ -148,7 +145,7 @@ const char
  text57[] = "Only one screen",
  text58[] = "Buffer",
  text59[] = "Wrap column",
- text60[] = "~bLine:~B %lu of %lu, ~bCol:~B %d of %d, ~bByte:~B %lu of %lu (%s%%); ~bchar~B = %s",
+ text60[] = "~bLine:~B %'lu of %'lu; ~bCol:~B %'d of %'d; ~bByte:~B %'lu of %'lu (%s%%); ~bchar~B = %s",
  text61[] = "%sconflicts with -no-read",
  text62[] = "User-defined",
  text63[] = " mode",
@@ -178,38 +175,36 @@ const char
  text87[] = "~bReplace~B \"",
  text88[] = "Cannot read directory \"%s\": %s",
  text89[] = "ScreenWindow  Buffer              File",
- text90[] = "~uSPC~U|~uy~U ~bYes~B, ~un~U ~bNo~B, ~uY~U ~bYes and stop~B, ~u!~U ~bDo rest~B, ~uu~U ~bUndo last~B,\
- ~ur~U ~bRestart~B, ~uESC~U|~uq~U ~bStop here~B, ~u.~U ~bStop and go back~B, ~u?~U ~bHelp~B",
+ text90[] = "~uSPC~U|~uy~U ~bYes~B, ~un~U ~bNo~B, ~uY~U ~bYes & quit~B, ~u!~U ~bDo rest~B, ~uu~U|~uU~U ~bUndo last|all~B,\
+ ~ur~U ~bRestart~B, ~uESC~U|~uq~U ~bQuit~B, ~u.~U ~bQuit & go back~B",
  text91[] = "Repeating match at same position detected",
- text92[] = "%d substitution%s",
- text93[] = "Current window too small to shrink by %d line%s",
+ text92[] = "%'d substitution%s",
+ text93[] = "Current window too small to shrink by %ld line%s",
  text94[] = "%s(): Out of memory!",
  text95[] = "Narrowed buffer... delete visible portion",
  text96[] = "written",
- text97[] = "Invalid %s argument",
+ text97[] = "name",
  text98[] = "Wrap column not set",
  text99[] = "file",
-#if WordCount
- text100[] = "Words: %ld, word chars: %ld, region chars: %ld, lines: %d, avg. chars/word: %.2f",
-#endif
+ text100[] = "Cannot coerce integer variable '~b%s~B' to string",
  text101[] = "%sconflict",
  text102[] = "Beginning value",
  text103[] = "Saving %s...",
  text104[] = "Modified buffers exist.  Exit anyway",
- text105[] = "%s already active, cancelled",
+ text105[] = "Region line count",
  text106[] = "Begin %s recording",
  text107[] = "%s not active",
  text108[] = "saved",
- text109[] = "%s is %s",
+ text109[] = " already in use",
  text110[] = "Default value length (%lu) exceeds maximum input length (%u)",
- text111[] = "'~b%s~B' value must be %d or greater",
- text112[] = "Maximum number of loop iterations (%d) exceeded!",
+ text111[] = "~b%s~B value (%'ld) must be in range %d - %'d",
+ text112[] = "Maximum number of loop iterations (%'d) exceeded!",
  text113[] = "Switch to",
  text114[] = "~bRing~B: %s, ~bentries~B: %hu, ~bsize~B: %hu",
  text115[] = "Word",
- text116[] = "No such function '%s'",
+ text116[] = "command or alias",
  text117[] = "Execute",
- text118[] = "No such buffer '%s'",
+ text118[] = "command, function, or alias",
  text119[] = "Pause duration",
  text120[] = "'break' or 'next' outside of any loop block",
  text121[] = "Unmatched '~b%s~B' keyword",
@@ -220,21 +215,21 @@ const char
  text126[] = "Current size: %hu, new size",
  text127[] = "alias",
  text128[] = "buffer name",
- text129[] = "Execute MScript file",
- text130[] = "No such command '%s'",
+ text129[] = "Execute MScript",
+ text130[] = "constant",
  text131[] = "Read",
  text132[] = "Insert",
  text133[] = "Find",
  text134[] = "View",
  text135[] = "Old buffer",
- text136[] = "No such character class '%s'",
+ text136[] = "hook",
  text137[] = "Repeat count",
  text138[] = "New file",
  text139[] = "Reading data...",
  text140[] = "Buffer does not exist.  Create it",
  text141[] = "I/O Error: %s, file \"%s\"",
  text142[] = "Cannot change a character past end of buffer '%s'",
- text143[] = "Line number",
+ text143[] = " top entry",
  text144[] = "Write to",
  text145[] = "No filename associated with buffer '%s'",
  text146[] = "global",
@@ -243,7 +238,7 @@ const char
  text149[] = "Wrote",
  text150[] = "(file saved as \"%s\") ",
  text151[] = "Set filename in",
- text152[] = "No such file \"%s\"",
+ text152[] = "user routine",
  text153[] = "Inserting data...",
  text154[] = "Inserted",
  text155[] = "Ring size",
@@ -255,8 +250,8 @@ const char
  text161[] = " (disabled '%s' hook)",
  text162[] = " (y/n)?",
  text163[] = "status",
- text164[] = "Cannot modify read-only variable '~b%s~B'",
- text165[] = "Name '~b%s~B' already in use",
+ text164[] = "Cannot modify %s constant '~b%s~B'",
+ text165[] = "Name '~b%s~B'%s",
  text166[] = "Integer expected",
  text167[] = "%u buffer%s saved",
  text168[] = "Delete all other %sbuffers",
@@ -267,15 +262,15 @@ const char
  text173[] = "Unbalanced %c%c%c string parameter",
  text174[] = "Created screen %hu",
  text175[] = "-search, + or - switch ",
- text176[] = "Function '~b%s~B' failed",
+ text176[] = "Function ~b%s~B failed",
  text177[] = "%s(): Screen number %d not found in screen list!",
  text178[] = "Screen %d deleted",
  text179[] = "Fence char",
  text180[] = "create",
- text181[] = "%s name '%s' already in use",
+ text181[] = "%s name '%s'%s",
  text182[] = "Environmental variable 'TERM' not defined!",
  text183[] = "User function",
- text184[] = "Overlap %ld must be between 0 and %d",
+ text184[] = "Overlap",
  text185[] = "Version",
  text186[] = "attribute",
  text187[] = "%s cannot be null",
@@ -284,9 +279,9 @@ const char
  text190[] = "Terminal size %hu x %hu is too small to run %s",
  text191[] = "Wrong type of operand for '%s'",
  text192[] = "This terminal (%s) does not have sufficient capabilities to run %s",
- text193[] = "Saved file \"%s\"\n",
+ text193[] = "Saved file \"%s\"",
  text194[] = "Shell command \"%s\" failed",
- text195[] = "Endless recursion detected (array contains itself)",
+ text195[] = "Endless recursion detected (array or hash contains itself)",
  text196[] = "endloop",
  text197[] = "endroutine",
  text198[] = "Misplaced '~b%s~B' keyword",
@@ -295,26 +290,26 @@ const char
  text201[] = "End: ",
  text202[] = "%s ring is empty",
  text203[] = "Searching...",
- text204[] = "Too many arguments for '[bs]printf' function",
+ text204[] = "Too many arguments for printf-formatting function",
  text205[] = "line",
  text206[] = "Command or function argument count",
- text207[] = "Cannot get %d line%s from adjacent window",
+ text207[] = "Cannot get %ld line%s from adjacent window",
  text208[] = "Saved %s not found",
- text209[] = "Arg: %d",
- text210[] = "~#u%s~U is only binding to core command '~b%s~B' -- cannot delete or reassign",
+ text209[] = "Arg: %ld",
+ text210[] = "~#u%s~U is only binding to core command ~b%s~B -- cannot delete or reassign",
  text211[] = "Screen refreshed",
  text212[] = "Variable '~b%s~B' not an integer",
  text213[] = "Comma",
  text214[] = "%s cannot be nil",
  text215[] = "Create alias ",
- text216[] = "Delete user routine",
+ text216[] = "symbolic",
  text217[] = "'break' level '%ld' must be 1 or greater",
  text218[] = "Append to",
  text219[] = "Script failed",
- text220[] = "Parent block of loop block at line %ld not found during buffer scan",
+ text220[] = "Parent block of loop block at line %'d not found during buffer scan",
  text221[] = "%s in RE pattern '%s'",
  text222[] = "Case of text",
- text223[] = "pop option",
+ text223[] = "Buffer '%s' homed to screen %d",
  text224[] = "Binding set",
  text225[] = "Too many break levels (%d short) from inner 'break'",
  text226[] = "Cannot %s %s buffer '%s'",
@@ -328,28 +323,29 @@ const char
  text234[] = "Increment",
  text235[] = "Format string",
  text236[] = "i increment cannot be zero!",
- text237[] = "Invalid i format '%s' (must contain exactly one %%d, %%o, %%u, %%x, or %%X)",
+ text237[] = "Invalid i format \"%s\" (must contain exactly one d,i,o,u,x,X spec)",
  text238[] = "executing",
- text239[] = "No such window '%d'",
- text240[] = "No such screen '%d'",
- text241[] = "Maximum ring size (%ld) less than current size (%d)",
+ text239[] = "variable",
+ text240[] = "character class",
+ text241[] = "Maximum ring size (%'ld) less than current size (%'d)",
  text242[] = "Option(s) conflict with prompt type",
  text243[] = "\n* Changed buffer",
- text244[] = "No such command or alias '%s'",
+ text244[] = "execute",
  text245[] = "Division by zero is undefined (%ld/0)",
  text246[] = "Cannot write to current buffer",
  text247[] = "function",
- text248[] = "an executing",
+ text248[] = "No active %s",
  text249[] = "Insert pipe",
  text250[] = "Show",
- text251[] = "%s delimiter '%s' cannot be more than %d character(s)",
+ text251[] = "Unknown %s delimiter symbol \"%s\"",
  text252[] = " delimited by ",
  text253[] = "(return status %d)\n",
  text254[] = "key literal",
  text255[] = "%s, matching RE pattern '%s'",
- text256[] = "%s tab size %d must be between 2 and %d",
+ text256[] = "%s tab size %ld must be in range 2 - %d",
  text257[] = ", original file renamed to \"",
- text258[] = "~uESC~U|~uq~U ~bStop here~B, ~u.~U ~bStop and go back~B, ~uu~U ~bUndo last~B, ~ur~U ~bRestart~B, ~u?~U ~bHelp~B",
+ text258[] = "~uESC~U|~uq~U ~bStop here~B, ~u.~U ~bStop and go back~B, ~uu~U|~uU~U ~bUndo last|all~B, ~ur~U ~bRestart~B,\
+ ~u?~U ~bHelp~B",
  text259[] = "No text selected",
  text260[] = "changed",
  text261[] = "Text",
@@ -358,11 +354,11 @@ const char
  text264[] = "clear",
  text265[] = "Cannot change directory to \"%s\": %s",
  text266[] = "Regular expression",
- text267[] = "No such command, function, or alias '%s'",
+ text267[] = "record",
  text268[] = "Cannot %s buffer: name '%s' cannot begin with %c",
- text269[] = "Delete alias",
+ text269[] = "hard",
  text270[] = "Cannot %s command or function buffer: name '%s' must begin with %c",
- text271[] = "No such alias '%s'",
+ text271[] = "Shrt    Name                        Key List",
  text272[] = "%s or %s has %hu alias(es)",
  text273[] = "Command and function buffer names (only) begin with ",
  text274[] = "WD: ",
@@ -373,24 +369,24 @@ const char
  text279[] = "Variable",
  text280[] = "%s name cannot be null or exceed %d characters",
  text281[] = "Missing spec in '%' format string",
- text282[] = "Cannot invoke '~b%s~B' command directly in a script (use '~brun~B')",
- text283[] = ", new value",
+ text282[] = "Cannot invoke ~b%s~B command directly in a script (use ~brun~B)",
+ text283[] = "; new value",
  text284[] = "Cannot %s %s buffer",
- text285[] = "Call argument",
+ text285[] = "Argument",
  text286[] = "identifier",
- text287[] = "i variable set to %d",
+ text287[] = "i variable set to %'d",
  text288[] = "Character expected",
  text289[] = "Unexpected token '%s'",
  text290[] = "Length argument",
  text291[] = " without delimiter at EOF",
- text292[] = "variable",
+ text292[] = "constants and variable",
  text293[] = "Cannot split a %hu-line window",
  text294[] = "Only one window",
  text295[] = "Unknown prompt type '%s'",
  text296[] = "Clear all and set",
  text297[] = "Current value: ",
  text298[] = "No previous wrap column set",
- text299[] = "Pop",
+ text299[] = "All %s deleted",
  text300[] = "False return",
  text301[] = " (expression)",
  text302[] = "No such group (ref: %hu, have: %hu) in replacement pattern '%s'",
@@ -398,23 +394,23 @@ const char
  text304[] = "Scan completed.  Press ~uq~U to quit or ~u.~U to go back.",
  text305[] = "Ring",
  text306[] = "Pipe command",
- text307[] = "%d line%s %s",
+ text307[] = "%'d line%s %s",
  text308[] = "Narrowed",
  text309[] = "Directory unknown for",
  text310[] = "%s multi-screen buffer '%s'",
  text311[] = " pattern",
- text312[] = "No such command or function '%s'",
+ text312[] = "Active macro",
  text313[] = "command or function",
  text314[] = "Unmatched '~bcommand~B' or '~bfunction~B' keyword",
  text315[] = " Hook     Set to Function      Numeric Argument     Function Arguments",
  text316[] = "Hooks",
- text317[] = "No such hook '%s'",
- text318[] = "attribute keyword",
- text319[] = "Maximum %s recursion depth (%d) exceeded",
+ text317[] = "New value",
+ text318[] = "ConstVar",
+ text319[] = "Maximum %s recursion depth (%'d) exceeded",
  text320[] = "More than one spec in '%' format string",
- text321[] = "Unknown format spec '%%%s'",
+ text321[] = "Unknown conversion spec '%%%s'",
  text322[] = "Column number",
- text323[] = "Indentation exceeds wrap column (%d)",
+ text323[] = "Indentation exceeds wrap column (%'d)",
  text324[] = ".  New name",
  text325[] = "of",
  text326[] = "Begin",
@@ -423,15 +419,15 @@ const char
  text329[] = "Unexpected %s argument",
  text330[] = "EntryText",
  text331[] = "window",
- text332[] = "%s tab size set to %d",
+ text332[] = "%s tab size set to %ld",
  text333[] = "pseudo command",
  text334[] = ", setting variable '~b%s~B'",
  text335[] = "File test code(s)",
  text336[] = "system function",
  text337[] = "Invalid escape sequence \"%.*s\"",
- text338[] = "Cannot %s a %s from a %s, cancelled",
+ text338[] = "Cannot %s a %s from a %s",
  text339[] = "to",
- text340[] = "~bCol:~B %d of %d; ~bchar~B = %s",
+ text340[] = "~bCol:~B %'d of %'d; ~bchar~B = %s",
  text341[] = "Cannot use key sequence ~#u%s~U as %s delimiter",
  text342[] = "prompt",
  text343[] = "search",
@@ -442,13 +438,13 @@ const char
  text348[] = "Save point in",
  text349[] = " (char)",
  text350[] = "set",
- text351[] = "All marks deleted",
+ text351[] = "mark",
  text352[] = "Cannot delete mark ~u%c~U",
  text353[] = "Marks",
  text354[] = "MarkOffset  Line Text",
  text355[] = " and marked as region",
  text356[] = "Too many windows (%u)",
- text357[] = "%s%s%s deleted",
+ text357[] = " Key     No Prefix         ESC Prefix        C-x Prefix        C-c Prefix        C-h Prefix",
  text358[] = "Illegal use of %s value",
  text359[] = "nil",
  text360[] = "Boolean",
@@ -459,9 +455,9 @@ const char
  text365[] = "BUFFER MODES",
  text366[] = "Scope-locked",
  text367[] = "Deleting buffer '%s'...",
- text368[] = "%d buffer%s deleted",
+ text368[] = "%u buffer%s deleted",
  text369[] = " in buffer '%s'",
- text370[] = "Array element %d not an integer",
+ text370[] = "Array element %'ld not an integer",
  text371[] = "Array expected",
  text372[] = "Buffer '%s' deleted",
  text373[] = "Illegal value for '~b%s~B' variable",
@@ -469,13 +465,13 @@ const char
  text375[] = "Attribute(s) changed",
  text376[] = "user command or function",
  text377[] = "%s '%s' is empty",
- text378[] = "Line offset value %ld out of range",
- text379[] = "'~b%s~B' value must be between %d and %d",
+ text378[] = "Line offset value %'ld out of range",
+ text379[] = "i variable value (%'ld) out of range (max +/- %'d)",
  text380[] = "screen",
  text381[] = "Buffer '%s' created",
  text382[] = "\" ~bwith~B \"",
  text383[] = "(self insert)",
- text384[] = "~bi:~B %d, ~bformat:~B \"%s\", ~bincr:~B %d",
+ text384[] = "~bi:~B %'d, ~bformat:~B \"%s\", ~bincr:~B %'d",
  text385[] = "Change buffer name to",
  text386[] = "Command or function declaration contains invalid argument range",
  text387[] = "Mode",
@@ -486,7 +482,7 @@ const char
  text392[] = "created",
  text393[] = "Tab size",
  text394[] = "attribute changed",
- text395[] = "No such %s '%s'",
+ text395[] = "No changes made",
  text396[] = "Cannot delete built-in %s '%s'",
  text397[] = "Invalid %s %s '%s'",
  text398[] = "Scope of %s '%s' must match %s '%s'",
@@ -502,22 +498,22 @@ const char
  text408[] = "Unterminated /#...#/ comment",
  text409[] = "CWD: %s",
  text410[] = "command option",
- text411[] = "Alias",
+ text411[] = " or 0 for none",
  text412[] = "User command",
- text413[] = "Function '~b%s~B' argument count (%hd, %hd) does not match hook's (%hd)",
+ text413[] = "Function \"~b%s~B\" argument count (%hd, %hd) does not match \"%s\" hook's (%hd)",
  text414[] = "system command",
  text415[] = "%s buffer '%s'",
  text416[] = " not allowed",
  text417[] = "user command",
  text418[] = "user function",
  text419[] = "Nested routine%s",
- text420[] = "Hook may not be set to %s '~b%s~B'",
+ text420[] = "Hook may not be set to %s ~b%s~B",
  text421[] = "initializing ncurses",
  text422[] = "Invalid color pair value(s)",
  text423[] = "Directory changed.  Write buffer '%s' to file \"%s/%s\"",
  text424[] = "ShellCmd",
- text425[] = "Color pair %ld must be between 0 and %hd",
- text426[] = "Color no. %ld must be between -1 and %hd",
+ text425[] = "Color pair",
+ text426[] = "Color no.",
  text427[] = "Terminal does not support color",
  text428[] = "Colors",
  text429[] = "COLOR PALETTE - Page %d of %d\n\n",
@@ -531,16 +527,16 @@ const char
  text437[] = "AUHL Name          Description",
  text438[] = " / Members",
  text439[] = "Changed",
- text440[] = "No such user routine '%s'",
+ text440[] = " and activated",
  text441[] = "Preprocessed",
  text442[] = "Terminal attributes enabled",
  text443[] = "display item",
  text444[] = " ring item",
  text445[] = " or 0 for new",
- text446[] = "Screen %d and %d homed buffer%s deleted",
+ text446[] = "Screen %d and %u homed buffer%s deleted",
  text447[] = "Invalid %s '%s'",
  text448[] = "Options",
- text449[] = "User routine",
+ text449[] = "Home %s buffer to",
  text450[] = "type keyword",
  text451[] = "function option",
  text452[] = "visible ",
@@ -559,23 +555,23 @@ const char
  text465[] = "end",
  text466[] = "macro",
  text467[] = "renamed",
- text468[] = "%s '%s' already exists",
+ text468[] = " already exists",
  text469[] = "Save to",
  text470[] = "%s is identical to '%s'",
  text471[] = "Macro",
  text472[] = "discarded",
  text473[] = "operate on",
- text474[] = "sort option",
+ text474[] = "key binding",
  text475[] = "Sorted",
  text476[] = ".  Discard",
- text477[] = "%s name cannot contain \"%s\"",
+ text477[] = " name cannot contain ",
  text478[] = "New name",
- text479[] = "File already exists.  %s",
+ text479[] = "File%s.  %s",
  text480[] = "Allow overwrite",
  text481[] = "Overwrite",
- text482[] = "0 => readPipe \"for f in",
- text483[] = "; do if [ -d \\\"$f\\\" ]; then echo \\\"$f/\\\"; elif [ -L \\\"$f\\\" ] || [ -e \\\"$f\\\" ]; then"
-		" echo \\\"$f\\\"; fi; done\"",
+ text482[] = "No such %s ~u%s~U",
+ text483[] = "~uSPC~U|~uf~U ~b+pg~B, ~ub~U ~b-pg~B, ~ud~U ~b+half~B, ~uu~U ~b-half~B, ~un~U ~b+ln~B,\
+ ~up~U ~b-ln~B, ~ug~U ~btop~B, ~uG~U ~bbot~B, ~uESC~U|~uq~U ~bquit~B, ~u?~U ~bhelp~B: ",
  text484[] = "Cannot %s file \"%s\": %s",
  text485[] = "Buffer and file \"%s\" %s",
  text486[] = "File \"%s\" %s",
@@ -588,21 +584,70 @@ const char
  text493[] = "No filename set for %s '%s'",
  text494[] = "Disk file",
  text495[] = "File",
- text496[] = "~bCurrent wrap col:~B %d, ~bprevious wrap col:~B %d",
- text497[] = "parameter name",
- text498[] = "previous";
+ text496[] = "~bCurrent wrap col:~B %'d, ~bprevious wrap col:~B %'d",
+ text497[] = "Unhomed buffer '%s'",
+ text498[] = "previous",
+ text499[] = "Create directory",
+ text500[] = "Remove directory",
+ text501[] = "Cannot create directory \"%s\": %s",
+ text502[] = "Cannot remove directory \"%s\": %s",
+ text503[] = "Directory created",
+ text504[] = "Directory removed",
+ text505[] = "Only one%s buffer",
+ text506[] = " homed",
+ text507[] = "hash key",
+ text508[] = "Hash value for key \"%s\" not an integer",
+ text509[] = "Hash expected",
+ text510[] = "Array, hash, or string expected",
+ text511[] = "Unknown hash property flag(s) \"%s\"",
+ text512[] = "Unexpected white space (at token '%s')",
+ text513[] = "system",
+ text514[] = "user constant",
+ text515[] = "system constant",
+ text516[] = "Inactivate",
+ text517[] = "Activate",
+ text518[] = "Clear all and activate",
+ text519[] = "Lines",
+ text520[] = "Filename",
+ text521[] = "HomeDir",
+ text522[] = "Size",
+ text523[] = "Attributes",
+ text524[] = "No such string element %'ld (string length %'ld)",
+ text525[] = "Tab stops",
+ text526[] = "a",
+ text527[] = "Show constant or variable",
+ text528[] = ":~b%s now~B '%s'",
+ text529[] = ": ~btop %c%s now~B '%s'",
+ text530[] = " deleted",
+ text531[] = "Swap",
+ text532[] = "Screen numbers swapped",
+ text533[] = "Delete constant or variable",
+ text534[] = "constant or variable",
+ text535[] = "Cannot delete system %s '%s'",
+ text536[] = "Constant",
+ text537[] = "Break %s link for file \"%s\" on output",
+ text538[] = "Delete all %ss",
+ text539[] = "routine",
+ text540[] = "activated",
+ text541[] = "space, ~, or non-printable characters",
+ text542[] = "Create",
+ text543[] = "shortcut",
+ text544[] = "Shortcut",
+ text545[] = "for",
+ text546[] = "type",
+ text547[] = "Delete all marks in current buffer";
 
 // General text literals.
 const char
  text800[] = "[arg, ...]",
- text801[] = "name = cf",
- text802[] = "mode[, bufname]",
- text803[] = "name",
- text804[] = "bufname, arg, ...",
+ text801[] = "bare-name = bare-cmdfunc-name",
+ text802[] = "mode[, buffer]",
+ text803[] = "s[, name]",
+ text804[] = "buffer, arg, ...",
  text805[] = "pat",
- text806[] = "key-lit, name",
- text807[] = "name, ...",
- text808[] = "[bufname]",
+ text806[] = "key-lit, bare-name",
+ text807[] = "bare-name, ...",
+ text808[] = "[buffer]",
  text809[] = "arg, ...",
  text810[] = "spat, rpat",
  text811[] = "str",
@@ -610,7 +655,7 @@ const char
  text813[] = "val[, fmt[, incr]]",
  text814[] = "path",
  text815[] = "key-lit",
- text816[] = "bufname[, arg, ...]",
+ text816[] = "buffer[, arg, ...]",
  text817[] = "str, from, to",
  text818[] = "str, {pat | c}[, opts]",
  text819[] = "dlm, val, ...",
@@ -626,66 +671,86 @@ const char
  text829[] = "chars",
  text830[] = "pref, chars",
  text831[] = "fmt[, arg, ...]",
- text832[] = "name, func",
- text833[] = "N[, bufname]",
+ text832[] = "hook-name, bare-name",
+ text833[] = "N[, buffer]",
  text834[] = "m",
  text835[] = "file, type",
- text836[] = "{bufname, ... | opts}",
+ text836[] = "{buffer, ... | opts}",
  text837[] = "dir",
- text838[] = "dlm, str[, limit]",
- text839[] = "var, dlm",
- text840[] = "var, dlm, val",
+ text838[] = "str, dlm[, limit]",
+ text839[] = "bare-name, dlm",
+ text840[] = "bare-name, dlm, val",
  text841[] = "expr[, opts[, dlm]]",
- text842[] = "bufname[, opts]",
- text843[] = "type",
+ text842[] = "buffer[, opts]",
+ text843[] = "s",
  text844[] = "[opts]",
- text845[] = "bufname, attrs",
+ text845[] = "attrs, buffer",
  text846[] = "array, i[, len]",
- text847[] = "bufname, modes",
- text848[] = "op[, {arg | opts}]",
+ text847[] = "modes[, buffer]",
+ text848[] = "name, value[, opts]",
  text849[] = "old, new",
- text850[] = "bufname, file",
+ text850[] = "file, buffer",
  text851[] = "[m]",
- text852[] = "bufname, fmt[, arg, ...]",
+ text852[] = "buffer, fmt[, arg, ...]",
  text853[] = "mode[, attr, ...]",
  text854[] = "group[, attr, ...]",
- text855[] = "group[, bufname]",
- text856[] = "op, {key-lit | name}",
+ text855[] = "group[, buffer]",
+ text856[] = "bare-name",
  text857[] = "[c]",
  text858[] = "{file | array}",
  text859[] = "{file | glob}[, opts]",
  text860[] = "class, {c | str}",
  text861[] = "[opts,] arg, ...",
  text862[] = "tab-size",
- text863[] = "attr[, bufname]",
+ text863[] = "attr[, buffer]",
  text864[] = "pair-no, fg-color, bg-color",
  text865[] = "type, colors",
- text866[] = "type, obj",
- text867[] = "bufname",
- text868[] = "file",
+ text866[] = "dir[, mode]",
+ text867[] = "N1, N2",
+ text868[] = "[s, ...]",
  text869[] = "file[, arg, ...]",
  text870[] = "file[, opts]",
  text871[] = "[name]",
  text872[] = "[name, ...]",
- text873[] = "pat[, opts]",
+ text873[] = "[pat[, opts]]",
  text874[] = "ring",
  text875[] = "ring[, size]",
- text876[] = "ring[, name]",
- text877[] = "array, val, i, len",
- text878[] = "array, val, i",
- text879[] = "[opts,] {file | bufname}",
- text880[] = "[opts,] file1, file2",
- text881[] = "[opts,] {file | bufname}, new-file",
- text882[] = "param, val";
+ text876[] = "hash[, size]",
+ text877[] = "array, i, len, val",
+ text878[] = "array, i, val",
+ text879[] = "{file | buffer}[, opts]",
+ text880[] = "file1, file2[, opts]",
+ text881[] = "{file | buffer}, new-file[, opts]",
+ text882[] = "param, val",
+ text883[] = "str[, base]",
+ text884[] = "[size[, opts]]",
+ text885[] = "hash",
+ text886[] = "hash, key",
+ text887[] = "str, c",
+ text888[] = "hash, expr[, opts]",
+ text889[] = "array[, opts]",
+ text890[] = "hash[, opts]",
+ text891[] = "[m, ...]",
+ text892[] = "tab-stops",
+ text893[] = "[pat]",
+ text894[] = "array, expr[, opts]",
+ text895[] = "pat, ...";
 
+#if SanityCheck
+char
+ text990[] = "%s(): Unknown ID %d for variable '%s'!",
+ text991[] = "Invalid extended key %.4hx for key code %.4ho in keyList table",
+ text992[] = "Prior loop execution level not found while rewinding stack",
+ text993[] = "xbuf(): Error: Unknown keyword '%.*s'",
+ text994[] = "getSym(): Unexpected call after end of string detected (last token \"%s\")";
+#endif
 #if MMDebug & Debug_ShowRE
 char
- text994[] = "SEARCH",
- text995[] = "REPLACE",
- text996[] = "RegexpInfo",
- text997[] = "Forward",
- text998[] = "Backward",
- text999[] = "PATTERN";
+ text995[] = "SEARCH",
+ text996[] = "PATTERN",
+ text997[] = "RegexpInfo",
+ text998[] = "Forward",
+ text999[] = "Backward";
 #endif
 
 // Command and function help text.
@@ -694,48 +759,75 @@ char
 #define CFLit_about		"Generate \"about the editor\" information in a new buffer and render it per ~bselectBuf~B\
  options (in a pop-up window if default n).\n\nReturns: ~bselectBuf~B values."
 #define CFLit_abs		"Return absolute value of N."
+#define CFLit_aclear		"Delete all elements from given array and return it."
 #define CFLit_aclone		"Return copy of given array."
-#define CFLit_acompact		"Return copy of given array with nil elements removed (or if n argument, remove nil elements\
- from array and return it)."
+#define CFLit_acompact		"Delete nil elements from given array.\n\nReturns: number of elements deleted."
 #define CFLit_adelete		"Delete element(s) from given array.  If optional len argument is not specified, the element at\
- index i is removed and returned; otherwise, len elements beginning at index i are removed from the array and returned as a new\
- array.  If len is negative or greater than the number of elements following the index position, all elements from the index\
- position to the end of the array are selected.  In any case, if the index is negative, the referenced element is selected by\
- counting backward from the end of the array, where -1 is the last element; otherwise, the referenced element is selected from\
- the beginning of the array with the first being 0."
-#define CFLit_adeleteif		"Delete all elements from given array that match expression value.  Value and array elements\
- may be any data types, including array.\n\nReturns: number of elements deleted."
+ index i is deleted; otherwise, len elements beginning at index i are deleted.  If len is negative or greater than the number\
+ of elements following the index position, all elements from the index position to the end of the array are selected.  In any\
+ case, if the index is negative, the referenced element is selected by counting backward from the end of the array, where -1 is\
+ the last element; otherwise, the referenced element is selected from the beginning of the array with the first being 0.\n\n\
+Returns: element that was deleted if len not specified, otherwise new array containing deleted elements."
+#define CFLit_anyType		"  Expression value may be any data type, including array or hash."
+#define CFLit_anyAryTypes	"Expression value and array elements may be any data types, including array and hash."
+#define CFLit_ahOptions		"  Additionally, the following option may be specified in optional string argument opts to\
+ control the matching process:\n\
+\tIgnoreCase\t\tIgnore case in string comparisons.\nCase of option keyword is ignored.  "
+#define CFLit_adeleteif		"Delete all elements from given array that match expression value." CFLit_ahOptions\
+ CFLit_anyAryTypes "\n\nReturns: number of elements deleted."
 #define CFLit_afill		"Replace len elements in given array beginning at index i with copies of val and return array. \
  If len is negative, all elements from the index position to the end of the array are replaced.  If len is non-negative but\
  greater than the number of elements following the index position, array is auto-extended to fill the referenced slice.  If the\
  index is negative, the starting element of the slice is selected by counting backward from the end of the array, where -1 is\
- the last element; otherwise, the starting element is selected from the beginning of the array with the first being 0. \
- Expression value and array elements may be any data types, including array."
-#define CFLit_aincludeQ		"Return true if expression value matches any element in array, otherwise false.  Expression\
- value and array elements may be any data types, including array."
-#define CFLit_aindex		"Return index of first element (or last element if n > 0) that matches expression value,\
- otherwise nil.  Array elements begin at index 0.  Expression value and array elements may be any data types, including array."
+ the last element; otherwise, the starting element is selected from the beginning of the array with the first being 0."\
+ CFLit_anyType
+#define CFLit_aincludeQ		"Return true if expression value matches any element in array, otherwise false."\
+ CFLit_ahOptions CFLit_anyAryTypes
+#define CFLit_aindex		"Return index of first element that matches expression value (with exact string matching),\
+ otherwise nil.  Array elements begin at index 0.  Alternatively, one or both of the following options may be specified in\
+ string argument opts to control the matching process:\n\
+\tIgnoreCase\t\tIgnore case in string comparisons.\n\
+\tLast\t\t\tReturn index of last element that matches instead of first.\n\
+Case of option keywords is ignored.  " CFLit_anyAryTypes
 #define CFLit_ainsert		"Insert val into given array at index i and return array.  If the index is negative, the\
  insertion position is determined by counting backward from the end of the array (where -1 is the last element), and the value\
  is inserted after the referenced position.  If the index is non-negative, the position is relative to the beginning of the\
- array with the first being 0.  In this case, the value is inserted before the referenced position.  Expression value may be\
- any data type, including array."
-#define CFLit_alias		"Create alias of command or function cf (and replace any existing alias if n > 0)."
+ array with the first being 0.  In this case, the value is inserted before the referenced position." CFLit_anyType
+#define CFLit_alias		"Create alias bare-name of named command or function (and replace any existing alias if\
+ n > 0)."
 #define CFLit_apop		"Remove last element from given array and return it, or nil if none left."
 #define CFLit_appendFile	"Append current buffer to named file and set buffer's state to unchanged."
-#define CFLit_apropos		"Generate list of commands, functions, aliases, and variables in a new buffer and render it per\
- ~bselectBuf~B options.  If default n, all system and user commands, system functions, user functions that have help text,\
- aliases, and variables are displayed in a pop-up window if their names match given pattern; otherwise, one or more of the\
- following comma-separated option(s) may be specified in string argument opts to control the selection\
- process:\n\tSystem\t\tSelect system commands and functions matching pattern.\n\tUser\t\tSelect user commands matching pattern\
- and user functions that match pattern and have help text.\n\tAll\t\t\tInclude user functions not having help text.\nIf\
- pattern is plain text, match is successful if name contains pat.  If pattern is nil or a null string, all names of type\
- selected by n argument and any specified options are listed.\n\nReturns: ~bselectBuf~B values."
-#define CFLit_apush		"Append expression value to given array and return array."
+#define CFLit_optDefault	"Case of option keywords is ignored.  If neither option is selected interactively, both are in\
+ effect.  "
+#define CFLit_patMatch		"If pattern is plain text, match is successful if name contains pat, ignoring case.  If pattern\
+ is nil or a null string, all names match.\n\nReturns: ~bselectBuf~B values."
+#define CFLit_apropos		"Generate list of commands, functions, aliases, constants, and variables in a new buffer and\
+ render it per ~bselectBuf~B options.  By default, all commands, functions, aliases, constants, and variables whose names match\
+ given search pattern (or all commands, system functions, user functions that have help text or are bound to a hook, aliases,\
+ constants, and variables if pattern not given) are displayed in a pop-up window; otherwise, if interactive and n argument or\
+ command executed in script mode, zero or more of the following comma-separated options may be specified in string argument\
+ opts to control the selection process:\n\
+\tSystem\t\tSelect aliases and system commands, functions, constants, and variables matching pattern.\n\
+\tUser\t\tSelect aliases and user commands, functions, constants, and variables matching pattern.\n"\
+ CFLit_optDefault CFLit_patMatch
+#define CFLit_apush		"Append expression value to given array and return array." CFLit_anyType
 #define CFLit_array		"Create array and return it, given optional size (default zero) and initial value of each\
- element (default nil).  Initializer value may be any data type, including array, and is copied into each element."
+ element (default nil).  Initializer value may be any data type, including array or hash, and is copied into each element."
 #define CFLit_ashift		"Remove first element from given array and return it, or nil if none left."
-#define CFLit_aunshift		"Prepend expression value to given array and return array."
+#define CFLit_asort		"Return copy of given array with elements sorted in ascending order.  Alternatively, one or\
+ more of the following comma-separated options may be specified in string argument opts to control the sorting process:\n\
+\tDescending\t\tSort in descending order.\n\
+\tIgnoreCase\t\tIgnore case in string comparisons.\n\
+\tInPlace\t\t\tSort given array in place and return it, instead of making a copy.\n\
+Case of option keywords is ignored.  All elements of the array must contain string values; otherwise, an error is returned."
+#define CFLit_atoh		"Convert given array of form [[key, value], ..., key, ...] to a hash and return it.  All\
+ elements of the array must be either a nested two-element array containing a hash key and value (with a string as the first\
+ element), or a string key (in which case, a node with a nil value is created); otherwise, an error is returned.  By default, a\
+ hash with exact keys is created with a node for each array element; otherwise, the following option may be specified in\
+ string argument opts:\n\
+\tIgnoreCase\t\tCreate hash that ignores case of keys.\n\
+Case of option keyword is ignored."
+#define CFLit_aunshift		"Prepend expression value to given array and return array." CFLit_anyType
 #define CFLit_backChar		"Move point backward [-]n characters (default 1).\n\nReturns: false if hit a buffer boundary,\
  otherwise true."
 #define CFLit_backLine		"Move point backward [-]n lines (default 1).\n\nReturns: false if hit a buffer boundary,\
@@ -744,107 +836,110 @@ char
 #define CFLit_backPageNext	"Scroll next window backward n pages (or half a page if n < 0, default 1)."
 #define CFLit_backPagePrev	"Scroll previous window backward n pages (or half a page if n < 0, default 1)."
 #define CFLit_backTab		"Move point backward [-]n tab stops (default 1)."
-#define CFLit_backWord		"Move point backward [-]n words (default 1).\n\nReturns: false if hit a buffer boundary,\
- otherwise true."
+#define CFLit_backWord		"Move point backward abs(n) words (default 1).  If n < 0, restrict movement to current line.\n\
+\nReturns: false if hit a buffer boundary or beginning of line and n < 0, otherwise true."
 #define CFLit_backspace		"Delete backward [-]n characters (or soft tabs if $softTabSize > 0, default 1)."
-#define CFLit_basename		"Return filename component of given pathname (without extension if n <= 0)."
+#define CFLit_basename		"Return basename component of given pathname (without extension if n <= 0)."
 #define CFLit_beep		"Sound beeper n times (default 1)."
-#define CFLit_beginBuf		"Move point to beginning of current buffer (or named buffer if n argument)."
+#define CFLit_beginBuf		"Move point to beginning of current buffer (or named buffer if interactive and n argument, or\
+ argument given in script mode)."
 #define CFLit_beginLine		"Move point to beginning of [-]nth line (default 1).\n\nReturns: false if hit a buffer\
  boundary, otherwise true."
 #define CFLit_beginMacro	"Begin recording a macro.  [Interactive only]"
-#define CFLit_beginText		"Move point to beginning of text on [-]nth line (default 1).\n\nReturns: false if hit a buffer\
- boundary, otherwise true."
-#define CFLit_beginWhite	"Move point to beginning of white space at or immediately before point."
-#define CFLit_bemptyQ		"Return true if current buffer is empty (or named buffer if n argument), otherwise false."
+#define CFLit_beginText		"Move point to beginning of text on [-]nth line (default 1).\n\nReturns: true if point does not\
+ hit a buffer boundary and was moved to a non-whitespace character on target line, otherwise false."
+#define CFLit_beginWhite	"Move point to beginning of white space at or immediately preceding point.\n\n\
+Returns: true if point was moved, otherwise false."
+#define CFLit_bemptyQ		"Return true if current buffer is empty (or named buffer if interactive and n argument, or\
+ argument given in script mode), otherwise false."
 #define CFLit_bgets		"Return nth next line (default 1) without trailing newline from named buffer beginning at\
  point, and move point to beginning of next line.  If no lines left, nil is returned."
-#define CFLit_binding		"Return key binding information for given op and argument.  Operation keywords are:\n\tName\t\t\
-Return name of command bound to given key-lit binding, or nil if none.\n\tValidate\tReturn key-lit in standardized form, or\
- nil if it is invalid.\n\tKeyList\t\tReturn array of key binding(s) bound to given command name.\nCase of keywords is ignored."
-#define CFLit_bindKey		"Bind named command to a key sequence (or single key if interactive and n <= 0)."
+#define CFLit_binding		"Return name of command bound to given key sequence, or nil if none."
+#define CFLit_bindingsof	"Return array of key binding(s) (as key literals) bound to named command."
+#define CFLit_bindKey		"Bind named command to given key sequence (or single key if interactive and n <= 0)."
 #define CFLit_textArgs		"  Argument(s) are converted to string and concatenated to form the text object."
 #define CFLit_bprint		"Insert argument(s) into named buffer at point n times (default 1) and return string result,\
  with ~binsert~B options." CFLit_textArgs
+#define CFLit_printfArgs	"  Array arguments are processed as if each element was specified as an argument."
 #define CFLit_bprintf		"Insert string built from specified format string and argument(s) into named buffer at point n\
- times (default 1) and return string result, with ~binsert~B options."
-#define CFLit_bufAttrQ		"Check if given attribute is set in current buffer (or named buffer if optional bufname\
- argument given) and return Boolean result.  Attributes are: \n\tActive\t\tFile was read.\n\tChanged\t\tBuffer is\
- changed.\n\tCommand\t\tUser command buffer.\n\tFunction\tUser function buffer.\n\tHidden\t\tBuffer is hidden from\
- view.\n\tNarrowed\tBuffer is in a narrowed state.\n\tReadOnly\tBuffer is read-only (may not be\
- modified).\n\tTermAttr\tTerminal attributes enabled in buffer."
+ times (default 1) and return string result, with ~binsert~B options." CFLit_printfArgs
+#define CFLit_btoa		"Convert given buffer to an array with each line of buffer (without its newline delimiter) as\
+ an element."
+#define CFLit_btos		"Join all lines in given buffer with a newline delimiter and return result as a string."
+#define CFLit_bufAttrQ		"Check if given attribute is set in current buffer (or named buffer if optional buffer\
+ argument given) and return Boolean result.  Attributes are:\n\
+\tActive\t\tFile was read.\n\
+\tChanged\t\tBuffer is changed.\n\
+\tCommand\t\tUser command buffer.\n\
+\tFunction\tUser function buffer.\n\
+\tHidden\t\tBuffer is hidden from view.\n\
+\tNarrowed\tBuffer is in a narrowed state.\n\
+\tReadOnly\tBuffer is read-only (may not be modified).\n\
+\tTermAttr\tTerminal attributes enabled in buffer."
 #define CFLit_bufBoundQ		"Return true if point at beginning (n < 0), middle (n == 0), end (n > 0), or either end\
  (default) of current buffer, otherwise false."
-#define CFLit_bufInfo		"Return information for named buffer or multiple buffers, subject to comma-separated option(s)\
- specified in optional string argument opts.  If opts not specified, an array is returned for named buffer, containing the\
- following elements:\n\t[0]\tbufname\t\t\t\tBuffer name.\n\t[1]\tfilename\t\t\tFilename associated with buffer, or nil if none.\
-\n\t[2]\thome-dir\t\t\tHome directory associated with buffer, or nil if none.\n\t[3]\tbytes\t\t\t\tTotal number of bytes in\
- buffer.\n\t[4]\tlines\t\t\t\tTotal number of lines in buffer.\nAlternatively, if opts is specified and contains keyword\
- \"Extended\", the following additional elements are returned: \n\t[5]\t[buf-attr, ...]\t\tList of enabled attributes (as\
- described for the ~bbufAttr?~B function).\n\t[6]\t[buf-mode, ...]\t\tList of enabled buffer modes.\nIf bufname is nil,\
- multiple arrays are returned instead (or buffer names only, if \"Brief\" option is specified), nested within a single array. \
- One array or buffer name is returned for each buffer, which are selected by specifying one or more of the following attribute\
- keywords in opts:\n\tVisible\t\t\tSelect visible buffers.\n\tHidden\t\t\tSelect hidden buffers.\n\tCommand\t\t\tSelect user\
- command buffers.\n\tFunction\t\tSelect user function buffers.\nCase of option and attribute keywords is ignored."
+#define CFLit_bufInfo		"Return hash of information for named buffer, containing the following keys and values:\n\
+\tFilename\tFilename associated with buffer, or nil if none.\n\
+\tHomeDir\t\tHome directory associated with buffer, or nil if none.\n\
+\tSize\t\tSize of buffer in bytes.\n\
+\tLines\t\tTotal number of lines in buffer.\n\
+In addition, if n argument, the following additional keys and values are returned:\n\
+\tAttributes\tList of enabled attributes in form [buf-attr, ...] (as described for the ~bbufAttr?~B function).\n\
+\tModes\t\tList of active buffer modes in form [buf-mode, ...]."
+#define CFLit_bufMatchGrp	"Return text matching captured group N from last buffer search (or array of all captured groups\
+ if N not given).  N must be >= 0; group 0 is entire match.  If N is out of bounds or text not available, nil is returned."
 #define CFLit_bufWind		"Return ordinal number of first window on current screen (other than current window if n\
  argument) displaying named buffer, or nil if none."
+#define CFLit_chdir		"Change working directory.\n\nReturns: absolute pathname of new directory."
 #define CFLit_chgBufAttr	"Toggle, set, or clear all of the comma-separated attribute(s) specified in string argument\
- attrs in named buffer per n argument:\n\tn < 0\t\tClear attribute(s).\n\tn == 0\t\tToggle attribute(s) (default).\n\tn ==\
- 1\t\tSet attribute(s).\n\tn > 1\t\tClear all, then set attribute(s).\nAttributes are:\n\tChanged\t\tBuffer is\
- changed.\n\tHidden\t\tBuffer is hidden from view.\n\tReadOnly\tBuffer is read-only (may not be\
- modified).\n\tTermAttr\tTerminal attributes enabled in buffer.\nCase of attribute keywords is ignored.  If n > 1, attrs may\
- be nil, otherwise at least one attribute must be specified.  If interactive and default n, one attribute is toggled in current\
- buffer.\n\nReturns: former state (-1 or 1) of last attribute changed or zero if n > 1 and no attributes were specified.  (If\
- n is -1 or 1 and one attribute is specified, return value may be used to restore former state of the attribute by using it as\
- the n argument of a subsequent ~bchgBufAttr~B command.)"
-#define CFLit_chgDir		"Change working directory.\n\nReturns: absolute pathname of new directory."
-#define CFLit_chgMode		"Toggle, enable, or disable buffer or global mode(s) per n argument:\n\tn < 0\t\t\
-Disable mode(s).\n\tn == 0\t\tToggle mode(s) (default).\n\tn == 1\t\tEnable mode(s).\n\tn > 1\t\tDisable all of type being\
- processed, then enable zero or more mode(s) of same type.\nIf bufname is nil, global mode(s) are processed, otherwise buffer\
- mode(s).  If n > 1, modes argument may be nil; otherwise, it must be either a string containing one or more comma-separated\
- mode names or an array of mode names.  Case of mode name(s) is ignored.  If interactive and default n, one buffer mode in\
- current buffer or one global mode is toggled.\n\nReturns: former state (-1 or 1) of last mode changed, or zero if n > 1 and no\
- modes were specified.  (If n is -1 or 1 and one mode is specified, return value may be used to restore former state of the\
- mode by using it as the n argument of a subsequent ~bchgMode~B command.)"
-#define CFLit_chr		"Return 8-bit (integer) character N in string form."
-#define CFLit_clearBuf		"Clear current buffer (or named buffer if n argument, ignoring changes if n < 0).\n\nReturns:\
+ attrs in named buffer per n argument:\n\
+\tn < 0\t\tClear attribute(s).\n\
+\tn == 0\t\tToggle attribute(s) (default).\n\
+\tn == 1\t\tSet attribute(s).\n\
+\tn > 1\t\tClear all, then set attribute(s).\nAttributes are:\n\
+\tChanged\t\tBuffer is changed.\n\
+\tHidden\t\tBuffer is hidden from view.\n\
+\tReadOnly\tBuffer is read-only (may not be modified).\n\
+\tTermAttr\tTerminal attributes enabled in buffer.\n\
+Case of attribute keywords is ignored.  If n < 0, attrs argument may be \"*\" to select (and clear) all attributes; otherwise,\
+ at least one attribute name must be specified.  If interactive and default n, one attribute is toggled in current buffer.\n\n\
+Returns: former state (-1 or 1) of last attribute changed, or zero if n < 0 and \"*\" was specified.  (If n is -1 or 1 and one\
+ attribute is specified, return value may be used to restore former state of the attribute by using it as the n argument of a\
+ subsequent ~bchgBufAttr~B command.)"
+#define CFLit_chgBufHome	"Set home screen of current buffer (or named buffer if interactive and n argument, or argument\
+ given in script mode) to screen N.  If N is zero, buffer's home screen is set to none."
+#define CFLit_chgMode		"Toggle, activate, or inactivate global or buffer mode(s) per n argument:\n\
+\tn < 0\t\tInactivate mode(s).\n\
+\tn == 0\t\tToggle mode(s) (default).\n\
+\tn == 1\t\tActivate mode(s).\n\
+\tn > 1\t\tInactivate all of type being processed, then activate one or more mode(s) of same type.\n\
+If buffer argument given, buffer mode(s) are processed, otherwise global mode(s).  If n < 0, modes argument may be \"*\"\
+ to select (and inactivate) all modes of type being processed; otherwise, it must be either a string containing one or more\
+ comma-separated mode names or an array of mode names.  Case of mode name(s) is ignored.\n\n\
+If interactive and default n, one buffer mode in current buffer or one global mode is toggled.\n\n\
+Returns: former state (-1 or 1) of last mode changed, or zero if n < 0 and \"*\" was specified.  (If n is -1 or 1 and one mode\
+ is specified, return value may be used to restore former state of the mode by using it as the n argument of a subsequent\
+ ~bchgMode~B command.)"
+#define CFLit_chomp		"Return copy of given string with last character removed if it matches character c."
+#define CFLit_chr		"Return 8-bit (integer) character N converted to a string."
+#define CFLit_clearBuf		"Clear current buffer (or named buffer if interactive and n argument, or argument given in\
+ script mode, ignoring changes if n < 0).\n\nReturns:\
  false if buffer not cleared, otherwise true."
-#define CFLit_clearHook		"Clear named hook(s) (or clear all hooks if n <= 0)."
+#define CFLit_clearHook		"Clear named hook(s) (or clear all hooks if n <= 0).  Returns: number of hooks cleared."
 #define CFLit_clearMsgLine	"Clear the message line."
 #define CFLit_copyFencedRegion	"Copy text from point to matching ( ), [ ], { }, or < > fence character to kill ring."
-#define CFLit_copyLine		"Copy [-]n lines to kill ring (default 1, region lines if n == 0)."
+#define CFLit_default1		" (default 1, region lines if n == 0)"
+#define CFLit_copyLine		"Copy [-]n lines to kill ring" CFLit_default1 "."
 #define CFLit_copyRegion	"Copy region text to kill ring."
 #define CFLit_copyToBreak	"Copy from point through [-]n lines (default 1) to kill ring, not including delimiter of last\
  line.  If n == 0, copy from point to beginning of current line.  If n == 1 and point is at end of line, copy delimiter only."
 #define CFLit_copyWord		"Copy [-]n words to kill ring (default 1, without trailing white space if n == 0).  Non-word\
  characters between point and first word are included."
-#if WordCount
-#define CFLit_countWords	"Scan region text and display counts of lines, words, and characters on message line. \
- [Interactive only]"
-#endif
-#define CFLit_cycleRing		"Cycle given ring [-]n times (default 1)."
-#define CFLit_definedQ		"Check if an object of a given type is defined and return\
- string or Boolean result if found, otherwise nil.  Type keywords are as follows:\
-\n\tName\t\tCheck if string object is an identifier name (such as a command or variable).\
-\n\tMark\t\tCheck if ASCII character object is a mark defined anywhere in current buffer.\
-\n\tActiveMark\tCheck if ASCII character object is a mark defined in visible portion of narrowed buffer.\
-\n\tMode\t\tCheck if string object is a defined mode name.\
-\n\tModeGroup\tCheck if string object is a defined mode group name.\
-\nCase of keywords is ignored.  If type is \"Name\", a string phrase describing the object is returned, as follows:\
-\n\talias\t\t\t\tAlias name.\
-\n\tbuffer\t\t\t\tBuffer name.\
-\n\tpseudo command\t\tSpecial \"command\" name, such as ~buniversalArg~B.\
-\n\tprefix key\t\t\tPrefix key command name, such as ~bmetaPrefix~B.\
-\n\tsystem command\t\tSystem command name.\
-\n\tsystem function\t\tSystem function name.\
-\n\tuser command\t\tUser command name.\
-\n\tuser function\t\tUser function name.\
-\n\tvariable\t\t\tVariable name.\
-\nIf type is \"Mode\", a string keyword is returned, as follows:\
-\n\tbuffer\t\t\t\tBuffer mode name.\
-\n\tglobal\t\t\t\tGlobal mode name.\
-\nIf type is \"Mark\", \"ActiveMark\", or \"ModeGroup\", a Boolean result is returned."
-#define CFLit_delAlias		"Delete named alias(es).\n\nReturns: zero if failure, otherwise number of aliases deleted."
+#define CFLit_ringNames		"Ring name must be \"Delete\", \"Kill\", \"Replace\", or \"Search\".  Case of name is ignored."
+#define CFLit_cycleRing		"Cycle given ring [-]n times (default 1).  " CFLit_ringNames
+#define CFLit_delAlias		"Delete named alias(es).  If interactive, one alias is deleted.  No error if script mode and an\
+ alias does not exist.\n\n\
+Returns: number of aliases deleted."
 #define CFLit_delBackChar	"Delete backward [-]n characters (default 1)."
 #define CFLit_delBackTab	"Delete backward [-]n hard tabs (or soft tabs if $softTabSize > 0, default 1)."
 #define CFLit_delBlankLines	"Delete all blank lines above and below point, or immediately below it (or above it if n < 0)\
@@ -862,74 +957,109 @@ Disable mode(s).\n\tn == 0\t\tToggle mode(s) (default).\n\tn == 1\t\tEnable mode
 \t\tConfirm\t\tAsk for confirmation on every buffer.\n\
 \t\tForce\t\tDelete all selected buffers, ignoring changes, with initial confirmation.\n\
 Case of option keywords is ignored.  \"Confirm\" and \"Force\" may not both be specified.  If neither is specified, buffers are\
- deleted with confirmation on changed ones only.  User command and function buffers are skipped unconditionally.\n\nReturns:\
- zero if failure, otherwise number of buffers deleted."
+ deleted with confirmation on changed ones only.  User command and function buffers are skipped unconditionally.  No error if\
+ script mode and a buffer does not exist.\n\n\
+Returns: number of buffers deleted."
+#define CFLit_delConstVar	"Delete named user constant(s) and/or variable(s).  If interactive, one constant or variable is\
+ deleted.  No error if script mode and a constant or variable does not exist.\n\n\
+Returns: number of constants and variables deleted."
 #define CFLit_delFencedRegion	"Delete text from point to matching ( ), [ ], { }, or < > fence character."
-#define CFLit_delFile		"Delete a file on disk.  If n argument, one or both of the following comma-separated options\
- may be specified in string argument opts; otherwise, the first argument must be omitted:\n\
+#define CFLit_delFile		"Delete a file on disk.  If interactive and n argument, or command executed in script mode, one\
+ or both of the following comma-separated options may be specified in optional string argument opts:\n\
 \tWithBuf\t\t\tDelete named buffer and its associated file.\n\
 \tIgnoreErr\t\tIgnore any file-deletion error.\n\
-Case of option keywords is ignored."
+Case of option keywords is ignored.\n\n\
+Returns: filename if deletion was successful, otherwise nil."
 #define CFLit_delForwChar	"Delete forward [-]n characters (default 1)."
 #define CFLit_delForwTab	"Delete forward [-]n hard tabs (or soft tabs if $softTabSize > 0, default 1)."
-#define CFLit_delLine		"Delete [-]n lines (default 1, region lines if n == 0)."
-#define CFLit_delMark		"Delete mark m (or all marks if n argument).  No error if script mode and mark does not exist."
+#define CFLit_delLine		"Delete [-]n lines" CFLit_default1 "."
+#define CFLit_delMacro		"Delete given macro(s) and associated shortcut(s), or delete one macro if interactive and\
+ default n or n > 0, or delete all macros and shortcuts if n <= 0 (with confirmation if interactive).  No error if script mode\
+ and a macro does not exist.\n\n\
+Returns: number of macros deleted."
+#define CFLit_delMark		"Delete given mark(s), or delete one mark if interactive and default n or n > 0, or delete all\
+ marks if n <= 0 (with confirmation if interactive).  No error if script mode and a mark does not exist.\n\n\
+Returns: number of marks deleted."
 #define CFLit_delRegion		"Delete region text."
-#define CFLit_delRingEntry	"Delete entri(es) from given ring.  If macro ring and default n, delete named macro from the\
- ring; if not macro ring or not default n, delete the most recent n entries (default 1) from given ring (or entry number n if\
- n < 0, all entries if n == 0).  If deletion(s) were from search or replace ring, the most recent remaining entry is\
- subsequently set as the current search or replacement pattern."
-#define CFLit_delRoutine	"Delete named user command(s) and/or function(s).\n\nReturns: zero if failure, otherwise number\
- of routines deleted."
+#define CFLit_delRingEntry	"Delete entri(es) from given ring per n argument, as follows:\n\
+\tDefault n\n\
+\t or n > 0\tDelete the most recent n entries (default 1) from given ring.\n\
+\tn < 0\t\tDelete entry number n.\n\
+\tn == 0\t\tDelete all entries.\n" CFLit_ringNames "\n\nIf deletion(s) were from search or replace ring, the most recent\
+ remaining entry is subsequently set as the current search or replacement pattern.\n\n\
+Returns: number of entries deleted, or zero if error."
+#define CFLit_delRoutine	"Delete named user command(s) and/or function(s).  If interactive, one command or function is\
+ deleted.  No error if script mode and a routine does not exist.\n\n\
+Returns: number of routines deleted."
 #define CFLit_delScreen		"Delete screen N (and switch to first screen if N is current screen).  If n < 0, also delete\
- all buffers not being displayed that are \"homed\" to screen being deleted."
+ all buffers not being displayed (including hidden ones) that are \"homed\" to screen being deleted."
+#define CFLit_delShortcut	"Delete given macro shortcut(s), or delete one shortcut if interactive and default n or n > 0,\
+ or delete all shortcuts if n <= 0 (with confirmation if interactive).  No error if script mode and a shortcut does not exist.\
+\n\nReturns: number of shortcuts deleted."
 #define CFLit_delToBreak	"Delete from point through [-]n lines (default 1), not including delimiter of last line.  If\
  n == 0, delete from point to beginning of current line.  If n == 1 and point is at end of line, delete delimiter only."
-#define CFLit_delWhite		"Delete white space (and non-word characters if n > 0) surrounding or immediately before point."
-#define CFLit_delWind		"Delete current window and join upward.  Alternatively if n argument, one or more of the\
- following comma-separated option(s) may be specified in string argument opts to control the deletion\
- process:\n\tJoinDown\t\tJoin downward instead of upward.\n\tForceJoin\t\tForce \"wrap around\" when\
- joining.\n\tDelBuf\t\t\tDelete buffer after join."
+#define CFLit_delWhite	"Delete white space (and non-word characters if n > 0) surrounding or immediately preceding point."
+#define CFLit_delWind		"Delete current window and join upward.  Alternatively if interactive and n argument, or\
+ command executed in script mode, one or more of the following comma-separated options may be specified in string argument\
+ opts to control the deletion process:\n\
+\tJoinDown\t\tJoin downward instead of upward.\n\
+\tForceJoin\t\tForce \"wrap around\" when joining.\n\
+\tDelBuf\t\t\tDelete buffer after join.\nCase of option keywords is ignored."
 #define CFLit_delWord		"Delete [-]n words (default 1, without trailing white space if n == 0).  Non-word characters\
  between point and first word are included."
-#define CFLit_detabLine		"Change hard tabs to spaces in [-]n lines (default 1, region lines if n == 0) given tab size,\
- and mark line block as new region.  If tab size is nil, $hardTabSize is used."
+#define CFLit_markBlock		" and mark line block as new region."
+#define CFLit_detabLine		"Change hard tabs to spaces in [-]n lines" CFLit_default1 " given tab size," CFLit_markBlock\
+ "  If tab size is zero, $hardTabSize is used."
 #define CFLit_dirname		"Return directory component of given pathname (\"\" if none, \".\" if none and n argument)."
-#define CFLit_dupLine		"Duplicate [-]n lines (default 1, region lines if n == 0) and move point to beginning of text\
- of duplicated block."
+#define CFLit_dupLine	"Duplicate [-]n lines" CFLit_default1 " and move point to beginning of text in duplicated block."
+#define CFLit_editMacro		"Edit a named macro on message line in string form.  If n argument or macro is active, new\
+ macro is activated after it is edited.  [Interactive only]"
 #define CFLit_editMode		"Create, delete, or edit a mode, given name and zero or more attributes to set or change.  If\
  mode does not exist, it is created if n > 0; otherwise, an error is returned.  If n <= 0, mode is deleted and no attribute\
  arguments are allowed; otherwise, zero or more may be specified.  Attribute arguments are strings of form \"keyword: value\",\
- as follows:\n\tGlobal: bool\t\tMake mode global scope if true, otherwise buffer scope.\n\tBuffer: bool\t\tMake mode buffer\
- scope if true, otherwise global scope.\n\tVisible: bool\t\tMake mode visible if true, otherwise hidden.\n\tHidden:\
- bool\t\tMake mode hidden if true, otherwise visible.\n\tDescription: text\tSet mode description to specified text.\n\tGroup:\
- name\t\t\tMake mode member of named group.\n\tGroup: nil\t\t\tRemove mode from all groups.\nExamples: \"Visible: false\" or\
- \"Group: ProgLang\".  Defaults for a new mode are \"Buffer: true\", \"Visible: true\".  Case of keywords and extraneous white\
- space are ignored."
-#define CFLit_editModeGroup	"Create, delete, or edit a mode group, given name and zero or more attributes to set or change.\
+ as follows:\n\
+\tGlobal: bool\t\tMake mode global scope if true, otherwise buffer scope.\n\
+\tBuffer: bool\t\tMake mode buffer scope if true, otherwise global scope.\n\
+\tVisible: bool\t\tMake mode visible if true, otherwise hidden.\n\
+\tHidden: bool\t\tMake mode hidden if true, otherwise visible.\n\
+\tDescription: text\tSet mode description to specified text.\n\
+\tGroup: name\t\t\tMake mode member of named group.\n\
+\tGroup: nil\t\t\tRemove mode from all groups.\n\
+Examples: \"Visible: false\" or \"Group: ProgLang\".  Defaults for a new mode are \"Buffer: true\", \"Visible: true\".  Case of\
+ keywords and extraneous white space are ignored."
+#define CFLit_editModeGrp	"Create, delete, or edit a mode group, given name and zero or more attributes to set or change.\
   If group does not exist, it is created if n > 0; otherwise, an error is returned.  If n <= 0, group is deleted and no\
  attribute arguments are allowed; otherwise, zero or more may be specified.  Attribute arguments are strings of form \"keyword:\
- value\", as follows:\n\tDescription: text\tSet mode group description to specified text.\n\tModes: list\t\t\tAdd specified\
- comma-separated list of mode names to mode group; for example, \"Modes: C, Ruby\".\n\tModes: nil\t\t\tRemove all modes from\
- group.\nCase of keywords and extraneous white space are ignored."
-#define CFLit_emptyQ		"Return true if expression evaluates to nil, an ASCII null character, a null string, or empty\
- array, otherwise false."
-#define CFLit_endBuf		"Move point to end of current buffer (or named buffer if n argument)."
+ value\", as follows:\n\
+\tDescription: text\tSet mode group description to specified text.\n\
+\tModes: list\t\t\tAdd specified comma-separated list of mode names to mode group; for example, \"Modes: C, Ruby\".\n\
+\tModes: nil\t\t\tRemove all modes from group.\n\
+Case of keywords and extraneous white space are ignored."
+#define CFLit_emptyQ		"Return true if expression evaluates to nil, an ASCII null character, a null string, empty\
+ array, or empty hash, otherwise false."
+#define CFLit_endBuf		"Move point to end of current buffer (or named buffer if interactive and n argument, or\
+ argument given in script mode)."
 #define CFLit_endLine		"Move point to end of [-]nth line (default 1).\n\nReturns: false if hit a buffer boundary,\
  otherwise true."
-#define CFLit_endMacro		"End recording a macro.  [Interactive only]"
-#define CFLit_endWhite		"Move point to end of white space at point."
-#define CFLit_endWord		"Move point to end of [-]nth word (default 1).\n\nReturns: false if hit a buffer boundary,\
- otherwise true."
-#define CFLit_entabLine		"Change spaces to hard tabs in [-]n lines (default 1, region lines if n == 0) given tab size,\
- and mark line block as new region.  If tab size is nil, $hardTabSize is used."
+#define CFLit_endMacro		"End recording a macro.  User is prompted to name macro, after which, it is activated and saved\
+ in macro table.  [Interactive only]"
+#define CFLit_endWhite		"Move point to end of white space at point.\n\n\
+Returns: true if point was moved, otherwise false."
+#define CFLit_endWord		"Move point forward to end of abs(nth) word (default 1).  If n < 0, restrict movement to\
+ current line.\n\n\
+Returns: false if hit a buffer boundary or end of line and n < 0, otherwise true."
+#define CFLit_entabLine		"Change spaces to hard tabs in [-]n lines" CFLit_default1 " given tab size," CFLit_markBlock\
+ "  If tab size is zero, $hardTabSize is used."
 #define CFLit_env	"Return value of given environmental variable.  If variable does not exist, a null string is returned."
 #define CFLit_eval		"Concatenate argument(s) (or prompt for string if interactive) and execute result as an\
  expression.\n\nReturns: result of evaluation."
-#define CFLit_exit		"Exit editor with optional message (and ignore changes if n != 0, force return code 1 if\
- n < 0).  Argument(s) are converted to string and concatenated to form the message."
+#define CFLit_exit		"Exit editor (with return code 0) and with optional message in script mode written to standard\
+ error.  Argument(s) are converted to string and concatenated to form the message.\n\n\
+If any buffer has unsaved changes, get confirmation first (or ignore changes if n argument, exit with return code 1 if n < 0 or\
+ ignoring changes in script mode)."
 #define CFLit_expandPath	"Return given pathname with \"~~/\", \"~~user/\", \"$var\", and \"${var}\" expanded in same\
  manner as a shell command line argument."
+#define CFLit_extension		"Return extension component of given pathname."
 #define CFLit_findFile		"Find named file and read (if n != 0) into a buffer with ~bselectBuf~B options (without\
  auto-completion if interactive and n == 0 or n == 1).  If a buffer already exists with the same filename, its buffer is\
  selected; otherwise, a buffer is created.\n\nReturns: ~bselectBuf~B values."
@@ -941,45 +1071,91 @@ Case of option keywords is ignored."
 #define CFLit_forwPageNext	"Scroll next window forward n pages (or half a page if n < 0, default 1)."
 #define CFLit_forwPagePrev	"Scroll previous window forward n pages (or half a page if n < 0, default 1)."
 #define CFLit_forwTab		"Move point forward [-]n tab stops (default 1)."
-#define CFLit_forwWord		"Move point forward [-]n words (default 1).\n\nReturns: false if hit a buffer boundary,\
- otherwise true."
-#define CFLit_getInfo		"Return informational item for given type keyword:\n\
-\tColors\t\tList of display item colors in form [[item-kw, [fg-color, bg-color]], ...] where color pair array is nil if color\
- not set for item (or number of colors and color pairs available in form [colors, pairs] if n argument).\n\
-\tDefaults\tList of default screen parameters in form [[param-name, value], ...] where value is -1 if no value set.\n\
+#define CFLit_forwWord		"Move point forward abs(n) words (default 1).  If n < 0, restrict movement to current line.\n\n\
+Returns: false if hit a buffer boundary or end of line and n < 0, otherwise true."
+#define CFLit_getInfo		"Return information for given type keyword:\n\
+\tBindings\tHash of all key bindings with key literal as hash key and name of command as value (or all possible key bindings\
+ if n argument, with a nil value if key not bound).\n\
+\tBuffers\t\tArray of visible buffer names (plus hidden ones if n argument).\n\
+\tColors\t\tHash of color parameters with the following keys and two-element array values (or nil if no colors set):\n\
+\t\t\t\t\tColorRange\tMinimum and maximum color numbers supported by terminal.\n\
+\t\t\t\t\tPairRange\tMinimum and maximum color pair numbers available for use.\n\
+\t\t\t\t\tShow\t\tForeground and background colors of title lines in \"show\" displays.\n\
+\t\t\t\t\tModeLine\tForeground and background colors of mode line.\n\
+\t\t\t\t\tRecord\t\tForeground and background colors of macro recording indicator on mode line.\n\
+\tDate\t\tCurrent date and time.\n\
+\tDefaults\tHash of default screen parameters with keys \"HardTabSize\", \"SoftTabSize\", and \"WrapCol\", and their integer\
+ values, where value is -1 if no value set.\n\
 \tEditor\t\tEditor name.\n\
-\tHooks\t\tHook list in form [[hook-name, func-name], ...] where func-name is nil if hook not set.\n\
+\tHooks\t\tHash of all hooks with hook name as key and name of function assigned to hook as value (or nil if hook not set).\n\
 \tLanguage\tLanguage of text messages.\n\
-\tModes\t\tMode list in form [[mode-name, group-name, user?, global?, hidden?, scope-locked?, active?], ...] where group-name\
- is nil if mode is not in a group, and last five elements are Boolean values.\n\
+\tMacroCount\tCount of macros in macro table.\n\
+\tModes\t\tHash of all modes with mode name as key and a hash as value with keys \"GroupName\", \"User?\", \"Global?\",\
+ \"Hidden?\", \"ScopeLocked?\", and \"Active?\", where group name is nil if mode is not in a group, and all other keys have\
+ Boolean values.\n\
 \tOS\t\t\tOperating system name.\n\
-\tScreens\t\tScreen list in form [[screen-num, wind-count, work-dir], ...].\n\
-\tVersion\t\tEditor version.\n\
-\tWindows\t\tList of windows in current screen in form [[wind-num, bufname], ...] (or all screens in form [[screen-num,\
- wind-num, bufname], ...] if n argument).\n\
+\tRingNames\tArray of ring names.\n\
+\tScreens\t\tArray of screen parameters in form [[screen-num, wind-count, work-dir], ...].\n\
+\tVersion\t\tShort editor version string (or long version string if n argument).\n\
+\tWindows\t\tArray of windows and buffers on all screens in form [[screen-num, wind-num, bufname], ...].\n\
 Case of keywords is ignored."
 #define CFLit_getKey		"Get one keystroke interactively and return it as a key literal.  Alternatively, one or more of\
- the following comma-separated option(s) may be specified in optional string argument opts to determine the type of input and\
- return value:\n\tChar\t\t\tReturn ASCII (integer) character instead of key literal.\n\tKeySeq\t\t\tGet a key sequence instead\
- of one keystroke.\n\tLitAbort\t\tProcess abort key literally.\nCase of option keywords is ignored.  If \"LitAbort\" not\
- specified, function is aborted if abort key is pressed."
+ the following comma-separated options may be specified in string argument opts to determine the type of input and return\
+ value:\n\
+\tChar\t\t\tReturn ASCII (integer) character instead of key literal.\n\
+\tKeySeq\t\t\tGet a key sequence instead of one keystroke.\n\
+\tLitAbort\t\tProcess abort key literally.\n\
+Case of option keywords is ignored.  If \"LitAbort\" not specified, function is aborted if abort key is pressed."
+#define CFLit_getMacro		"Get named macro, or active macro if name is nil, and return it as an array in form [name,\
+ value] (or nil if macro does not exist or no active macro).  Alternatively if name not given, return array of all macros in\
+ macro table."
 #define CFLit_getWord		"Get previous (n < 0), current (n == 0, default), or next (n > 0) word from current line and\
  return it.  If indicated word does not exist or n == 0 and point is not in a word, nil is returned.  Point is left at the\
  beginning of the word if n < 0 and at the end if n >= 0.  When going backward, point movement mimics the ~bbackWord~B command\
- and therefore, the \"previous\" word is the current word if point is in a word at the start and past its first character. \
- Additionally, lines are spanned during search if n < -1 or n > 1."
-#define CFLit_glob		"Return a (possibly empty) array of file(s) and/or director(ies) that match given shell glob\
- pattern."
-#define CFLit_gotoFence		"Move point to matching ( ), [ ], { }, or < > fence character from one at point (or one given\
- as an argument if n argument).\n\nReturns: true if matching fence found, otherwise false."
-#define CFLit_gotoLine	"Move point to beginning of line N (or to end of buffer if N == 0, in named buffer if n argument)."
+ and therefore, the \"previous\" word is the current word if point is in a word, but past its first character.  Additionally,\
+ lines are spanned during search if n < -1 or n > 1."
+#define CFLit_glob		"Return a (possibly empty) array of unique file(s) and/or director(ies) that match given shell\
+ glob pattern(s).  A pattern may contain a leading tilde (~~) for home directory and/or braces.  Directories in result have a\
+ slash (/) appended to name."
+#define CFLit_gotoFence		"Move point to matching ( ), [ ], { }, or < > fence character from one at point (or one entered\
+ interactively if n argument, or given as an argument in script mode).\n\n\
+Returns: true if matching fence found, otherwise false."
+#define CFLit_gotoLine		"Move point to beginning of line N, or to beginning of -Nth line from end of buffer if N < 0,\
+ or to end of buffer if N == 0 (and in named buffer if interactive and n argument, or argument given in script mode)."
 #define CFLit_gotoMark		"Move point to mark m and restore its window framing if mark is outside of current window (or\
  force reframing if n >= 0).  If n <= 0, also delete mark after point is moved."
-#define CFLit_groupModeQ	"Check if any mode in given group is enabled and return name of first one found if so,\
- otherwise nil.  If group contains buffer modes, they are checked in current buffer (or named buffer if optional bufname\
+#define CFLit_grpModeActiveQ	"Check if any mode in given group is active and return name of first one found if so,\
+ otherwise nil.  If group contains buffer modes, they are checked in current buffer (or named buffer if optional buffer\
  argument given).  If group does not exist, nil is returned unless n > 0, in which case it is an error.  Case of group name is\
  ignored."
 #define CFLit_growWind		"Increase size of current window by abs(n) lines (default 1 at bottom, at top if n < 0)."
+#define CFLit_hash		"Create hash with exact keys and return it, given optional initial size (default zero) and\
+ options.  Alternatively, the following option may be specified in string argument opts:\n\
+\tIgnoreCase\t\tCreate hash that ignores case of keys.\n\
+Case of option keyword is ignored."
+#define CFLit_hasKeyQ		"Return true if key exists in given hash, otherwise false."
+#define CFLit_hclear		"Delete all nodes and their keys from given hash, set size of cleared hash to given size if\
+ specified (otherwise zero), and return hash."
+#define CFLit_hclone		"Return copy of given hash."
+#define CFLit_hcompact		"Delete nil nodes and their keys from given hash.\n\nReturns: number of nodes deleted."
+#define CFLit_hdelete		"Delete node from hash with given key, and return its value."
+#define CFLit_anyHashTypes	"Expression value and hash nodes may be any data types, including array and hash."
+#define CFLit_hdeleteif		"Delete all keys and nodes from given hash whose values match expression value."\
+ CFLit_ahOptions CFLit_anyHashTypes "\n\nReturns: number of nodes deleted."
+#define CFLit_hfindnode		"Return key of first node found in given hash that matches expression value, otherwise nil."\
+ CFLit_ahOptions CFLit_anyHashTypes
+#define CFLit_hkeys		"Return array of keys from given hash."
+#define CFLit_hincludeQ		"Return true if expression value matches any node in given hash, otherwise false."\
+ CFLit_ahOptions CFLit_anyHashTypes
+#define CFLit_hsort		"Convert given hash to an array of form [[key, value], ...] and return it, with nested array\
+ elements sorted in ascending order by hash key.  Alternatively, one or both of the following comma-separated options may be\
+ specified in string argument opts to control the sorting process:\n\
+\tDescending\t\tSort in descending order.\n\
+\tIgnoreCase\t\tIgnore case in key comparisons.\n\
+Case of option keywords is ignored.  Array may be used in a \"for\" loop to access hash keys and values in sorted order, or\
+ converted back to a hash with the ~batoh~B function."
+#define CFLit_htoa		"Convert given hash to an array of form [[key, value], ...] and return it.  Array may be\
+ converted back to a hash with the ~batoh~B function."
 #define CFLit_searchReturn	"\n\nReturns: string found, or false if not found."
 #define CFLit_restrictBack	"  If n == 0, restrict search to text between point and beginning of current\
  line.  If n < 0, restrict search to text between point and beginning of abs(nth) previous line."
@@ -989,16 +1165,20 @@ Case of keywords is ignored."
  CFLit_searchReturn
 #define CFLit_huntForw		"Repeat most recent search forward n times if n >= 0, otherwise once.  If n < 0,"\
  CFLit_restrictForw CFLit_searchReturn
-#define CFLit_indentRegion	"Indent lines in region by n tab stops (default 1) and mark line block as new region."
+#define CFLit_hvalues		"Return array of values from given hash."
+#define CFLit_indentLine	"Indent [-]n lines" CFLit_default1 " by given number of tab stops," CFLit_markBlock
+#define CFLit_indentRegion	"Indent lines in region by n tab stops (default 1)" CFLit_markBlock
 #define CFLit_index		"Return position of pattern pat in given string, or nil if not found.  Alternatively, one or\
- both of the following comma-separated option(s) may be specified in optional string argument opts to select the type of search\
- operation:\n\tChar\tReturn position of character c instead of pattern pat.\n\tLast\tFind last (rightmost) occurrence instead\
- of first.\nCase of option keywords is ignored.  Beginning of string is position 0."
+ both of the following comma-separated options may be specified in string argument opts to select the type of search\
+ operation:\n\
+\tChar\tReturn position of character c instead of pattern pat.\n\
+\tLast\tFind last (rightmost) occurrence instead of first.\n\
+Case of option keywords is ignored.  Beginning of string is position 0."
 #define CFLit_insertText	" argument(s) into current buffer at point n times (default 1) and return string result\
  (or insert once without moving point if n == 0, with literal newline if n < 0)."
 #define CFLit_insert		"Insert" CFLit_insertText CFLit_textArgs
 #define CFLit_insertBuf		"Insert named buffer at point (without moving point if n == 0) and mark as region."
-#define CFLit_insertf		"Insert string built from specified format string and" CFLit_insertText
+#define CFLit_insertf		"Insert string built from specified format string and" CFLit_insertText CFLit_printfArgs
 #define CFLit_insertFile	"Insert named file at point (without moving point if n == 0) and mark as region."
 #define CFLit_inserti		"Format, insert at point, and add increment to i variable abs(n) times (default 1).  If n < 0,\
  point is moved back to original position after each iteration."
@@ -1007,6 +1187,7 @@ Case of keywords is ignored."
 #define CFLit_insertSpace	"Insert abs(n) spaces ahead of point (default 1, ignoring \"Over\" and \"Repl\" buffer modes if\
  n < 0)."
 #define CFLit_interactiveQ	"Return true if current script is being executed interactively, otherwise false."
+#define CFLit_isBufQ		"Check if given string argument is a buffer name and return Boolean result."
 #define CFLit_isClassQ		"Return true if character c or every character in string str is in the given ASCII character\
  class, otherwise false.  The class argument is any of the following keywords:\n\
 \talnum\t\tAlphabetic character or digit.\n\
@@ -1022,109 +1203,149 @@ Case of keywords is ignored."
 \tupper\t\tUpper case letter.\n\
 \tword\t\tLetter, digit, or underscore character: any of \"A-Za-z0-9_\".\n\
 \txdigit\t\tHexadecimal digit: any of \"0-9A-Fa-f\"."
-#define CFLit_join		"Join one or more values with given string delimiter and return string result (skipping nil\
- values if n <= 0).  All values are converted to string and each element of an array (processed recursively) is treated as a\
- separate value."
+#define CFLit_isConstVarQ	"Check if given string argument is the name of a constant or variable and return Boolean\
+ result."
+#define CFLit_isExecQ		"Check if given string argument is the name of an executable and return one- or two-keyword\
+ result if found, otherwise nil.  Keywords and their descriptions are as follows:\n\
+\talias\t\t\t\tAlias name.\n\
+\tpseudo command\t\tSpecial \"command\" name, such as ~buniversalArg~B.\n\
+\tsystem command\t\tSystem command name.\n\
+\tsystem function\t\tSystem function name.\n\
+\tuser command\t\tUser command name.\n\
+\tuser function\t\tUser function name."
+#define CFLit_isMacroQ		"Check if given string argument is the name of a macro and return Boolean result."
+#define CFLit_isMarkQ		"Check if given character argument m is an active mark in current buffer and return Boolean\
+ result."
+#define CFLit_isModeQ		"Check if given string argument is the name of a global or buffer mode and return keyword\
+ result if found, otherwise nil.  Keywords and their descriptions are as follows:\n\
+\tbuffer\t\t\tBuffer mode name.\n\
+\tglobal\t\t\tGlobal mode name."
+#define CFLit_isModeGrpQ	"Check if given string argument is the name of a mode group and return Boolean result."
+#define CFLit_isShortcutQ	"Check if given character argument s is a macro shortcut and return name of macro it is set to\
+ if found, otherwise nil."
+#define CFLit_join		"Join one or more values with given string delimiter (or nil) and return string result\
+ (skipping nil values if n <= 0).  All values are converted to string and each element of an array (processed recursively) is\
+ treated as a separate value."
 #define CFLit_joinLines	"Join [-]n lines (default -1, region lines if n == 0) into a single line, replacing intervening white\
  space with zero spaces (\"chars\" is nil), one space (\"chars\" is a null string), or one or two spaces (\"chars\" is a list\
  of one or more \"end of sentence\" characters).  In the last case, two spaces are inserted between lines if the first line\
  ends with any of the given characters and the second line is not blank, otherwise one.  When command is invoked interactively,\
  a null string is used for the \"chars\" argument."
-#define CFLit_joinWind		"Join current window with upper window.  Alternatively if n argument, one or more of the\
- following comma-separated option(s) may be specified in string argument opts to control the join process:\n\tJoinDown\t\tJoin\
- with lower window (downward) instead of upper one.\n\tForceJoin\t\tForce \"wrap around\" when joining.\n\tDelBuf\t\t\tDelete\
- buffer in other window after join."
+#define CFLit_joinWind		"Join current window with upper window.  Alternatively if interactive and n argument, or\
+ command executed in script mode, one or more of the following comma-separated options may be specified in string argument\
+ opts to control the join process:\n\
+\tJoinDown\t\tJoin with lower window (downward) instead of upper one.\n\
+\tForceJoin\t\tForce \"wrap around\" when joining.\n\
+\tDelBuf\t\t\tDelete buffer in other window after join.\n\
+Case of option keywords is ignored."
 #define CFLit_keyPendingQ	"Return true if type-ahead key(s) pending, otherwise false."
 #define CFLit_kill		"Return text from kill number N (where N <= 0)."
 #define CFLit_killFencedRegion	"Delete and save text from point to matching ( ), [ ], { }, or < > fence character to kill\
  ring."
-#define CFLit_killLine		"Delete and save [-]n lines to kill ring (default 1, region lines if n == 0)."
+#define CFLit_killLine		"Delete and save [-]n lines to kill ring" CFLit_default1 "."
 #define CFLit_killRegion	"Delete and save region text to kill ring."
 #define CFLit_killToBreak	"Delete and save text from point through [-]n lines (default 1) to kill ring, not including\
  delimiter of last line.  If n == 0, delete and save text from point to beginning of current line.  If n == 1 and point is at\
  end of line, delete and save delimiter only."
 #define CFLit_killWord		"Delete and save [-]n words to kill ring (default 1, without trailing white space if n == 0). \
  Non-word characters between point and first word are included."
-#define CFLit_lastBuf		"Switch to last buffer exited from in current screen (and delete current buffer if n < 0). \
- Returns: ~bselectBuf~B value for n == 1."
-#define CFLit_length		"Return length of string or size of an array."
+#define CFLit_lastBuf		"Switch to last buffer exited from in current screen (and delete current buffer if n < 0).\n\n\
+Returns: ~bselectBuf~B value for n == 1."
+#define CFLit_lastScreen	"Switch to last screen exited from.  If n < 0, also delete current screen and\
+ all buffers not being displayed (including hidden ones) that are \"homed\" to it.\n\n\
+Returns: new screen number."
+#define CFLit_length		"Return length of string, number of elements in array, or number of nodes in hash."
 #define CFLit_let		"Assign a value (or an expression if n argument) to a system or global variable.  [Interactive\
  only]"
-#define CFLit_linkFile		"Create file2 as a link to file1.  If n argument, one or both of the following comma-separated options\
- may be specified in string argument opts; otherwise, the first argument must be omitted:\n\
+#define CFLit_linkFile		"Create file2 as a link to file1.  If interactive and n argument, or command executed in\
+ script mode, one or both of the following comma-separated options may be specified in optional string argument opts to control\
+ the link operation:\n\
 \tSymLink\t\tCreate symbolic link instead of hard link.\n\
 \tForce\t\tReplace file2 if it already exists.\n\
 Case of option keywords is ignored."
-#define CFLit_lowerCaseLine	"Change [-]n lines to lower case (default 1, region lines if n == 0) and mark line block as\
- new region."
+#define CFLit_loadMacro		"Load a macro into macro table without activating it, given name and encoded value.  Macro must\
+ not already exist by name or value.  Alternatively, one or both of the following comma-separated options may be specified in\
+ string argument opts to control the loading process:\n\
+\tActivate\tActivate macro after loading it.\n\
+\tForce\t\tForce overwrite of an existing macro with same name, and replace any existing macro with same value.\n\
+Case of option keywords is ignored."
+#define CFLit_lowerCaseLine	"Change [-]n lines to lower case" CFLit_default1 CFLit_markBlock
 #define CFLit_lowerCaseRegion	"Change all letters in region to lower case."
 #define CFLit_lowerCaseStr	"Return string converted to lower case."
 #define CFLit_lowerCaseWord	"Change n words to lower case (default 1)."
-#define CFLit_manageMacro	"Perform macro operation per op keyword and return result.  Operation keywords are:\n\tSelect\t\
-Search for named macro (specified in arg) and, if found, move it to top of macro ring, activate it, and return true;\
- otherwise, return false.\n\tSet\t\tSet given macro (specified in arg as an encoded string, or as [name, value]) and return\
- nil (or return error message if macro is a duplicate by name or value, force overwrite if n > 0).\n\tGet\t\tGet current\
- macro, with one or more comma-separated option(s) specified in string argument opts if n argument, and return it in encoded\
- string form, or nil if macro ring is empty.\n\"Get\" options are:\n\tSplit\tReturn current macro in form [name, value].\n\t\
-All\t\tReturn all macros on macro ring in form [[name, value], ...]."
-#define CFLit_markBuf	"Save point position in mark " WorkMarkStr " (or mark m if n argument) and mark whole buffer as region."
-#define CFLit_match		"Return text matching captured group N from last =~~ expression or index() call using a regular\
- expression as the pattern (or from last buffer search if n argument).  N must be >= 0; group 0 is entire match.  If N is out\
- of bounds, nil is returned."
+#define CFLit_markBuf		"Save point position in mark " WorkMarkStr " (or mark entered interactively if n argument, or\
+ mark m given in script mode) and mark whole buffer as region."
 #define CFLit_message		"Set a return message and return true (default) or false.  The \"RtnMsg\" global mode is\
- ignored.  If n argument, one or more comma-separated options may be specified in string argument opts; otherwise, the first\
- argument must be omitted.  Argument(s) following optional first argument are converted to string and concatenated to form the\
- message.  By default, a message is set only if one has not already been set, and is wrapped in brackets (thus informational). \
- Options are:\n\tFail\t\tDo not wrap message in brackets and return false instead of true.\n\tForce\t\tAny existing message\
- is replaced unconditionally (forced).\n\tHigh\t\tMessage is considered high priority and will replace any existing message\
- that is not high priority and was not forced.\n\tNoWrap\t\tDo not wrap message in brackets.\n\tTermAttr\tEnable\
- terminal attributes in message.\nCase of option keywords is ignored.  If \"Force\" is specified and message is nil or a null\
- string, any existing message is cleared."
+ ignored.  If n argument, one or more comma-separated options may be specified in optional string argument opts; otherwise, the\
+ first argument must be omitted.  Argument(s) following optional first argument are converted to string and concatenated to\
+ form the message.  By default, a message is set only if one has not already been set, and is wrapped in brackets (thus\
+ informational).  Options are:\n\
+\tFail\t\tDo not wrap message in brackets and return false instead of true.\n\
+\tForce\t\tAny existing message is replaced unconditionally (forced).\n\
+\tHigh\t\tMessage is considered high priority and will replace any existing message that is not high priority and was not\
+ forced.\n\
+\tNoWrap\t\tDo not wrap message in brackets.\n\
+\tTermAttr\tEnable terminal attributes in message.\n\
+Case of option keywords is ignored.  If \"Force\" is specified and message is nil or a null string, any existing message is\
+ cleared."
 #define CFLit_metaPrefix	"Begin meta key sequence."
-#define CFLit_modeQ		"Check if given buffer or global mode is enabled and return Boolean result.  If mode is a\
- buffer mode, it is checked in current buffer (or named buffer if optional bufname argument given).  If mode does not exist,\
- false is returned unless n > 0, in which case it is an error.  Case of mode name is ignored."
+#define CFLit_mkdir		"Create a directory.  Permissions mode may be specified if interactive and n argument, or as a\
+ second argument in script mode (usually as an octal number); otherwise, a default value is used.\n\n\
+Returns: absolute pathname of directory that was created."
+#define CFLit_modeActiveQ	"Check if given buffer or global mode is active and return Boolean result.  If mode is a\
+ buffer mode, it is checked in current buffer (or named buffer if optional buffer argument given).  If mode does not exist,\
+ nil is returned unless n > 0, in which case it is an error.  Case of mode name is ignored."
 #define CFLit_moveWindDown	"Move window frame [-]n lines down (default 1)."
 #define CFLit_moveWindUp	"Move window frame [-]n lines up (default 1)."
-#define CFLit_narrowBuf	"Keep [-]n lines (default 1, region lines if n == 0) in current buffer and hide and preserve remainder."
+#define CFLit_narrowBuf		"Keep [-]n lines" CFLit_default1 " in current buffer and hide and preserve remainder."
 #define CFLit_negativeArg	"Begin or continue entry of universal negative-trending n argument (in sequence -1, -2, ...)."
-#define CFLit_newline		"Insert n lines (default 1, with auto-formatting if \"Wrap\" buffer mode enabled) or insert\
+#define CFLit_newline		"Insert n lines (default 1, with auto-formatting if \"Wrap\" buffer mode active) or insert\
  abs(n) lines without formatting if n < 0."
-#define CFLit_newlineI		"Insert n lines with same indentation as previous line (default 1)."
-#define CFLit_pnBuf1		" visible buffer (or switch to "
-#define CFLit_pnBuf2		" buffer having same home directory as current screen if n >= 0).  If n <= 0, also delete\
+#define CFLit_newlineI		"Insert n lines (default 1) with same indentation as previous line."
+#define CFLit_pnBuf1		" buffer having same home directory as current screen (or switch to "
+#define CFLit_pnBuf2		" visible buffer if n >= 0).  If n <= 0, also delete\
  buffer that was exited from.\n\nReturns: name of buffer switched to, or nil if no switch occurred."
 #define CFLit_nextBuf		"Switch to next" CFLit_pnBuf1 "next" CFLit_pnBuf2
 #define CFLit_nextScreen	"Switch to next screen n times (default 1)."
 #define CFLit_nextWind		"Switch to next window n times (default 1)."
 #define CFLit_nilQ		"Return true if expression value is nil, otherwise false."
 #define CFLit_nullQ		"Return true if string is null (empty), otherwise false."
-#define CFLit_numericQ	"Return true if string is a numeric literal which can be converted to an integer, otherwise false."
+#define CFLit_strtol	"  String and base may be any form or value recognized by the ~bstrtol()~B Standard C Library function."
+#define CFLit_numericQ		"Check if given string is a numeric literal which can be converted to an integer using\
+ optional base value (default 0) and return Boolean result." CFLit_strtol
 #define CFLit_onlyWind		"Make current window the only window on screen (delete all others)."
 #define CFLit_openLine		"Open abs(n) lines ahead of point (default 1).  If n < 0, also move point to first empty line\
  opened if possible."
 #define CFLit_openLineI	"Open a line before the [-]nth line (default 1) with same indentation as line preceding target line."
-#define CFLit_ord		"Return first character of given string as a character value (8-bit integer)."
-#define CFLit_outdentRegion	"Outdent lines in region by n tab stops (default 1) and mark line block as new region."
+#define CFLit_ord		"Return first 8-bit character of given string converted to an unsigned integer."
+#define CFLit_outdentLine	"Outdent [-]n lines" CFLit_default1 " by given number of tab stops," CFLit_markBlock
+#define CFLit_outdentRegion	"Outdent lines in region by n tab stops (default 1)" CFLit_markBlock
 #define CFLit_over		"Overwrite text in current buffer beginning at point n times (default 1) with argument(s) and\
  return string result, with ~binsert~B options." CFLit_textArgs "  Buffer text is overwritten by the text object in the same\
  manner as if it were entered interactively in "
 #define CFLit_overwriteChar	CFLit_over "\"Repl\" mode."
 #define CFLit_overwriteCol	CFLit_over "\"Over\" mode."
 #define CFLit_pathname		"Return absolute pathname of given file or directory, or an array of absolute pathnames if\
- argument is an array (of pathnames).  If n <= 0, symbolic links are not resolved."
+ argument is an array (of pathnames).  If n <= 0 and file or directory is a symbolic link, basename component is not resolved."
 #define CFLit_pause		"Pause execution for N seconds (or centiseconds if n argument)."
-#define CFLit_pipeBuf		"Feed current buffer through shell pipeline and read its output back into buffer, with\
- ~breadFile~B options.  Argument(s) are converted to string and concatenated to form the command.\n\nReturns: false if failure,\
- otherwise ~bselectBuf~B values."
-#define CFLit_popBuf		"Display named buffer in a pop-up window.  Additionally if n argument, one or more of the\
- following comma-separated option(s) may be specified in string argument opts to control the pop-up\
- operation:\n\tAltModeLine\t\tUse alternate mode line containing name of buffer being popped.\n\tDelete\t\t\tDelete buffer\
- after it is displayed.\n\tShift\t\t\tShift long lines left.\n\tTermAttr\t\tEnable terminal attributes.\nCase of option\
- keywords is ignored.\n\nReturns: name of buffer popped if not deleted afterward, otherwise nil."
-#define CFLit_popFile		"Display named file in a pop-up window with ~bpopBuf~B options if n argument, plus additional\
- option:\n\tExisting\t\tSelect existing buffer with same filename if possible.\nIf a buffer is created for the file, it is\
- deleted after the file is displayed.\n\nReturns: name of buffer popped if not deleted afterward, otherwise nil."
+#define CFLit_readFileOptions	", with ~breadFile~B options (but without read deferral if n == 0)."
+#define CFLit_pipeBuf		"Feed current buffer through shell pipeline and read its output back into buffer"\
+ CFLit_readFileOptions	"  Argument(s) are converted to string and concatenated to form the command.\n\n\
+Returns: false if failure, otherwise ~bselectBuf~B values."
+#define CFLit_popBuf		"Display named buffer in a pop-up window.  Additionally if interactive and n argument, or\
+ command executed in script mode, one or more of the following comma-separated options may be specified in optional string\
+ argument opts to control the pop-up operation:\n\
+\tAltModeLine\t\tUse alternate mode line containing name of buffer being popped.\n\
+\tDelete\t\t\tDelete buffer after it is displayed.\n\
+\tShift\t\t\tShift long lines left.\n\
+\tTermAttr\t\tEnable terminal attributes.\n\
+Case of option keywords is ignored.\n\n\
+Returns: name of buffer popped if not deleted afterward, otherwise nil."
+#define CFLit_popFile		"Display named file in a pop-up window with ~bpopBuf~B options if interactive and n argument,\
+ or opts argument given in script mode, plus additional option:\n\
+\tExisting\t\tSelect existing buffer with same filename if possible.\n\
+If a buffer is created for the file, it is deleted after the file is displayed.\n\n\
+Returns: name of buffer popped if not deleted afterward, otherwise nil."
 #define CFLit_prefix1		"Begin prefix 1 key sequence."
 #define CFLit_prefix2		"Begin prefix 2 key sequence."
 #define CFLit_prefix3		"Begin prefix 3 key sequence."
@@ -1134,80 +1355,122 @@ All\t\tReturn all macros on macro ring in form [[name, value], ...]."
 #define CFLit_print		"Write argument(s) to message line (with terminal attributes enabled if n argument). \
  Argument(s) are converted to string and concatenated to form the message."
 #define CFLit_printf		"Write string built from specified format string and argument(s) to message line (with terminal\
- attributes enabled if n argument)."
+ attributes enabled if n argument)." CFLit_printfArgs
 #define CFLit_prompt		"Get terminal input and return string, ASCII character, or nil result, given optional prompt\
  string, options' string, and default input value.  Nil may be specified for any argument and/or used as a placeholder so that\
  a subsequent argument may be specified.  By default, a string value is read from the message line and returned (without a\
- prompt if prmt not given or is nil); otherwise, prmt, def, and one or more comma-separated option(s) of form \"keyword\" or\
- \"keyword: value\" may be specified in opts to control the input process.  Options of the first form are:\n\tNoEcho\t\t\tDo\
- not echo key(s) that are typed.\n\tNoAuto\t\t\tSuppress auto-completion.\n\tTermAttr\t\tEnable terminal attributes in prompt\
- string.\nOptions of the second form are:\n\tDelim: lit\t\tSpecify an input delimiter lit (a key literal) to use instead of\
- the return key.\n\tType: t\t\t\tSpecify an input type t, which must be one of the following:\n\t\tBuffer\t\t\tBuffer name\
- completion.\n\t\tChar\t\t\tSingle character.\n\t\tDelRing\t\t\tDelete ring access.\n\t\tFile\t\t\tFilename\
- completion.\n\t\tKey\t\t\t\tOne key.\n\t\tKeySeq\t\t\tOne key sequence.\n\t\tKillRing\t\tKill ring\
- access.\n\t\tMacro\t\t\tMacro name completion and ring access.\n\t\tMode\t\t\tMode name completion.\n\t\tMutableVar\t\tMutable\
- variable name completion.\n\t\tReplaceRing\t\tReplace ring access.\n\t\tRingName\t\tRing name\
- completion.\n\t\tSearchRing\t\tSearch ring access.\n\t\tString\t\t\tString (default).\n\t\tVar\t\t\t\tVariable name completion\
- (mutable and immutable).\nIf \"Delim\" option is given, it must be the last option in opts, and all characters following it\
- are used as its value.\n\nIf a prompt string is not specified, input is read without a prompt; otherwise, the following steps\
- are taken to build the prompt string that is displayed:\n\t 1.\tIf the prompt string begins with a letter, a colon and a space\
- (\": \") are appended to the string; otherwise, it is used as is, however any leading ' or \" quote character is stripped off\
- first (which force the string to be used as is) and any trailing space characters are moved to the very end of the final\
- prompt string that is built.\n\t 2.\tIf a non-empty default input value is specified, it is displayed after the prompt string\
- between square brackets [ ] if the input type is \"Char\"; otherwise, it is stored in the input buffer as the initial\
- value.\nA key literal is returned for types \"Key\" and \"KeySeq\"; otherwise, if the input buffer is empty and the user\
- presses the delimiter key, the default value (if specified) is returned as an ASCII character if input type is \"Char\";\
+ prompt if prmt not given or is nil); otherwise, prmt, def, and one or more comma-separated options of form \"keyword\" or\
+ \"keyword: value\" may be specified in optional string argument opts to control the input process.  Options of the first form\
+ are:\n\
+\tNoEcho\t\t\tDo not echo key(s) that are typed.\n\
+\tNoAuto\t\t\tSuppress auto-completion.\n\
+\tTermAttr\t\tEnable terminal attributes in prompt string.\n\
+Options of the second form are:\n\
+\tDelim: lit\t\tSpecify an input delimiter lit (a key literal) to use instead of the return key.\n\
+\tType: t\t\t\tSpecify an input type t, which must be one of the following:\n\
+\t\tBuffer\t\t\tBuffer name completion.\n\
+\t\tChar\t\t\tSingle character.\n\
+\t\tConstVar\t\tConstant and variable name completion (all globals).\n\
+\t\tDelRing\t\t\tDelete ring access.\n\
+\t\tFile\t\t\tFilename completion.\n\
+\t\tKey\t\t\t\tOne key.\n\
+\t\tKeySeq\t\t\tOne key sequence.\n\
+\t\tKillRing\t\tKill ring access.\n\
+\t\tMacro\t\t\tMacro name completion.\n\
+\t\tMode\t\t\tMode name completion.\n\
+\t\tMutableVar\t\tMutable (global) variable name completion.\n\
+\t\tReplaceRing\t\tReplace ring access.\n\
+\t\tRingName\t\tRing name completion.\n\
+\t\tSearchRing\t\tSearch ring access.\n\
+\t\tString\t\t\tString (default).\n\
+Case of option keywords is ignored.  If \"Delim\" option is given, it must be the last option in opts, and all characters\
+ following it are used as its value.\n\n\
+If a prompt string is not specified, input is read without a prompt; otherwise, the following steps are taken to build the\
+ prompt string that is displayed:\n\
+\t 1.\tIf the prompt string begins with a letter, a colon and a space (\": \") are appended to the string; otherwise, it is\
+ used as is, however any leading ' or \" quote character is stripped off first (which force the string to be used as is) and\
+ any trailing space characters are moved to the very end of the final prompt string that is built.\n\
+\t 2.\tIf a non-empty default input value is specified, it is displayed after the prompt string between square brackets [ ] if\
+ the input type is \"Char\"; otherwise, it is stored in the input buffer as the initial value.\n\
+A key literal is returned for types \"Key\" and \"KeySeq\"; otherwise, if the input buffer is empty and the user presses the\
+ delimiter key, the default value (if specified) is returned as a string (or as an ASCII character if input type is \"Char\");\
  otherwise, nil is returned.  If the user presses ~uC-SPC~U at any time, a null string is returned instead (or null character\
  ~u?\\0~U if the input type is \"Char\"); otherwise, the string in the input buffer is returned when the delimiter key is\
  pressed."
-#define CFLit_replaceN		" beginning at point.  If default n, replace all occurrences; if n >= 0, replace n occurrences;\
- if n < 0, also replace all occurrences but"
-#define CFLit_searchPat		"\n\nThe search pattern is as described under ~bsearchForw~B."
-#define CFLit_replacePat	"\n\nThe replacement pattern is a string which may contain references of form '\\~un~U' (where\
- ~un~U is a group number) to substring(s) in the text that were matched by the search pattern.  \\0 is the text that matched\
- the entire search pattern and can be used for both regular expression and plain text search patterns.  \\1, \\2, ... are used\
- for regular expression patterns only, and refer to the text that matched the nth group.  References may occur multiple times\
- in the replacement pattern and in any order.\n\n"
-#define CFLit_queryReplace	"Replace zero or more occurrences of search pattern spat with replacement pattern rpat\
- interactively," CFLit_replaceN CFLit_restrictForw CFLit_searchPat CFLit_replacePat "Returns: false if search was stopped\
- prematurely by user, otherwise true."
-#define CFLit_quickExit		"Save any changed buffers and exit editor.  If any changed buffer is not saved successfully,\
- exit is cancelled."
+#define CFLit_pwd		"Display working directory on message line if interactive.\n\n\
+Returns: absolute pathname of current directory."
+#define CFLit_searchPat		"\n\nThe search pattern is as described for the ~bsearchForw~B command."
+#define CFLit_replaceZero	"Replace zero or more occurrences of search pattern spat with replacement pattern rpat"
+#define CFLit_queryReplace	CFLit_replaceZero " interactively, beginning at point.  If default n, replace all occurrences;\
+ if n > 0, replace n occurrences; if n < 0, also replace all occurrences but" CFLit_restrictForw "  If n == 0 and interactive,\
+ use most recent search and replacement patterns (resume search) and operate as if n were the default; otherwise, replace zero\
+ occurrences." CFLit_searchPat "\n\nThe replacement pattern is as described for the ~breplace~B command.\n\n\
+For each match found, user is asked if the matching text should be replaced and what the new text will be.  Possible single-key\
+ responses are:\n\
+\tSPC | y\t\tYes: do replacement and find next occurrence.\n\
+\tn\t\t\tNo: skip this match and find next occurrence.\n\
+\tY\t\t\tYes: do replacement and quit (and stay at current position).\n\
+\t!\t\t\tYes: do this replacement and all following ones to end of buffer without further prompting.\n\
+\tu\t\t\tUndo most recent replacement and re-prompt at that location.\n\
+\tU\t\t\tUndo all replacements made so far and re-prompt where first replacement was made (start over).\n\
+\tr\t\t\tRestart scan: go back to original starting position and resume search from there.\n\
+\tESC | q\t\tQuit: stop searching and stay at current position.\n\
+\t.\t\t\tQuit: stop searching and go back to original starting position.\n\
+\t?\t\t\tHelp: display all possible responses on message line in abbreviated form.\n\
+\nIf end of buffer is reached or n > 0 and n or more replacements have been made, user is prompted for final action to take,\
+ which is any of ESC, q, ., r, u, U, or ?.\n\
+\nReturns: false if search was stopped prematurely by user, otherwise true."
+#define CFLit_quickExit		"Save any changed buffers and exit editor (with return code 0).  If any changed buffer is not\
+ saved successfully, exit is cancelled."
 #define CFLit_quote		"Return expression value converted to a string form which can be converted back to the original\
- value via ~beval~B (and force through any array recursion if n > 0)."
+ value via ~beval~B (and force through any array or hash recursion if n > 0)."
 #define CFLit_quoteChar		"Get one keystroke and insert it into the current buffer in raw form abs(n) times (default 1,\
  ignoring \"Over\" and \"Repl\" buffer modes if n < 0).  If a function key is entered, it is inserted as a key literal."
 #define CFLit_rand		"Return pseudo-random integer in range 0 to N - 1.  If N <= 1, zero is returned."
-#define CFLit_readFile		"Read named file into current buffer (or new buffer if n argument) with ~bselectBuf~B options. \
- Returns: ~bselectBuf~B values."
-#define CFLit_readPipe		"Execute shell pipeline and read its output into current buffer, with ~breadFile~B options. \
- Argument(s) are converted to string and concatenated to form the command.\n\nReturns: false if failure, otherwise\
+#define CFLit_readFile		"Read named file into current buffer (or new buffer if n argument, with read deferred if\
+ n == 0) with ~bselectBuf~B options.\n\nReturns: ~bselectBuf~B values."
+#define CFLit_readPipe		"Execute shell pipeline and read its output into current buffer" CFLit_readFileOptions \
+" Argument(s) are converted to string and concatenated to form the command.\n\nReturns: false if failure, otherwise\
  ~bselectBuf~B values."
 #define CFLit_reframeWind	"Reframe current window with point at [-]nth (n != 0) or center (n == 0, default) window line."
-#define CFLit_renameBuf		"Rename buffer \"old\" to \"new\" (or if interactive and default n, rename current buffer). \
- Returns: new buffer name."
-#define CFLit_renameFile	"Rename a file on disk.  If n argument, one or both of the following comma-separated option(s)\
- may be specified in string argument opts; otherwise, the first argument must be omitted:\n\
+#define CFLit_renameBuf		"Rename buffer \"old\" to \"new\" (or if interactive and default n, rename current buffer).\n\
+\nReturns: new buffer name."
+#define CFLit_renameFile	"Rename a file on disk.  If interactive and n argument, or command executed in script\
+ mode, one or both of the following comma-separated options may be specified in optional string argument opts:\n\
 \tFromBuf\t\tUse file associated with named buffer given as first argument as the one to rename.\n\
 \tDiskOnly\tIf \"FromBuf\" option specified, do not set the buffer's file to the new filename.\n\
-Case of option keywords is ignored."
-#define CFLit_renameMacro	"Rename macro \"old\" to \"new\".  The new name must not already be in use.  If n argument,\
- macro is moved to top of ring and loaded after it is renamed.\n\nReturns: new macro name."
-#define CFLit_replace		"Replace zero or more occurrences of search pattern spat with replacement pattern rpat,"\
- CFLit_replaceN CFLit_restrictForw CFLit_searchPat CFLit_replacePat "Returns: false if n > 0 and fewer than n replacements were\
- made, otherwise true."
+Case of option keywords is ignored.\n\n\
+Returns: new filename if successful, otherwise nil."
+#define CFLit_renameMacro	"Rename macro \"old\" to \"new\".  The new name must not already be in use."
+#define CFLit_replace		CFLit_replaceZero ", beginning at point.  If default n, replace all occurrences; if n >= 0,\
+ replace n occurrences; if n < 0, also replace all occurrences but" CFLit_restrictForw CFLit_searchPat\
+"\n\nThe replacement pattern is a string which may contain zero or more literal characters, escaped digits of form '\\~un~U'\
+ (where ~un~U is a group number), or escape sequences of form '\\~ux~U' (where ~ux~U is any character other than a digit), all\
+ of which are expanded if needed and concatenated to form the replacement text.  Escaped digits are references to substring(s)\
+ in the text that were matched by the search pattern.  \\0 is the text that matched the entire search pattern and can be used\
+ for both regular expression and plain text search patterns.  \\1...\\9 are used for regular expression patterns only, and\
+ refer to the text that matched the nth captured group.  Escape sequences are used to specify certain special characters, as\
+ follows:\n\
+\t\\e\tEscape character.\t\t\\t\tTab character.\n\
+\t\\f\tForm feed.\t\t\t\t\\v\tVertical tab character.\n\
+\t\\n\tNewline.\t\t\t\t\\\\\tBackslash.\n\
+\t\\r\tCarriage return.\t\t\\~uX~U\tLiteral character ~uX~U if other character and not a digit.\n\
+Both escaped digits and escape sequences may occur multiple times in the replacement pattern and in any order.\n\n\
+Returns: number of replacements made."
 #define CFLit_resetTerm		"Update all screens and windows to match current terminal dimensions and redraw screen."
 #define CFLit_resizeWind	"Change size of current window to abs(n) lines (growing or shrinking at bottom if n > 0, at top\
  if n < 0, or make all windows the same size if n == 0)."
 #define CFLit_restoreBuf	"Switch to remembered buffer in current window and return its name."
 #define CFLit_restoreScreen	"Switch to remembered screen and return its number."
 #define CFLit_restoreWind	"Switch to remembered window on current screen and return its number."
-#define CFLit_revertYank	"Revert text insertion from prior ~byank~B, ~byankCycle~B, ~bundelete~B, or ~bundeleteCycle~B\
- command."
-#define CFLit_ringSize		"Get size information for given ring (or set maximum size to size if n argument).  If maximum\
- size of ring is zero, size is unlimited. \n\nReturns: two-element array containing the current number of entries in the ring\
- and the maximum size."
-#define CFLit_run		"Execute named command or alias interactively with numeric prefix n.\n\nReturns: execution\
+#define CFLit_revertYank	"Revert text insertion from prior ~byank~B, ~byankCycle~B, ~byankDel~B, ~bundelete~B, or\
+ ~bundeleteCycle~B command."
+#define CFLit_ringSize		"Get size information for given ring (or set maximum size to size entered interactively if n\
+ argument, or size given in script mode).  If maximum size of ring is zero, size is unlimited.  " CFLit_ringNames\
+ "\n\nReturns: two-element array containing the current number of entries in the ring and the maximum size."
+#define CFLit_rmdir		"Remove a directory (which must be empty).\n\nReturns: absolute pathname of directory that was\
+ removed."
+#define CFLit_run		"Execute named command or alias interactively with n argument.\n\nReturns: execution\
  result."
 #define CFLit_saveBuf		"Remember current buffer."
 #define CFLit_saveFile	"Save current buffer (if changed) to its associated file (or all changed buffers if n argument)."
@@ -1217,27 +1480,22 @@ Case of option keywords is ignored."
  ~bselectBuf~B values."
 #define CFLit_searchBack	"Search backward for nth occurrence of a pattern if n > 0, otherwise first."\
  CFLit_restrictBack CFLit_searchPat CFLit_searchReturn
-#define CFLit_searchForw0	"Search forward for nth occurrence of a pattern if n >= 0, otherwise first.  If n < 0,"\
+#if FuzzySearch
+#define CFLit_fuzzy1		"\tf\tFuzzy (approximate) matching.\n"
+#define CFLit_fuzzy2		"If f or m"
+#else
+#define CFLit_fuzzy1
+#define CFLit_fuzzy2		"If m"
+#endif
+#define CFLit_searchForw	"Search forward for nth occurrence of a pattern if n >= 0, otherwise first.  If n < 0,"\
  CFLit_restrictForw "  Pattern may contain a suffix of form ':~bopts~B' for specifying options, where opts is one or more of\
  the following letters:\n\
 \te\tExact matching.\n\
-\ti\tIgnore case.\n"
-#if FuzzySearch
-#define CFLit_fuzzy1		"\tf\tFuzzy (approximate) matching.\n"
-#else
-#define CFLit_fuzzy1
-#endif
-#define CFLit_searchForw1	"\tm\tMulti-line regular expression matching ('.' and '[^' match a newline).\n\
+\ti\tIgnore case.\n" CFLit_fuzzy1 "\tm\tMulti-line regular expression matching ('.' and '[^' match a newline).\n\
 \tp\tInterpret pat as plain text.\n\
-\tr\tInterpret pat as a regular expression; for example, '\\<\\w+\\>:re'.\n"
-#if FuzzySearch
-#define CFLit_fuzzy2	"If f or m"
-#else
-#define CFLit_fuzzy2	"If m"
-#endif
-#define CFLit_searchForw2	" is specified, r is assumed.  An invalid suffix is assumed to be part of the pattern.  Options\
- override the \"Exact\" and \"Regexp\" modes.  " CFLit_searchReturn
-#define CFLit_searchForw	CFLit_searchForw0 CFLit_fuzzy1 CFLit_searchForw1 CFLit_fuzzy2 CFLit_searchForw2
+\tr\tInterpret pat as a regular expression; for example, '\\<\\w+\\>:re'.\n" CFLit_fuzzy2 " is specified, r is assumed.  An\
+ invalid suffix is assumed to be part of the pattern.  Options override the \"Exact\" and \"Regexp\" modes.  "\
+ CFLit_searchReturn
 #define CFLit_selectBuf		"Select named buffer and render it according to n argument:\n\
 \tn < -2\t\tDisplay buffer in a different window and switch to that window.\n\
 \tn == -2\t\tDisplay buffer in a different window but stay in current window.\n\
@@ -1249,27 +1507,29 @@ Case of option keywords is ignored."
 If buffer does not exist and pop is requested, an error is returned; otherwise, buffer is created (with user confirmation, if\
  interactive).  If n <= -2 and only one window exists, a window is created; otherwise, window is switched to one already\
  displaying the buffer, or buffer is displayed in the window immediately above the current window if possible.  Note that if n\
- >= 2, a window is always created for the buffer, but if n <= -2, an existing window is selected for the buffer, if\
- possible.\n\nReturns:\n\
+ >= 2, a window is always created for the buffer, but if n <= -2, an existing window is selected for the buffer, if possible.\n\
+\nReturns:\n\
 \tn == -1\t\tName of buffer that was popped if not deleted afterward, otherwise nil.\n\
 \tn == 0\t\tTwo-element array containing buffer name and Boolean value indicating whether the buffer was created.\n\
 \tOther n\t\tFour-element array containing same first two elements as for n == 0 plus ordinal value of window displaying the\
  buffer and Boolean value indicating whether the window was created."
-#define CFLit_selectLine	"Select text or line(s) around point, mark selected text as region, move point to beginning\
+#define CFLit_selectMacro	"Select named macro and activate it."
+#define CFLit_selectScreen	"Switch to screen N (or create screen and switch to it if N == 0)."
+#define CFLit_selectText	"Select text or line(s) around point, mark selected text as region, move point to beginning\
  of region, and return number of lines selected.  Text is selected per n argument (default zero) and N value, as follows:\n\
-\tn <= 0\t\t(N is line selector) - Select [-]N lines (default 1, region lines if N == 0),\
- not including delimiter of last line if n < 0.\n\
+\tn <= 0\t\t(N is line selector) - Select [-]N lines (default 1, region lines if N == 0), not including delimiter of last line\
+ if n < 0.\n\
 \tn > 0\t\t(N is text selector) - Select text from point through [-]N lines (default 1), not including delimiter of last line. \
  Additionally, if N == 0, select text from point to beginning of current line;\
  if N == 1 and point is at end of line, select delimiter only."
-#define CFLit_selectScreen	"Switch to screen N (or create screen and switch to it if N == 0)."
 #define CFLit_selectWind	"Switch to window N (or nth from bottom if N < 0)."
 #define CFLit_setBufFile	"Associate a file with named buffer (or current buffer if interactive and default n) and\
  derive new buffer name from it unless n <= 0 or filename is nil or null.  If filename is nil or null, buffer's filename is\
- cleared.\n\nReturns: two-element array containing new buffer name and new filename."
+ cleared.\n\n\
+Returns: two-element array containing new buffer name and new filename."
 #define CFLit_setColorPair	"Assign a foreground and background color to color pair number pair-no (or next one available\
- if pair-no is zero).  Pair number can subsequently be used for ~un~U in a ~~~un~Uc terminal attribute\
- specification.\n\nReturns: pair number assigned."
+ if pair-no is zero).  Pair number can subsequently be used for ~un~U in a ~~~un~Uc terminal attribute specification.\n\n\
+Returns: pair number assigned."
 #define CFLit_setDefault	"Set a default integer value to use for one of the following parameters when a screen is\
  created:\n\
 \tHardTabSize\t\tHard tab size.\n\
@@ -1281,26 +1541,47 @@ Case of parameter names is ignored."
 \tInfo\t\tSet color for informational displays.\n\
 \tModeLine\tSet color for mode lines.\n\
 \tRecord\t\tSet color for macro recording indicator."
-#define CFLit_setHook		"Set named hook to system or user function func."
-#define CFLit_seti		"Set i variable, sprintf format string, and increment if script mode or interactive and default\
- n.  If interactive and n >= 0, set i variable to n and leave format string and increment unchanged; if n < 0, display\
- all parameters on message line and leave them unchanged."
-#define CFLit_setMark		"Save point position and window framing in mark " RegionMarkStr " (or mark m if n argument)."
+#define CFLit_setHook		"Set named hook to named system or user function."
+#define CFLit_seti		"Set i variable, printf format string, and increment if script mode.  If interactive, operation\
+ is dependent on n argument, as follows:\n\
+\tDefault n\tSet all parameters interactively.\n\
+\tn >= 0\t\tSet i variable to n and leave format string and increment unchanged.\n\
+\tn < 0\t\tDisplay all parameters on message line only.\n\
+The format string must contain exactly one d, i, o, u, x, or X conversion specifier; for example, \"Line %'d\"."
+#define CFLit_setMark		"Save point position and window framing in mark " RegionMarkStr " (or mark entered\
+ interactively if n argument, or mark m given in script mode)."
+#define CFLit_setShortcut	"Create macro shortcut s for either named macro (if interactive and n argument, or optional\
+ name given in script mode), or active macro (otherwise)."
 #define CFLit_setWrapCol	"Set wrap column to N if script mode or interactive and default n.  If n >= 0, current and\
  previous wrap columns are swapped; if interactive and n < 0 or new value is same as current value, current and previous wrap\
  columns are displayed on message line and values are left unchanged."
 #define CFLit_shell		"Spawn an interactive shell session.\n\nReturns: false if failure, otherwise true."
 #define CFLit_shellCmd		"Execute a shell command and display result in a pop-up window.  If n argument, one or more\
- comma-separated options may be specified in string argument opts; otherwise, the first argument must be omitted.  Argument(s)\
- following optional first argument are converted to string and concatenated to form the command.  Options are:\n\tNoHdr\t\tDo\
- not write command at top of result buffer.\n\tNoPop\t\tSkip pop-up window display.\n\tShift\t\tShift long lines left in pop-up\
- window.\nCase of option keywords is ignored.\n\nReturns: false if command fails, otherwise true."
-#define CFLit_showAliases	"Generate list of aliases matching given pattern in a new buffer and render it per\
- ~bselectBuf~B options (in a pop-up window if default n).  If pattern is plain text, match is successful if name contains pat. \
- If pattern is nil or a null string, all aliases are listed.\n\nReturns: ~bselectBuf~B values."
-#define CFLit_showBuffers	"Generate list of buffers in a new buffer and render it per ~bselectBuf~B options.  If default\
- n, all visible buffers are displayed in a pop-up window; otherwise, buffers are selected by the comma-separated option(s)\
- specified in string argument opts, as follows:\n\tOne or more of the following option(s) must be specified:\n\
+ comma-separated options may be specified in optional string argument opts; otherwise, the first argument must be omitted. \
+ Argument(s) following optional first argument are converted to string and concatenated to form the command.  Options are:\n\
+\tNoHdr\t\tDo not write command at top of result buffer.\n\
+\tNoPop\t\tSkip pop-up window display.\n\
+\tShift\t\tShift long lines left in pop-up window.\n\
+Case of option keywords is ignored.\n\n\
+Returns: false if command fails, otherwise true."
+#define CFLit_shiftLine		"Change indentation of current line without moving point.  If default n, indent by one tab\
+ stop; if n > 0, indent by n tab stops; if n < 0, outdent by abs(n) tab stops; otherwise (n == 0), delete white space at\
+ beginning of line."
+#define CFLit_showAliases	"Generate list of aliases whose names match given search pattern in a new buffer and render it\
+ per ~bselectBuf~B options (in a pop-up window if default n).  " CFLit_patMatch
+#define CFLit_showBindings	"Generate list of key bindings and the commands they are bound to in a new buffer and render it\
+ per ~bselectBuf~B options.  By default, keys bound to a command and matching given search pattern are displayed in a pop-up\
+ window; otherwise, if interactive and n argument, or command executed in script mode, one or both of the following comma-\
+separated options may be specified in string argument opts:\n\
+\tNoFunc\t\tExclude keys having a function key component (of form \"FNx\").\n\
+\tUnbound\t\tInclude keys not bound to a command.\n\
+Case of option keywords is ignored.  If pattern is plain text, match is successful if key literal contains pat, ignoring case. \
+ If pattern is nil or a null string, all key literals match.\n\n\
+Returns: ~bselectBuf~B values."
+#define CFLit_showBuffers	"Generate list of buffers in a new buffer and render it per ~bselectBuf~B options.  By default,\
+ all visible buffers are displayed in a pop-up window; otherwise, if interactive and n argument, or command executed in script\
+ mode, buffers are selected by the comma-separated option(s) specified in string argument opts, as follows:\n\
+\tOne or more of the following options must be specified:\n\
 \t\tVisible\t\tSelect all visible buffers.\n\
 \t\tHomed\t\tSelect visible buffers \"homed\" to current screen only.\n\
 \t\tCommand\t\tSelect user command buffers.\n\
@@ -1308,33 +1589,31 @@ Case of parameter names is ignored."
 \tZero or more of the following options may also be specified:\n\
 \t\tHidden\t\tInclude hidden (non-command/function) buffers in selection.\n\
 \t\tHomeDir\t\tInclude buffer's home directory in display if available.\n\
-The first column in the list is buffer attribute and state information:\
+Case of option keywords is ignored.  The first column in the list is buffer attribute and state information:\
  ~u~bA~Zctive, ~u~bH~Zidden, ~u~bU~Zser command/function, ~u~bP~Zreprocessed, ~u~bN~Zarrowed, ~u~bT~ZermAttr, ~u~bB~Zackground,\
- ~u~bR~ZeadOnly, and ~u~bC~Zhanged.\n\nReturns: ~bselectBuf~B values."
+ ~u~bR~ZeadOnly, and ~u~bC~Zhanged.\n\n\
+Returns: ~bselectBuf~B values."
 #define CFLit_showColors	"Generate a palette of available colors or defined color pairs and display it in a pop-up\
  window.  If n <= 0, display color pairs, otherwise color palette.  In the latter case, number of colors displayed is\
  dependent on terminal type and may be split into pages, selected by n: first page is displayed for n == 1 (default), second\
  page for n == 2, and so on until all colors shown."
-#define CFLit_showCommands	"Generate list of system and user commands and their bindings in a new buffer and render it per\
- ~bselectBuf~B options.  If default n, system and user commands matching given pattern are displayed in a pop-up window;\
- otherwise, one or both of the following comma-separated option(s) may be specified in string argument opts:\n\tSystem\t\t\
-Select system commands matching pattern.\n\tUser\t\tSelect user commands matching pattern.\nIf pattern is plain text,\
- match is successful if name contains pat.  If pattern is nil or a null string, all commands of type selected by n argument and\
- any specified options are listed.\n\nReturns: ~bselectBuf~B values."
-#define CFLit_showDir		"Display working directory on message line.\n\nReturns: absolute pathname of current directory."
-#define CFLit_showFence		"Find ( ), [ ], { }, or < > fence character matching one at point (or one given as an argument\
- if n argument) and briefly display the cursor there if it is in the current window."
-#define CFLit_showFunctions	"Generate list of system and user functions in a new buffer and render it per ~bselectBuf~B\
- options.  If default n, system functions matching given pattern and user functions matching given pattern that also have help\
- text are displayed in a pop-up window; otherwise, one or more of the following comma-separated option(s) may be specified in\
- string argument opts:\n\tSystem\t\tSelect system functions matching pattern.\n\tUser\t\tSelect user functions that match\
- pattern and have help text.\n\tAll\t\t\tInclude user functions not having help text.\nIf pattern is plain text, match is\
- successful if name contains pat.  If pattern is nil or a null string, all functions of type selected by n argument and any\
- specified options are listed.\n\nReturns: ~bselectBuf~B values."
+#define CFLit_showConstVar	"Display name of given constant or variable and its value on message line."
+#define CFLit_showConstVars	"Generate list of system and user constants and variables in a new buffer and render it per\
+ ~bselectBuf~B options.  By default, system and user constants and variables whose names match given search pattern (or all\
+ constants and variables if pattern not given) are displayed in a pop-up window; otherwise, if interactive and n argument, or\
+ command executed in script mode, zero or more of the following comma-separated options may be specified in string argument\
+ opts:\n\
+\tSystem\t\tSearch system constants and variables.\n\
+\tUser\t\tSearch user constants and variables.\n" CFLit_optDefault CFLit_patMatch
+#define CFLit_showFence		"Find ( ), [ ], { }, or < > fence character matching one at point (or character entered\
+ interactively if n argument, or character given in script mode) and briefly display the cursor there if it is in the current\
+ window."
 #define CFLit_showHooks		"Generate list of hooks in a new buffer and render it per ~bselectBuf~B options (in a pop-up\
  window if default n).\n\nReturns: ~bselectBuf~B values."
-#define CFLit_showKey		"Display name of command bound to key sequence (or single key if n <= 0) in a pop-up window (or\
- on message line if n >= 0).  [Interactive only]"
+#define CFLit_showKey		"Prompt for a key sequence (or single key if n <= 0) and display name of command bound to it in\
+ a pop-up window (or on message line if n >= 0).  [Interactive only]"
+#define CFLit_showMacros	"Generate list of macros and their shortcuts in a new buffer and render it per ~bselectBuf~B\
+ options (in a pop-up window if default n).\n\nReturns: ~bselectBuf~B values."
 #define CFLit_showMarks		"Generate list of buffer marks in a new buffer and render it per ~bselectBuf~B options (in a\
  pop-up window if default n).\n\nReturns: ~bselectBuf~B values."
 #define CFLit_showModes		"Generate list of modes in a new buffer and render it per ~bselectBuf~B options (in a pop-up\
@@ -1346,29 +1625,36 @@ Select system commands matching pattern.\n\tUser\t\tSelect user commands matchin
  ~bselectBuf~B options (in a pop-up window if default n).\n\nReturns: ~bselectBuf~B values."
 #endif
 #define CFLit_showRing		"Generate list of entries from given ring in a new buffer and render it per ~bselectBuf~B\
- options (in a pop-up window if default n).\n\nReturns: ~bselectBuf~B values."
+ options (in a pop-up window if default n).  " CFLit_ringNames "\n\nReturns: ~bselectBuf~B values."
+#define CFLit_showRoutines	"Generate list of all system and user commands and functions in a new buffer and render it per\
+ ~bselectBuf~B options.  By default, commands and functions whose names match given search pattern (or all commands and\
+ functions if pattern not given) are displayed in a pop-up window; otherwise, if interactive and n argument, or command\
+ executed in script mode, zero or more of the following comma-separated options may be specified in string argument opts:\n\
+\tCommand\t\tSearch commands.\n\
+\tFunction\tSearch functions.\n\
+\tSystem\t\tSearch system routines.\n\
+\tUser\t\tSearch user routines.\n\
+Case of option keywords is ignored.  If neither \"Command\" or \"Function\" option is selected interactively, both are in\
+ effect; and if neither \"System\" or \"User\" option is selected interactively, both are in effect.  " CFLit_patMatch
 #define CFLit_showScreens	"Generate list of screens and their associated windows and buffers in a new buffer and render\
  it per ~bselectBuf~B options (in a pop-up window if default n).\n\nReturns: ~bselectBuf~B values."
-#define CFLit_showVariables	"Generate list of system and user variables matching given pattern in a new buffer and render\
- it per ~bselectBuf~B options (in a pop-up window if default n).  If pattern is plain text, match is successful if name\
- contains pat.  If pattern is nil or a null string, all variables are listed.\n\nReturns: ~bselectBuf~B values."
 #define CFLit_shQuote		"Return expression converted to string and enclosed in ' quotes.  Apostrophe ' characters are\
  converted to \\' so that the string is converted back to its orignal form if processed as a shell argument."
 #define CFLit_shrinkWind	"Decrease size of current window by abs(n) lines (default 1 at bottom, at top if n < 0)."
-#define CFLit_sortRegion	"Sort lines in region in ascending order and mark line block as new region.  Alternatively if n\
- argument, one or both of the following comma-separated option(s) may be specified in string argument opts to control the\
- sorting process:\n\tDescending\t\tSort in descending order.\n\tIgnore\t\t\tIgnore case in line comparisons.\nCase of option\
- keywords is ignored."
-#define CFLit_space		"Insert n spaces (default 1, with auto-wrap if \"Wrap\" buffer mode enabled) or insert abs(n)\
+#define CFLit_sortRegion	"Sort lines in region in ascending order" CFLit_markBlock "  Alternatively if interactive and n\
+ argument, or command executed in script mode, one or both of the following comma-separated options may be specified in string\
+ argument opts to control the sorting process:\n\
+\tDescending\t\tSort in descending order.\n\
+\tIgnoreCase\t\tIgnore case in line comparisons.\n\
+Case of option keywords is ignored."
+#define CFLit_space		"Insert n spaces (default 1, with auto-wrap if \"Wrap\" buffer mode active) or insert abs(n)\
  spaces without formatting if n < 0."
 #define CFLit_split		"Split string str into an array and return it, using delimiter character dlm and optional\
- limit.\n\
-\tPossible values of dlm are:\n\
-\t\t?\\s\t\t\t\tOne or more contiguous white space characters in the string are treated as a single delimiter\
- and leading white space in the string is ignored.\n\
+ limit.\n\tPossible values of dlm are:\n\
+\t\t?\\s\t\t\t\tOne or more contiguous white space characters in the string are treated as a single delimiter and leading white\
+ space in the string is ignored.\n\
 \t\t?\\0 or nil\t\tThe string is split into individual characters.\n\
-\t\tOther char\t\tCharacter dlm is used as the delimiter.\n\
-\tPossible values of limit are:\n\
+\t\tOther char\t\tCharacter dlm is used as the delimiter.\n\tPossible values of limit are:\n\
 \t\t< 0\t\t\t\tEach delimiter found is significant and delineates two substrings, either or both of which may be null.\n\
 \t\t== 0 (default)\tTrailing null substrings are ignored.\n\
 \t\t> 0\t\t\t\tA maximum of limit array elements are returned (and thus, the last element of the array will contain embedded\
@@ -1376,29 +1662,36 @@ Select system commands matching pattern.\n\tUser\t\tSelect user commands matchin
 Note that if dlm is a null character (?\\0) or nil and limit <= 0, the limit value has no effect on the result.  Also, if n\
  argument given, white space is removed from each substring before it is appended to the array by passing n and the substring\
  to the ~bstrip~B function."
-#define CFLit_splitWind		"Split current window into two.  Sizes and window selection are determined by n\
- argument:\n\tdefault\t\tSplit window into two of equal size and stay in current window.\n\tn <= -2\t\tSplit window just above\
- current line and move to other window.\n\tn == -1\t\tSplit window just above current line and stay in current window.\n\tn ==\
- 0\t\tMove to other window after (default) split.\n\tn > 0\t\tSet size of upper window to n lines.\n\nReturns: ordinal number\
- of new window not containing point."
-#define CFLit_sprintf		"Return string built from specified format string and argument(s)."
-#define CFLit_statQ		"Test given file for specified type(s) and return Boolean result.  Types are:\n\
+#define CFLit_splitWind		"Split current window into two.  Sizes and window selection are determined by n argument:\n\
+\tdefault\t\tSplit window into two of equal size and stay in current window.\n\
+\tn <= -2\t\tSplit window just above current line and move to other window.\n\
+\tn == -1\t\tSplit window just above current line and stay in current window.\n\
+\tn == 0\t\tMove to other window after (default) split.\n\
+\tn > 0\t\tSet size of upper window to n lines.\n\n\
+Returns: ordinal number of new window not containing point."
+#define CFLit_sprintf		"Return string built from specified format string and argument(s)." CFLit_printfArgs
+#define CFLit_statQ		"Test given file for specified type(s) and return Boolean result.  Type letter(s) which may be\
+ specified in string argument type are:\n\
 \t~u~bd~Zirectory\t\t\tsymbolic ~u~bL~Zink\t\t~u~bs~Zize > 0\n\
 \t~u~be~Zxists\t\t\t\thard ~u~bl~Zink\t\t\t~u~bw~Zriteable\n\
 \tregular ~u~bf~Zile\t\t~u~br~Zeadable\t\t\te~u~bx~Zecutable.\n\
-If multiple letters are specified, true is returned if any type\
- matches (or if all types match if n argument)."
-#define CFLit_strFit		"Return condensed string, possibly with embedded ellipsis, of maximum length n."
-#define CFLit_strPop		"Remove last portion of string variable var using character delimiter dlm (?\\s for white\
- space) and return it.  If delimiter is nil or ?\\0, last character is removed and returned."
-#define CFLit_strPush		"Append value to string variable var using string delimiter dlm and return new variable value."
-#define CFLit_strShift		"Remove first portion of string variable var using character delimiter dlm (?\\s for white\
- space) and return it.  If delimiter is nil or ?\\0, first character is removed and returned."
-#define CFLit_strUnshift	"Prepend value to string variable var using string delimiter dlm and return new variable value."
+If multiple letters are specified, true is returned if any type matches (or if all types match if n argument)."
+#define CFLit_strfit		"Return string str in condensed form, possibly with embedded ellipsis, of maximum length n."
+#define CFLit_strMatchGrp	"Return text matching captured group N from last =~~ expression, ~bindex~B function call\
+ (without \"Char\" option), or ~bsub~B function call (or array of all captured groups if N not given).  N must be >= 0; group 0\
+ is entire match.  If N is out of bounds or text not available, nil is returned."
+#define CFLit_strPop		"Remove last substring delimited by character dlm (?\\s for white space) from named string\
+ variable and return it, or nil if none left.  If delimiter is nil or ?\\0, last character is removed and returned."
+#define CFLit_strPush		"Append string or nil delimiter dlm and value val to named string variable and return new\
+ variable value.  Type of value may be nil, integer, or string."
+#define CFLit_strShift		"Remove first substring delimited by character dlm (?\\s for white space) from named string\
+ variable and return it, or nil if none left.  If delimiter is nil or ?\\0, first character is removed and returned."
+#define CFLit_strUnshift	"Prepend concatenation of value val and string or nil delimiter dlm to named string variable\
+ and return new variable value.  Type of value may be nil, integer, or string."
 #define CFLit_strip		"Return string stripped of white space at both ends (or left end only if n < 0, right end only\
  if n > 0)."
 #define CFLit_sub		"Replace first (or all if n > 1) occurrences of \"from\" pattern in str with \"to\" pattern and\
- return result."
+ return result.  The from and to patterns are as described for the ~breplace~B command."
 #define CFLit_subline		"Extract substring of given length from current line beginning at point (position 0) + pos and\
  return it.  Length is infinite if not specified.  If length is negative, it specifies a position backward from end of line at\
  which to end the extraction, not including the ending character.  Delimiter at end of line is not included in result."
@@ -1408,116 +1701,131 @@ If multiple letters are specified, true is returned if any type\
 #define CFLit_suspend		"Suspend editor (put in background) and return to shell session."
 #define CFLit_swapMark		"Swap point position with mark m and restore its window framing if mark is outside of current\
  window (or force reframing if n >= 0)."
+#define CFLit_swapScreens	"Swap number of screen N1 with screen N2."
 #define CFLit_tab		"Insert hard tab (or soft tab if $softTabSize > 0) n times (default 1).  If n <= 0, soft tab\
  size is set to abs(n) and no tabs are inserted."
-#define CFLit_titleCaseLine	"Change words in [-]n lines to title case (default 1, region lines if n == 0) and mark line\
- block as new region."
+#define CFLit_titleCaseLine	"Change words in [-]n lines to title case" CFLit_default1 CFLit_markBlock
 #define CFLit_titleCaseRegion	"Change all words in region to title case.  First character in region is assumed to be the\
  beginning of a word if it is a word character."
 #define CFLit_titleCaseStr	"Return string with all words it contains converted to title case."
 #define CFLit_titleCaseWord	"Change n words to title case (default 1).  Character at point is assumed to be the beginning\
  of a word if it is a word character."
-#define CFLit_toInt		"Return numeric string literal converted to integer, ignoring any leading or trailing white\
- space.  String may be in any form recognized by the ~bstrtol()~B Standard C Library function with a zero base."
-#define CFLit_toStr		"Return expression value converted to string form, optionally with zero or more of the\
- following comma-separated option(s) specified in string argument opts to control the conversion process:\n\tShowNil\t\tConvert\
- nil value(s) to \"nil\".\n\tQuote1 or\n\t Quote2\t\tEnclose string values in ' or \" quotes, respectively.\n\tQuote\t\tQuote\
- strings automatically based on other options specified.\n\tVizChar or\n\t EscChar\tConvert invisible characters to visible or\
- escaped-character form, respectively.\n\tThouSep\t\tInsert commas in thousands' places in numbers.\nIn addition, the following\
- options may be specified for array expressions:\n\tSkipNil\t\tSkip nil arguments.\n\tDelim\t\tInsert comma delimiter between\
- elements.\n\tBrackets\tEnclose array elements in brackets [...].\nAlso, either of the following \"shortcut\" options may be\
- specified in lieu of (or in addition to) the options described above:\n\tLang\t\tUse \"language expression\" conversion\
- options \"ShowNil\", \"EscChar\", \"Quote\", \"Brackets\", and \"Delim\".\n\tVizStr\t\tUse \"human readable\" conversion\
- options \"ShowNil\", \"VizChar\", \"Quote1\", \"Brackets\", and \"Delim\".\nCase of option keywords is ignored.  An array-\
-element delimiter may also be specified in optional string argument dlm (and opts may be nil in this case), which overrides the\
- \"Delim\" option."
-#define CFLit_tr		"Return translated string.  Each \"from\" character in string is replaced with corresponding\
- \"to\" character.  If \"to\" string is shorter than \"from\" string, the last \"to\" character is used for each additional\
- \"from\" character.  If \"to\" string is nil or null, all \"from\" characters in string are deleted."
+#define CFLit_toint		"Return numeric string literal converted to integer using optional base value (default 0),\
+ ignoring any leading or trailing white space." CFLit_strtol "  The string argument may also be an integer, in which case, it\
+ is returned without conversion."
+#define CFLit_tostr		"Return expression value converted to string form, optionally with zero or more of the\
+ following comma-separated options specified in string argument opts to control the conversion process:\n\
+\tShowNil\t\tConvert nil value(s) to \"nil\".\n\
+\tQuote1 or\n\t Quote2\t\tEnclose string values in ' or \" quotes, respectively.\n\
+\tQuote\t\tQuote strings automatically based on other options specified.\n\
+\tVizChar or\n\t EscChar\tConvert invisible characters to visible or escaped-character form, respectively.\n\
+\tThouSep\t\tInsert commas in thousands' places in numbers.\n\
+In addition, the following options may be specified for array and hash expressions:\n\
+\tSkipNil\t\tSkip nil array elements and hash values.\n\
+\tDelim\t\tInsert comma delimiter between array elements and hash key-value pairs.\n\
+\tFences\t\tEnclose array elements in brackets [...] and hash key-value pairs in braces {...}.\n\
+Also, either of the following \"shortcut\" options may be specified in lieu of (or in addition to) the options described\
+ above:\n\
+\tLang\t\tUse \"language expression\" conversion options \"ShowNil\", \"EscChar\", \"Quote\", \"Fences\", and\
+ \"Delim\".\n\
+\tVizStr\t\tUse \"human readable\" conversion options \"ShowNil\", \"VizChar\", \"Quote1\", \"Fences\", and \"Delim\".\n\
+Case of option keywords is ignored.\n\nA delimiter may also be specified in optional string argument dlm (and opts may be nil\
+ in this case), which overrides the \"Delim\" option."
+#define CFLit_tr		"Return translation of string str using characters in \"from\" and \"to\" strings.  Each\
+ \"from\" character found in str is replaced with corresponding \"to\" character.  If \"to\" string is shorter than \"from\"\
+ string, the last \"to\" character is used for each additional \"from\" character.  Alternatively, if \"to\" string is nil or\
+ null, all \"from\" characters in str are deleted."
 #define CFLit_traverseLine	"Move point forward or backward $travJump characters (or to far right if n == 0).  If n != 0,\
  first traversal is accelerated forward (n > 0) or backward (n < 0)."
-#define CFLit_trimLine		"Trim white space from end of [-]n lines (default 1, region lines if n == 0) and mark line\
- block as new region."
+#define CFLit_trimLine		"Trim white space from end of [-]n lines" CFLit_default1 CFLit_markBlock
 #define CFLit_truncBuf		"Delete all text from point to end of buffer (or from point to beginning of buffer if n <= 0). \
  If interactive, user is prompted for confirmation unless n >= 2 or n <= -2."
-#define CFLit_typeQ		"Return type of expression: \"array\", \"bool\", \"int\", \"nil\", or \"string\"."
-#define CFLit_upperCaseLine	"Change [-]n lines to upper case (default 1, region lines if n == 0) and mark line block as\
- new region."
+#define CFLit_typeof		"Return type of expression: \"nil\", \"bool\", \"int\", \"string\", \"array\", or \"hash\"."
+#define CFLit_upperCaseLine	"Change [-]n lines to upper case" CFLit_default1 CFLit_markBlock
 #define CFLit_upperCaseRegion	"Change all letters in region to upper case."
 #define CFLit_upperCaseStr	"Return string converted to upper case."
 #define CFLit_upperCaseWord	"Change n words to upper case (default 1)."
 #define CFLit_unbindKey		"Unbind a key sequence (or single key if interactive and n <= 0).\n\nReturns: true if\
  successful, otherwise false."
-#define CFLit_undelete		"Insert text from last \"delete\" command n times (default 1) and mark as region (or insert\
- once without moving point if n == 0, insert nth older delete once if n < 0)."
+#define CFLit_undelete		"Insert text from most recent \"delete\" command n times (default 1) and mark as region (or\
+ insert once without moving point if n == 0, insert nth delete from ring once if n < 0)."
 #define CFLit_undeleteCycle	"Replace undeleted text with next older ring entry (default) or cycle delete ring [-]n times\
- and use topmost entry (n != 0).  New text is marked as region.  If n == 0 or last command was not an ~bundelete~B or\
+ and use topmost entry.  New text is marked as region.  If n == 0 or previous command was not an ~bundelete~B or\
  ~bundeleteCycle~B, no action is taken."
 #define CFLit_universalArg	"Begin or continue entry of universal positive-trending n argument (in sequence 2, 0, 3, 4,\
  ...)."
 #define CFLit_updateScreen	"Update and redraw screen if altered and no keystrokes pending.  Additionally, one or both of\
- the following comma-separated option(s) may be specified in optional string argument opts to control the update\
- process:\n\tForce\t\tPending keystrokes are ignored.\n\tNoRedraw\tRedraw of physical screen is suppressed.\nCase of option\
- keywords is ignored."
+ the following comma-separated options may be specified in optional string argument opts to control the update process:\n\
+\tForce\t\tPending keystrokes are ignored.\n\
+\tNoRedraw\tRedraw of physical screen is suppressed.\n\
+Case of option keywords is ignored."
 #define CFLit_viewFile		"Find named file and read (if n != 0) into a read-only buffer with ~bselectBuf~B options\
  (without auto-completion if interactive and n == 0 or n == 1).  If a buffer already exists with the same filename, its buffer\
- is selected; otherwise, a buffer is created.\n\nReturns: ~bselectBuf~B values."
+ is selected; otherwise, a buffer is created.\n\n\
+Returns: ~bselectBuf~B values."
 #define CFLit_widenBuf		"Expose all hidden lines in current buffer (unnarrow)."
-#define CFLit_wrapLine		"Rewrap [-]n lines (default 1, region lines if n == 0) at $wrapCol, given a \"line prefix\"\
- string and \"end of sentence\" characters to pass to the ~bjoinLines~B command.  All lines in the block are filled and/or\
- wrapped so that they have the same indentation as the first line and do not extend past the wrap column.  Additionally, if\
- the line prefix is not nil or a null string (for example, \"# \" for a comment block) it is inserted after any indentation in\
- each line that is created during the wrapping process.  Existing prefix strings (with or without trailing white space) are\
- also recognized and removed from each line of the block before ~bjoinLines~B is called.  When command is invoked\
- interactively, a null string is used for the \"chars\" argument."
+#define CFLit_wrapLine		"Rewrap [-]n lines" CFLit_default1 " at $wrapCol, given a \"line prefix\" string and \"end of\
+ sentence\" characters to pass to the ~bjoinLines~B command.  All lines in the block are filled and/or wrapped so that they\
+ have the same indentation as the first line and do not extend past the wrap column.  Additionally, if the line prefix is not\
+ nil or a null string (for example, \"# \" for a comment block) it is inserted after any indentation in each line that is\
+ created during the wrapping process.  Existing prefix strings (with or without trailing white space) are also recognized and\
+ removed from each line of the block before ~bjoinLines~B is called.  When command is invoked interactively, a null string is\
+ used for the \"chars\" argument."
 #define CFLit_wrapWord		"Move word at point to beginning of next line if word is past column n (default 0); otherwise,\
  move following word (if any) or start a new line."
-#define CFLit_writeBuf		"Write lines in region (or characters in region if n >= 0) to named buffer at point.  If n <=\
- 0, also delete text that was written.\n\nReturns: text written."
 #define CFLit_writeFile		"Write current buffer to named file.  If default n or n > 0, also set buffer's filename to file\
  path, derive new buffer name from it, and set buffer's state to unchanged."
+#define CFLit_writeSuffix	"  If buffer does not exist, it is created (with user confirmation, if interactive).\n\n\
+Returns: text written."
+#define CFLit_writeLine		"Write [-]n lines" CFLit_default1 " to named buffer at point." CFLit_writeSuffix
+#define CFLit_writeRegion	"Write region text to named buffer at point.  If n <= 0, also delete text that was written."\
+ CFLit_writeSuffix
 #define CFLit_xeqBuf		"Execute named buffer as a user command with numeric prefix n and optional\
  arguments.\n\nReturns: execution result."
 #define CFLit_xeqFile		"Search for named file with ~bxPathname~B function and execute file that is found as a user\
  command with numeric prefix n and optional arguments.\n\nReturns: execution result."
-#define CFLit_xeqMacro		"Execute current macro (or named macro if n <= 0) abs(n) times (default 1, with infinite\
- repetitions if n == 0).  Execution stops after n or $maxLoop iterations (if not zero), or if any invoked command or function\
- returns false."
-#define CFLit_xPathname		"Search for given file or directory in $execPath directories and return\
- absolute pathname if found, otherwise nil.  Pathname is searched for verbatim first, then with \"" ScriptExt "\" appended\
- unless the filename already has that extension.  Alternatively, one or both of the following comma-separated option(s) may\
- be specified in optional string argument opts to control the search process:\n\tGlob\t\tProcess first argument as a shell glob\
- pattern instead of a file or directory, and return a (possibly empty) array of absolute pathnames that\
- match.\n\tSkipNull\tSkip null directories in $execPath (so that the current directory is not searched).\nCase of option\
- keywords is ignored.  If the given file or directory argument begins with a slash (/) and a glob search is being performed, an\
- error is returned (use ~bglob~B function instead); otherwise, it is searched for as an absolute pathname, bypassing the\
- directories in $execPath."
-#define CFLit_yank		"Insert last kill n times (default 1) and mark as region (or insert once without moving point\
- if n == 0, insert nth older kill once if n < 0)." 
+#define CFLit_xeqMacro		"Execute active macro (or named macro if interactive and n < 0, or macro shortcut if\
+ interactive and n >= 0, or macro specified in script mode) abs(n) times (default 1), or with infinite repetitions if n == 0. \
+ If script mode, n cannot be negative.  Execution stops after n or $maxLoop iterations (if variable not zero), or if any\
+ invoked command or function returns false."
+#define CFLit_xPathname		"Search for given file or directory in $execPath directories and return absolute pathname if\
+ found, otherwise nil.  Pathname is searched for verbatim first, then with \"" ScriptExt "\" appended unless the filename\
+ already has that extension.  Alternatively, one or both of the following comma-separated options may be specified in string\
+ argument opts to control the search process:\n\
+\tGlob\t\tSearch for glob in $execPath directories like file, but process argument as a shell glob pattern (that may contain\
+ braces) instead of a single file or directory, and return a (possibly empty) array of files that match.\n\
+\tSkipNull\tSkip null directories in $execPath (so that the current directory is not searched).\n\
+Case of option keywords is ignored.  If the given file or directory argument begins with \"/\", \"./\", or \"../\" and a glob\
+ search is being performed, an error is returned (use ~bglob~B function instead); otherwise, it is searched for as an absolute\
+ pathname, bypassing the directories in $execPath."
+#define CFLit_yank		"Insert most recent kill n times (default 1) and mark as region (or insert once without moving\
+ point if n == 0, insert nth kill from ring once if n < 0)." 
 #define CFLit_yankCycle		"Replace yanked text with next older ring entry (default) or cycle kill ring [-]n times and\
- use topmost entry (n != 0).  New text is marked as region.  If n == 0 or last command was not a ~byank~B or ~byankCycle~B,\
- no action is taken."
+ use topmost entry.  New text is marked as region.  If n == 0 or previous command was not a ~byank~B, ~byankCycle~B, or\
+ ~byankDel~B, no action is taken."
+#define CFLit_yankDel		"Insert a kill like ~byank~B, but also delete kill from ring immediately afterward."
 
 // Hook help text.
-#define HLitN_defn		"defn."
-#define HLitN_chgDir		"From ~bchgDir~B command^ ~uOR~U defn at startup."
-#define HLitN_exit		"From ~bexit~B or^ ~bquickExit~B command."
-#define HLitN_postKey		"Key prefix."
+#define HLitN_defn		"defn"
+#define HLitN_chgDir		"From ~bchdir~B command^ ~uOR~U defn at startup"
+#define HLitN_exit		"From ~bexit~B or^ ~bquickExit~B command"
+#define HLitN_postKey		"From key entered"
 #define HLitN_preKey		HLitN_postKey
 
 #define HLitArg_none		"~b0:~B (none)"
-#define HLitArg_createBuf	"~b1:~B Buffer name."
-#define HLitArg_enterBuf	"~b1:~B \"exitBuf\" return^  value."
-#define HLitArg_mode		"~b2:~B nil, prior value of^  $GlobalModes ~uOR~U^  buffer name, prior^  value of $BufModes."
-#define HLitArg_postKey		"~b1:~B \"preKey\" return^  value."
-#define HLitArg_read		"~b2:~B Buffer name, filename^  (or nil if standard^  input)."
-#define HLitArg_write		"~b2:~B Buffer name, filename."
-#define HLitArg_filename	"~b2:~B Buffer name, filename^  (or nil if none)."
+#define HLitArg_createBuf	"~b1:~B buffer"
+#define HLitArg_enterBuf	"~b1:~B \"exitBuf\" return^  value"
+#define HLitArg_mode		"~b2:~B nil, prior value of^  GlobalModes ~uOR~U^  buffer, prior value^  of BufModes"
+#define HLitArg_postKey		"~b1:~B \"preKey\" return^  value"
+#define HLitArg_read		"~b2:~B buffer, file (or nil^  if standard input)"
+#define HLitArg_write		"~b3:~B buffer, file, mode^  (?w or ?a)"
+#define HLitArg_filename	"~b2:~B buffer, file (or nil^  if none)"
 
 // Mode descriptions.
 #define MLit_AutoSave		"Automatic file save."
 #define MLit_AutoTerm		"Automatic termination of last line of buffer when saving."
 #define MLit_Backup		"Create backup (" BackupExt ") file when saving."
+#define MLit_BufCount		"Display count of visible buffers on bottom mode line."
 #define MLit_Clobber		"Allow user commands and functions to be recreated."
 #define MLit_ColDisp		"Display column number of point on mode line."
 #define MLit_Exact		"Case-sensitive searches by default."
@@ -1543,7 +1851,7 @@ element delimiter may also be specified in optional string argument dlm (and opt
 // **** For help.c ****
 
 // "About MightEMacs" help text.
-#define ALit_Author		"(c) Copyright 2022 Richard W. Marinelli <italian389@yahoo.com>"
+#define ALit_Author		"(c) Copyright 2026 Richard W. Marinelli <italian389@yahoo.com>"
 #define ALit_Footer1		" runs on Unix and Linux platforms and is licensed under the"
 #define ALit_Footer2		"GNU General Public License (GPLv3), which can be viewed at"
 #define ALit_Footer3		"http://www.gnu.org/licenses/gpl-3.0.en.html"
@@ -1566,18 +1874,17 @@ element delimiter may also be specified in optional string argument dlm (and opt
 // System variable help text.
 #define VLit_ArgList		"Array containing user command or function arguments, if any, when a user routine (or buffer)\
  is being executed."
-#define VLit_BufInpDelim	"Line delimiter(s) used for last file read into current buffer."
+#define VLit_BufInpDelim	"Symbolic name of line delimiter used for last file read into current buffer."
 #define VLit_BufModes		"Array containing names of active buffer modes in current buffer."
-#define VLit_Date		"Current date and time."
 #define VLit_GlobalModes	"Array containing names of active global modes."
 #define VLit_HorzScrollCol	"First displayed column of current line."
 #define VLit_LastKey		"Ordinal (integer) value of last key entered, or -1 if a key sequence was entered or key was\
  not a 7-bit ASCII character."
 #define VLit_LineLen		"Length of current line in characters, not including newline delimiter."
-#define VLit_Match		"String matching pattern from last buffer search, ~bindex~B function, or =~~ expression."
+#define VLit_Match		"String matching pattern from last buffer search, =~~ expression, ~bindex~B function call\
+ (without \"Char\" option), or ~bsub~B function call."
 #define VLit_RegionText		"Text in current region."
 #define VLit_ReturnMsg		"Message returned by last command or script."
-#define VLit_RingNames		"Array containing names of rings."
 #define VLit_RunFile		"Pathname of running script."
 #define VLit_RunName		"Name of running user command, user function, or buffer."
 #define VLit_ScreenCount	"Number of existing screens."
@@ -1589,20 +1896,24 @@ element delimiter may also be specified in optional string argument dlm (and opt
 #define VLit_bufname		"Name of current buffer."
 #define VLit_execPath		"Colon-separated list of script search directories.  If a directory is null, the current\
  directory is searched."
-#define VLit_fencePause		"Centiseconds to pause for fence matching (when \"Fence1\" or \"Fence2\" mode is enabled)."
+#define VLit_fencePause		"Centiseconds to pause for fence matching (when \"Fence1\" or \"Fence2\" mode is active)."
 #define VLit_hardTabSize	"Size of a hard tab (character) in columns for current screen."
 #define VLit_horzJump		"Percentage of horizontal window size to jump when scrolling (0-" JumpMaxStr ", 0 for smooth\
  scrolling, default " HorzJumpStr ")."
-#define VLit_inpDelim		"Global input line delimiter(s).  Must be one or two characters, or a null string for \"auto\"."
-#define VLit_lastKeySeq		"Last key sequence entered in string form."
+#define VLit_delim1		"Symbolic name of line delimiter to use for "
+#define VLit_delim2		".  Must be NL, CRLF, CR, NUL, or a null string"
+#define VLit_inpDelim		VLit_delim1 "input files" VLit_delim2 " for \"auto\" (first NL, CR-LF, or CR character(s) found\
+ in a file sets its line delimiter)."
+#define VLit_lastKeySeq		"Last key sequence entered in key literal form."
 #define VLit_lineChar		"Character at point as an ASCII (int) value."
 #define VLit_lineCol		"Column number of point."
-#define VLit_lineOffset		"Number of characters in line before point."
+#define VLit_lineOffset		"Number of characters in line preceding point."
 #define VLit_lineText		"Text of current line without newline delimiter."
 #define VLit_maxCallDepth	"Maximum depth allowed in user command or function recursion (or unlimited if zero)."
 #define VLit_maxLoop		"Maximum number of iterations allowed for a loop block or macro (or unlimited if zero)."
 #define VLit_maxPromptPct	"Maximum percentage of terminal width to use for a prompt string (in range 15-90)."
-#define VLit_otpDelim	"Global output line delimiter(s).  Must be one or two characters.  If null, $BufInpDelim is used."
+#define VLit_otpDelim		VLit_delim1 "output files (overrides BufInpDelim)" VLit_delim2\
+ ".  If null, BufInpDelim is used."
 #define VLit_pageOverlap	"Number of lines to overlap when paging."
 #define VLit_replacePat		"Replacement pattern."
 #define VLit_screenNum		"Ordinal number of current screen."
@@ -1671,11 +1982,17 @@ extern const char
  text460[], text461[], text462[], text463[], text464[], text465[], text466[], text467[], text468[], text469[], text470[],
  text471[], text472[], text473[], text474[], text475[], text476[], text477[], text478[], text479[], text480[], text481[],
  text482[], text483[], text484[], text485[], text486[], text487[], text488[], text489[], text490[], text491[], text492[],
- text493[], text494[], text495[], text496[], text497[],	text498[];
-extern const char
- text803[];
+ text493[], text494[], text495[], text496[], text497[],	text498[], text499[], text500[], text501[], text502[], text503[],
+ text504[], text505[], text506[], text507[], text508[], text509[], text510[], text511[], text512[], text513[], text514[],
+ text515[], text516[], text517[], text518[], text519[], text520[], text521[], text522[], text523[], text524[], text525[],
+ text526[], text527[], text528[], text529[], text530[], text531[], text532[], text533[], text534[], text535[], text536[],
+ text537[], text538[], text539[], text540[], text541[], text542[], text543[], text544[], text545[], text546[], text547[];
+#if SanityCheck
+extern char
+ text990[], text991[], text992[], text993[], text994[];
+#endif
 #if MMDebug & Debug_ShowRE
 extern char
- text994[], text995[], text996[], text997[], text998[], text999[];
+ text995[], text996[], text997[], text998[], text999[];
 #endif
 #endif

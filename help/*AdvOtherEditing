@@ -8,19 +8,18 @@ Managing white space:
     ~uSPC~U         space               Insert n spaces (default 1) or abs(n) spaces
                                     without word wrap or text replacement if
                                     n < 0.
-    ~#uC-x SPC~U     insertSpace         Insert abs(n) spaces ahead of point, forcing
+    ~#uESC SPC~U     insertSpace         Insert abs(n) spaces ahead of point, forcing
                                     text insertion if n < 0.
-    ~#uESC \~U       delWhite            Remove white space surrounding and
-                                    immediately before point.  If n > 0, non-
+    ~#uC-x SPC~U     delWhite            Remove white space surrounding and
+                                    immediately preceding point.  If n > 0, non-
                                     word characters are also deleted.
     ~#uC-x C-o~U     delBlankLines       Delete blank lines above and below point.
                                     If the current line is not blank, blank
                                     lines immediately below it will be deleted,
                                     or immediately above it if n < 0.
     ~#uC-h C-a~U     beginWhite          Move point to beginning of white space at or
-                                    immediately before point.
-    ~#uC-h C-e~U     endWhite            Move point to end of white space at or
-                                    immediately following point.
+                                    immediately preceding point.
+    ~#uC-h C-e~U     endWhite            Move point to end of white space at point.
 
 Inserting lines:
 

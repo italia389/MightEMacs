@@ -1,4 +1,4 @@
-// (c) Copyright 2022 Richard W. Marinelli
+// (c) Copyright 2026 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -21,18 +21,18 @@
 // CORE INPUT FUNCTIONS
 //	findFile command
 //		* call findViewFile()
-//	findViewFile(Datum *pRtnVal, int n, bool view)
+//	findViewFile(Datum *pRtnVal, long n, bool view)
 //		* get a filename
 //		* check if file is attached to an existing buffer
 //		* if so, either return (do nothing) or switch to buffer
 //		* if buffer not found, create one, set filename, (optionally) set buffer to "read-only", and call render()
 //		=> CALLED BY execCmdFunc() for findFile and viewFile commands.
-//	ifile(char *filename, int n)
+//	f_ropen(char *filename, long n)
 //		* insert given file into current buffer before current line, optionally leaving point before inserted text
 //		=> CALLED BY insertFile(), insertPipe()
 //	insertFile() -- command routine
-//		* get a filename and call ifile()
-//	readFile(Datum *pRtnVal, int n, char **args)
+//		* get a filename and call f_ropen()
+//	readFile(Datum *pRtnVal, long n, char **args)
 //		* get a filename
 //		* create new buffer with name derived from filename if requested
 //		* read given file into current buffer or new buffer via readIn()
@@ -53,8 +53,8 @@
 #include <sys/uio.h>
 #include <errno.h>
 #include <glob.h>
-#include "cmd.h"
 #include "exec.h"
+#include "bind.h"
 
 // Make selected global definitions local.
 #define FileData
@@ -69,116 +69,83 @@ static int globtoa(Datum *pRtnVal, glob_t *pGlob) {
 	if(makeArray(pRtnVal, 0, &pArray) != Success)
 		return sess.rtn.status;
 	if(pGlob->gl_pathc > 0) {
-		Datum datum;
+		Datum *pDatum;
 		char **pPath = pGlob->gl_pathv;
-		dinit(&datum);
 		do {
-			if(dsetstr(*pPath, &datum) != 0 || apush(pArray, &datum, AOpCopy) != 0)
+			if((pDatum = dnew()) == NULL || dsetstr(*pPath, pDatum) != 0 || apush(pArray, pDatum, OpAdopt) != 0)
 				return libfail();
 			} while(*++pPath != NULL);
-		dclear(&datum);
-		globfree(pGlob);
 		}
+	globfree(pGlob);
 	return sess.rtn.status;
 	}
 
-// Append filenames (one per line) from a buffer (which may be empty) to an existing array, then remove duplicates and any
-// files that do not exist.  Return status.
-static int buftoa(Array *pArray, Buffer *pBuf) {
+// Do "glob" function: return a (possibly empty) array of file(s) and/or director(ies) that match given shell glob pattern(s)
+// (any of which may contain braces).  Return status.
+int globPat(Datum *pRtnVal, long n, Datum **args) {
+	Array *pArray;
 	Datum *pDatum;
-	Line *pBufLine = pBuf->pFirstLine;
+	char *pat;
+	glob_t globObj;
+	int r;
+	uint argFlags = ArgFirst;
+	uint globFlags = GLOB_MARK | GLOB_NOSORT | GLOB_BRACE | GLOB_TILDE;
 
-	// Copy buffer lines to array.
-	for(;;) {
-		if(pBufLine->used == 0)
-			break;
-		if(dnew(&pDatum) != 0 || dsetsubstr(pBufLine->text, pBufLine->used, pDatum) != 0 ||
-		 apush(pArray, pDatum, 0) != 0)
-			goto LibFail;
-		if((pBufLine = pBufLine->next) == NULL)
-			break;
-		}
+	if((pDatum = dnewtrack()) == NULL)
+		goto LibFail;
 
-	// Remove duplicates.
-	if(auniq(pArray, NULL, AOpInPlace) == NULL)
+	// Loop through arguments, collecting pathnames.
+	do {
+		if(funcArg(pDatum, argFlags) != Success)
+			goto Retn;
+		pat = pDatum->str;
+		if((r = glob(pat, globFlags, NULL, &globObj)) != 0 && r != GLOB_NOMATCH) {
+			globfree(&globObj);
+			(void) rsset(errno == GLOB_NOSPACE ? FatalError : Failure, 0, text406, pat, strerror(errno));
+								// "Glob of pattern \"%s\" failed: %s"
+			}
+		argFlags = 0;
+		if(globObj.gl_pathc > 0)
+			globFlags |= GLOB_APPEND;
+		} while(haveSym(s_comma, false));
+
+	// Transfer results to an array.
+	if(globtoa(pRtnVal, &globObj) != Success)
+		goto Retn;
+
+	// Remove duplicates, sort results, and return.
+	pArray = dgetarrayptr(pRtnVal);
+	if(pArray->used > 0)
+		if(auniq(pArray, NULL, OpInPlace) == NULL || asort(pArray, acmp, OpInPlace) == NULL)
 LibFail:
-		return libfail();
-
-	return sess.rtn.status;
-	}
-
-// Do "glob" function: return a (possibly empty) array of file(s) and/or director(ies) that match given shell glob pattern
-// (which may contain braces).  Return status.
-int globPat(Datum *pRtnVal, int n, Datum **args) {
-
-	if(disnull(*args)) {
-		Array *pArray;
-		(void) makeArray(pRtnVal, 0, &pArray);
-		}
-	else {
-		// If glob pattern does not contain braces, use system glob() function.
-		char *pat = args[0]->str;
-		if(strchr(pat, '{') == NULL) {
-			int r;
-			glob_t globObj;
-
-			globObj.gl_pathc = 0;
-			if((r = glob(pat, GLOB_MARK, NULL, &globObj)) != 0 && r != GLOB_NOMATCH) {
-				if(globObj.gl_pathc > 0)
-					globfree(&globObj);
-				(void) rsset(errno == GLOB_NOSPACE ? FatalError : Failure, 0, text406, pat, strerror(errno));
-									// "Glob of pattern \"%s\" failed: %s"
-				}
-			else
-				(void) globtoa(pRtnVal, &globObj);
-			}
-		else {
-			// Braces found in pattern.  Expand them in a shell command:
-			// 0 => readPipe "for f in <pat>; do echo \"$f\"; done"
-			if(runCmd(pRtnVal, text482, pat, text483, 0) == Success) {
-				// "0 => readPipe \"for f in"
-		// "; do if [ -d \\\"$f\\\" ]; then echo \\\"$f/\\\"; elif ...; then echo \\\"$f\\\"; fi; done\"";
-
-				// Filenames now in scratch buffer.  Copy them into an array (the one returned by runCmd())
-				// and delete the buffer.
-				Array *pArray = pRtnVal->u.pArray;
-				Datum *pDatum0 = ashift(pArray);		// Scratch buffer name (can't fail).
-				Datum *pDatum1 = ashift(pArray);		// Buffer created? (can't fail).
-				Buffer *pBuf = bsrch(pDatum0->str, NULL);	// Scratch buffer pointer (can't fail).
-
-				// Array in *pRtnVal now empty.  Add datums to garbage stack and copy buffer lines to array.
-				dtrack(pDatum0); dtrack(pDatum1);
-				if(buftoa(pArray, pBuf) == Success)
-					(void) bdelete(pBuf, 0);
-				}
-			}
-		}
-
+			return libfail();
+Retn:
 	return sess.rtn.status;
 	}
 
 // Do "pathname" function: return absolute pathname of given file or directory (or an array of absolute pathnames if argument is
 // an array).  If n <= 0, symbolic links are not resolved.  Return status.
-int absPathname(Datum *pRtnVal, int n, Datum **args) {
+int absPathname(Datum *pRtnVal, long n, Datum **args) {
 
 	if(!dtyparray(args[0]))
-		(void) getPath(args[0]->str, n == INT_MIN || n > 0, pRtnVal);
+		(void) absPath(args[0]->str, n == DefN || n > 0, pRtnVal);
 	else {
-		Array *pArray0, *pArray;
+		ArrayEach each;
+		Array *pArray0;
 		Datum *pArrayEl, *path, *expandedPath;
 
 		if(makeArray(pRtnVal, 0, &pArray0) == Success) {
-			if(dnewtrack(&path) != 0 || dnewtrack(&expandedPath) != 0)
+			if((path = dnewtrack()) == NULL || (expandedPath = dnewtrack()) == NULL)
 				goto LibFail;
-			pArray = (*args)->u.pArray;
-			while((pArrayEl = aeach(&pArray)) != NULL) {
+			aeachinit(&each, dgetarrayptr((*args)));
+			while((pArrayEl = aeach(&each)) != NULL) {
 				if(!dtypstr(pArrayEl))
 					return rsset(Failure, 0, text329, dtype(pArrayEl, false));
 						// "Unexpected %s argument"
 				if(expandPath(expandedPath, pArrayEl) != Success ||
-				 getPath(expandedPath->str, n == INT_MIN || n > 0, path) != Success)
+				 absPath(expandedPath->str, n == DefN || n > 0, path) != Success)
 					break;
-				if(apush(pArray0, path, AOpCopy) != 0)
+				if(apush(pArray0, path, OpXfer) != 0)
 LibFail:
 					return libfail();
 				}
@@ -188,36 +155,21 @@ LibFail:
 	}
 
 // Do xPathname function.  Return status.
-int xPathname(Datum *pRtnVal, int n, Datum **args) {
-	const char *myName = (cmdFuncTable + cf_xPathname)->name;
-	static bool doGlob, skipNull;
-	static Option options[] = {
-		{"^Glob", NULL, 0, .u.ptr = (void *) &doGlob},
-		{"^SkipNull", NULL, 0, .u.ptr = (void *) &skipNull},
-		{NULL, NULL, 0, 0}};
-	static OptHdr optHdr = {
-		0, text451, false, options};
-			// "function option"
+int xPathname(Datum *pRtnVal, long n, Datum **args) {
+	CmdFunc *pCmdFunc = cmdFuncTable + cf_xPathname;
+	const char *myName = pCmdFunc->name;
+	uint flags = pCmdFunc->pOptHdr->selFlags;
 
-	// Get options and set flags.
-	initBoolOpts(options);
-	if(args[1] != NULL) {
-		if(parseOpts(&optHdr, NULL, args[1], NULL) != Success)
-			return sess.rtn.status;
-		setBoolOpts(options);
-		}
-
-	if(doGlob) {
+	if(flags & XP_GlobPat) {
 		glob_t globObj;
 
-		if(pathSearch(args[0]->str, skipNull ? (XP_GlobPat | XP_SkipNull) :
-		 XP_GlobPat, (void *) &globObj, myName) == Success)
+		if(pathSearch(args[0]->str, flags, (void *) &globObj, myName) == Success)
 			(void) globtoa(pRtnVal, &globObj);
 		}
 	else {
 		char *result;
 
-		if(pathSearch(args[0]->str, skipNull ? XP_SkipNull : 0, (void *) &result, myName) == Success) {
+		if(pathSearch(args[0]->str, flags, (void *) &result, myName) == Success) {
 			if(result == NULL)
 				dsetnil(pRtnVal);
 			else if(dsetstr(result, pRtnVal) != 0)
@@ -250,17 +202,20 @@ int inpInit(int fileHandle) {
 	// Create initial line buffer.
 	f_free();
 	if((fileInfo.lineBuf = (char *) malloc(FILineBufSize)) == NULL)
-		return rsset(Panic, 0, text94, "f_ropen");
+		return rsset(Panic, 0, text94, "inpInit");
 				// "%s(): Out of memory!"
 
-	// Set EOF flag and initialize buffer pointers.
+	// Set EOF flag, initialize buffer pointers, and set actual line delimiter(s).
 	fileInfo.flags = fileInfo.fileHandle < 0 ? FIEOF : 0;
 	fileInfo.lineBufEnd = fileInfo.lineBuf + FILineBufSize;
-	if((fileInfo.realInpDelim1 = (short) fileInfo.userInpDelim.u.delim[0]) == 0)
-		fileInfo.realInpDelim1 = fileInfo.realInpDelim2 = -1;
-	else if((fileInfo.realInpDelim2 = (short) fileInfo.userInpDelim.u.delim[1]) == 0)
-		fileInfo.realInpDelim2 = -1;
 	fileInfo.ioBufEnd = fileInfo.ioBufCur = fileInfo.dataBuf;
+	if(fileInfo.userInpDelimSym == FDelimUndef)
+		fileInfo.inpDelim1 = fileInfo.inpDelim2 = -1;
+	else {
+		fileInfo.inpDelim1 = fileInfo.userInpDelimSym == FDelimNL ? '\n' :
+		 fileInfo.userInpDelimSym == FDelimNUL ? '\0' : '\r';
+		fileInfo.inpDelim2 = fileInfo.userInpDelimSym == FDelimCRLF ? '\n' : -1;
+		}
 
 	return sess.rtn.status;
 	}
@@ -279,33 +234,36 @@ static int f_ropen(const char *filename, bool required) {
 	return inpInit(fileHandle);
 	}
 
+// Set output delimiter(s) per symbol.
+static void f_setOtpDelim(ushort sym) {
+
+	fileInfo.pOtpDelim = sym == FDelimNL ? "\n" : sym == FDelimCRLF ? "\r\n" : sym == FDelimCR ? "\r" : "";
+	fileInfo.otpDelimLen = sym == FDelimCRLF ? 2 : 1;
+	}
+
 // Initialize FileInfo object for output.
 void otpInit(Buffer *pBuf, int fileHandle) {
 
 	fileInfo.fileHandle = fileHandle;
 	fileInfo.flags = 0;
 
-	// Initialize buffer pointers and record delimiter.
+	// Initialize buffer pointers and line delimiter.
 	fileInfo.ioBufEnd = (fileInfo.ioBufCur = fileInfo.dataBuf) + sizeof(fileInfo.dataBuf);
-	if(*fileInfo.userOtpDelim.u.delim != '\0') {		// Use user-assigned output delimiter if specified.
-		fileInfo.realOtpDelim.u.pDelim = fileInfo.userOtpDelim.u.delim;
-		fileInfo.realOtpDelim.len = fileInfo.userOtpDelim.len;
-		}
-	else if(*pBuf->inpDelim.u.delim != '\0') {		// Otherwise, use buffer's input delimiter(s).
-		fileInfo.realOtpDelim.u.pDelim = pBuf->inpDelim.u.delim;
-		fileInfo.realOtpDelim.len = pBuf->inpDelim.len;
-		}
-	else {							// Default to a newline.
-		fileInfo.realOtpDelim.u.pDelim = "\n";
-		fileInfo.realOtpDelim.len = 1;
+	if(fileInfo.userOtpDelimSym != FDelimUndef)		// Use user-assigned output delimiter if specified...
+		f_setOtpDelim(fileInfo.userOtpDelimSym);
+	else if(pBuf->inpDelimSym != FDelimUndef)		// otherwise, buffer's input delimiter(s)...
+		f_setOtpDelim(pBuf->inpDelimSym);
+	else {							// otherwise, newline.
+		fileInfo.pOtpDelim = "\n";
+		fileInfo.otpDelimLen = 1;
 		}
 	}
 
 // Open a file for writing or appending.  Return status.
-static int f_wopen(Buffer *pBuf, const char *filename, short mode) {
+static int f_wopen(Buffer *pBuf, const char *filename, short fmode) {
 	int fileHandle;
 
-	if((fileHandle = open(filename, O_WRONLY | O_CREAT | (mode == 'w' ? O_TRUNC : O_APPEND), 0666)) == -1)
+	if((fileHandle = open(filename, O_WRONLY | O_CREAT | (fmode == 'w' ? O_TRUNC : O_APPEND), 0666)) == -1)
 		return rsset(Failure, RSHigh, text141, strerror(errno), filename);
 				// "I/O Error: %s, file \"%s\""
 	saveFilename(filename);
@@ -313,15 +271,15 @@ static int f_wopen(Buffer *pBuf, const char *filename, short mode) {
 	return sess.rtn.status;
 	}
 
-// Perform I/O on a pipe, with retries if applicable.  Return value returned from read() or write() call.
-static int f_io(bool doRead, char *buf, size_t size) {
-	int n;
+// Perform I/O on a file or pipe, with retries if applicable.  Return value returned from read() or write() call.
+static int f_io(bool doRead, char *iobuf, size_t size) {
+	int byteCount;
 	int pipeDelay = FIPipeDelay;
-	int loopCount = (fileInfo.flags & FIRetry) ? FIPipeAttempts : 1;
-	ssize_t (*iofunc)(int fileHandle, void *buf, size_t size) = doRead ? read : write;
+	int loopCount = fileInfo.flags & FIRetry ? FIPipeAttempts : 1;
+	ssize_t (*iofunc)(int fileHandle, void *iobuf, size_t size) = doRead ? read : write;
 
 	for(;;) {
-		if((n = iofunc(fileInfo.fileHandle, buf, size)) != -1)
+		if((byteCount = iofunc(fileInfo.fileHandle, iobuf, size)) != -1)
 			break;
 
 		// Read or write failed.  Set exception and return if unexpected error or maximum retries reached.
@@ -335,7 +293,21 @@ static int f_io(bool doRead, char *buf, size_t size) {
 		centiPause(pipeDelay++);
 		}
 
-	return n;
+	return byteCount;
+	}
+
+// Return delimiter symbol, given two delimiters.
+static ushort delimCharsToSym(ushort delim1, ushort delim2) {
+
+	switch(delim1) {
+		case '\n':
+			return FDelimNL;
+		case '\r':
+			return delim2 == '\n' ? FDelimCRLF : FDelimCR;
+		case '\0':
+			return FDelimNUL;
+		}
+	return FDelimUndef;
 	}
 
 // Flush I/O buffer to output file.  Return status.
@@ -361,27 +333,15 @@ static int f_close(bool otpFile) {
 	fileInfo.fileHandle = -1;
 	fileInfo.filename = NULL;
 
-	// Store delimiter(s) used for I/O in buffer record.
-	if(!otpFile) {
-		char *str = sess.cur.pBuf->inpDelim.u.delim;
-
-		sess.cur.pBuf->inpDelim.len = 0;
-		if(fileInfo.realInpDelim1 != -1) {
-			*str++ = fileInfo.realInpDelim1;
-			sess.cur.pBuf->inpDelim.len = 1;
-			if(fileInfo.realInpDelim2 != -1) {
-				*str++ = fileInfo.realInpDelim2;
-				sess.cur.pBuf->inpDelim.len = 2;
-				}
-			}
-		*str = '\0';
-		}
+	// Store type of input delimiter used during read in buffer record (which can't be undefined).
+	if(!otpFile)
+		sess.cur.pBuf->inpDelimSym = delimCharsToSym(fileInfo.inpDelim1, fileInfo.inpDelim2);
 
 	return sess.rtn.status;
 	}
 
 // Write bytes to the current (already opened) file with buffering.  Return status.
-static int f_write(const char *buf, int bufLen) {
+static int f_write(const char *iobuf, int bufLen) {
 
 	// Time for buffer flush?
 	if(fileInfo.ioBufCur > fileInfo.dataBuf && fileInfo.ioBufCur + bufLen > fileInfo.ioBufEnd) {
@@ -395,12 +355,12 @@ static int f_write(const char *buf, int bufLen) {
 	if(fileInfo.ioBufCur + bufLen <= fileInfo.ioBufEnd) {
 
 		// Yes, store it.
-		memcpy(fileInfo.ioBufCur, buf, bufLen);
+		memcpy(fileInfo.ioBufCur, iobuf, bufLen);
 		fileInfo.ioBufCur += bufLen;
 		}
 	else
 		// Won't fit.  Write it directly.
-		(void) f_io(false, (char *) buf, bufLen);
+		(void) f_io(false, (char *) iobuf, bufLen);
 
 	return sess.rtn.status;
 	}
@@ -410,7 +370,7 @@ static int f_putline(Line *pLine, bool writeDelim) {
 
 	// Write the line and appropriate line delimiter(s), and check for errors.
 	if(f_write(pLine->text, pLine->used) == Success && writeDelim)
-		(void) f_write(fileInfo.realOtpDelim.u.pDelim, fileInfo.realOtpDelim.len);
+		(void) f_write(fileInfo.pOtpDelim, fileInfo.otpDelimLen);
 
 	return sess.rtn.status;
 	}
@@ -437,7 +397,7 @@ static int f_putc(short c) {
 
 // Get next character from (opened) input file and store in *pChar.  Return status, including IOEOF if end of file reached.
 static int f_getc(short *pChar) {
-	int n;
+	int byteCount;
 
 	// At EOF?
 	if(fileInfo.flags & FIEOF)
@@ -447,11 +407,11 @@ static int f_getc(short *pChar) {
 	if(fileInfo.ioBufCur == fileInfo.ioBufEnd) {
 
 		// Yep, refill it.
-		if((n = f_io(true, fileInfo.dataBuf, FIFileBufSize)) == -1)
+		if((byteCount = f_io(true, fileInfo.dataBuf, FIFileBufSize)) == -1)
 			return sess.rtn.status;
 
 		// Hit EOF?
-		if(n == 0) {
+		if(byteCount == 0) {
 
 			// Yep, note it...
 			fileInfo.flags |= FIEOF;
@@ -462,7 +422,7 @@ EOFRetn:
 			}
 
 		// No, update buffer pointers.
-		fileInfo.ioBufEnd = (fileInfo.ioBufCur = fileInfo.dataBuf) + n;
+		fileInfo.ioBufEnd = (fileInfo.ioBufCur = fileInfo.dataBuf) + byteCount;
 		}
 
 	*pChar = (short) *fileInfo.ioBufCur++;
@@ -472,7 +432,7 @@ EOFRetn:
 // Read a line from a file into fileInfo.lineBuf and store the byte count and delimiter status in the supplied pointers.  Check
 // for I/O errors and return status.  *hasDelimp is not set unless at least one byte was read (so the returned value from a
 // previous call will remain valid).
-static int f_getline(uint *len, bool *hasDelimp) {
+static int f_getline(uint *len, bool *pHasDelim) {
 	int status;
 	short c;
 	uint lineLen;
@@ -486,7 +446,7 @@ static int f_getline(uint *len, bool *hasDelimp) {
 	fileInfo.lineBufCur = fileInfo.lineBuf;		// Current line buffer pointer.
 
 	// Input line delimiters undefined?
-	if(fileInfo.realInpDelim1 == -1) {
+	if(fileInfo.inpDelim1 == -1) {
 
 		// Yes.  Read bytes until a NL or CR found, or EOF reached.
 		for(;;) {
@@ -495,25 +455,25 @@ static int f_getline(uint *len, bool *hasDelimp) {
 			if(status != Success)
 				return sess.rtn.status;
 			if(c == '\n') {
-				fileInfo.realInpDelim1 = '\n';
-				fileInfo.realInpDelim2 = -1;
+				fileInfo.inpDelim1 = '\n';
+				fileInfo.inpDelim2 = -1;
 				goto DelimFound;
 				}
 			if(c == '\r') {
-				fileInfo.realInpDelim1 = '\r';
+				fileInfo.inpDelim1 = '\r';
 				if((status = f_getc(&c)) == IOEOF)
 					goto CR;
 				if(status != Success)
 					return sess.rtn.status;
 				if(c == '\n') {
-					fileInfo.realInpDelim2 = '\n';
+					fileInfo.inpDelim2 = '\n';
 					goto DelimFound;
 					}
 
 				// Not a CR-LF sequence; "unget" the last character.
 				--fileInfo.ioBufCur;
 CR:
-				fileInfo.realInpDelim2 = -1;
+				fileInfo.inpDelim2 = -1;
 				goto DelimFound;
 				}
 
@@ -529,26 +489,26 @@ CR:
 			goto EOLn;
 		if(status != Success)
 			return sess.rtn.status;
-		if(c == fileInfo.realInpDelim1) {
+		if(c == fileInfo.inpDelim1) {
 
 			// Got match on first delimiter.  Need two?
-			if(fileInfo.realInpDelim2 == -1)
+			if(fileInfo.inpDelim2 == -1)
 
 				// Nope, we're done.
-				goto DelimFound;
+				break;
 
 			// Yes, check next character.
 			if((status = f_getc(&c)) != IOEOF) {
 				if(status != Success)
 					return sess.rtn.status;
-				if(c == fileInfo.realInpDelim2)
+				if(c == fileInfo.inpDelim2)
 
 					// Second delimiter matches also, we're done.
-					goto DelimFound;
+					break;
 
 				// Not a match; "unget" the last character.
 				--fileInfo.ioBufCur;
-				c = fileInfo.realInpDelim1;
+				c = fileInfo.inpDelim1;
 				}
 			}
 
@@ -560,14 +520,14 @@ DelimFound:
 	hasDelim = true;
 EOLn:
 	// Hit EOF and nothing read?
-	if((lineLen = fileInfo.lineBufCur - fileInfo.lineBuf) == 0 && (fileInfo.flags & FIEOF))
+	if((lineLen = fileInfo.lineBufCur - fileInfo.lineBuf) == 0 && fileInfo.flags & FIEOF)
 
 		// Yes.
 		return IOEOF;
 
 	// Got a (possibly zero-length) line.  Save the length for the caller and return delimiter status if non-zero.
 	if((*len = lineLen) > 0)
-		*hasDelimp = hasDelim;
+		*pHasDelim = hasDelim;
 
 	return sess.rtn.status;
 	}
@@ -588,9 +548,9 @@ int insertLine(const char *src, int len, bool hasDelim, Buffer *pBuf, Point *pPo
 		char *dest = pLine->text;
 		if(pPoint->offset > 0) {
 			strEnd = (str = pPoint->pLine->text) + pPoint->offset;	// Copy text before point.
-			do
+			do {
 				*dest++ = *str++;
-				while(str < strEnd);
+				} while(str < strEnd);
 			}
 		strEnd = src + len;						// Copy line.
 		while(src < strEnd)
@@ -601,9 +561,9 @@ int insertLine(const char *src, int len, bool hasDelim, Buffer *pBuf, Point *pPo
 			else {
 				str = (dest = pPoint->pLine->text) + pPoint->offset;
 				strEnd = pPoint->pLine->text + pPoint->pLine->used;
-				do
+				do {
 					*dest++ = *str++;
-					while(str < strEnd);
+					} while(str < strEnd);
 				pPoint->pLine->used -= pPoint->offset;
 				pPoint->offset = 0;
 				}
@@ -612,9 +572,9 @@ int insertLine(const char *src, int len, bool hasDelim, Buffer *pBuf, Point *pPo
 			if(pPoint->offset < pPoint->pLine->used) {		// Copy remaining text.
 				str = pPoint->pLine->text + pPoint->offset;
 				strEnd = pPoint->pLine->text + pPoint->pLine->used;
-				do
+				do {
 					*dest++ = *str++;
-					while(str < strEnd);
+					} while(str < strEnd);
 				}
 			pPoint->offset += len;
 			lreplace1(pPoint->pLine, pBuf, pLine);			// Replace point line with new one.
@@ -633,7 +593,7 @@ int insertLine(const char *src, int len, bool hasDelim, Buffer *pBuf, Point *pPo
 // inserted; if pTargPoint parameter is NULL, point from current window is used and (1), inserted lines are marked as a region;
 // (2), target buffer is marked as changed if any lines were inserted; and (3), point is moved to beginning of region if n is
 // zero.  In all cases, "n" parameter is updated to number of lines inserted.
-int insertData(int n, Buffer *pSrcBuf, DataInsert *pDataInsert) {
+int insertData(long n, Buffer *pSrcBuf, DataInsert *pDataInsert) {
 	Point *pPoint, point0;
 	Line *pLine0;
 	int windPos;
@@ -646,7 +606,7 @@ int insertData(int n, Buffer *pSrcBuf, DataInsert *pDataInsert) {
 		// No, use one from current window and save state of target buffer for region manipulation later.
 		pPoint = &sess.cur.pFace->point;
 		point0.pLine = (pPoint->pLine == pDataInsert->pTargBuf->pFirstLine) ? NULL : pPoint->pLine->prev;
-		windPos = getWindPos(sess.cur.pWind);
+		windPos = getWindPos(sess.pCurWind);
 		}
 	else
 		// Yes, use it.
@@ -670,7 +630,7 @@ int insertData(int n, Buffer *pSrcBuf, DataInsert *pDataInsert) {
 		// (and len > 0).  If point was not specified, insert line's contents at point via einsertc() being that point
 		// is from the current window; otherwise, replace target point line with line read.  In the latter case, it is
 		// assumed that the point line is last line of the buffer.
-		if(mlputs(MLHome | MLWrap | MLFlush, pDataInsert->msg) != Success)		// Let user know what's up...
+		if(mlputs(pDataInsert->msg, MLHome | MLWrap | MLFlush) != Success)		// Let user know what's up...
 			return sess.rtn.status;
 		while((pDataInsert->status = f_getline(&len, &hasDelim)) == Success) {		// and read the file.
 			if(insertLine(fileInfo.lineBuf, len, hasDelim, pDataInsert->pTargBuf, pPoint) != Success)
@@ -711,8 +671,8 @@ int insertData(int n, Buffer *pSrcBuf, DataInsert *pDataInsert) {
 	if(pDataInsert->lineCt > 0) {
 		bchange(pDataInsert->pTargBuf, WFHard);
 		if(pDataInsert->pTargBuf == sess.cur.pBuf && n != 0) {
-			sess.cur.pWind->reframeRow = 0;
-			sess.cur.pWind->flags |= WFReframe;
+			sess.pCurWind->reframeRow = 0;
+			sess.pCurWind->face.wflags |= WFReframe;
 			}
 		}
 
@@ -742,9 +702,14 @@ uint fileExists(const char *filename) {
 	return 0;
 	}
 
+// Convert a line delimiter symbol to string form and return it.
+const char *delimSymToStr(ushort sym) {
+
+	return sym == FDelimNL ? "NL" : sym == FDelimCRLF ? "CRLF" : sym == FDelimCR ? "CR" : sym == FDelimNUL ? "NUL" : "";
+	}
+
 // Report I/O results as a return message, given active fabrication object.  Return status.
-int ioStat(DFab *rtnMsg, ushort flags, Datum *pBakName, int status, const char *filename, const char *action, uint lineCt) {
-	char *str;
+int ioStat(DFab *rtnMsg, uint flags, Datum *pBakName, int status, const char *filename, const char *action, uint lineCt) {
 
 	// Report any non-fatal read or close error.
 	if(!(flags & IOS_OtpFile) && status < Success) {
@@ -765,15 +730,28 @@ int ioStat(DFab *rtnMsg, ushort flags, Datum *pBakName, int status, const char *
 		goto LibFail;
 
 	// Non-standard line delimiter(s)?
-	str = (flags & IOS_OtpFile) ? fileInfo.realOtpDelim.u.pDelim : sess.cur.pBuf->inpDelim.u.delim;
-	if(str[0] != '\0' && (str[0] != '\n' || str[1] != '\0')) {
-		if(dputs(text252, rtnMsg, 0) != 0 || dputs(str, rtnMsg, DCvtVizChar) != 0)
-				// " delimited by "
-			goto LibFail;
+	if(status == Success) {
+		ushort sym;
+		bool stdDelim = true;
+		if(flags & IOS_OtpFile) {
+			if(fileInfo.pOtpDelim[0] != '\n' || fileInfo.pOtpDelim[1] != '\0') {
+				stdDelim = false;
+				sym = delimCharsToSym(fileInfo.pOtpDelim[0], fileInfo.pOtpDelim[1]);
+				}
+			}
+		else if(sess.cur.pBuf->inpDelimSym != FDelimUndef)
+			if(fileInfo.inpDelim1 != '\n' || fileInfo.inpDelim2 != -1) {
+				stdDelim = false;
+				sym = sess.cur.pBuf->inpDelimSym;
+				}
+		if(!stdDelim)
+			if(dputs(text252, rtnMsg, 0) != 0 || dputs(delimSymToStr(sym), rtnMsg, 0) != 0)
+					// " delimited by "
+				goto LibFail;
 		}
 
 	// Missing line delimiter at EOF?
-	if((flags & IOS_NoDelim) && dputs(text291, rtnMsg, 0) != 0)
+	if(flags & IOS_NoDelim && dputs(text291, rtnMsg, 0) != 0)
 			// " without delimiter at EOF"
 		goto LibFail;
 
@@ -784,9 +762,9 @@ int ioStat(DFab *rtnMsg, ushort flags, Datum *pBakName, int status, const char *
 
 	// Backup file created on output?
 	if(pBakName != NULL) {
-		if(dputs(text257, rtnMsg, 0) != 0 || dputs(fbasename(pBakName->str, true), rtnMsg, 0) != 0 ||
-				// ", original file renamed to \""
-		 dputc('"', rtnMsg, 0) != 0)
+		if(dputs(text257, rtnMsg, 0) != 0 ||
+			// ", original file renamed to \""
+		 dputs(cname(pBakName->str, CNBasename | CNPtrOnly), rtnMsg, 0) != 0 || dputc('"', rtnMsg, 0) != 0)
 			goto LibFail;
 		}
 
@@ -800,52 +778,43 @@ LibFail:
 	return libfail();
 	}
 
-// Prompt for a filename (which cannot be null), using "def" as default (which may be NULL).  ArgFirst and/or Term_* flags may
-// be specified in "flags" argument.  Return status.
-int getFilename(Datum *pRtnVal, const char *prompt, const char *def, uint flags) {
+// Prompt for a filename (which cannot be null), using "defName" as default (which may be NULL).  ArgFirst and/or Term_* flags
+// may be specified in "flags" argument.  Return status.
+int getFilename(Datum *pRtnVal, const char *basePrompt, const char *defName, uint flags) {
 
 	if(sess.opFlags & OpScript)
 		(void) funcArg(pRtnVal, (flags & ArgFirst) | ArgNotNull1 | ArgPath);
 	else {
-		TermInpCtrl termInpCtrl = {def, RtnKey, MaxPathname, NULL};
+		TermInpCtrl termInpCtrl = {defName, RtnKey, MaxPathname, NULL};
 		char promptBuf[WorkBufSize];
-		sprintf(promptBuf, "%s %s", prompt, text99);
+		sprintf(promptBuf, "%s %s", basePrompt, text99);
 						// "file"
-		(void) termInp(pRtnVal, promptBuf, ArgNotNull1 | ArgNil1,
-		 Term_C_Filename | (flags & ~ArgFirst), &termInpCtrl);
+		(void) termInp(pRtnVal, promptBuf, ArgNotNull1 | ArgNil1, TermC_Filename | (flags & ~ArgFirst), &termInpCtrl);
 		}
 	return sess.rtn.status;
 	}
 
-// Delete a file on disk (with options, if n argument) and return status.  Return filename if deletion was successful,
-// otherwise nil.
-int delFile(Datum *pRtnVal, int n, Datum **args) {
-	static bool withBuf, ignoreErr;
-	static Option options[] = {
-		{"With^Buf", "With^Buf", 0, .u.ptr = (void *) &withBuf},
-		{"^IgnoreErr", "^Ign", 0, .u.ptr = (void *) &ignoreErr},
-		{NULL, NULL, 0, 0}};
-	static OptHdr optHdr = {
-		ArgFirst, text410, false, options};
-			// "command option"
+// Delete a file on disk (possibly with options) and return status.  Return filename if deletion was successful, otherwise nil.
+int delFile(Datum *pRtnVal, long n, Datum **args) {
+	uint flags = cmdFuncTable[cf_delFile].pOptHdr->selFlags;
 
-	initBoolOpts(options);
-	if(n != INT_MIN) {
-		int count;
+	// If no options were selected interactively, bail out (user cancelled).
+	if(n != DefN && !(sess.opFlags & OpScript) && flags == 0)
+		return sess.rtn.status;
 
-		// Get options and set flags.
-		if(parseOpts(&optHdr, text448, NULL, &count) != Success || count == 0)
-				// "Options"
-			return sess.rtn.status;
-		setBoolOpts(options);
-		}
+	if(flags & File_WithBuf) {
 
-	if(withBuf) {
 		// Get buffer name.
-		Buffer *pBuf = bdefault();
-		if(getBufname(pRtnVal, text26, pBuf != NULL ? pBuf->bufname : NULL, OpDelete, &pBuf, NULL) != Success ||
+		uint oflags;
+		Buffer *pBuf;
+		if(sess.opFlags & OpScript) {
+			dxfer(pRtnVal, args[0]);		// Buffer name.
+			oflags = OpDelete | OpHaveBName;
+			}
+		else
+			oflags = OpDelete | OpDefBName;
+		if(getBufname(pRtnVal, text26, oflags, &pBuf, NULL) != Success || pBuf == NULL)
 				// "Delete"
-		 pBuf == NULL)
 			return sess.rtn.status;
 
 		// Save filename and delete buffer.  Error if no filename set.
@@ -857,82 +826,76 @@ int delFile(Datum *pRtnVal, int n, Datum **args) {
 		if(bdelete(pBuf, 0) != Success)
 			return sess.rtn.status;
 		}
+	else if(sess.opFlags & OpScript)
+		dxfer(pRtnVal, args[0]);			// Filename.
 	else {
 		// Get filename.
-		if(getFilename(pRtnVal, text26, NULL, ArgFirst | Term_C_NoAuto) != Success || disnil(pRtnVal))
+		if(getFilename(pRtnVal, text26, NULL, ArgFirst | TermC_NoAuto) != Success || disnil(pRtnVal))
 				// "Delete"
 			return sess.rtn.status;
 		}
 
-	// Have filename in *pRtnVal.  Delete it.
+	// Have filename in pRtnVal.  Delete it.
 	if(fileExists(pRtnVal->str)) {
 		if(unlink(pRtnVal->str) == 0)
-			(void) rsset(Success, RSHigh, withBuf ? text485 : text486, pRtnVal->str, text10);
+			(void) rsset(Success, RSHigh, flags & File_WithBuf ? text485 : text486, pRtnVal->str, text10);
 					// "Buffer and file \"%s\" %s", "File \"%s\" %s", "deleted"
-		else if(!ignoreErr)
+		else if(!(flags & File_IgnoreErr))
 			(void) rsset(Failure, 0, text484, text263, pRtnVal->str, strerror(errno));
 				// "Cannot %s file \"%s\": %s", "delete"
 		}
-	else if(withBuf) {
+	else if(flags & File_WithBuf) {
 		dsetnil(pRtnVal);
 		(void) rsset(Success, RSHigh, "%s %s", text58, text10);
 			// "Buffer", "deleted"
 		}
 	else {
-		if(!ignoreErr)
-			(void) rsset(Failure, 0, text152, pRtnVal->str);
-					// "No such file \"%s\""
+		if(!(flags & File_IgnoreErr))
+			(void) rsset(Failure, 0, text52, text99, pRtnVal->str);
+					// "No such %s \"%s\"", "file"
 		dsetnil(pRtnVal);
 		}
 
 	return sess.rtn.status;
 	}
 
-// Create hard or symbolic link to a file (with options, if n argument) and return status.
-int linkFile(Datum *pRtnVal, int n, Datum **args) {
+// Create hard or symbolic link to a file (possibly with options) and return status.
+int linkFile(Datum *pRtnVal, long n, Datum **args) {
 	Datum *pOldFile, *pNewFile;
-	static bool symbolic, force;
-	static Option options[] = {
-		{"^SymLink", "^SymLnk", 0, .u.ptr = (void *) &symbolic},
-		{"^Force", "^Frc", 0, .u.ptr = (void *) &force},
-		{NULL, NULL, 0, 0}};
-	static OptHdr optHdr = {
-		ArgFirst, text410, false, options};
-			// "command option"
+	uint flags = cmdFuncTable[cf_linkFile].pOptHdr->selFlags;
 
-	if(dnewtrack(&pOldFile) != 0 || dnewtrack(&pNewFile) != 0)
+	// If no options were selected interactively, bail out (user cancelled).
+	if(n != DefN && !(sess.opFlags & OpScript) && flags == 0)
+		return sess.rtn.status;
+
+	if((pOldFile = dnewtrack()) == NULL || (pNewFile = dnewtrack()) == NULL)
 		return libfail();
-	initBoolOpts(options);
-	if(n != INT_MIN) {
-		int count;
-
-		// Get options and set flags.
-		if(parseOpts(&optHdr, text448, NULL, &count) != Success || count == 0)
-				// "Options"
-			return sess.rtn.status;
-		setBoolOpts(options);
-		}
 
 	// Get old filename.  Error if hard link and file does not exist.
-	if(getFilename(pOldFile, symbolic ? text488 : text487, NULL, ArgFirst | Term_C_NoAuto) != Success || disnil(pOldFile))
+	if(sess.opFlags & OpScript)
+		dxfer(pOldFile, args[0]);
+	else if(getFilename(pOldFile, flags & File_Symbolic ? text488 : text487, NULL,
 			// "Make symbolic link from existing", "Make hard link from existing"
+	 TermC_NoAuto) != Success || disnil(pOldFile))
 		return sess.rtn.status;
-	if(!symbolic && !fileExists(pOldFile->str))
-		return rsset(Failure, 0, text152, pOldFile->str);
-				// "No such file \"%s\""
+	if(!(flags & File_Symbolic) && !fileExists(pOldFile->str))
+		return rsset(Failure, 0, text52, text99, pOldFile->str);
+				// "No such %s \"%s\"", "file"
 
 	// Get new filename.
-	if(getFilename(pNewFile, text489, NULL, Term_C_NoAuto) != Success || disnil(pNewFile))
-			// "to new"
+	if(sess.opFlags & OpScript)
+		dxfer(pNewFile, args[1]);
+	else if(getFilename(pNewFile, text489, NULL, TermC_NoAuto) != Success || disnil(pNewFile))
+				// "to new"
 		return sess.rtn.status;
 
 	// Delete new file if force and it already exists.
-	if(force && fileExists(pNewFile->str) && unlink(pNewFile->str) != 0)
+	if(flags & File_ForceLink && fileExists(pNewFile->str) && unlink(pNewFile->str) != 0)
 		return rsset(Failure, 0, text484, text263, pNewFile->str, strerror(errno));
 				// "Cannot %s file \"%s\": %s", "delete"
 
 	// Ready to roll.  Create link.
-	if((symbolic ? symlink(pOldFile->str, pNewFile->str) : link(pOldFile->str, pNewFile->str)) != 0)
+	if((flags & File_Symbolic ? symlink(pOldFile->str, pNewFile->str) : link(pOldFile->str, pNewFile->str)) != 0)
 		return rsset(Failure, 0, text490, pNewFile->str, strerror(errno));
 			// "Cannot create link file \"%s\": %s"
 
@@ -947,11 +910,11 @@ static int bfchange(Buffer *pBuf) {
 
 	// We cannot set a filename on a read-only buffer, user command or function buffer, or an executing buffer.
 	if(pBuf->flags & (BFReadOnly | BFCmdFunc))
-		return rsset(Failure, 0, text344, (pBuf->flags & BFCmdFunc) ? text376 : text460);
+		return rsset(Failure, 0, text344, pBuf->flags & BFCmdFunc ? text376 : text460);
 			// "Operation not permitted on a %s buffer", "user command or function", "read-only"
-	if(pBuf->pCallInfo != NULL && pBuf->pCallInfo->execCount > 0)
-		return rsset(Failure, 0, text284, text276, text248);
-			// "Cannot %s %s buffer", "modify", "an executing"
+	if(pBuf->pCallHdr != NULL && pBuf->pCallHdr->execCount > 0)
+		return rsset(Failure, 0, text284, text276, text238);
+			// "Cannot %s %s buffer", "modify", "executing"
 	return sess.rtn.status;
 	}
 
@@ -959,7 +922,7 @@ static int bfchange(Buffer *pBuf) {
 // different working directories; otherwise, return true if the given buffer is being displayed on at least two screens having
 // different working directories.  In the latter case, if pSaveDir not NULL, also set *pSaveDir to directory of last screen that
 // buffer is displayed on (which will be unique if false is returned).
-static bool workDirStatus(Buffer *pBuf, const char **pSaveDir) {
+static bool multiHomeDir(Buffer *pBuf, const char **pSaveDir) {
 	EScreen *pScrn = sess.scrnHead;
 	const char *workDir = NULL;
 	if(pBuf == NULL) {						// Check for multiple working directories.
@@ -994,110 +957,109 @@ static bool workDirStatus(Buffer *pBuf, const char **pSaveDir) {
 	return false;
 	}
 
-// Set filename in buffer with flags and update buffer directory, if applicable.  Also derive new buffer name from filename if
-// "chgName" is true.  It is assumed that buffer is not a user command or function.  Return status.
-static int setfile(Buffer *pBuf, Datum *pFile, ushort flags, bool chgName) {
+// Set filename in buffer with flags and update buffer's home directory, if applicable.  Also derive new buffer name from
+// filename if BF_DeriveName flag is set.  It is assumed that buffer is not a user command or function and BF_UpdBufDir flag is
+// not set (and thus, setFilename() does not update buffer's home directory).  Return status.
+static int setfile(Buffer *pBuf, Datum *pFile, uint flags) {
 
 	if(setFilename(pBuf, pFile->str, flags) == Success) {
 
 		// Update buffer directory if not in background and not multi-homed.
 		if(pBuf->windCount > 0) {
-			const char *saveDir;
+			const char *homeDir;
 
-			if(!workDirStatus(pBuf, &saveDir))
-				pBuf->saveDir = (pBuf->filename == NULL || *pBuf->filename == '/') ? NULL : saveDir;
+			if(!multiHomeDir(pBuf, &homeDir))
+				pBuf->homeDir = homeDir;
 			}
 
 		// Change buffer name if applicable.
-		if(chgName && pBuf->filename != NULL)
+		if(flags & BF_DeriveName && pBuf->filename != NULL)
 			(void) brename(NULL, BR_Auto, pBuf);
 		}
 
 	return sess.rtn.status;
 	}
 
-// Rename a file on disk (with options, if n argument) and return status.  Return new filename if successful, otherwise nil.
-int renameFile(Datum *pRtnVal, int n, Datum **args) {
+// Rename a file on disk (possibly with options) and return status.  Return new filename if successful, otherwise nil.
+int renameFile(Datum *pRtnVal, long n, Datum **args) {
 	Datum *pDatum;
 	Buffer *pBuf;
-	static bool fromBuf, diskOnly;
-	static Option options[] = {
-		{"From^Buf", NULL, 0, .u.ptr = (void *) &fromBuf},
-		{"^DiskOnly", "^DskOnly", 0, .u.ptr = (void *) &diskOnly},
-		{NULL, NULL, 0, 0}};
-	static OptHdr optHdr = {
-		ArgFirst, text410, false, options};
-			// "command option"
+	uint flags = cmdFuncTable[cf_renameFile].pOptHdr->selFlags;
 
-	if(dnewtrack(&pDatum) != 0)
+	// If no options were selected interactively, bail out (user cancelled).
+	if(n != DefN && !(sess.opFlags & OpScript) && flags == 0)
+		return sess.rtn.status;
+
+	if((pDatum = dnewtrack()) == NULL)
 		return libfail();
-	initBoolOpts(options);
-	if(n != INT_MIN) {
-		int count;
 
-		// Get options and set flags.
-		if(parseOpts(&optHdr, text448, NULL, &count) != Success || count == 0)
-				// "Options"
-			return sess.rtn.status;
-		setBoolOpts(options);
-		}
+	// Get buffer name or filename into pDatum if script mode.
+	if(sess.opFlags & OpScript)
+		dxfer(pDatum, args[0]);
 
-	if(fromBuf) {
+	if(flags & File_FromBuf) {
+
 		// Get buffer name and check if filename change allowed.
-		if(getBufname(pDatum, text492, sess.cur.pBuf->bufname, OpDelete, &pBuf, NULL) != Success ||
+		uint oflags = sess.opFlags & OpScript ? OpDelete | OpHaveBName : OpDelete | OpCurBName;
+		if(getBufname(pDatum, text492, oflags, &pBuf, NULL) != Success || pBuf == NULL ||
+		 (!(flags & File_DiskOnly) && bfchange(pBuf) != Success))
 				// "Rename file in"
-		 pBuf == NULL || (!diskOnly && bfchange(pBuf) != Success))
 			return sess.rtn.status;
 
-		// Error if no filename set; otherwise, save it.
+		// Error if no filename set in buffer; otherwise, save filename.
 		if(pBuf->filename == NULL)
 			return rsset(Failure, 0, text493, text83, pBuf->bufname);
 				// "No filename set for %s '%s'", "buffer"
 		if(dsetstr(pBuf->filename, pDatum) != 0)
 			return libfail();
+
+		// Activate buffer if needed.
+		if(!(pBuf->flags & BFActive) && bactivate(pBuf) != Success)
+			return sess.rtn.status;
 		}
-	else {
+	else if(!(sess.opFlags & OpScript)) {
+
 		// Get old filename.
-		if(getFilename(pDatum, text29, NULL, n == INT_MIN ? ArgFirst | Term_C_NoAuto : Term_C_NoAuto) != Success ||
+		if(getFilename(pDatum, text29, NULL, TermC_NoAuto) != Success || disnil(pDatum))
 				// "Rename"
-		 disnil(pDatum))
 			return sess.rtn.status;
 		}
 
 	// Check if file exists.
 	if(!fileExists(pDatum->str))
-		return rsset(Failure, 0, text152, pDatum->str);
-				// "No such file \"%s\""
+		return rsset(Failure, 0, text52, text99, pDatum->str);
+				// "No such %s \"%s\"", "file"
 	// Get new filename.
-	if(getFilename(pRtnVal, text339, fromBuf ? pBuf->filename : NULL, Term_C_NoAuto) != Success || disnil(pRtnVal))
-			// "to"
+	if(sess.opFlags & OpScript)
+		dxfer(pRtnVal, args[1]);
+	else if(getFilename(pRtnVal, text339, flags & File_FromBuf ? pBuf->filename : NULL, TermC_NoAuto) != Success ||
+				// "to"
+	 disnil(pRtnVal))
 		return sess.rtn.status;
 
 	// Have old and new filenames in *pDatum and *pRtnVal.  Rename file on disk.
-	if(rename(pDatum->str, pRtnVal->str) != 0)
+	if(rename(pDatum->str, pRtnVal->str) != 0) {
+		dsetnil(pRtnVal);
 		return rsset(Failure, 0, text484, text275, pDatum->str, strerror(errno));
 			// "Cannot %s file \"%s\": %s", "rename"
+		}
 
 	// Set buffer's filename if applicable.
-	if(fromBuf && !diskOnly && setfile(pBuf, pRtnVal, 0, true) != Success)
+	if((flags & (File_FromBuf | File_DiskOnly)) == File_FromBuf && setfile(pBuf, pRtnVal, BF_DeriveName) != Success) {
+		dsetnil(pRtnVal);
 		return sess.rtn.status;
+		}
 
 	// Success.
-	return rsset(Success, RSHigh, "%s %s", fromBuf ? text494 : text495,  text467);
+	return rsset(Success, RSHigh, "%s %s", flags & File_DiskOnly ? text494 : text495,  text467);
 					// "Disk file", "File", "renamed"
 	}
 
 // Prepare a buffer for reading.  "flags" is passed to bclear().  Return status.
-int readPrep(Buffer *pBuf, ushort flags) {
+int readPrep(Buffer *pBuf, uint flags) {
 
-	if(pBuf->flags & BFCmdFunc)
-		(void) rsset(Failure, RSNoFormat, text344);
-				// "Operation not permitted on a user command or function buffer"
-	else if(bclear(pBuf, flags) == Success) {
-		if(pBuf->flags & BFNarrowed)				// Mark as changed if narrowed.
-			pBuf->flags |= BFChanged;
-		}
-	return sess.rtn.status;
+	return pBuf->flags & BFCmdFunc ? rsset(Failure, 0, text344, text376) : bclear(pBuf, flags);
+				// "Operation not permitted on a %s buffer", "user command or function"
 	}
 
 // Read a file into the given buffer, blowing away any text found there.  If filename is NULL, use the buffer's filename if set,
@@ -1106,7 +1068,7 @@ int readPrep(Buffer *pBuf, ushort flags) {
 // (b), run the filename hook if the buffer filename was changed.  If RWExist flag is set, return an error if the file does not
 // exist.  If RWStats flag set, set a return message containing input statistics.  Return status, including Cancelled if buffer
 // was not cleared (user did not "okay" it) and IONSF if file does not exist.
-int readIn(Buffer *pBuf, const char *filename, ushort flags) {
+int readIn(Buffer *pBuf, const char *filename, uint flags) {
 	EWindow *pWind;
 	DataInsert dataInsert = {
 		pBuf,			// Target buffer.
@@ -1120,7 +1082,7 @@ int readIn(Buffer *pBuf, const char *filename, ushort flags) {
 	// Determine filename.
 	if(filename == NULL)
 		filename = pBuf->filename;
-	else if((flags & RWKeep) && !(pBuf->flags & BFNarrowed) &&
+	else if(flags & RWKeep && !(pBuf->flags & BFNarrowed) &&
 	 setFilename(pBuf, filename, 0) != Success)			// Save given filename.
 		return sess.rtn.status;
 
@@ -1133,7 +1095,7 @@ int readIn(Buffer *pBuf, const char *filename, ushort flags) {
 	// Read the file and "unchange" the buffer.
 	if(insertData(1, NULL, &dataInsert) != Success)
 		return sess.rtn.status;
-	pBuf->flags &= ~BFChanged;
+	bchgflag(pBuf, false);
 
 	// Report results.
 	if(flags & RWStats) {
@@ -1156,15 +1118,15 @@ Retn:
 	do {
 		if(pWind->pBuf == pBuf) {
 			faceInit(&pWind->face, pBuf->pFirstLine, NULL);
-			pWind->flags |= (WFHard | WFMode);
+			pWind->face.wflags |= (WFHard | WFMode);
 			}
 		} while((pWind = pWind->next) != NULL);
 
 	// Erase filename and run read hook if requested.
 	if(!(flags & RWKeep))
 		clearBufFilename(pBuf);
-	else if(dataInsert.status >= Success && (flags & RWReadHook) && !(pBuf->flags & BFCmdFunc))
-		if(execHook(NULL, INT_MIN, hookTable + HkRead, 2, pBuf->bufname, pBuf->filename) <= FatalError)
+	else if(dataInsert.status >= Success && flags & RWReadHook && !(pBuf->flags & BFCmdFunc))
+		if(execHook(NULL, DefN, hookTable + HkRead, 2, pBuf->bufname, pBuf->filename) <= FatalError)
 			return sess.rtn.status;
 
 	// Return status.
@@ -1172,44 +1134,57 @@ Retn:
 							// "New file"
 	}
 
+// Create inactive buffer for readFile() and findViewFile() functions.
+static int createBuf(char *filename, Buffer **ppBuf, bool *pCreated) {
+
+	if(bfind(filename, BN_Create | BN_CreateHook | BN_Derive | BN_Force, 0, ppBuf, pCreated) == Success) {
+
+		// Set filename and flag as inactive.
+		if(setFilename(*ppBuf, filename, BF_UpdBufDir) == Success)
+			(*ppBuf)->flags &= ~BFActive;
+		}
+	return sess.rtn.status;
+	}
+
 // Read given file into a buffer.  If default n, use the current buffer.  If not default n, create a buffer, derive the buffer
 // name from the filename, and save the filename in the buffer header.  In any case, set the buffer to "read only" if the
 // "ReadOnly" global mode is enabled.  Render buffer and return status.
-int readFile(Datum *pRtnVal, int n, Datum **args) {
+int readFile(Datum *pRtnVal, long n, Datum **args) {
 	Buffer *pBuf;
 
 	// Get the filename.
-	if(getFilename(pRtnVal, n == -1 ? text299 : text131, sess.cur.pBuf->filename, ArgFirst) != Success || disnil(pRtnVal))
+	if(getFilename(pRtnVal, n == -1 ? text27 : text131, sess.cur.pBuf->filename, ArgFirst) != Success || disnil(pRtnVal))
 				// "Pop", "Read"
 		return sess.rtn.status;
 
 	// Use current buffer by default; otherwise, create one.
-	if(n == INT_MIN)
+	if(n == DefN) {
 		pBuf = sess.cur.pBuf;
-	else if(bfind(pRtnVal->str, BS_Create | BS_CreateHook | BS_Derive | BS_Force, 0, &pBuf, NULL) != Success)
-		return sess.rtn.status;
 
-	// Read the file and rename current buffer if a buffer was not created.
-	if(readIn(pBuf, pRtnVal->str, RWReadHook | RWExist | RWKeep | RWStats) != Success ||
-	 (n == INT_MIN && brename(NULL, BR_Auto, sess.cur.pBuf) != Success))
-		return sess.rtn.status;
+		// Using current buffer.  Read the file and rename buffer.
+		if(readIn(pBuf, pRtnVal->str, RWReadHook | RWExist | RWKeep | RWStats) != Success ||
+		 brename(NULL, BR_Auto, pBuf) != Success)
+			return sess.rtn.status;
 
-	// Update buffer directory.
-	pBuf->saveDir = (*pRtnVal->str == '/') ? NULL : sess.cur.pScrn->workDir;
+		// Update buffer directory.
+		pBuf->homeDir = sess.pCurScrn->workDir;
+		}
+	else if(createBuf(pRtnVal->str, &pBuf, NULL) != Success)
+		return sess.rtn.status;
 
 	// Set buffer to "read only" if "ReadOnly" global mode enabled.
-	if(modeInfo.cache[MdIdxReadOnly]->flags & MdEnabled) {
+	if(mode.cache[MdIdxReadOnly]->flags & MdActive) {
 		pBuf->flags |= BFReadOnly;
 		supd_windFlags(pBuf, WFMode);
 		}
 
 	// Render the buffer.
-	return render(pRtnVal, n == INT_MIN ? 1 : n, pBuf, n == INT_MIN ? 0 : RendNewBuf | RendNotify);
+	return render(pRtnVal, n == DefN ? 1 : n, pBuf, n == DefN ? 0 : RendNewBuf | RendNotify);
 	}
 
 // Insert a file into the current buffer.  If zero argument, leave point before the inserted lines, otherwise after.  This
 // is really easy; all you do it find the name of the file, and call the standard "insert a file into the current buffer" code.
-int insertFile(Datum *pRtnVal, int n, Datum **args) {
+int insertFile(Datum *pRtnVal, long n, Datum **args) {
 
 	if(getFilename(pRtnVal, text132, NULL, ArgFirst | Term_NoDef) != Success || disnil(pRtnVal))
 			// "Insert"
@@ -1242,7 +1217,7 @@ static int fileCompare(Buffer *pBuf, const char *filename) {
 	if(pBuf->filename != NULL && strcmp(pBuf->filename, filename) == 0) {
 
 		// Match found.  Check directory.
-		if(*filename == '/' || pBuf->saveDir == sess.cur.pScrn->workDir)
+		if(*filename == '/' || pBuf->homeDir == sess.pCurScrn->workDir)
 			return rsset(Success, RSNoFormat, text135);
 						// "Old buffer"
 		}
@@ -1253,19 +1228,19 @@ static int fileCompare(Buffer *pBuf, const char *filename) {
 // the file if one does not already exist and stay in current buffer.  If n != 0 and the file is not currently attached to a
 // buffer, create a buffer.  In all cases, set buffer to "read only" if it was created and either "view" is true or ReadOnly
 // global mode is enabled.  Render buffer and return status.
-int findViewFile(Datum *pRtnVal, int n, bool view) {
-	Datum *pArrayEl;
+int findViewFile(Datum *pRtnVal, long n, bool view) {
 	Buffer *pBuf;
-	Array *pArray;
+	HashNode *pNode;
+	HashEach each;
 	EScreen *pScrn;
 	EWindow *pWind;
 	int status;
 	bool created = false;
-	bool readOnly = view || (modeInfo.cache[MdIdxReadOnly]->flags & MdEnabled);
+	bool readOnly = view || mode.cache[MdIdxReadOnly]->flags & MdActive;
 
 	// Get filename.
 	if(getFilename(pRtnVal, view ? text134 : text133, NULL, n < 0 || n > 1 ? ArgFirst | Term_NoDef :
-	 ArgFirst | Term_NoDef | Term_C_NoAuto) != Success || disnil(pRtnVal))
+	 ArgFirst | Term_NoDef | TermC_NoAuto) != Success || disnil(pRtnVal))
 			// "View", "Find"
 		return sess.rtn.status;
 
@@ -1282,9 +1257,9 @@ int findViewFile(Datum *pRtnVal, int n, bool view) {
 		} while((pScrn = pScrn->next) != NULL);
 
 	// No match.  Now check background buffers.
-	pArray = &bufTable;
-	while((pArrayEl = aeach(&pArray)) != NULL) {
-		pBuf = bufPtr(pArrayEl);
+	heachinit(&each, &buf.table);
+	while((pNode = heach(&each)) != NULL) {
+		pBuf = bufPtr(pNode->pVal);
 		if(pBuf->windCount == 0) {				// Select if not being displayed.
 			if((status = fileCompare(pBuf, pRtnVal->str)) < NotFound)
 				return sess.rtn.status;
@@ -1294,13 +1269,8 @@ int findViewFile(Datum *pRtnVal, int n, bool view) {
 		}
 
 	// No buffer found... create one.
-	if(bfind(pRtnVal->str, BS_Create | BS_CreateHook | BS_Derive | BS_Force, 0, &pBuf, &created) != Success)
+	if(createBuf(pRtnVal->str, &pBuf, &created) != Success)
 		return sess.rtn.status;
-
-	// Set filename and flag as inactive.
-	if(setFilename(pBuf, pRtnVal->str, BF_UpdBufDir) != Success)
-		return sess.rtn.status;
-	pBuf->flags = 0;
 ViewChk:
 	// Set "read only" buffer attribute if readOnly is true.  No need to run filename hook -- that will happen when the
 	// buffer is activated.  If file being viewed is associated with an existing buffer that has been modified, notify user
@@ -1317,7 +1287,7 @@ ViewChk:
 			}
 		}
 
-	return render(pRtnVal, n == INT_MIN ? 1 : n, pBuf, created ? RendNewBuf : 0);
+	return render(pRtnVal, n == DefN ? 1 : n, pBuf, created ? RendNewBuf | RendNotify : 0);
 	}
 
 // Check given buffer flags and verify with user before writing to a file.  Return status.
@@ -1332,22 +1302,63 @@ static int bufStatusCheck(Buffer *pBuf) {
 		 dputf(&prompt, 0, text147, text308, pBuf->bufname) != 0 || dclose(&prompt, FabStr) != 0)
 				// "%s buffer '%s'... write it out", "Narrowed"
 			(void) libfail();
-		else if(terminpYN(prompt.pDatum->str, &yep) == Success && !yep)
+		else if(termInpYN(prompt.pDatum->str, &yep) == Success && !yep)
 			(void) rsset(UserAbort, 0, NULL);
 		}
 
 	return sess.rtn.status;
 	}
 
-// Write a buffer to disk, given buffer, filename and mode ('w' = write, 'a' = append) and return status.  Before the file is
-// written, a user routine (write hook) can be run.  The number of lines written, and possibly other status information is
-// displayed.  If "ATerm" mode is enabled and the buffer does not have a terminating line delimiter, one is added before the
-// buffer is written.  If "Safe" or "Bak" mode is enabled, the buffer is written out to a temporary file, the old file is
-// unlinked or renamed to "<file>.bak" (if "<file>.bak" does not already exist), and the temporary is renamed to the original.
-static int writeOut(Buffer *pBuf, const char *filename, short mode, ushort flags) {
+// Check if output file is a symbolic or hard link and ask user if it should be deleted before write (to break the link) if so.
+static int linkCheck(Buffer *pBuf, const char *filename) {
+
+	// Skip link check if safe mode (because output file will be deleted before write in that case).
+	if(!modeSet(MdIdxSafe, pBuf)) {
+		struct stat s;
+
+		// Check if output file exists, is a symbolic or hard link, and is not in "fileLinkKeepers" hash.
+		if(lstat(filename, &s) == 0 && ((s.st_mode & S_IFMT) == S_IFLNK ||
+		 ((s.st_mode & S_IFMT) == S_IFREG && s.st_nlink > 1))) {
+			Datum *pPath, *pPrompt;
+			bool nukeIt;
+			char wkBuf[strlen(filename) + 1];
+
+			if((pPath = dnewtrack()) == NULL || (pPrompt = dnewtrack()) == NULL)
+				goto LibFail;
+			if(absPath(strcpy(wkBuf, filename), false, pPath) == Success &&
+			 hsearch(&fileLinkKeepers, pPath->str) == NULL) {
+
+				// Outfile is a link and not previously brought to user's attention.  Ask user if the link
+				// should be broken.  If yes, delete the output file; otherwise, remember response by adding
+				// absolute pathname to fileLinkKeepers hash (as key with nil value).
+				if(dsetf(pPrompt, text537, (s.st_mode & S_IFMT) == S_IFLNK ? text216 : text269, filename) != 0)
+						// "Break %s link for file \"%s\" on output", "symbolic", "hard"
+					goto LibFail;
+				if(termInpYN(pPrompt->str, &nukeIt) == Success) {
+					if(nukeIt)
+						(void) unlink(filename);
+					else if(hnewnode(&fileLinkKeepers, pPath->str, NULL) == NULL)
+LibFail:
+						return libfail();
+					}
+			 	}
+		 	}
+		}
+
+	return sess.rtn.status;
+	}
+
+// Write a buffer to disk, given buffer, filename, mode ('w' = write, 'a' = append), and save flags, and return status.  Before
+// the file is written, a user routine (write hook) can be run.  The number of lines written, and possibly other status
+// information is displayed.  If "ATerm" mode is enabled and the buffer does not have a terminating line delimiter, one is added
+// before the buffer is written.  If "Safe" or "Bak" mode is enabled, the buffer is written out to a temporary file, the old
+// file is unlinked or renamed to "<file>.bak" (if "<file>.bak" does not already exist), and the temporary is renamed to the
+// original.  If BW_QuickExit flag is set and buffer is saved to disk, buffer is flagged (with BFQSave and possibly BFQBak) for
+// "quickExit" command processing.  In all cases, call ioStat() with appropriate flags and arguments on exit.
+static int writeOut(Buffer *pBuf, const char *filename, short fmode, uint flags) {
 	uint lineCt;			// Number of lines written.
 	int status;			// Return status.
-	ushort saveFlags = 0;		// Are we safe saving? (0x01 bit = 'safe' save, 0x02 bit = 'bak' save)
+	uint saveFlags = 0;		// Are we safe saving? (0x01 bit = 'safe' save, 0x02 bit = 'bak' save)
 	DFab fab;
 	struct stat s;			// File permision info.
 	Datum *pTempName;		// Temporary filename.
@@ -1356,17 +1367,17 @@ static int writeOut(Buffer *pBuf, const char *filename, short mode, ushort flags
 	if(dopentrack(&fab) != 0)
 		goto LibFail;
 
-	// Run user-assigned write hook.
-	if(!(pBuf->flags & (BFHidden | BFCommand | BFFunc)) &&
-	 execHook(NULL, INT_MIN, hookTable + HkWrite, 2, pBuf->bufname, filename) != Success)
+	// Check for symbolic or hard link and run user-assigned write hook.
+	if((fmode == 'w' && linkCheck(pBuf, filename) != Success) ||
+	 execHook(NULL, DefN, hookTable + HkWrite, 0x103, pBuf->bufname, filename, (long) fmode) != Success)
 		return sess.rtn.status;
 
 	// Determine if we will use the "safe save" method.
-	if((modeSet(MdIdxBak, pBuf) || modeSet(MdIdxSafe, pBuf)) && fileExists(filename) && mode == 'w') {
+	if(fmode == 'w' && (modeSet(MdIdxBak, pBuf) || modeSet(MdIdxSafe, pBuf)) && fileExists(filename)) {
 		if(modeSet(MdIdxBak, pBuf)) {
 
 			// 'Bak' mode enabled.  Create backup version of filename.
-			if(dnewtrack(&pBakName) != 0 || dsalloc(pBakName, strlen(filename) + strlen(BackupExt) + 1) != 0)
+			if((pBakName = dnewtrack()) == NULL || dsalloc(pBakName, strlen(filename) + strlen(BackupExt) + 1) != 0)
 				goto LibFail;
 			sprintf(pBakName->str, "%s%s", filename, BackupExt);
 
@@ -1381,14 +1392,14 @@ static int writeOut(Buffer *pBuf, const char *filename, short mode, ushort flags
 	// Open output file.
 	if(saveFlags) {
 		char *suffix;
-		size_t len;
+		size_t prefixLen;
 
-		// Duplicate original file pathname and keep first letter of filename.
-		len = fbasename(filename, true) - filename + 1;
-		if(dnewtrack(&pTempName) != 0 || dsalloc(pTempName, len + 6) != 0)
+		// Duplicate original pathname and keep first letter of filename.
+		prefixLen = cname((char *) filename, CNBasename | CNPtrOnly) - filename + 1;
+		if((pTempName = dnewtrack()) == NULL || dsalloc(pTempName, prefixLen + 6) != 0)
 			goto LibFail;
-		stplcpy(pTempName->str, filename, len + 1);
-		suffix = pTempName->str + len;
+		stplcpy(pTempName->str, filename, prefixLen + 1);
+		suffix = pTempName->str + prefixLen;
 
 		// Create a unique name, using random numbers.
 		do {
@@ -1396,10 +1407,10 @@ static int writeOut(Buffer *pBuf, const char *filename, short mode, ushort flags
 			} while(fileExists(pTempName->str));
 
 		// Open the temporary file.
-		status = f_wopen(pBuf, pTempName->str, mode);
+		status = f_wopen(pBuf, pTempName->str, fmode);
 		}
 	else
-		status = f_wopen(pBuf, filename, mode);
+		status = f_wopen(pBuf, filename, fmode);
 
 	// If the open failed or write fails, abort mission.
 	if(status != Success || (status = writeDiskPipe(pBuf, &lineCt)) != Success) {
@@ -1409,10 +1420,10 @@ static int writeOut(Buffer *pBuf, const char *filename, short mode, ushort flags
 		}
 
 	// Write was successful: clear "changed" flag and update window flags.
-	pBuf->flags &= ~BFChanged;
+	bchgflag(pBuf, false);
 	supd_windFlags(pBuf, WFMode);
 
-	// Do file manipulations if safe save.
+	// Do file "fixups" if safe save.
 	if(saveFlags) {
 		// Get the permisions of the original file.
 		if((status = stat(filename, &s)) != 0)
@@ -1440,63 +1451,68 @@ static int writeOut(Buffer *pBuf, const char *filename, short mode, ushort flags
 			}
 		}
 
+	// If all is well, flag buffer as saved for main() to display on quick exit.
+	if(status == Success && flags & BW_QuickExit)
+		pBuf->flags |= (saveFlags & 0x02 ? BFQSave | BFQBak : BFQSave);
+
 	// Report lines written and return status.
-	return (flags & RWStats) ?
-	 ioStat(&fab, lineCt > 0 && (!(pBuf->flags & BFNarrowed) || pBuf->pNarBotLine == NULL) &&
-	  pBuf->pFirstLine->prev->used > 0 ? (IOS_OtpFile | IOS_NoDelim) : IOS_OtpFile,
-	  status == Success && (saveFlags & 0x02) ? pBakName : NULL, status, filename, text149, lineCt) : sess.rtn.status;
-									// "Wrote"
+	return ioStat(&fab, lineCt > 0 && (!(pBuf->flags & BFNarrowed) || pBuf->pNarBotLine == NULL) &&
+	 pBuf->pFirstLine->prev->used > 0 ? IOS_OtpFile | IOS_NoDelim : IOS_OtpFile,
+	 status == Success && saveFlags & 0x02 ? pBakName : NULL, status, filename, text149, lineCt);
+										// "Wrote"
 LibFail:
 	return libfail();
 	}
 
 // Do appendFile or writeFile command.  Ask for a filename, and write or append the contents of the current buffer to that file.
 // Update the remembered filename if writeFile and default n or n > 0.  Return status.
-int appendWriteFile(Datum *pRtnVal, int n, const char *prompt, short mode) {
-	bool fullUpdate = (mode != 'w' || n == INT_MIN || n > 0);
+int appendWriteFile(Datum *pRtnVal, long n, const char *prompt, short fmode) {
+	Buffer *pBuf = sess.cur.pBuf;
+	bool tempWrite = n <= 0 && n != DefN;
 
 	// Get the filename.
-	if(getFilename(pRtnVal, prompt, NULL, ArgFirst | Term_C_NoAuto) != Success || disnil(pRtnVal))
+	if(getFilename(pRtnVal, prompt, NULL, ArgFirst | TermC_NoAuto) != Success || disnil(pRtnVal))
 		return sess.rtn.status;
 
 	// Complain about narrowed buffers.
-	if(bufStatusCheck(sess.cur.pBuf) != Success)
+	if(bufStatusCheck(pBuf) != Success)
 		return sess.rtn.status;
 
 	// Get confirmation if needed.
-	if(mode == 'w' && fileExists(pRtnVal->str) && opConfirm(BF_Overwrite) != Success)
+	if(fmode == 'w' && fileExists(pRtnVal->str) && opConfirm(BF_Overwrite) != Success)
 		return sess.rtn.status;
 
-	// It's a go... update buffer directory and write the file.  Also preserve "buffer changed" flag if temporary write.
-	if(!(sess.cur.pBuf->flags & BFCmdFunc) && fullUpdate)
-		sess.cur.pBuf->saveDir = (*pRtnVal->str == '/') ? NULL : sess.cur.pScrn->workDir;
-	ushort chgFlag = sess.cur.pBuf->flags & BFChanged;
-	if(writeOut(sess.cur.pBuf, pRtnVal->str, mode, RWStats) != Success)
+	// It's a go... write the file.  Also save and restore "buffer changed" flag if append or temporary write.
+	ushort chgFlag = pBuf->flags & BFChanged;
+	if(writeOut(pBuf, pRtnVal->str, fmode, 0) != Success)
 		return sess.rtn.status;
-	if(!fullUpdate)
-		sess.cur.pBuf->flags |= chgFlag;
+	if((fmode == 'a' || tempWrite) && chgFlag)
+		bchgflag(pBuf, true);
 
-	// Update filename and buffer name if write (not append) and not suppressed by n value.
-	if(mode == 'w' && fullUpdate && !(sess.cur.pBuf->flags & BFCmdFunc) &&
-	 setFilename(sess.cur.pBuf, pRtnVal->str, 0) > FatalError)
-		(void) brename(NULL, BR_Auto, sess.cur.pBuf);
+	// Update filename, buffer name, and buffer directory if write operation (not append) and not temporary.
+	if(fmode == 'w' && !tempWrite && !(pBuf->flags & BFCmdFunc)) {
+		if(setFilename(pBuf, pRtnVal->str, 0) > FatalError) {
+			(void) brename(NULL, BR_Auto, pBuf);
+			pBuf->homeDir = sess.pCurScrn->workDir;
+			}
+		}
 	dclear(pRtnVal);
 
 	return sess.rtn.status;
 	}
 
-// Save given buffer to disk if possible.  *pCurDir contains current directory and is updated if directory is changed.  If
-// BS_QuickExit flag is set, buffer is flagged (with BFQSave) for "quickExit" command if saved.
-static int saveBuf(Buffer *pBuf, ushort flags, const char **pCurDir, const char *workDir, uint *pSavedCount, uint *pNarCount) {
+// Save given buffer to disk if possible.  *pCurDir contains current directory and is updated if directory is changed.  "flags"
+// argument is passed to writeOut().
+static int saveBuf(Buffer *pBuf, uint flags, const char **pCurDir, const char *workDir, uint *pSavedCount, uint *pNarCount) {
 
 	pBuf->flags &= ~BFQSave;					// Clear "saved" flag.
 	if(!(pBuf->flags & BFChanged) ||				// If not changed...
-	 ((pBuf->flags & BFCmdFunc) && (flags & BS_All)))		// or a user command/function and saving all...
+	 (pBuf->flags & BFCmdFunc && flags & BW_All))			// or a user command/function and saving all...
 		return Cancelled;					// skip it.
 	if(pBuf->filename == NULL)					// Must have a filename.
 		return rsset(Failure, 0, text145, pBuf->bufname);
 			// "No filename associated with buffer '%s'"
-	if((pBuf->flags & BFNarrowed) && (flags & BS_All)) {		// If narrowed and saving all...
+	if(pBuf->flags & BFNarrowed && flags & BW_All) {		// If narrowed and saving all...
 		++*pNarCount;						// count it and...
 		return Cancelled;					// skip it.
 		}
@@ -1504,18 +1520,18 @@ static int saveBuf(Buffer *pBuf, ushort flags, const char **pCurDir, const char 
 		return sess.rtn.status;
 
 	// Change working directory if needed.
-	if((flags & BS_MultiDir) && *pBuf->filename != '/') {		// If multiple directories and have relative pathname...
+	if(flags & BW_MultiDir && *pBuf->filename != '/') {		// If multiple directories and have relative pathname...
 		if(workDir == NULL) {					// and buffer is in the background...
-			if(pBuf->saveDir == NULL)			// home directory set?
+			if(pBuf->homeDir == NULL)			// home directory set?
 				return rsset(Failure, 0, text415, text309, pBuf->bufname);	// No, return error.
 					// "%s buffer '%s'", "Directory unknown for"
 			else
-				workDir = pBuf->saveDir;		// Yes, use it.
+				workDir = pBuf->homeDir;		// Yes, use it.
 			}
-		else if(workDirStatus(pBuf, NULL))			// Multi-homed buffer (in foreground)?
+		else if(multiHomeDir(pBuf, NULL))			// Multi-homed buffer (in foreground)?
 			return rsset(Failure, 0, text310, text309, pBuf->bufname);	// Yes, error.
 				// "%s multi-screen buffer '%s'", "Directory unknown for"
-		else if(pBuf->saveDir != workDir) {			// No, buffer's home directory different than screen's?
+		else if(pBuf->homeDir != workDir) {			// No, buffer's home directory different than screen's?
 			bool yep;					// Yes, get permission from user to use directory of
 			DFab prompt;					// screen it is being displayed on.
 
@@ -1524,11 +1540,11 @@ static int saveBuf(Buffer *pBuf, ushort flags, const char **pCurDir, const char 
 				// "Directory changed.  Write buffer '%s' to file \"%s/%s\""
 			 dclose(&prompt, FabStr) != 0)
 				return libfail();
-			if(terminpYN(prompt.pDatum->str, &yep) != Success)
+			if(termInpYN(prompt.pDatum->str, &yep) != Success)
 				return sess.rtn.status;
 			if(!yep)					// Permission given?
 				return rsset(UserAbort, 0, NULL);	// No, user abort.
-			pBuf->saveDir = workDir;			// Yes, use screen's directory.
+			pBuf->homeDir = workDir;			// Yes, use screen's directory.
 			}
 
 		// It's a go... change directory if different.
@@ -1540,35 +1556,35 @@ static int saveBuf(Buffer *pBuf, ushort flags, const char **pCurDir, const char 
 	if(mlprintf(MLHome | MLWrap | MLFlush, text103, pBuf->filename) != Success)
 			// "Saving %s..."
 		return sess.rtn.status;
-	if((flags & (BS_All | BS_QuickExit)) == BS_All)
+	if((flags & (BW_All | BW_QuickExit)) == BW_All)
 		centiPause(40);
-	if(writeOut(pBuf, pBuf->filename, 'w', RWStats) != Success)
-		return sess.rtn.status;
-	sess.autoSaveCount = sess.autoSaveTrig;			// Reset $autoSave...
-	++*pSavedCount;						// increment "save" count...
-	if(flags & BS_QuickExit)
-		pBuf->flags |= BFQSave;				// and flag as saved for main() to display on quick exit.
+	if(writeOut(pBuf, pBuf->filename, 'w', flags) == Success) {
+		sess.autoSaveCount = sess.autoSaveTrig;			// Reset $autoSave...
+		++*pSavedCount;						// and increment "save" count.
+		}
+
 	return sess.rtn.status;
 	}
 
 // Save the contents of the current buffer (or all buffers if n argument) to its associated file.  Do nothing if nothing has
 // changed.  Error if there is no filename set for a buffer.
-int saveBufs(int n, ushort flags) {
-	Datum **ppBufItem, **ppBufItemEnd;
+int saveBufs(long n, uint flags) {
+	HashNode *pNode;
+	HashEach each;
 	Buffer *pBuf;
 	int status;
-	const char *workDir = sess.cur.pScrn->workDir;
+	const char *workDir = sess.pCurScrn->workDir;
 	uint savedCount = 0;			// Count of saved buffers.
 	uint narCount = 0;			// Count of narrowed buffers that are skipped.
 
-	if(n != INT_MIN)
-		flags |= BS_All;
-	if(workDirStatus(NULL, NULL))
-		flags |= BS_MultiDir;
+	if(n != DefN)
+		flags |= BW_All;
+	if(multiHomeDir(NULL, NULL))
+		flags |= BW_MultiDir;
 
 	// Search for changed buffers one screen at a time if updating all to simplify tracking and minimize frequency of
 	// chdir() calls when multiple screen directories exist.
-	if(flags & BS_All) {
+	if(flags & BW_All) {
 		EWindow *pWind;
 		EScreen *pScrn = sess.scrnHead;
 		do {						// In all screens...
@@ -1582,25 +1598,30 @@ int saveBufs(int n, ushort flags) {
 		}
 
 	// Scan buffer list for changed buffers (in background only if updating all).
-	ppBufItemEnd = (ppBufItem = bufTable.elements) + bufTable.used;
-	pBuf = (flags & BS_All) ? bufPtr(*ppBufItem) : sess.cur.pBuf;
+	if(flags & BW_All) {
+		heachinit(&each, &buf.table);
+		pNode = heach(&each);
+		pBuf = bufPtr(pNode->pVal);
+		}
+	else
+		pBuf = sess.cur.pBuf;
 	for(;;) {
 		// Skip any buffer being displayed if screen traversal was done so that any multi-homed buffers that were
 		// skipped (and counted) will be skipped here also.
-		if(!(flags & BS_All) || pBuf->windCount == 0) {
-			if((status = saveBuf(pBuf, flags, &workDir, pBuf == sess.cur.pBuf ? sess.cur.pScrn->workDir : NULL,
+		if(!(flags & BW_All) || pBuf->windCount == 0) {
+			if((status = saveBuf(pBuf, flags, &workDir, pBuf == sess.cur.pBuf ? sess.pCurScrn->workDir : NULL,
 			 &savedCount, &narCount)) <= UserAbort)
 				return sess.rtn.status;
 			}
-		if(!(flags & BS_All) || ++ppBufItem == ppBufItemEnd)
+		if(!(flags & BW_All) || (pNode = heach(&each)) == NULL)
 			break;
-		pBuf = bufPtr(*ppBufItem);
+		pBuf = bufPtr(pNode->pVal);
 		}
 
 	// Return to original working directory if needed and set return message.
-	if(workDir != sess.cur.pScrn->workDir)
-		(void) chgdir(sess.cur.pScrn->workDir);
-	if((flags & (BS_All | BS_QuickExit)) == BS_All && sess.rtn.status == Success) {
+	if(workDir != sess.pCurScrn->workDir)
+		(void) chgdir(sess.pCurScrn->workDir);
+	if((flags & (BW_All | BW_QuickExit)) == BW_All && sess.rtn.status == Success) {
 		char workBuf[WorkBufSize];
 
 		sprintf(workBuf, text167, savedCount, savedCount != 1 ? "s" : "");
@@ -1617,10 +1638,10 @@ int saveBufs(int n, ushort flags) {
 int writeDiskPipe(Buffer *pBuf, uint *pLineCount) {
 	Line *pLine, *pLineEnd;
 	uint lineCt;
-	bool addNL = (pBuf->flags & BFNarrowed) && pBuf->pNarBotLine != NULL;
+	bool addNL = pBuf->flags & BFNarrowed && pBuf->pNarBotLine != NULL;
 
-	if(mlputs(MLHome | MLWrap | MLFlush, text148) != Success)
-					// "Writing data..."
+	if(mlputs(text148, MLHome | MLWrap | MLFlush) != Success)
+			// "Writing data..."
 		return sess.rtn.status;
 
 	// Check if buffer is narrowed and/or ATerm mode is set.  If buffer is narrowed and bottom portion exists, ignore ATerm
@@ -1662,14 +1683,13 @@ int writeDiskPipe(Buffer *pBuf, uint *pLineCount) {
 // buffer.  If the new filename is nil or null, set the filename to null; otherwise, if n > 0 or is the default, change the
 // buffer name to match the filename.  pRtnVal is set to a two-element array containing new buffer name and new filename.
 // Return status.
-int setBufFile(Datum *pRtnVal, int n, Datum **args) {
+int setBufFile(Datum *pRtnVal, long n, Datum **args) {
 	Buffer *pBuf;
 
 	// Get buffer.
-	if(n == INT_MIN && !(sess.opFlags & OpScript))
+	if(n == DefN && !(sess.opFlags & OpScript))
 		pBuf = sess.cur.pBuf;
-	else if(getBufname(pRtnVal, text151, (pBuf = bdefault()) != NULL ? pBuf->bufname : NULL,
-	 ArgFirst | OpDelete, &pBuf, NULL) != Success || pBuf == NULL)
+	else if(getBufname(pRtnVal, text151, OpDelete | OpDefBName, &pBuf, NULL) != Success || pBuf == NULL)
 			// "Set filename in"
 		return sess.rtn.status;
 
@@ -1678,15 +1698,13 @@ int setBufFile(Datum *pRtnVal, int n, Datum **args) {
 		return sess.rtn.status;
 
 	// Get filename.
-	if(sess.opFlags & OpScript) {
-		if(funcArg(pRtnVal, ArgNil1 | ArgPath) != Success)
-			return sess.rtn.status;
-		}
+	if(sess.opFlags & OpScript)
+		dxfer(pRtnVal, args[0]);
 	else {
 		TermInpCtrl termInpCtrl = {pBuf->filename, RtnKey, MaxPathname, NULL};
 		char *str, workBuf[strlen(text151) + 16];
 
-		if(n == INT_MIN) {
+		if(n == DefN) {
 			str = stpcpy(workBuf, text151);
 				// "Set filename in"
 			do {
@@ -1698,14 +1716,18 @@ int setBufFile(Datum *pRtnVal, int n, Datum **args) {
 			}
 		else
 			str = (char *) text339;
-		if(termInp(pRtnVal, str, ArgNil1, Term_C_Filename | Term_C_NoAuto, &termInpCtrl) != Success)
+		if(termInp(pRtnVal, str, ArgNil1, TermC_Filename | TermC_NoAuto, &termInpCtrl) != Success)
 			return sess.rtn.status;
 		}
+
+	// Activate buffer if needed.
+	if(!(pBuf->flags & BFActive) && bactivate(pBuf) != Success)
+		return sess.rtn.status;
 
 	// Set new filename (which may be null or nil).
 	if(disnil(pRtnVal))
 		dsetnull(pRtnVal);
-	if(setfile(pBuf, pRtnVal, BF_WarnExists, (n == INT_MIN || n > 0)) != Success)
+	if(setfile(pBuf, pRtnVal, n == DefN || n > 0 ? BF_WarnExists | BF_DeriveName : BF_WarnExists) != Success)
 		return sess.rtn.status;
 
 	// Set pRtnVal to result (an array).
@@ -1717,7 +1739,7 @@ int setBufFile(Datum *pRtnVal, int n, Datum **args) {
 	else if(dsetstr(pRtnVal->str, pArray->elements[1]) != 0)
 LibFail:
 		return libfail();
-	agStash(pRtnVal, pArray);
+	astash(pRtnVal, pArray);
 
 	// Update mode line.
 	supd_windFlags(pBuf, WFMode);

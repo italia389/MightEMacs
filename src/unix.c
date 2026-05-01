@@ -1,4 +1,4 @@
-// (c) Copyright 2022 Richard W. Marinelli
+// (c) Copyright 2026 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -59,7 +59,7 @@
 #include "bind.h"
 
 // Minimum terminal capabilities.
-#define CAP_EL		"pArrayEl"			// Clear to end of line.
+#define CAP_EL		"el"			// Clear to end of line.
 #define CAP_CLEAR	"clear"			// Clear to end of page.
 #define CAP_CUP		"cup"			// Cursor motion.
 #define CAP_BOLD	"bold"			// Bold starts.
@@ -76,15 +76,13 @@ static char *ttyPath = "/dev/tty";
 // Function key tables.
 typedef struct {
 	short keyCode;
-	ushort extKey;
-	} KeyTable;
+	ExtKey extKey;
+	} ExtKeyEntry;
 
-// FKey symbols used are "BCDEFINPVZ<>".  Keys that are unlikely to appear on any modern keyboard are set to '?'.
-//
 // Key codes generated on CentOS Linux platforms depend on TERM setting, as follows:
 //			-------------------- TERM --------------------
 //	KEY		vt220		xterm-color	xterm-256color
-//	delete		0x7F		0x7F		KEY_BACKSPACE
+//	delete		0x7f		0x7f		KEY_BACKSPACE
 //	C-h		KEY_BACKSPACE	KEY_BACKSPACE	0x08
 // tigetstr(dch1)	^[[P		^[[P		^[[P
 // tigetstr(kbs)	^H		^H		^?
@@ -93,7 +91,7 @@ typedef struct {
 // Key codes generated on Ubuntu Linux platforms depend on TERM setting, as follows:
 //			-------------------- TERM --------------------
 //	KEY		vt220		xterm-color	xterm-256color
-//	delete		0x7F		KEY_BACKSPACE	KEY_BACKSPACE
+//	delete		0x7f		KEY_BACKSPACE	KEY_BACKSPACE
 //	C-h		KEY_BACKSPACE	0x08		0x08
 // tigetstr(dch1)	^[[P		^[[P		^[[P
 // tigetstr(kbs)	^H		^?		^?
@@ -102,115 +100,137 @@ typedef struct {
 // Key codes generated on macOS platforms do NOT depend on TERM setting:
 //			---------------------------- TERM ----------------------------
 //	KEY		vt100		vt220		xterm-color	xterm-256color
-//	delete		0x7F		0x7F		0x7F		0x7F
+//	delete		0x7f		0x7f		0x7f		0x7f
 //	C-h		KEY_BACKSPACE	KEY_BACKSPACE	KEY_BACKSPACE	KEY_BACKSPACE
 // tigetstr(dch1)	NULL		^[[P		^[[P		^[[P
 // tigetstr(kbs)	^H		^H		^H		^H
 // tigetstr(kdch1)	NULL		NULL		^[[3~		^[[3~
 //
 // Given the above, it is sufficient to check the value returned from tigetstr("kbs") at startup.  If "\0x08" is returned, we
-// can assume that the delete key will be returned as 0x7F from the getch() call, and control+h will be returned as
-// KEY_BACKSPACE.  Likewise, if tigetstr("kbs") returns "\0x7F", the delete key will be KEY_BACKSPACE and control+h will be
-// 0x08.  Hence, we can set the keyTable table accordingly and get consistent extended key values for those two keys.
-static KeyTable keyList[] = {
-	{KEY_DOWN, FKey | 'N'},			// Down-arrow key.
-	{KEY_UP, FKey | 'P'},			// Up-arrow key.
-	{KEY_LEFT, FKey | 'B'},			// Left-arrow key.
-	{KEY_RIGHT, FKey | 'F'},		// Right-arrow key.
-	{KEY_HOME, FKey | '<'},			// Home key.
-	{KEY_BACKSPACE, Ctrl | 'H'},		// Backspace key.
+// can assume that the delete key will be returned as 0x7f from the getch() call, and control+h will be returned as
+// KEY_BACKSPACE.  Likewise, if tigetstr("kbs") returns "\0x7f", the delete key will be KEY_BACKSPACE and control+h will be
+// 0x08.  Hence, we can set the extKeyTable table accordingly and get consistent extended key values for those two keys.
+
+// Table of special ncurses key codes returned from getch() that we care about; that is, are useful and should be acted upon in
+// some way; for example, the arrow keys and numbered function keys.  These are loaded into extKeyTable at startup, which is
+// subsequently used to translate the key codes obtained from ncurses at runtime to extended keys used by the editor.  Keys that
+// are unlikely to appear on any modern keyboard are set to '?' and ignored.  (It is unlikely they could ever be generated from
+// a modern keyboard, but if so, they will be no-ops at runtime.)  All unique function key symbols (the 'x' in "FKey | 'x'")
+// used in this table are also listed in the SpecFKeySyms macro string, which is defined in bind.h, so that adequate space can
+// be reserved in the binding table for all function keys we are supporting.  If you change this table, be sure to update the
+// macro also.
+//
+// All the lines in the table below were taken from the ncurses.h header for macOS (Free Software Foundation ver. 5.7) and
+// modified to add the desired extended key for each key code (which was moved to the beginning of the comment at right).
+// Comments were kept intact for the most part.
+static ExtKeyEntry keyList[] = {
 #if 0
-#define KEY_F0		0410			/* Function keys.  Space for 64 */
-#define KEY_F(n)	(KEY_F0+(n))		/* Value of function key n */
-#define KEY_DL		0510			/* delete-line key */
+// A few key codes do not depend upon the terminfo entry.
+#define KEY_CODE_YES	0400			// A wchar_t contains a key code.
+#define KEY_MIN		0401			// Minimum curses key.
+#define KEY_BREAK	0401			// Break key (unreliable).
+#define KEY_SRESET	0530			// Soft (partial) reset (unreliable).
+#define KEY_RESET	0531			// Reset or hard reset (unreliable).
 #endif
-	{KEY_DL, FKey | '?'},			// Delete-line key.
-	{KEY_IL, FKey | '?'},			// Insert-line key.
-	{KEY_DC, FKey | 'D'},			// Delete-character key.
-	{KEY_IC, FKey | 'I'},			// Insert-character key.
-	{KEY_EIC, FKey | '?'},			// Sent by rmir or smir in insert mode.
-	{KEY_CLEAR, FKey | 'C'},		// Clear-screen or erase key.
-	{KEY_EOS, FKey | '?'},			// Clear-to-end-of-screen key.
-	{KEY_EOL, FKey | '?'},			// Clear-to-end-of-line key.
-	{KEY_SF, FKey | '?'},			// Scroll-forward key.
-	{KEY_SR, FKey | '?'},			// Scroll-backward key.
-	{KEY_NPAGE, FKey | 'V'},		// Next-page key.
-	{KEY_PPAGE, FKey | 'Z'},		// Previous-page key.
-	{KEY_STAB, FKey | '?'},			// Set-tab key.
-	{KEY_CTAB, FKey | '?'},			// Clear-tab key.
-	{KEY_CATAB, FKey | '?'},		// Clear-all-tabs key.
-	{KEY_ENTER, FKey | 'E'},		// Enter/send key.
-	{KEY_PRINT, FKey | '?'},		// Print key.
-	{KEY_LL, FKey | '?'},			// Lower-left key (home down).
-	{KEY_A1, FKey | '?'},			// Upper left of keypad.
-	{KEY_A3, FKey | '?'},			// Upper right of keypad.
-	{KEY_B2, FKey | '?'},			// Center of keypad.
-	{KEY_C1, FKey | '?'},			// Lower left of keypad.
-	{KEY_C3, FKey | '?'},			// Lower right of keypad.
-	{KEY_BTAB, Shift | Ctrl | 'I'},		// Back-tab key.
-	{KEY_BEG, FKey | '?'},			// Begin key.
-	{KEY_CANCEL, FKey | '?'},		// Cancel key.
-	{KEY_CLOSE, FKey | '?'},		// Close key.
-	{KEY_COMMAND, FKey | '?'},		// Command key.
-	{KEY_COPY, FKey | '?'},			// Copy key.
-	{KEY_CREATE, FKey | '?'},		// Create key.
-	{KEY_END, FKey | '>'},			// End key.
-	{KEY_EXIT, FKey | '?'},			// Exit key.
-	{KEY_FIND, FKey | '?'},			// Find key.
-	{KEY_HELP, FKey | '?'},			// Help key.
-	{KEY_MARK, FKey | '?'},			// Mark key.
-	{KEY_MESSAGE, FKey | '?'},		// Message key.
-	{KEY_MOVE, FKey | '?'},			// Move key.
-	{KEY_NEXT, FKey | '?'},			// Next key.
-	{KEY_OPEN, FKey | '?'},			// Open key.
-	{KEY_OPTIONS, FKey | '?'},		// Options key.
-	{KEY_PREVIOUS, FKey | '?'},		// Previous key.
-	{KEY_REDO, FKey | '?'},			// Redo key.
-	{KEY_REFERENCE, FKey | '?'},		// Reference key.
-	{KEY_REFRESH, FKey | '?'},		// Refresh key.
-	{KEY_REPLACE, FKey | '?'},		// Replace key.
-	{KEY_RESTART, FKey | '?'},		// Restart key.
-	{KEY_RESUME, FKey | '?'},		// Resume key.
-	{KEY_SAVE, FKey | '?'},			// Save key.
-	{KEY_SBEG, FKey | '?'},			// Shifted begin key.
-	{KEY_SCANCEL, FKey | '?'},		// Shifted cancel key.
-	{KEY_SCOMMAND, FKey | '?'},		// Shifted command key.
-	{KEY_SCOPY, FKey | '?'},		// Shifted copy key.
-	{KEY_SCREATE, FKey | '?'},		// Shifted create key.
-	{KEY_SDC, FKey | '?'},			// Shifted delete-character key.
-	{KEY_SDL, FKey | '?'},			// Shifted delete-line key.
-	{KEY_SELECT, FKey | '?'},		// Select key.
-	{KEY_SEND, FKey | '?'},			// Shifted end key.
-	{KEY_SEOL, FKey | '?'},			// Shifted clear-to-end-of-line key.
-	{KEY_SEXIT, FKey | '?'},		// Shifted exit key.
-	{KEY_SFIND, FKey | '?'},		// Shifted find key.
-	{KEY_SHELP, FKey | '?'},		// Shifted help key.
-	{KEY_SHOME, FKey | '?'},		// Shifted home key.
-	{KEY_SIC, FKey | '?'},			// Shifted insert-character key.
-	{KEY_SLEFT, Shift| FKey | 'B'},		// Shifted left-arrow key.
-	{KEY_SMESSAGE, FKey | '?'},		// Shifted message key.
-	{KEY_SMOVE, FKey | '?'},		// Shifted move key.
-	{KEY_SNEXT, FKey | '?'},		// Shifted next key.
-	{KEY_SOPTIONS, FKey | '?'},		// Shifted options key.
-	{KEY_SPREVIOUS, FKey | '?'},		// Shifted previous key.
-	{KEY_SPRINT, FKey | '?'},		// Shifted print key.
-	{KEY_SREDO, FKey | '?'},		// Shifted redo key.
-	{KEY_SREPLACE, FKey | '?'},		// Shifted replace key.
-	{KEY_SRIGHT, Shift | FKey | 'F'},	// Shifted right-arrow key.
-	{KEY_SRSUME, FKey | '?'},		// Shifted resume key.
-	{KEY_SSAVE, FKey | '?'},		// Shifted save key.
-	{KEY_SSUSPEND, FKey | '?'},		// Shifted suspend key.
-	{KEY_SUNDO, FKey | '?'},		// Shifted undo key.
-	{KEY_SUSPEND, FKey | '?'},		// Suspend key.
-	{KEY_UNDO, FKey | '?'},			// Undo key.
-	{KEY_MOUSE, FKey | '?'},		// Mouse event has occurred.
-	{KEY_RESIZE, TermResizeKey},		// Terminal resize event.
-	{KEY_EVENT, FKey | '?'},		// We were interrupted by an event.
+	{KEY_DOWN, FKey | 'N'},			// 0402 - Down-arrow key.
+	{KEY_UP, FKey | 'P'},			// 0403 - Up-arrow key.
+	{KEY_LEFT, FKey | 'B'},			// 0404 - Left-arrow key.
+	{KEY_RIGHT, FKey | 'F'},		// 0405 - Right-arrow key.
+	{KEY_HOME, FKey | 'H'},			// 0406 - Home key (fn-left-arrow).
+	{KEY_BACKSPACE, Ctrl | 'H'},		// 0407 - Backspace key.
+#if 0
+#define KEY_F0		0410			// Function keys.  Space for 64.
+#define KEY_F(n)	(KEY_F0+(n))		// Value of function key n.
+#endif						// fn-delete -> S-FNe, option-right-arrow -> ESC f, option-left-arrow -> ESC b
+//	{KEY_DL, FKey | '?'},			// 0510 - Delete-line key.
+//	{KEY_IL, FKey | '?'},			// 0511 - Insert-line key.
+	{KEY_DC, FKey | 'D'},			// 0512 - Delete-character key (fn-delete).
+//	{KEY_IC, FKey | '?'},			// 0513 - Insert-character key.
+//	{KEY_EIC, FKey | '?'},			// 0514 - Sent by rmir or smir in insert mode.
+	{KEY_CLEAR, FKey | 'C'},		// 0515 - Clear-screen or erase key.
+//	{KEY_EOS, FKey | '?'},			// 0516 - Clear-to-end-of-screen key.
+//	{KEY_EOL, FKey | '?'},			// 0517 - Clear-to-end-of-line key.
+//	{KEY_SF, FKey | '?'},			// 0520 - Scroll-forward key.
+//	{KEY_SR, FKey | '?'},			// 0521 - Scroll-backward key.
+	{KEY_NPAGE, FKey | 'V'},		// 0522 - Next-page key (fn-down-arrow).
+	{KEY_PPAGE, FKey | 'Z'},		// 0523 - Previous-page key (fn-up-arrow).
+//	{KEY_STAB, FKey | '?'},			// 0524 - Set-tab key.
+//	{KEY_CTAB, FKey | '?'},			// 0525 - Clear-tab key.
+//	{KEY_CATAB, FKey | '?'},		// 0526 - Clear-all-tabs key.
+	{KEY_ENTER, FKey | 'S'},		// 0527 - Enter/send key (fn-return).
+	/* Codes 0530 and 0531 are defined above (as unreliable). */
+//	{KEY_PRINT, FKey | '?'},		// 0532 - Print key.
+//	{KEY_LL, FKey | '?'},			// 0533 - Lower-left key (home down).
+//	{KEY_A1, FKey | '?'},			// 0534 - Upper left of keypad.
+//	{KEY_A3, FKey | '?'},			// 0535 - Upper right of keypad.
+//	{KEY_B2, FKey | '?'},			// 0536 - Center of keypad.
+//	{KEY_C1, FKey | '?'},			// 0537 - Lower left of keypad.
+//	{KEY_C3, FKey | '?'},			// 0540 - Lower right of keypad.
+	{KEY_BTAB, Shift | Ctrl | 'I'},		// 0541 - Back-tab key (shift-tab).
+//	{KEY_BEG, FKey | '?'},			// 0542 - Begin key.
+//	{KEY_CANCEL, FKey | '?'},		// 0543 - Cancel key.
+//	{KEY_CLOSE, FKey | '?'},		// 0544 - Close key.
+//	{KEY_COMMAND, FKey | '?'},		// 0545 - Command key.
+//	{KEY_COPY, FKey | '?'},			// 0546 - Copy key.
+//	{KEY_CREATE, FKey | '?'},		// 0547 - Create key.
+	{KEY_END, FKey | 'E'},			// 0550 - End key (fn-right-arrow).
+//	{KEY_EXIT, FKey | '?'},			// 0551 - Exit key.
+//	{KEY_FIND, FKey | '?'},			// 0552 - Find key.
+	{KEY_HELP, FKey | 'L'},			// 0553 - Help key.
+//	{KEY_MARK, FKey | '?'},			// 0554 - Mark key.
+//	{KEY_MESSAGE, FKey | '?'},		// 0555 - Message key.
+//	{KEY_MOVE, FKey | '?'},			// 0556 - Move key.
+//	{KEY_NEXT, FKey | '?'},			// 0557 - Next key.
+//	{KEY_OPEN, FKey | '?'},			// 0560 - Open key.
+//	{KEY_OPTIONS, FKey | '?'},		// 0561 - Options key.
+//	{KEY_PREVIOUS, FKey | '?'},		// 0562 - Previous key.
+//	{KEY_REDO, FKey | '?'},			// 0563 - Redo key.
+//	{KEY_REFERENCE, FKey | '?'},		// 0564 - Reference key.
+//	{KEY_REFRESH, FKey | '?'},		// 0565 - Refresh key.
+//	{KEY_REPLACE, FKey | '?'},		// 0566 - Replace key.
+//	{KEY_RESTART, FKey | '?'},		// 0567 - Restart key.
+//	{KEY_RESUME, FKey | '?'},		// 0570 - Resume key.
+//	{KEY_SAVE, FKey | '?'},			// 0571 - Save key.
+//	{KEY_SBEG, FKey | '?'},			// 0572 - Shifted begin key.
+//	{KEY_SCANCEL, FKey | '?'},		// 0573 - Shifted cancel key.
+//	{KEY_SCOMMAND, FKey | '?'},		// 0574 - Shifted command key.
+//	{KEY_SCOPY, FKey | '?'},		// 0575 - Shifted copy key.
+//	{KEY_SCREATE, FKey | '?'},		// 0576 - Shifted create key.
+	{KEY_SDC, Shift | FKey | 'D'},		// 0577 - Shifted delete-character key (shift-fn-delete).
+//	{KEY_SDL, FKey | '?'},			// 0600 - Shifted delete-line key.
+//	{KEY_SELECT, FKey | '?'},		// 0601 - Select key.
+	{KEY_SEND, Shift | FKey | 'E'},		// 0602 - Shifted end key (shift-fn-right-arrow).
+//	{KEY_SEOL, FKey | '?'},			// 0603 - Shifted clear-to-end-of-line key.
+//	{KEY_SEXIT, FKey | '?'},		// 0604 - Shifted exit key.
+//	{KEY_SFIND, FKey | '?'},		// 0605 - Shifted find key.
+	{KEY_SHELP, Shift | FKey | 'L'},	// 0606 - Shifted help key.
+	{KEY_SHOME, Shift | FKey | 'H'},	// 0607 - Shifted home key (shift-fn-left-arrow).
+//	{KEY_SIC, FKey | '?'},			// 0610 - Shifted insert-character key.
+	{KEY_SLEFT, Shift | FKey | 'B'},	// 0611 - Shifted left-arrow key (shift-left-arrow).
+//	{KEY_SMESSAGE, FKey | '?'},		// 0612 - Shifted message key.
+//	{KEY_SMOVE, FKey | '?'},		// 0613 - Shifted move key.
+//	{KEY_SNEXT, FKey | '?'},		// 0614 - Shifted next key.
+//	{KEY_SOPTIONS, FKey | '?'},		// 0615 - Shifted options key.
+//	{KEY_SPREVIOUS, FKey | '?'},		// 0616 - Shifted previous key.
+//	{KEY_SPRINT, FKey | '?'},		// 0617 - Shifted print key.
+//	{KEY_SREDO, FKey | '?'},		// 0620 - Shifted redo key.
+//	{KEY_SREPLACE, FKey | '?'},		// 0621 - Shifted replace key.
+	{KEY_SRIGHT, Shift | FKey | 'F'},	// 0622 - Shifted right-arrow key (shift-right-arrow).
+//	{KEY_SRSUME, FKey | '?'},		// 0623 - Shifted resume key.
+//	{KEY_SSAVE, FKey | '?'},		// 0624 - Shifted save key.
+//	{KEY_SSUSPEND, FKey | '?'},		// 0625 - Shifted suspend key.
+//	{KEY_SUNDO, FKey | '?'},		// 0626 - Shifted undo key.
+//	{KEY_SUSPEND, FKey | '?'},		// 0627 - Suspend key.
+//	{KEY_UNDO, FKey | '?'},			// 0630 - Undo key.
+//	{KEY_MOUSE, FKey | '?'},		// 0631 - Mouse event has occurred.
+	{KEY_RESIZE, TermResizeKey},		// 0632 - Terminal resize event.
+//	{KEY_EVENT, FKey | '?'},		// 0633 - We were interrupted by an event.
 	{-1, 0},				// END OF LIST.
 	};
-//#define KEY_MAX		0777		/* Maximum key value is 0633 */
+//#define KEY_MAX		0777		// Maximum key value is 0633.
 
-static ushort keyTable[KEY_EVENT - KEY_MIN + 1];// Table for fast function key lookups by index.
+static ExtKey extKeyTable[KEY_EVENT - KEY_MIN + 1];
+						// Table for fast function key lookups by key code -> extended key.
 static DIR *dir = NULL;				// Current directory stream.
 static char *filePath = NULL;			// ereaddir() file buffer (allocated from heap).
 static char *filePathEnd = NULL;		// Pointer past end of path in filePath.
@@ -223,13 +243,8 @@ int sysCallError(const char *caller, const char *call, bool addTERM) {
 
 	(void) rsset(OSError, 0, text44, call, caller);
 		// "calling %s() from %s() function"
-	if(addTERM && vTerm.termName != NULL) {
-		DFab msg;
-
-		if(dopenwith(&msg, &sess.rtn.msg, FabAppend) != 0 || dputf(&msg, 0, ", TERM '%s'", vTerm.termName) != 0 ||
-		 dclose(&msg, FabStr) != 0)
-			(void) libfail();
-		}
+	if(addTERM && vTerm.termName != NULL)
+		(void) rscat(", TERM '%s'", vTerm.termName);
 	return sess.rtn.status;
 	}
 
@@ -239,45 +254,47 @@ int tflush(void) {
 	return refresh() == ERR ? sysCallError("tflush", "refresh", false) : sess.rtn.status;
 	}
 
-// Get a character and return it in *pChar if pChar not NULL.  Return status.
-int tgetc(bool msgLine, ushort *pChar) {
+// Get a character and return it in *pExtKey if pExtKey not NULL.  Return status.
+int tgetc(bool msgLine, ExtKey *pExtKey) {
 	short keyCode;
-	ushort c;
+	ExtKey extKey;
 	WINDOW *pWindow = msgLine ? term.pMsgLineWind : stdscr;
 
 	// Loop until we get a character or an error occurs.
 	for(;;) {
 		if((keyCode = wgetch(pWindow)) != ERR) {
 
-			// Got a key.  Ignore it if unknown function key.
+			// Got a key.  Process it if no high bits set or is a known function key; otherwise, ignore it.
 #if MMDebug & Debug_NCurses
-			fprintf(logfile, "tgetc(): got keyCode %.4ho\n", keyCode);
-			if(!((c = keyCode) & ~0xFF))
+			fprintf(logfile, "tgetc(): Got keyCode %.4ho\n", keyCode);
+			if(!((extKey = keyCode) & ~0xff))
 				break;
-			c = keyTable[keyCode - KEY_MIN];
-			fprintf(logfile, "  -> FKey x%.4hX\n", c);
-			if(c != (FKey | '?'))
+			extKey = extKeyTable[keyCode - KEY_MIN];
+			fprintf(logfile, "  -> FKey x%.4hX\n", extKey);
+			if(extKey != 0)
 				break;
 #else
-			if(!((c = keyCode) & ~0xFF) || (c = keyTable[keyCode - KEY_MIN]) != (FKey | '?'))
+			if(!((extKey = keyCode) & ~0xff) || (extKey = extKeyTable[keyCode - KEY_MIN]) != 0)
 				break;
+#endif
+#if MMDebug & Debug_KeyCode
+			fprintf(logfile, "tgetc(): Got unknown keyCode %.4ho\n", keyCode);
 #endif
 			}
 		else if(errno != 0)
 			return sysCallError("tgetc", "wgetch", false);
 		}
 
-	if(pChar != NULL) {
-		if(!(keyCode & ~0xFF)) {
+	// Return key if requested.
+	if(pExtKey != NULL) {
+		if(!(keyCode & ~0x7f)) {	// If 7-bit key code...
 
-			// Convert to extended character if control key.
-			if(c == '\0')
-				c = Ctrl | ' ';
-			else if(c <= 0x1F || c == 0x7F)
-				c = Ctrl | (c ^ 0x40);
+			// Convert raw 7-bit character to extended key.
+			extKey = ctoek(keyCode);
 			}
-		*pChar = c;
+		*pExtKey = extKey;
 		}
+
 	return sess.rtn.status;
 	}
 
@@ -302,9 +319,9 @@ int typahead(int *pCount) {
 	}
 
 // Update terminal size parameters, given number of columns and rows.
-void setTermSize(ushort cols, ushort rows) {
+static void setTermSize(int cols, int rows) {
 
-	sampBuf.smallSize = (term.cols = cols) / 4;
+	term.cols = cols;
 	term.rows = rows;
 	calcHorzJumpCols();
 	}
@@ -316,7 +333,7 @@ void setTermSize(ushort cols, ushort rows) {
 //	unsigned short ws_xpixel;	/* horizontal size, pixels */
 //	unsigned short ws_ypixel;	/* vertical size, pixels */
 //	};
-int getTermSize(ushort *col, ushort *row) {
+static int getTermSize(ushort *col, ushort *row) {
 	static const char myName[] = "getTermSize";
 	struct winsize w;
 
@@ -331,18 +348,19 @@ int getTermSize(ushort *col, ushort *row) {
 			// "Terminal size %hu x %hu is too small to run %s"
 		}
 
-	if((*col = w.ws_col) > term.maxCols)
-		*col = term.maxCols;
-	if((*row = w.ws_row) > term.maxRows)
-		*row = term.maxRows;
+	if((*col = w.ws_col) > TTY_MaxCols)
+		*col = TTY_MaxCols;
+	if((*row = w.ws_row) > TTY_MaxRows)
+		*row = TTY_MaxRows;
+
 	return sess.rtn.status;
 	}
 
 // Reset terminal.  Get the current terminal dimensions, update the ETerm structure, flag all screens that have different
 // dimensions for a "window resize", and flag current screen for a "redraw".  Return status.  Needs to be called when the size
 // of the terminal window changes; for example, when switching from portrait to landscape viewing on a mobile device.
-int resetTerm(Datum *pRtnVal, int n, Datum **args) {
-	static const char myName[] = "resetTermc";
+int resetTerm(Datum *pRtnVal, long n, Datum **args) {
+	static const char myName[] = "resetTerm";
 	EScreen *pScrn;		// Current screen being examined.
 	ushort cols, rows;	// Current terminal dimensions.
 	const char *name;
@@ -425,6 +443,9 @@ static int topen2(bool resetTTY) {
 // Initialize screen package -- done once at startup.  Return status.
 int topen(void) {
 	static const char myName[] = "topen";
+	ExtKeyEntry *pExtKeyEntry;
+	const char *str, *strEnd;
+	struct lconv *pLocale;
 	ushort cols, rows;
 
 	// Get terminal type.
@@ -453,11 +474,20 @@ int topen(void) {
 		return sess.rtn.status;
 	setTermSize(cols, rows);
 
-	// Initialize locale.  *NOTE: For future use if and when multibyte support is added.  For now the default "C" locale
-	// gives the best performance.
+	// Initialize locale.  *NOTE: The LC_ALL option is for future use if and when multibyte support is added.  For now, the
+	// default "C" locale gives the best performance and using the native locale for LC_NUMERIC enables thousands'
+	// separators in numbers.
 #if 0
 	(void) setlocale(LC_ALL, "");
+#else
+	(void) setlocale(LC_NUMERIC, "");
 #endif
+	pLocale = localeconv();
+	if((sess.thouSep = strdup(pLocale->thousands_sep)) == NULL)
+		return rsset(Panic, 0, text94, myName);
+			// "%s(): Out of memory!"
+	sess.thouSepLen = strlen(sess.thouSep);
+
 	// Initialize screen.
 	(void) initscr();
 	if(has_colors()) {
@@ -543,22 +573,36 @@ int topen(void) {
 	if(tigetstr(CAP_SMUL) != NULL)
 		sess.opFlags |= OpHaveUL;
 
-	// Initialize escape-sequence table, including 20 function keys, both shifted and unshifted.  Note that 64 slots are
+	// Initialize curses-key-code-to-extended-key extKeyTable, which is populated with all entries from keyList table (which
+	// includes S-TAB) plus NumFKeyCount function keys, both shifted and unshifted.  Note that 64 slots (key codes) are
 	// reserved for function keys in ncurses.h but shifted ones are not documented.  So we will assume that the shifted ones
 	// begin at slot 32.
-	KeyTable *pKeyTable = keyList;
+
+	// Add keys from keyList table...
+	pExtKeyEntry = keyList;
 	do {
-		keyTable[pKeyTable->keyCode - KEY_MIN] = pKeyTable->extKey;
-		} while((++pKeyTable)->keyCode != -1);
-	char *fn;
-	rows = KEY_F0 - KEY_MIN;
-	cols = 0;
+#if SanityCheck
+		// Validate extended key.
+		cols = pExtKeyEntry->extKey;
+		if((cols & (Ctrl | FKey)) == (Ctrl | FKey) || 
+		 (cols & Ctrl && (((cols & 0xff) != ' ' && cols & 0xff < 'A') || cols & 0xff > '_')) ||
+		 (cols & FKey && ((str = strchr(fKeySyms, cols & 0xff)) == NULL ||
+		 (ulong)(str - fKeySyms) >= SpecFKeyCount + NumFKeyCount)))
+			return rsset(FatalError, 0, text991, cols, pExtKeyEntry->keyCode);
+				// "Invalid extended key %.4hx for key code %.4ho in keyList table"
+#endif
+		extKeyTable[pExtKeyEntry->keyCode - KEY_MIN] = pExtKeyEntry->extKey;
+		} while((++pExtKeyEntry)->keyCode != -1);
+
+	// and generate numbered function key entries, beginning with key code KEY_F0.
+	rows = KEY_F0 - KEY_MIN;	// Table offset to first function key entry.
+	cols = 0;			// Shift prefix.
 	do {
-		fn = "1234567890abcdefghij";
+		strEnd = (str = fKeySyms + SpecFKeyCount) + NumFKeyCount;
 		do {
-			keyTable[rows++] = cols | FKey | *fn++;;
-			} while(*fn != '\0');
-		rows = KEY_F0 - KEY_MIN + (KEY_DL - KEY_F0) / 2;
+			extKeyTable[rows++] = cols | FKey | *str++;
+			} while(str < strEnd);
+		rows += (KEY_DL - KEY_F0) / 2;
 		cols ^= Shift;
 		} while(cols);
 
@@ -572,9 +616,22 @@ int topen(void) {
 
 #if LINUX
 	// Fix KEY_BACKSPACE entry if needed.
-	char *kbs = tigetstr("kbs");
-	if(kbs != NULL && strcmp(kbs, "\x7F") == 0)
-		keyTable[KEY_BACKSPACE - KEY_MIN] = Ctrl | '?';
+	str = tigetstr("kbs");
+	if(str != NULL && str[0] == 0x7f && str[1] == '\0')
+		extKeyTable[KEY_BACKSPACE - KEY_MIN] = Ctrl | '?';
+#endif
+#if MMDebug & Debug_DumpExtKey
+	// Dump extended key table to log file.
+	ExtKey *pExtKey, *pExtKeyEnd;
+	char keyBuf[16];
+
+	rows = 0;
+	pExtKeyEnd = (pExtKey = extKeyTable) + elementsof(extKeyTable);
+	do {
+		cols = *pExtKey++;
+		fprintf(logfile, "%.4hx -> %s\n", rows++, cols == 0 ? "NUL" : cols == (FKey | '?') ? "FN ??" :
+		 ektos(keyBuf, cols, false));
+		} while(pExtKey < pExtKeyEnd);
 #endif
 	// Finish up.
 	return topen2(false);
@@ -680,43 +737,94 @@ int chgdir(const char *dir) {
 			// "Cannot change directory to \"%s\": %s"
 	}
 
-// Do chgDir command (change working directory).  Return status.
-int chgWorkDir(Datum *pRtnVal, int n, Datum **args) {
-	HookRec *pHookRec = hookTable + HkChDir;
+// Do "chdir", "mkdir", or "rmdir" command.  Return status.
+int dirFunc(Datum *pRtnVal, long n, Datum **args, CmdFuncId cmdFuncId) {
 	TermInpCtrl termInpCtrl = {NULL, RtnKey, MaxPathname, NULL};
+	const char *successMsg, *failureMsg;
+	int rtnCode;
+	mode_t pmode = 0777;
+	ushort rflags = 0;
 
 	// Get directory name.
-	if(sess.opFlags & OpScript)
-		expandPath(pRtnVal, args[0]);
-	else if(termInp(pRtnVal, text277, ArgNil1, Term_C_Filename, &termInpCtrl) != Success || disnil(pRtnVal))
-			// "Change directory"
-		return sess.rtn.status;
+	if(sess.opFlags & OpScript) {
+		if(expandPath(pRtnVal, args[0]) != Success)
+			goto Retn;
+		}
+	else if(termInp(pRtnVal, cmdFuncId == cf_chdir ? text277 : cmdFuncId == cf_mkdir ? text499 : text500, ArgNil1,
+						// "Change directory",		"Create directory", "Remove directory"
+	 TermC_Filename, &termInpCtrl) != Success || disnil(pRtnVal))
+		goto Retn;
 
-	// Make the change.
-	if(chgdir(pRtnVal->str) != Success)
-		return sess.rtn.status;
+	// Process command.
+	switch(cmdFuncId) {
+		case cf_chdir:
+			if(chgdir(pRtnVal->str) != Success)
+				goto Retn;
 
-	// Get new path (absolute pathname), save it in current screen, and return it to caller.
-	if(setWorkDir(sess.cur.pScrn) != Success)
-		return sess.rtn.status;
-	if(dsetstr(sess.cur.pScrn->workDir, pRtnVal) != 0)
-		return libfail();
+			// Get new path (absolute pathname), save it in current screen, and return it to caller.
+			if(setWorkDir(sess.pCurScrn) != Success)
+				goto Retn;
+			if(dsetstr(sess.pCurScrn->workDir, pRtnVal) != 0)
+				return libfail();
 
-	// Set mode line update flag if needed.
-	if(modeInfo.cache[MdIdxWkDir]->flags & MdEnabled)
-		sess.cur.pWind->flags |= WFMode;
+			// Set mode line update flag if needed.
+			if(mode.cache[MdIdxWkDir]->flags & MdActive)
+				sess.pCurWind->face.wflags |= WFMode;
 
-	// Run change-directory user hook unless it is not set or is currently running.
-	if(pHookRec->func.type != PtrNull && !pHookRec->running && execHook(NULL, n, pHookRec, 0) != Success)
-		return sess.rtn.status;
+			// Run change-directory user hook unless it is not set or is currently running.
+			HookRec *pHookRec = hookTable + HkChDir;
+			if(pHookRec->func.type != PtrNull && !pHookRec->running && execHook(NULL, n, pHookRec, 0) != Success)
+				goto Retn;
 
-	// Display new directory if 'WkDir' global mode not enabled.
-	return (modeInfo.cache[MdIdxWkDir]->flags & MdEnabled) ? sess.rtn.status :
-	 rsset(Success, RSNoFormat | RSNoWrap, sess.cur.pScrn->workDir);
+			// Return status if 'WkDir' global mode enabled; otherwise, display new directory.
+			if(mode.cache[MdIdxWkDir]->flags & MdActive)
+				goto Retn;
+			successMsg = sess.pCurScrn->workDir;
+			rflags = RSNoFormat | RSNoWrap;
+			break;
+		case cf_mkdir:
+			// Get mode.
+			if(sess.opFlags & OpScript) {
+				if(args[1] != NULL)
+					pmode = dgetint(args[1]);
+				}
+			else if(n != DefN) {
+				Datum *pDatum;
+				if((pDatum = dnewtrack()) == NULL)
+					return libfail();
+				if(termInp(pDatum, text387, ArgNil1 | ArgNotNull1, 0, NULL) != Success ||
+						// "Mode"
+				 disnil(pDatum) || toInt(pDatum, 0) != Success)
+					goto Retn;
+				pmode = dgetint(pDatum);
+				}
+
+			// Make system call.
+			failureMsg = text501;
+				// "Cannot create directory \"%s\": %s"
+			successMsg = text503;
+				// "Directory created"
+			rtnCode = mkdir(pRtnVal->str, pmode);
+			goto CheckStatus;
+		case cf_rmdir:
+			failureMsg = text502;
+				// "Cannot remove directory \"%s\": %s"
+			successMsg = text504;
+				// "Directory removed"
+			rtnCode = rmdir(pRtnVal->str);
+CheckStatus:
+			if(rtnCode != 0)
+				return rsset(Failure, 0, failureMsg, pRtnVal->str, strerror(errno));
+		}
+
+	// Return success message.
+	(void) rsset(Success, rflags, successMsg);
+Retn:
+	return sess.rtn.status;
 	}
 
 // Suspend MightEMacs.
-int suspendMM(Datum *pRtnVal, int n, Datum **args) {
+int suspendMM(Datum *pRtnVal, long n, Datum **args) {
 
 	// Reset the terminal and exit ncurses.
 	if(tclose(true) != Success)
@@ -738,18 +846,27 @@ int suspendMM(Datum *pRtnVal, int n, Datum **args) {
 //	__darwin_time_t 	tv_sec; 	# seconds
 //	__darwin_suseconds_t	tv_usec;	# and microseconds
 //	};.
-void centiPause(int n) {
+void centiPause(int cs) {
 
-	if(n > 0) {
+	if(cs > 0) {
 		struct timeval t;
 
 		// Set time record.
-		t.tv_sec = n / 100;
-		t.tv_usec = n % 100 * 10000;
+		t.tv_sec = cs / 100;
+		t.tv_usec = cs % 100 * 10000;
 
 		// Call select();
 		(void) select(1, NULL, NULL, NULL, &t);
 		}
+	}
+
+// Duplicate a string and return Panic if failure.
+int strclone(char **pDest, const char *src, const char *funcName) {
+
+	if((*pDest = strdup(src)) == NULL)
+		return rsset(Panic, 0, text94, funcName);
+			// "%s(): Out of memory!"
+	return sess.rtn.status;
 	}
 
 // Get time of day as a string.
@@ -815,7 +932,7 @@ static char *shellPath(void) {
 	}
 
 // Create subshell.  Return status.
-int shellCLI(Datum *pRtnVal, int n, Datum **args) {
+int shellCLI(Datum *pRtnVal, long n, Datum **args) {
 	int rtnCode;
 	char *sh = shellPath();
 
@@ -832,7 +949,7 @@ int shellCLI(Datum *pRtnVal, int n, Datum **args) {
 // Get Unix command line.  Return status.
 static int getCmd(Datum **ppCmdLine, const char *prompt) {
 
-	if(dnewtrack(ppCmdLine) != 0)
+	if((*ppCmdLine = dnewtrack()) == NULL)
 		return libfail();
 	if(sess.opFlags & OpScript) {
 
@@ -848,12 +965,28 @@ static int getCmd(Datum **ppCmdLine, const char *prompt) {
 	}
 
 // Read data from open file descriptor, insert into given buffer, and close file.  Return status.
-static int insertPipeData(int fileHandle, int n, Buffer *pBuf, DataInsert *pDataInsert, ushort flags) {
+static int insertPipeData(int fileHandle, long n, Buffer *pBuf, DataInsert *pDataInsert, ushort flags) {
 
+#if FastFileIO
+	inpInit(fileHandle);
+	pDataInsert->pTargBuf = pBuf;
+	pDataInsert->pTargPoint = (pBuf == sess.cur.pBuf) ? NULL : &pBuf->face.point;
+	pDataInsert->msg = flags & PipeInsert ? text153 : text139;
+				// "Inserting data...", "Reading data..."
+
+	// Enable non-blocking reads and timeout retries.
+	if(fcntl(fileHandle, F_SETFL, O_NONBLOCK) == -1)
+		return sysCallError("insertPipeData", "fcntl", false);
+	fileInfo.flags |= FIRetry;
+	fileInfo.filename = pipeFilename;
+
+	// Read the data.
+	return insertData(n, NULL, pDataInsert);
+#else
 	if(inpInit(fileHandle) == Success) {
 		pDataInsert->pTargBuf = pBuf;
 		pDataInsert->pTargPoint = (pBuf == sess.cur.pBuf) ? NULL : &pBuf->face.point;
-		pDataInsert->msg = (flags & PipeInsert) ? text153 : text139;
+		pDataInsert->msg = flags & PipeInsert ? text153 : text139;
 					// "Inserting data...", "Reading data..."
 
 		// Enable non-blocking reads and timeout retries.
@@ -866,6 +999,7 @@ static int insertPipeData(int fileHandle, int n, Buffer *pBuf, DataInsert *pData
 		(void) insertData(n, NULL, pDataInsert);
 		}
 	return sess.rtn.status;
+#endif
 	}
 
 // Save results of command execution in a temporary buffer.  If pCmdLine is NULL, skip header line.  Return status.
@@ -875,8 +1009,8 @@ static int resultBuf(Buffer **ppBuf, Datum *pCmdLine, int *pipe3, int *pipe2) {
 	DataInsert dataInsert;
 
 	// Save message flag state and disable it.
-	oldFlags = modeInfo.cache[MdIdxRtnMsg]->flags & MdEnabled;
-	clearGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
+	oldFlags = mode.cache[MdIdxRtnMsg]->flags & MdActive;
+	clearGlobalMode(mode.cache[MdIdxRtnMsg]);
 
 	// Get a temporary buffer.
 	if(sysBuf(text424, ppBuf, 0) != Success)
@@ -901,9 +1035,9 @@ static int resultBuf(Buffer **ppBuf, Datum *pCmdLine, int *pipe3, int *pipe2) {
 		goto ERtn;
 
 	// Unchange buffer and restore message flag.
-	(*ppBuf)->flags &= ~BFChanged;
+	bchgflag(*ppBuf, false);
 	if(oldFlags)
-		setGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
+		setGlobalMode(mode.cache[MdIdxRtnMsg]);
 	goto Retn;
 ERtn:
 	// Save and restore status (so that bdelete() will not fail).
@@ -929,7 +1063,7 @@ static int getPend(int fileHandle, int *pCount) {
 
 // Get a shell command, fork a child process to execute it, and capture results.  Return status.  Routine is called for
 // insertPipe, pipeBuf, readPipe, and shellCmd commands.
-int pipeCmd(Datum *pRtnVal, int n, const char *prompt, ushort flags) {
+int pipeCmd(Datum *pRtnVal, long n, const char *prompt, uint flags) {
 	const char *filename;
 	Buffer *pResultBuf;
 	Datum *pCmdLine;
@@ -938,14 +1072,7 @@ int pipeCmd(Datum *pRtnVal, int n, const char *prompt, ushort flags) {
 	pid_t pid;
 	ushort action;
 	ushort rendFlags = RendNewBuf | RendAltML | RendWait;
-	static Option optTable[] = {
-		{"^Shift", "^Shft", 0, 0},
-		{"No^Pop", NULL, 0, 0},
-		{"No^Hdr", NULL, 0, 0},
-		{NULL, NULL, 0, 0}};
-	static OptHdr optHdr = {
-		ArgFirst, text410, false, optTable};
-				// "command option"
+	OptHdr *pOptHdr;
 	static const char myName[] = "pipeCmd";
 
 	dsetbool(false, pRtnVal);
@@ -955,11 +1082,10 @@ int pipeCmd(Datum *pRtnVal, int n, const char *prompt, ushort flags) {
 #if MMDebug & Debug_PipeCmd
 		fputs("\npipeCmd(): executing shellCmd...\n", logfile);
 #endif
-		if(n == INT_MIN)
-			deselectOpts(optTable);
-		else if(parseOpts(&optHdr, text448, NULL, NULL) != Success ||
-					// "Options"
-		 ((sess.opFlags & OpScript) && !needSym(s_comma, true)))
+		pOptHdr = cmdFuncTable[cf_shellCmd].pOptHdr;
+		if(n == DefN)
+			deselectOpts(pOptHdr);
+		else if(sess.opFlags & OpScript && !needSym(s_comma, true))
 			return sess.rtn.status;
 		}
 
@@ -969,7 +1095,7 @@ int pipeCmd(Datum *pRtnVal, int n, const char *prompt, ushort flags) {
 
 	// If target buffer is current buffer and executing a pipeBuf or readPipe command, verify it can be erased (getting user
 	// okay if necessary) before proceeding.
-	if(!(flags & (PipePopOnly | PipeInsert)) && (n == INT_MIN || n == 1) && bconfirm(sess.cur.pBuf, 0) != Success)
+	if(!(flags & (PipePopOnly | PipeInsert)) && (n == DefN || n == 1) && bconfirm(sess.cur.pBuf, 0) != Success)
 		return sess.rtn.status;
 
 	// Target buffer ready.  Create three pipes: one for writing target buffer into (pipeBuf command), one for reading
@@ -986,7 +1112,7 @@ int pipeCmd(Datum *pRtnVal, int n, const char *prompt, ushort flags) {
 #endif
 	switch(fork()) {
 		case 0:
-			 // Child process.  Connect standard input to pipe1.
+			// Child process.  Connect standard input to pipe1.
 #if MMDebug & Debug_PipeCmd
 			fprintf(logfile, "Child process is PID %d\nChild: connecting standard input to pipe1...\n", getpid());
 #endif
@@ -1077,7 +1203,7 @@ DupErr:
 	for(;;) {
 		if(action < 2) {
 			// Check if any bytes pending.
-			if(getPend((action & 1) ? pipe3[0] : pipe2[0], &count) != Success) {
+			if(getPend(action & 1 ? pipe3[0] : pipe2[0], &count) != Success) {
 				filename = "getPend";
 				goto OSErr;
 				}
@@ -1115,7 +1241,7 @@ DupErr:
 			if(flags & PipePopOnly) {
 
 				// shellCmd: build result buffer if requested, pop it, and delete it.
-				if(optTable[1].ctrlFlags & OptSelected) {
+				if(pOptHdr->optTable[1].ctrlFlags & OptSelected) {
 #if MMDebug & Debug_PipeCmd
 					fputs("shellCmd: command succeeded, skipping pop-up per options.\n", logfile);
 #endif
@@ -1125,7 +1251,7 @@ DupErr:
 #if MMDebug & Debug_PipeCmd
 				fputs("shellCmd: command succeeded, calling resultBuf()...\n", logfile);
 #endif
-				if(resultBuf(&pResultBuf, optTable[2].ctrlFlags & OptSelected ? NULL : pCmdLine, pipe3,
+				if(resultBuf(&pResultBuf, pOptHdr->optTable[2].ctrlFlags & OptSelected ? NULL : pCmdLine, pipe3,
 				 pipe2) != Success) {
 #if MMDebug & Debug_PipeCmd
 					fprintf(logfile, "  resultBuf() FAILED: returned %d '%s'\n",
@@ -1136,7 +1262,7 @@ DupErr:
 #if MMDebug & Debug_PipeCmd
 				fputs("  resultBuf() succeeded, popping buffer.\n", logfile);
 #endif
-				if(optTable[0].ctrlFlags & OptSelected)
+				if(pOptHdr->optTable[0].ctrlFlags & OptSelected)
 					rendFlags |= RendShift;
 				n = true;
 				goto PopBuf;
@@ -1147,7 +1273,7 @@ DupErr:
 			DFab fab;
 			DataInsert dataInsert;
 
-			if((flags & PipeInsert) || (!(flags & PipeWrite) && (n == INT_MIN || n == 1))) {
+			if(flags & PipeInsert || (!(flags & PipeWrite) && (n == DefN || n == 1))) {
 				pBuf = sess.cur.pBuf;
 				if(!(flags & PipeInsert) && readPrep(pBuf, BC_IgnChgd) != Success)
 					goto CloseWait;
@@ -1161,22 +1287,22 @@ DupErr:
 				 flags & PipeInsert ? text154 : text131, dataInsert.lineCt) == Success) {
 						// "Inserted", "Read"
 					if(!(flags & PipeInsert)) {
-						pBuf->flags &= ~BFChanged;
+						bchgflag(pBuf, false);
 
 						// If pipeBuf command and results were destined for current buffer, swap
 						// contents of scratch buffer and current buffer and delete the scratch.
-						if((flags & PipeWrite) && (n == INT_MIN || n == 1)) {
+						if(flags & PipeWrite && (n == DefN || n == 1)) {
 							Line *pLine = pBuf->pFirstLine;
 							pBuf->pFirstLine = sess.cur.pBuf->pFirstLine;
 							sess.cur.pBuf->pFirstLine = pLine;
 							(void) bdelete(pBuf, BC_IgnChgd);		// Can't fail.
 							pBuf = sess.cur.pBuf;
-							pBuf->flags &= ~BFChanged;
+							bchgflag(pBuf, false);
 							supd_windFlags(pBuf, WFHard | WFMode);
 							}
-						faceInit(pBuf == sess.cur.pBuf ? &sess.cur.pWind->face :
+						faceInit(pBuf == sess.cur.pBuf ? &sess.pCurWind->face :
 						 &pBuf->face, pBuf->pFirstLine, pBuf);
-						(void) render(pRtnVal, n == INT_MIN ? 1 : n, pBuf, n == INT_MIN ? 0 :
+						(void) render(pRtnVal, n == DefN ? 1 : n, pBuf, n == DefN ? 0 :
 						 RendNewBuf | RendNotify);
 						}
 				 	}
@@ -1193,7 +1319,7 @@ DupErr:
 										// "Shell command \"%s\" failed"
 				 dclose(&alert, FabStr) != 0)
 					goto LibFail;
-				if(mlputs(MLHome | MLFlush | MLForce, pRtnVal->str) != Success)
+				if(mlputs(pRtnVal->str, MLHome | MLFlush | MLForce) != Success)
 					goto CloseWait;
 				centiPause(160);
 				}
@@ -1324,79 +1450,22 @@ LibFail:
 	return libfail();
 	}
 
-// Return pointer to base filename, given pathname or filename.  If withExt is true, return base filename with extension,
-// otherwise without.  "name" is not modified in either case.
-char *fbasename(const char *name, bool withExt) {
-	char *str1, *str2;
-	static char nameBuf[MaxFilename + 1];
-
-	if((str1 = str2 = strchr(name, '\0')) > name) {
-
-		// Find rightmost slash, if any.
-		while(str1 > name) {
-			if(str1[-1] == '/')
-				break;
-			--str1;
-			}
-
-		// Find and eliminate extension, if requested.
-		if(!withExt) {
-			uint len;
-
-			while(str2 > str1) {
-				if(*--str2 == '.') {
-					if(str2 == str1)		// Bail out if '.' is first character.
-						break;
-					len = str2 - str1 + 1;
-					stplcpy(nameBuf, str1, len > sizeof(nameBuf) ? sizeof(nameBuf) : len);
-					return nameBuf;
-					}
-				}
-			}
-		}
-
-	return str1;
-	}
-
-// Return pointer to directory name, given pathname or filename and n argument.  If non-default n, return "." if no directory
-// portion found in name, otherwise a null string.  Given name is modified (truncated).
-char *fdirname(char *name, int n) {
-	char *str;
-
-	str = fbasename(name, true);
-	if(*name == '/' && (*str == '\0' || str == name + 1))
-		name[1] = '\0';
-	else if(strchr(name, '/') == NULL) {
-		if(*name != '\0') {
-			if(n == INT_MIN)
-				name[0] = '\0';
-			else
-				strcpy(name, ".");
-			}
-		}
-	else
-		str[-1] = '\0';
-	return name;
-	}
-
 // Save pathname on heap (in path) and set *pDest to it.  Return status.
 static int savePath(char **pDest, const char *name) {
 	static char *path = NULL;
 
 	if(path != NULL)
 		free((void *) path);
-	if((path = (char *) malloc(strlen(name) + 1)) == NULL)
-		return rsset(Panic, 0, text94, "savePath");
-			// "%s(): Out of memory!"
-	strcpy(*pDest = path, name);
+	(void) strclone(pDest, name, "savePath");
+	path = *pDest;
 	return sess.rtn.status;
 	}
 
-// Find script file(s) in the HOME directory or in the $execPath directories per flags, and return status.  If name begins with
-// a slash (/), it is either searched for verbatim (XP_GlobPat flag not set) or the search immediately fails (XP_GlobPat flag
-// set); otherwise, if XP_HomeOnly flag is set, it is searched for in the HOME directory only; otherwise, it is searched for in
-// every directory in $execPath (skipping null directories if XP_SkipNull flag set) either as a glob pattern (XP_GlobPat flag
-// set) or a plain filename (XP_GlobPat flag not set).  Call details are as follows:
+// Find script file(s) in the HOME directory or in the $execPath directories per flags, given name, and return status.  If name
+// begins with "/", "./", or "../", it is either searched for verbatim (XP_GlobPat flag not set) or the search immediately fails
+// (XP_GlobPat flag set); otherwise, if XP_HomeOnly flag is set, it is searched for in the HOME directory only; otherwise, it is
+// searched for in every directory in $execPath (skipping null directories if XP_SkipNull flag set) either as a glob pattern
+// (XP_GlobPat flag set) or a plain filename (XP_GlobPat flag not set).  Call details are as follows:
 //
 // If XP_GlobPat flag is set:
 //	- result must be of type glob_t * and point to a glob_t structure provided by the caller.
@@ -1409,7 +1478,7 @@ static int savePath(char **pDest, const char *name) {
 //	- searches are for the original filename first, followed by <filename>ScriptExt unless the filename already has that
 //	  extension.
 // In all cases, if XP_SkipNull flag is set, null directories in $execPath are skipped.
-int pathSearch(const char *name, ushort flags, void *result, const char *funcName) {
+int pathSearch(const char *name, uint flags, void *result, const char *funcName) {
 	char *str1, *str2;
 	Datum *pExtName;			// Name with extension, if applicable.
 	glob_t *pGlob;
@@ -1418,24 +1487,24 @@ int pathSearch(const char *name, ushort flags, void *result, const char *funcNam
 	static char *scriptExt = ScriptExt;
 	size_t scriptExtLen = strlen(scriptExt);
 
+	// Null filename?
+ 	if(maxLen == 0)
+ 		return sess.rtn.status;
+
 	// Get ready.
-	if(flags & XP_GlobPat) {
+	if(flags & XP_GlobPat)
 		pGlob = (glob_t *) result;
-		pGlob->gl_pathc = 0;
-		}
 	else {
 		pPath = (char **) result;
 		*pPath = NULL;
 		}
 
-	// Null filename?
- 	if(maxLen == 0)
- 		return sess.rtn.status;
-
  	// Create filename-with-extension version.
- 	if(dnewtrack(&pExtName) != 0)
+ 	if((pExtName = dnewtrack()) == NULL)
  		goto LibFail;
-	if(!(flags & XP_GlobPat) && ((str1 = strchr(fbasename(name, true), '.')) == NULL || strcmp(str1, scriptExt) != 0)) {
+
+ 	// Add extension to name if not already there.
+	if(!(flags & XP_GlobPat) && strcmp(cname((char *) name, CNExtension | CNPtrOnly), scriptExt) != 0) {
 		maxLen += scriptExtLen;
 		if(dsalloc(pExtName, maxLen + 1) != 0)
 			goto LibFail;
@@ -1444,14 +1513,16 @@ int pathSearch(const char *name, ushort flags, void *result, const char *funcNam
 	else
 		dsetnull(pExtName);
 
-	// If the path begins with '/', check only that.
-	if(*name == '/') {
-		if(!(flags & XP_GlobPat))
-			return fileExists(name) & (FTypRegular | FTypSymLink) ? savePath(pPath, name) : (!disnull(pExtName) &&
-			 (fileExists(pExtName->str) & (FTypRegular | FTypSymLink))) ? savePath(pPath, pExtName->str) :
-			 sess.rtn.status;
-		return rsset(Failure, 0, text407, funcName);
-			// "Invalid argument for %s glob search"
+	// Now find file.  If the path begins with '/', check only that: verbatim first, then with script extension.
+	if(name[0] == '/' || (name[0] == '.' && (name[1] == '/' || (name[1] == '.' && name[2] == '/')))) {
+		if(flags & XP_GlobPat)
+			return rsset(Failure, 0, text407, funcName);
+				// "Invalid argument for %s glob search"
+		if(fileExists(name) & (FTypRegular | FTypSymLink))
+			return savePath(pPath, name);
+		if(!disnull(pExtName) && (fileExists(pExtName->str) & (FTypRegular | FTypSymLink)))
+			return savePath(pPath, pExtName->str);
+		return sess.rtn.status;
 		}
 
 	// Check HOME directory (only), if requested.
@@ -1468,10 +1539,11 @@ int pathSearch(const char *name, ushort flags, void *result, const char *funcNam
 		}
 
 	// All special cases checked.  Create name list (filenames to check) and scan the execPath directories.
+	char *dirSepTok;
+	uint globFlags = GLOB_MARK | GLOB_NOSORT | GLOB_BRACE;
 	const char *nameList[] = {
 		name, pExtName->str, NULL};
 	for(str2 = execPath; *str2 != '\0';) {
-		char *dirSepTok;
 
 		// Build next possible file spec or glob pattern.
 		str1 = str2;
@@ -1494,13 +1566,12 @@ int pathSearch(const char *name, ushort flags, void *result, const char *funcNam
 				if((*ppName)[0] != '\0') {
 					sprintf(pathBuf, "%.*s%s%s", (int) (str2 - str1), str1, dirSepTok, *ppName);
 					if(flags & XP_GlobPat) {
-						if((r = glob(pathBuf, GLOB_MARK, NULL, pGlob)) != 0 && r != GLOB_NOMATCH) {
+						if((r = glob(pathBuf, globFlags, NULL, pGlob)) != 0 && r != GLOB_NOMATCH)
 							return rsset(errno == GLOB_NOSPACE ? FatalError : Failure, 0, text406,
 											// "Glob of pattern \"%s\" failed: %s"
 							 pathBuf, strerror(errno));
-							}
 						if(pGlob->gl_pathc > 0)
-							return sess.rtn.status;
+							globFlags |= GLOB_APPEND;
 						}
 					else if(fileExists(pathBuf) & (FTypRegular | FTypSymLink))
 						return savePath(pPath, pathBuf);
@@ -1508,12 +1579,12 @@ int pathSearch(const char *name, ushort flags, void *result, const char *funcNam
 				} while(*++ppName != NULL);
 			}
 
-		// Not found.  Onward...
+		// Not found or glob search.  Onward...
 		if(*str2 == ':')
 			++str2;
 		}
 
-	// No such luck.
+	// No such luck (or glob search).
 	return sess.rtn.status;
 LibFail:
 	return libfail();
@@ -1521,7 +1592,7 @@ LibFail:
 
 // Get absolute pathname of "filename" (which may be modified) and return in "pPath".  Resolve it if it's a symbolic link and
 // "resolve" is true.  Return status.
-int getPath(char *filename, bool resolve, Datum *pPath) {
+int absPath(char *filename, bool resolve, Datum *pPath) {
 	char nameBuf[MaxPathname + 1];
 
 	if(!resolve) {
@@ -1534,15 +1605,13 @@ int getPath(char *filename, bool resolve, Datum *pPath) {
 
 		// File is a symbolic link.  Get pathname of parent directory and append filename.
 		DFab fab;
-		char *str = fbasename(filename, true);
-		char base[strlen(str) + 1];
-		strcpy(base, str);
-		if(dopenwith(&fab, pPath, FabClear) != 0)
-			goto LibFail;
-		if(realpath(filename = fdirname(filename, 1), nameBuf) == NULL)
+		char *basename = cname(filename, CNBasename);
+		filename = cname(filename, CNDirname | CNDefaultDir);
+		if(realpath(filename, nameBuf) == NULL)
 			goto ErrRetn;
-		if(dputs(nameBuf, &fab, 0) != 0 || (strcmp(nameBuf, "/") != 0 && dputc('/', &fab, 0) != 0) ||
-		 dputs(base, &fab, 0) != 0 || dclose(&fab, FabStr) != 0)
+		if(dopenwith(&fab, pPath, FabClear) != 0 || dputs(nameBuf, &fab, 0) != 0 ||
+		 (strcmp(nameBuf, "/") != 0 && dputc('/', &fab, 0) != 0) ||
+		 dputs(basename, &fab, 0) != 0 || dclose(&fab, FabStr) != 0)
 			goto LibFail;
 		}
 	else {
@@ -1559,35 +1628,35 @@ LibFail:
 	return sess.rtn.status;
 	}
 
-// Open directory for filename retrieval, given complete or partial pathname (which may end with a slash).  Initialize
-// *pFilePath to static pointer to pathnames to be returned by ereaddir().  Return status.
+// Open directory for filename retrieval, given complete or partial pathname (which may end with a slash) in a mutable buffer.
+// Initialize *pFilePath to static pointer to pathnames to be returned by ereaddir().  Return status.
 int eopendir(const char *fileSpec, char **pFilePath) {
-	char *fn, *term;
-	size_t prefLen;
+	char *basename, *term;
+	size_t prefixLen;
 
 	// Find directory prefix.  Terminate after slash if Unix root directory, otherwise at rightmost slash.
-	term = ((fn = fbasename(fileSpec, true)) > fileSpec && fn - fileSpec > 1) ? fn - 1 : fn;
+	basename = cname((char *) fileSpec, CNBasename | CNPtrOnly | CNKeepSlash);
+	term = (basename > fileSpec && basename - fileSpec > 1) ? basename - 1 : basename;
+	prefixLen = term - fileSpec;
 
 	// Get space for directory name plus maximum filename.
 	if(filePath != NULL)
 		free((void *) filePath);
-	if((filePath = (char *) malloc((prefLen = (term - fileSpec)) + MaxFilename + 3)) == NULL)
+	if((filePath = (char *) malloc(prefixLen + MaxFilename + 3)) == NULL)
 		return rsset(Panic, 0, text94, "eopendir");
 			// "%s(): Out of memory!"
-	stplcpy(*pFilePath = filePath, fileSpec, prefLen + 1);
+	stplcpy(*pFilePath = filePath, fileSpec, prefixLen + 1);
 
 	// Open the directory.
-	if(dir != NULL) {
+	if(dir != NULL)
 		closedir(dir);
-		dir = NULL;
-		}
 	if((dir = opendir(*filePath == '\0' ? "." : filePath)) == NULL)
 		return rsset(Failure, RSHigh, text88, filePath, strerror(errno));
 			// "Cannot read directory \"%s\": %s"
 
 	// Set filePathEnd, restore trailing slash in pathname if applicable, and return.
-	if(fn > fileSpec)
-		*((filePathEnd = filePath + (fn - fileSpec)) - 1) = '/';
+	if(basename > fileSpec)
+		(filePathEnd = filePath + (basename - fileSpec))[-1] = '/';
 	else
 		filePathEnd = filePath;
 

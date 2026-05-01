@@ -17,7 +17,7 @@ When invoking the command, if you clear the line and press ~ureturn~U or ~uC-SPC
 the prompt, the filename will be cleared.
 
 MightEMacs provides several other commands for working with buffers, which you
-may want to try out.  See the ~bshowCommands~B (~#uC-h c~U) display for details.
+may want to try out.  See the ~bshowRoutines~B (~#uC-h r~U) help text for details.
 Following is a summary of the buffer commands which are used most often and also
 those that are not discussed on other help pages:
 
@@ -26,6 +26,7 @@ those that are not discussed on other help pages:
                                 "TermAttr".  (All other attributes are
                                 maintained by the editor and cannot be
                                 modified.)
+    chgBufHome      ~#uC-x h~U       Change a buffer's home screen.
     clearBuf        ~#uC-x DEL~U     Delete all text from a buffer and clear the
                                 "Changed" buffer attribute.
     delBuf          ~#uC-x C-b~U     Delete a named buffer or multiple buffers that
@@ -37,11 +38,17 @@ those that are not discussed on other help pages:
                                 numeric prefix is negative, the current buffer
                                 is deleted after the switch.
     nextBuf         ~#uC-x ]~U       Switch to the next (alphabetically higher)
-                                buffer.  If the numeric prefix is negative, the
-                                current buffer is deleted after the switch.
+                                buffer that is homed to current screen (or to
+                                the next visible buffer if the numeric prefix is
+                                zero or positive).  If the numeric prefix is
+                                zero or negative, the current buffer is deleted
+                                after the switch.
     prevBuf         ~#uC-x [~U       Switch to the previous (alphabetically lower)
-                                buffer.  If the numeric prefix is negative, the
-                                current buffer is deleted after the switch.
+                                buffer that is homed to current screen (or to
+                                the previous visible buffer if the numeric
+                                prefix is zero or positive).  If the numeric
+                                prefix is zero or negative, the current buffer
+                                is deleted after the switch.
     renameBuf       ~#uC-x B~U       Rename a buffer.
     scratchBuf      ~#uC-x #~U       Create a "scratch" buffer with a unique name and
                                 switch to it.
@@ -51,9 +58,11 @@ those that are not discussed on other help pages:
     truncBuf        ~#uESC t~U       Truncate current buffer; that is, delete all
                                 text from the point to the beginning or end of
                                 the buffer.
-    writeBuf        ~#uC-x *~U       Write lines or characters in region from current
-                                buffer to another buffer, and optionally delete
-                                text that was written.
+    writeLine       ~#uC-x *~U       Write lines from current buffer to another
+				buffer.
+    writeRegion     ~#uESC *~U       Write characters in region from current buffer
+                                to another buffer, and optionally delete text
+                                that was written.
     xeqBuf          ~#uC-x x~U       Execute a named buffer as a user routine.
 
 There are two other buffer commands worth mentioning: ~bnarrowBuf~B (~#uC-x <~U) and

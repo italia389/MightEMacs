@@ -15,7 +15,7 @@ designed just for this purpose.
 
 You also may not assign a user function to a hook unless the function was
 defined with an argument count that is the same as the hook's argument count,
-which is shown in the ~bshowHooks~B display.  (User command and function
+which is shown in the ~bshowHooks~B help text.  (User command and function
 definitions are explained in detail in the ~bStatements~B section.)
 
 A hook is set with the ~bsetHook~B function and cleared with the ~bclearHook~B
@@ -33,10 +33,10 @@ To see all hooks and their settings, enter ~#uC-h h~U (showHooks).
 
 The complete list of hooks follows:
 
-    ~bHook name~B   ~bMacro arguments~B     ~bDescription~B
+    ~bHook name~B   ~bFunction arguments~B  ~bDescription~B
 
     chgDir       (none)             Change-directory hook -- called at program
-                                    startup and after the ~bchgDir~B command is
+                                    startup and after the ~bchdir~B command is
                                     executed.
 
     createBuf   Buffer name         Create-buffer hook -- called at program
@@ -64,12 +64,12 @@ The complete list of hooks follows:
                                     (filename) argument will be ~unil~U if the
                                     buffer's filename is not set.
 
-    mode        nil, $GlobalModes   Mode-change hook -- called whenever any mode
+    mode        nil, GlobalModes    Mode-change hook -- called whenever any mode
                  ~uOR~U buffer name,    is changed.  If global mode(s) are changed,
-                 $BufModes          arguments are nil and the prior $GlobalModes
+                 BufModes           arguments are nil and the prior GlobalModes
                                     value.  If buffer mode(s) are changed,
                                     arguments are the buffer name and the prior
-                                    $BufModes value.  (The value of the variable
+                                    BufModes value.  (The value of the variable
                                     can be compared to the current value of the
                                     same variable to find the mode(s) that
                                     changed.)
@@ -79,7 +79,7 @@ The complete list of hooks follows:
                                     sequence that was entered is available in
                                     the $lastKeySeq variable (in string form).
                                     If it was a single 7-bit ASCII character, it
-                                    is also available in the $LastKey variable
+                                    is also available in the LastKey variable
                                     in integer form (which is intended to be
                                     used by scripts that do programming language
                                     formatting).  The hook function may set a
@@ -101,10 +101,12 @@ The complete list of hooks follows:
                                     read.
 
     write       Buffer name,        Write-file hook -- called just before a
-                 filename           buffer is written to disk.
+                 filename, mode     buffer is written to disk.  Mode argument is
+                                    either ?w or ?a, indicating whether writing
+                                    or appending to output file.
 
     wrap        (none)              Wrap-word hook -- called when the "Wrap"
-                                    buffer mode is enabled, the "ReadOnly"
+                                    buffer mode is activated, the "ReadOnly"
                                     buffer attribute is not set, a space or
                                     ~ureturn~U was entered, and the point is at or
                                     past the wrap column ($wrapCol).

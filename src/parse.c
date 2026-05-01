@@ -1,4 +1,4 @@
-// (c) Copyright 2022 Richard W. Marinelli
+// (c) Copyright 2026 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -79,7 +79,7 @@ static Op opTable[] = {
 	/* <=	25 */	{NULL, NULL, '=', s_le},
 	/* =	26 */	{opTable + 30, opTable + 27, '=', s_assign},
 	/* ==	27 */	{opTable + 28, NULL, '=', s_eq},
-	/* =>	28 */	{opTable + 29, NULL, '>', s_nArg},
+	/* =>	28 */	{opTable + 29, NULL, '>', s_bind},
 	/* =~	29 */	{NULL, NULL, '~', s_regEQ},
 	/* >	30 */	{opTable + 34, opTable + 31, '>', s_gt},
 	/* >=	31 */	{opTable + 32, NULL, '=', s_ge},
@@ -95,7 +95,7 @@ static Op opTable[] = {
 	/* |	41 */	{opTable + 44, opTable + 42, '|', s_bitOr},
 	/* ||	42 */	{opTable + 43, NULL, '|', s_or},
 	/* |=	43 */	{NULL, NULL, '=', s_assignBitOr},
-	/* ~	44 */	{NULL, NULL, '~', s_bitNot},
+	/* ~	44 */	{NULL, NULL, '~', s_bitCompl},
 	};
 
 // binSearch() helper function for returning script keyword, given table (array) and index.
@@ -104,16 +104,17 @@ static const char *scriptKeyword(const void *table, ssize_t i) {
 	return ((KeywordInfo *) table)[i].name;
 	}
 
-// Convert ASCII string to long integer, save in *result (if result not NULL), and return status or Boolean result.  If invalid
-// number, return error if query is false; otherwise, return false.  Any leading or trailing white space is ignored.
-int ascToLong(const char *src, long *result, bool query) {
+// Convert given ASCII string and base to long integer, save in *result (if result not NULL), and return status or Boolean
+// result.  If invalid number, return error if query is false; otherwise, return false.  Any leading or trailing white space is
+// ignored.  Base may be any value allowed by strtol() function.
+int ascToLong(const char *src, int base, long *result, bool query) {
 	long longVal;
 	char *str;
 
 	if(*src == '\0')
 		goto Err;
 	errno = 0;
-	longVal = strtol(src, &str, 0);
+	longVal = strtol(src, &str, base);
 	if(errno == ERANGE)
 		goto Err;
 	while(*str == ' ' || *str == '\t')
@@ -134,24 +135,15 @@ char *longToAsc(long n, char *dest) {
 	return dest;
 	}
 
-// Convert a value to an integer.  Return status.
-int toInt(Datum *pDatum) {
+// Convert a value to a long integer.  Return status.
+int toInt(Datum *pDatum, int base) {
 	long i;
 
 	if(pDatum->type != dat_int) {
-		if(ascToLong(pDatum->str, &i, false) != Success)
-			return sess.rtn.status;
-		dsetint(i, pDatum);
+		if(ascToLong(pDatum->str, base, &i, false) == Success)
+			dsetint(i, pDatum);
 		}
 	return sess.rtn.status;
-	}
-
-// Check if return code from a CXL library datum-conversion function is greater than zero (indicating endless recursion during
-// an array-to-string conversion) and set an error message if so.  Return status.
-int endless(int rtnCode) {
-
-	return rtnCode > 0 ? rsset(Failure, RSNoFormat, text195) : sess.rtn.status;
-		// "Endless recursion detected (array contains itself)"
 	}
 
 // Convert a Datum object to a string in place, using default conversion method.  Return status.
@@ -159,7 +151,7 @@ int toStr(Datum *pDatum) {
 
 #if MMDebug & Debug_Expr
 	fputs("### toStr(): converted ", logfile);
-	dumpVal(pDatum);
+	dumpVal(pDatum, false);
 #endif
 	if(disnil(pDatum))
 		dsetnull(pDatum);
@@ -167,14 +159,13 @@ int toStr(Datum *pDatum) {
 		int rtnCode;
 		Datum *pDatum1;
 
-		if(dnewtrack(&pDatum1) != 0 || (rtnCode = dtos(pDatum1, pDatum, NULL, 0)) < 0)
+		if((pDatum1 = dnewtrack()) == NULL || (rtnCode = dtos(pDatum1, pDatum, NULL, 0)) < 0)
 			return libfail();
 		if(endless(rtnCode) == Success) {
 			dxfer(pDatum, pDatum1);
 #if MMDebug & Debug_Expr
 			fputs(" to string ", logfile);
-			dumpVal(pDatum);
-			fputc('\n', logfile);
+			dumpVal(pDatum, true);
 #endif
 			}
 		}
@@ -211,39 +202,27 @@ char *nonWhite(const char *s, bool skipInLine) {
 	}
 
 // Deselect all options in an option table.
-void deselectOpts(Option *pOpt) {
+void deselectOpts(OptHdr *pOptHdr) {
+	Option *pOpt, *pOptEnd;
 
+	pOptEnd = (pOpt = pOptHdr->optTable) + pOptHdr->optCount;
 	do {
 		if(!(pOpt->ctrlFlags & OptIgnore))
 			pOpt->ctrlFlags &= ~OptSelected;
-		} while((++pOpt)->keyword != NULL);
+		} while(++pOpt < pOptEnd);
 	}
 
-// Initialize all option table options (which are assumed to be Boolean types) to true if OptFalse flag set, otherwise false.
-void initBoolOpts(Option *pOpt) {
+// Get and return OR'd flags from option table that were selected after parseOpts() call.
+uint getFlagOpts(OptHdr *pOptHdr) {
+	Option *pOpt, *pOptEnd;
+	uint state, flags = 0;
 
+	pOptEnd = (pOpt = pOptHdr->optTable) + pOptHdr->optCount;
 	do {
-		*((bool *) pOpt->u.ptr) = (pOpt->ctrlFlags & OptFalse) != 0;
-		} while((++pOpt)->keyword != NULL);
-	}
-
-// Set Boolean values in option table after parseOpts() call.
-void setBoolOpts(Option *pOpt) {
-
-	do {
-		if(pOpt->ctrlFlags & OptSelected)
-			*((bool *) pOpt->u.ptr) = (pOpt->ctrlFlags & OptFalse) == 0;
-		} while((++pOpt)->keyword != NULL);
-	}
-
-// Get and return flags from option table after parseOpts() call.
-uint getFlagOpts(Option *pOpt) {
-	uint flags = 0;
-
-	do {
-		if(pOpt->ctrlFlags & OptSelected)
+		state = pOpt->ctrlFlags & (OptSelected | OptFalse);
+		if(state == OptSelected || state == OptFalse)
 			flags |= pOpt->u.value;
-		} while((++pOpt)->keyword != NULL);
+		} while(++pOpt < pOptEnd);
 	return flags;
 	}
 
@@ -279,35 +258,51 @@ char *strparse(char **pStr, short delimChar) {
 	return str0;
 	}
 
+// Return option type string.
+static const char *optType(OptHdr *pOptHdr) {
+
+	return pOptHdr->type != NULL ? pOptHdr->type : pOptHdr->ctrlFlags & OHdrFunc ? text451 : text410;
+									// "function option", "command option"
+	}
+
 // Parse one or more keyword options from given Datum object (pOptions != NULL), the next command-line argument (pOptions ==
-// NULL, using optHdr->argFlags in funcArg() call), or build a prompt and obtain interactively, if applicable, and return
-// status.  If pOptions is not NULL, it may be nil (in which case it is processed as a null string); otherwise, it is assumed to
-// contain a string.  Keywords are specified in given pOptHdr->optTable table, which is assumed to be a NULL-terminated array of
-// Option objects.  Options that are found are marked in table by setting the OptSelected flag.  If an unknown option is found
-// or if no options are specified and ArgNil1 flag is not set in optHdr->argFlags, an error is returned; otherwise, *count (if
-// count not NULL) is set to the number of options found, which will be zero if interactive and nothing was entered.
-int parseOpts(OptHdr *pOptHdr, const char *basePrompt, Datum *pOptions, int *count) {
+// NULL, using ArgFirst flag in funcArg() call if OHdrFirst flag set in optHdr->ctrlFlags), or build a prompt (from string in
+// header and options keywords) and obtain interactively, if applicable, and return status.  If pOptions is not NULL, it may be
+// nil (in which case it is processed as a null string); otherwise, it is assumed to contain a string.  Keywords are specified
+// in pOptHdr->optTable table, which is assumed to be an array of pOptHdr->optCount Option objects.  Options that are found are
+// marked in table by setting the OptSelected flag.  If an unknown option is found or if no options are specified, an error is
+// returned; otherwise, the OHdrFound configuration flag is set in header if any options were found, or cleared otherwise
+// (including if interactive and nothing was entered).
+int parseOpts(OptHdr *pOptHdr, Datum *pOptions) {
 	Datum *pOptStr;
-	Option *pOpt;
+	Option *pOpt, *pOptEnd;
+	uint flags;
 	int found = 0;
 	const char *keyword;
 	char *str;
 
-	if((!(sess.opFlags & OpScript) || pOptions == NULL) && dnewtrack(&pOptStr) != 0)
+	if((!(sess.opFlags & OpScript) || pOptions == NULL) && (pOptStr = dnewtrack()) == NULL)
 		goto LibFail;
 
-	// Deselect all options in table.
-	deselectOpts(pOptHdr->optTable);
+	// Deselect all options in table and clear "found" flag.
+	deselectOpts(pOptHdr);
+	pOptHdr->ctrlFlags &= ~OHdrFound;
 
 	if(sess.opFlags & OpScript) {
 
 		// Get string to parse.  Use caller-supplied options if available.
 		if(pOptions != NULL)
 			pOptStr = pOptions;
-		else if(funcArg(pOptStr, pOptHdr->argFlags) != Success)
-			return sess.rtn.status;
+		else {
+			flags = pOptHdr->ctrlFlags & OHdrFirst ? ArgFirst : 0;
+			if(pOptHdr->ctrlFlags & OHdrNil)
+				flags |= ArgNil1;
+			if(funcArg(pOptStr, flags) != Success)
+				return sess.rtn.status;
+			}
 
 		if(!disnil(pOptStr)) {
+
 			// Parse keywords from argument string.
 			char *str0, *str1;
 			char workBuf[32];
@@ -318,7 +313,7 @@ int parseOpts(OptHdr *pOptHdr, const char *basePrompt, Datum *pOptions, int *cou
 					continue;
 
 				// Scan table for a match.
-				pOpt = pOptHdr->optTable;
+				pOptEnd = (pOpt = pOptHdr->optTable) + pOptHdr->optCount;
 				do {
 					if(!(pOpt->ctrlFlags & OptIgnore)) {
 
@@ -335,25 +330,25 @@ int parseOpts(OptHdr *pOptHdr, const char *basePrompt, Datum *pOptions, int *cou
 						if(strcasecmp(str1, workBuf) == 0)
 							goto Found;
 						}
-					} while((++pOpt)->keyword != NULL);
+					} while(++pOpt < pOptEnd);
 
 				// Match not found... return error.
 				goto ErrRtn;
 Found:
 				// Match found.  Count it, validate it, and mark table entry.
-				if(++found > 1 && pOptHdr->single) {
+				if(++found > 1 && pOptHdr->ctrlFlags & OHdrSingle) {
 					str1 = optBuf;
 ErrRtn:
-					return rsset(Failure, 0, text447, pOptHdr->type, str1);
-						// "Invalid %s '%s'"
+					return rsset(Failure, 0, text447, optType(pOptHdr), str1);
+							// "Invalid %s '%s'"
 					}
 				pOpt->ctrlFlags |= OptSelected;
 				}
 			}
 
-		// Error if none found and ArgNil1 flag not set.
-		if(found == 0 && !(pOptHdr->argFlags & ArgNil1))
-			return rsset(Failure, 0, text455, pOptHdr->type);
+		// Error if none found and OHdrNil flag not set.
+		if(found == 0 && !(pOptHdr->ctrlFlags & OHdrNil))
+			return rsset(Failure, 0, text455, optType(pOptHdr));
 				// "Missing required %s",
 		}
 	else {
@@ -363,9 +358,11 @@ ErrRtn:
 		bool optLetter = false;
 		short c;
 
-		if(dopenwith(&prompt, pOptStr, FabClear) != 0 || dputs(basePrompt, &prompt, 0) != 0)
+		if(dopenwith(&prompt, pOptStr, FabClear) != 0 ||
+		 dputs(pOptHdr->prompt == NULL ? text448 : pOptHdr->prompt, &prompt, 0) != 0)
+					// "Options"
 			goto LibFail;
-		pOpt = pOptHdr->optTable;
+		pOptEnd = (pOpt = pOptHdr->optTable) + pOptHdr->optCount;
 		do {
 			if(!(pOpt->ctrlFlags & OptIgnore)) {
 				if(dputs(lead, &prompt, 0) != 0)
@@ -390,23 +387,23 @@ ErrRtn:
 					} while(*keyword != '\0');
 				lead = ", ";
 				}
-			} while((++pOpt)->keyword != NULL);
+			} while(++pOpt < pOptEnd);
 		if(dputc(')', &prompt, 0) != 0 || dclose(&prompt, FabStr) != 0)
 			goto LibFail;
 
 		// Get option letter(s) from user.  If single letter (int) is input, convert it to a string.
-		if(termInp(pOptStr, pOptStr->str, ArgNotNull1 | ArgNil1,
-		 pOptHdr->single ? Term_LongPrmt | Term_Attr | Term_OneChar : Term_LongPrmt | Term_Attr, NULL) != Success)
+		if(termInp(pOptStr, pOptStr->str, ArgNotNull1 | ArgNil1, pOptHdr->ctrlFlags & OHdrSingle ?
+		 Term_LongPrmt | Term_Attr | Term_OneChar : Term_LongPrmt | Term_Attr, NULL) != Success)
 			return sess.rtn.status;
 		if(disnil(pOptStr))
 			goto Retn;
-		if(pOptHdr->single)
-			dconvchr(lowCase[pOptStr->u.intNum], pOptStr);
+		if(pOptHdr->ctrlFlags & OHdrSingle)
+			dconvchr(lowCase[dgetint(pOptStr)], pOptStr);
 		else
 			makeLower(pOptStr->str, pOptStr->str);
 
 		// Have one or more letters in pOptStr.  Scan table and mark matches.
-		pOpt = pOptHdr->optTable;
+		pOptEnd = (pOpt = pOptHdr->optTable) + pOptHdr->optCount;
 		do {
 			if(!(pOpt->ctrlFlags & OptIgnore)) {
 
@@ -415,31 +412,31 @@ ErrRtn:
 				c = lowCase[(int) strchr(pOpt->keyword, '^')[1]];
 				if((str = strchr(pOptStr->str, c)) != NULL) {
 					++found;
-					*str = 0xFF;
+					*str = 0xff;
 					pOpt->ctrlFlags |= OptSelected;
 					}
 				else
 					pOpt->ctrlFlags &= ~OptSelected;
 				}
-			} while((++pOpt)->keyword != NULL);
+			} while(++pOpt < pOptEnd);
 
 		// Any leftover letters in user string?
 		str = pOptStr->str;
 		do {
-			if(*str != 0xFF) {
+			if(*str != 0xff) {
 				char workBuf[2];
 
 				workBuf[0] = *str;
 				workBuf[1] = '\0';
-				return rsset(Failure, 0, text447, pOptHdr->type, workBuf);
+				return rsset(Failure, 0, text447, optType(pOptHdr), workBuf);
 						// "Invalid %s '%s'"
 				}
 			} while(*++str != '\0');
 		}
 Retn:
-	// Scan completed and table entries marked.  Return number of matches.
-	if(count != NULL)
-		*count = found;
+	// Scan completed and table entries marked.  Set "found" flag if any matches found.
+	if(found > 0)
+		pOptHdr->ctrlFlags |= OHdrFound;
 	return sess.rtn.status;
 LibFail:
 	return libfail();
@@ -448,44 +445,25 @@ LibFail:
 // Convert first argument to string form, set result as return value, and return status.  Conversion options are parsed from
 // optional second argument:
 //	ShowNil		-> convert nil to "nil", otherwise "".
-//	SkipNil		-> skip nil arguments in arrays.
+//	SkipNil		-> skip nil arguments in arrays and hashes.
 //	Quote1		-> enclose strings in single (') quotes.
 //	Quote2		-> enclose strings in double (") quotes.
 //	Quote		-> quote characters and strings depending on type and flags.
 //	VizChar		-> convert invisible characters in strings to visible form via vizc().
 //	EscChar		-> convert invisible characters in strings to escaped-character form.
 //	ThouSep		-> insert commas in thousands' places in integers.
-//	Delim		-> insert comma delimiter between array elements.
-//	Brackets	-> wrap array elements in brackets [...].
+//	Delim		-> insert comma delimiter between array elements and hash nodes.
+//	Fences		-> wrap array elements in brackets [...] and hash nodes in braces {...}.
 // Additionally, a string delimiter may be specified as the third argument (and the second argument may be nil).
-int toString(Datum *pRtnVal, int n, Datum **args) {
-	ushort cflags = 0;
+int toString(Datum *pRtnVal, long n, Datum **args) {
+	uint cflags = 0;
 	char *delim = NULL;
-	static Option options[] = {
-		{"Show^Nil", NULL, 0, DCvtShowNil},
-		{"S^kipNil", NULL, 0, ACvtSkipNil},
-		{"Quote^1", NULL, 0, DCvtQuote1},
-		{"Quote^2", NULL, 0, DCvtQuote2},
-		{"^Quote", NULL, 0, DCvtQuote},
-		{"^VizChar", NULL, 0, DCvtVizChar},
-		{"^EscChar", NULL, 0, DCvtEscChar},
-		{"^ThouSep", NULL, 0, DCvtThouSep},
-		{"^Delim", NULL, 0, ACvtDelim},
-		{"^Brackets", NULL, 0, ACvtBrkts},
-		{"^Lang", NULL, 0, DCvtLang},
-		{"Viz^Str", NULL, 0, DCvtVizStr},
-		{NULL, NULL, 0, 0}};
-	static OptHdr optHdr = {
-		0, text451, false, options};
-			// "function option"
+	OptHdr *pOptHdr = cmdFuncTable[cf_tostr].pOptHdr;
 
 	// Get options and set flags.
 	if(args[1] != NULL) {
-		if(!disnil(args[1])) {
-			if(parseOpts(&optHdr, NULL, args[1], NULL) != Success)
-				return sess.rtn.status;
-			cflags = getFlagOpts(options);
-			}
+		if(pOptHdr->ctrlFlags & OHdrFound)
+			cflags = pOptHdr->selFlags;
 
 		// Get delimiter argument, if present.
 		if(args[2] != NULL)
@@ -666,13 +644,10 @@ static Symbol getSpecial(char **pSrc) {
 	return pPrevOp ? pPrevOp->sym : s_nil;
 	}
 
-// Check string for a numeric literal.  If extended is true, allow form recognized by strtol() with base zero and no leading
-// sign.  If valid literal found, set *pSrc to first invalid character and return symbol; otherwise, return s_nil.
+// Parse numeric literal from a string.  It is assumed string begins with a digit.  If extended is true, allow form recognized
+// by strtol() with base zero (and no leading sign).  Set *pSrc to first invalid character and return symbol.
 static Symbol getNumLit(char **pSrc, bool extended) {
-	char *src = *pSrc;
-	if(!is_digit(*src++))
-		return s_nil;
-
+	char *src = *pSrc + 1;
 	if(extended && src[-1] == '0' && (*src == 'x' || *src == 'X')) {
 		++src;
 		while(is_digit(*src) || (*src >= 'a' && *src <= 'f') || (*src >= 'A' && *src <= 'F'))
@@ -700,12 +675,12 @@ Symbol getIdent(char **pSrc, ushort *pWordLen) {
 	// Valid identifier found; find terminator.
 	src = src0 + strspn(src0, identChars);
 
-	// Query type?
-	if(*src == TokC_Query) {
-		*pSrc = src + 1;
+	// Query type or global constant?
+	if(*src == TokC_Query || isUpperCase(*src0)) {
+		*pSrc = src + (*src == TokC_Query ? 1 : 0);
 		if(pWordLen != NULL)
 			*pWordLen = *pSrc - src0;
-		return s_identQuery;
+		return *src == TokC_Query ? s_identQuery : s_globalConst;
 		}
 
 	// Check if keyword.
@@ -768,10 +743,12 @@ int getSym(void) {
 		case '"':
 		case '\'':
 			sym = getStrLit(&src, c);		// String or character literal.
-			if(*src != c)				// Unterminated string?
-				return rsset(Failure, 0, text123,
-				 strSamp(src0, strlen(src0), (size_t) term.cols * 3 / 10));
+			if(*src != c) {				// Unterminated string?
+				size_t len = term.cols * 3 / 10 + 1;
+				char workBuf[len];
+				return rsset(Failure, 0, text123, strfit(workBuf, len, src0, 0));
 					// "Unterminated string %s"
+				}
 			++src;
 			goto SaveExit;
 		case '?':
@@ -793,8 +770,7 @@ int getSym(void) {
 		case '7':
 		case '8':
 		case '9':
-			sym = s_numLit;				// Numeric literal.
-			(void) getNumLit(&src, true);
+			sym = getNumLit(&src, true);		// Numeric literal.
 			goto SaveExit;
 
 		// User variable?
@@ -813,18 +789,15 @@ int getSym(void) {
 			--src;
 			goto Unk;
 
-		// Identifier?
+		// Identifier or global constant?
 		default:
 			if((sym = getIdent(&src, NULL)) != s_nil)
 				goto SaveExit;
 Special:
 			if((sym = getSpecial(&src)) != s_nil) {
 SaveExit:
-				c = *src;
-				*src = '\0';
-				if(dsetstr(src0, &pLastParse->tok) != 0)
+				if(dsetsubstr(src0, src - src0, &pLastParse->tok) != 0)
 					return libfail();
-				*src = c;
 				break;
 				}
 Unk:
@@ -844,8 +817,8 @@ Unk:
 #if SanityCheck
 	// Check if this function was called at end-of-parse-string (should never happen).
 	if(sym == s_nil && pLastParse->sym == s_nil)
-		return rsset(FatalError, 0, "getSym(): Called after end of string detected, parsing \"%s\"",
-		 pLastParse->tok.str);
+		return rsset(Failure, 0, text994, pLastParse->tok.str);
+			// "getSym(): Unexpected call after end of string detected (last token \"%s\")"
 #endif
 	// Return results.
 	pLastParse->sym = sym;
@@ -857,13 +830,19 @@ Unk:
 	return (sym == s_nil) ? NotFound : sess.rtn.status;
 	}
 
+// Return true if next character to parse is c.
+bool nextChar(short c) {
+
+	return pLastParse->sym != s_nil && *pLastParse->src == c;
+	}
+
 // Return true if next character to parse is white space.
 bool haveWhite(void) {
 
-	return pLastParse->sym != s_nil && (*pLastParse->src == ' ' || *pLastParse->src == '\t');
+	return pLastParse->sym != s_nil && isspace(*pLastParse->src);
 	}
 
-// Check if given symbol (or any symbol if sym is s_any) remains in command line being parsed..
+// Check if current symbol exists and matches given symbol (or any symbol if sym is s_any).
 // If a symbol is found:
 //	If symbol matches "sym" or "sym" is s_any, return true.
 //	Otherwise, set error if "required" is true and return false.
@@ -917,4 +896,26 @@ bool extraSym(void) {
 		return true;
 		}
 	return false;
+	}
+
+// Check if argument exists or does not exist and return Boolean result.  Simulate "argument" based on n value if interactive.
+bool haveArg(long n, Datum **pArg, bool exists) {
+
+	if(sess.opFlags & OpScript) {
+
+		// Script mode.  If pArg not NULL and *pArg not NULL, return true if exists? is true, otherwise false.
+		if(pArg != NULL)
+			return (*pArg != NULL) == exists;
+
+		// If no arguments left, return false if exists? is true, otherwise true.
+		if(!haveSym(s_any, false) || sess.opFlags & OpParens && haveSym(s_rightParen, false))
+			return !exists;
+
+		// Have an argument symbol.  Return true if exists? is true, otherwise false.
+		return exists;
+		}
+
+	// Interactive mode.  Return true if non-default n and exists? is true or vice-versa (default n and exists? is false),
+	// otherwise false.
+	return (n != DefN) == exists;
 	}

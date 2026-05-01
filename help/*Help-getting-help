@@ -25,7 +25,7 @@ displays the following in a pop-up window:
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r=* (Exact) == unnamed ============================= MightEMacs 9.7.0 ~R|
+    |~r=* (Exact) == unnamed [1] ======================== MightEMacs 10.0.0 ~R|
     | End: ~b_~B                                                              |
      ---------------------------------------------------------------------
 
@@ -33,7 +33,7 @@ displays the following in a pop-up window:
 we used earlier in the ~bIntroduction~B section.  Now type ~#uC-u C-u C-h ? C-h~U.  You
 will see the following on the ~bmessage line~B instead:
 
-    |~r=* (Exact) == unnamed ============================= MightEMacs 9.7.0 ~R|
+    |~r=* (Exact) == unnamed [1] ======================== MightEMacs 10.0.0 ~R|
     |~uC-h~U -> ~bprefix3~B - Begin prefix 3 key sequence.                        |
      ---------------------------------------------------------------------
 
@@ -47,14 +47,14 @@ truncated on the message line.  Type ~#uC-h ? C-x b~U to see an example of this.
 
 MightEMacs also provides informational displays via other "show" commands, which
 are all bound to a key sequence that begins with ~uC-h~U.  For example, to see all
-commands and their bindings, press ~#uC-h c~U (showCommands), then press ~ureturn~U at
-the "Apropos" prompt.  Scroll down to near the bottom of the first section and
-notice that there are several other "show" commands as well, which you may want
-to try.
+commands and functions and their bindings, press ~#uC-h r~U (showRoutines), then
+press ~ureturn~U at the "Apropos" prompt.  Scroll down to near the bottom of the
+first section and notice that there are several other "show" commands as well,
+which you may want to try.
 
 There is one additional command in the "show" family which combines the output
-from the ~bshowCommands~B (~#uC-h c~U), ~bshowFunctions~B (~#uC-h f~U), ~bshowAliases~B (~#uC-h a~U),
-and ~bshowVariables~B (~#uC-h v~U) commands:
+from the ~bshowRoutines~B (~#uC-h r~U), ~bshowAliases~B (~#uC-h a~U), and ~bshowConstVars~B (~#uC-h v~U)
+commands:
 
     apropos     ~#uESC a~U
 
@@ -62,7 +62,7 @@ This command prompts for a search string, scans the names from all the
 aforementioned commands, and displays all the items that contain the string you
 entered, ignoring case.  If the string entered is null, all output is displayed:
 
-    |~r=* (Exact) == unnamed ============================= MightEMacs 9.7.0 ~R|
+    |~r=* (Exact) == unnamed [1] ======================== MightEMacs 10.0.0 ~R|
     |Apropos name: ~b_~B                                                      |
      ---------------------------------------------------------------------
 

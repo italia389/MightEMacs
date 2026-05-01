@@ -1,18 +1,18 @@
-# (c) Copyright 2022 Richard W. Marinelli
+# (c) Copyright 2026 Richard W. Marinelli
 #
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# help.ms		Ver. 9.6.0
+# help.ms		Ver. 10.0.0
 #	MightEMacs help system.
 
 ##### Set global constants. #####
-$HelpInfo = [['*Help', '*Help-home'], ['*Adv', '*AdvMainMenu'], 'C-h g']
+HelpInfo = [['*Help', '*Help-home'], ['*Adv', '*AdvMainMenu'], 'C-h g']
 				# Parameters for novice, expert, and common.
 
 # Find help directory.
-if stat? (dir = '%s/../help' % (1 => dirname($RunFile))), 'dL'
-	$HelpDir = pathname(dir)
+if stat? (dir = '%s/../help' % (1 => dirname(RunFile))), 'dL'
+	HelpDir = pathname(dir)
 else
 	# Directory not found.
 	return false
@@ -22,13 +22,13 @@ endif
 
 # Read given help file into current window and set its attributes.
 function hsLoadFile(1)
-	if defined?('Name', $1) == 'buffer'
+	if isBuf?($1)
 		selectBuf $1
 	else
-		bufname = (findFile join('/', $HelpDir, $1))[0]
-		setBufFile bufname, nil
-		2 => chgMode bufname, nil
-		1 => chgBufAttr bufname, 'Hidden, ReadOnly, TermAttr'
+		bufname = (findFile join('/', HelpDir, $1))[0]
+		setBufFile nil, bufname
+		-1 => chgMode '*', bufname
+		1 => chgBufAttr 'Hidden, ReadOnly, TermAttr', bufname
 	endif
 endroutine
 
@@ -53,7 +53,7 @@ endroutine
 
 # Return link name if point on a link, otherwise nil.
 function hsOnLink?(0)
-	1 => setMark ??
+	setMark ??
 	result = nil
 	loop
 		if hsWordChar? $lineChar
@@ -67,7 +67,7 @@ function hsOnLink?(0)
 			setMark
 			hsForwWord
 			if $lineChar == ord('>')
-				result = $RegionText
+				result = RegionText
 				break
 			endif
 		elsif $lineChar == ord('<')
@@ -80,7 +80,7 @@ function hsOnLink?(0)
 			if $lineChar != ord('>')
 				break
 			endif
-			result = $RegionText
+			result = RegionText
 			break
 		elsif $lineChar == ord('>')
 			if $lineOffset == 0 || !hsWordChar?(ord subline(-1, 1))
@@ -91,7 +91,7 @@ function hsOnLink?(0)
 			if $lineOffset == 0 || subline(-1, 1) != '<'
 				break
 			endif
-			result = $RegionText
+			result = RegionText
 			break
 		endif
 		break
@@ -104,12 +104,12 @@ endroutine
 
 # Go to current link or perform appropriate action.
 command hsGoto(0) {description: 'Go to a help link.'}
-	helpBufPrefix = $HelpInfo[0][0]
+	helpBufPrefix = HelpInfo[0][0]
 
 	if index($bufname, helpBufPrefix) != 0			# In a help buffer?
 		run help					# No, enter Help System.
 	else							# Yes, initialize.
-		mainBuf = $HelpInfo[0][1]
+		mainBuf = HelpInfo[0][1]
 
 		if nil?(link = hsOnLink?)			# Point on a link?
 			beep
@@ -134,15 +134,15 @@ endroutine
 function hsMain(0)
 
 	# Get common parameter(s).
-	helpKey = $HelpInfo[2]
-	helpBufPrefix, mainBuf = $HelpInfo[$0 == defn ? 0 : 1]
+	helpKey = HelpInfo[2]
+	helpBufPrefix, mainBuf = HelpInfo[$0 == defn ? 0 : 1]
 
 	# Set up and switch to help screen.
 	curScreenNum = $screenNum
 	loop
 		# If novice level, find screen displaying a buffer whose name begins with helpBufPrefix.
 		if($0 == defn)
-			for windInfo in 1 => getInfo('Windows')
+			for windInfo in getInfo('Windows')
 				screenNum, windNum, bufname = windInfo
 				if index(bufname, helpBufPrefix) == 0
 					if screenNum == curScreenNum
@@ -206,7 +206,7 @@ function hsMain(0)
 						if $lineChar == ord('F')
 
 							# Pop file.
-							1 => popFile join('/', $HelpDir, subline(2)),\
+							popFile join('/', HelpDir, subline(2)),\
 							 'AltModeLine, Delete, TermAttr'
 						elsif $lineChar == ord('M')
 
@@ -219,13 +219,13 @@ function hsMain(0)
 							execPath = $execPath
 							until nil?(dir = strShift(execPath, ?:))
 								if !null?(dir) && (i = index(dir, '/lib/memacs')) != nil
-									manPath = join('/', substr(dir, 0, i),\
+									manPath = join('/', dir[0, i],\
 									 'share/man/man1', '%s.1' % page)
 									stat?(manPath, 'f') and page = manPath
 									break
 								endif
 							endloop
-							cols, rows = $TermSize
+							cols, rows = TermSize
 							1 => shellCmd 'NoHdr', 'MANWIDTH=', cols, ' man ', page, ' | col -b'
 						endif
 						next
@@ -240,8 +240,10 @@ function hsMain(0)
 		screenNum = $screenNum
 		restoreScreen
 		delScreen screenNum
-		for bufname in 1 => bufInfo(nil, 'Visible, Hidden, Brief')
-			index(bufname, helpBufPrefix) == 0 && delBuf(bufname)
+		for bufname in 1 => getInfo 'Buffers'
+			if index(bufname, helpBufPrefix) == 0
+				delBuf(bufname)
+			endif
 		endloop
 		restoreSearchRing searchPat
 	endif

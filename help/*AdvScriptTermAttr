@@ -81,6 +81,5 @@ just prior to displaying colored text to ensure that a pair number used
 previously was not redefined.  Color pairs currently in use can be displayed at
 any time by calling the ~bshowColors~B (~#uC-h C~U) command with a negative numeric
 prefix.  Additionally, current color availability and settings can be obtained
-in a script via "getInfo 'Colors'", which returns the requested values
-(controlled by the n argument) in an array.  See the ~bshowFunctions~B (~#uC-h f~U)
-display for details.
+in a script via "getInfo 'Colors'", which returns the requested values in a
+hash.  See the ~bshowRoutines~B (~#uC-h r~U) help text for details.

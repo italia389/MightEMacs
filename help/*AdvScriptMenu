@@ -2,12 +2,13 @@
                              ~bS C R I P T   M E N U~B
 
 
-       1. Introduction                    7. Key Binding Syntax
-       2. Data Types                      8. Terminal Attributes
-       3. Arrays                          9. Using Color
-       4. Expressions and Aliases        10. MScript Rules and Guidelines
-       5. Statements                     11. Running a Script from the Shell
-       6. User Input
+       1. Introduction                    7. User Input
+       2. Data Types                      8. Key Binding Syntax
+       3. Arrays                          9. Terminal Attributes
+       4. Hashes                         10. Using Color
+       5. Expressions and Aliases        11. MScript Rules and Guidelines
+       6. Statements                     12. Running a Script from the Shell
+
 
 
 
@@ -83,11 +84,12 @@ back:*AdvMainMenu
 1:F:*AdvScriptIntro
 2:F:*AdvScriptDataTypes
 3:F:*AdvScriptArrays
-4:F:*AdvScriptExpr
-5:F:*AdvScriptStatements
-6:F:*AdvScriptUserInput
-7:F:*AdvScriptBindings
-8:F:*AdvScriptTermAttr
-9:F:*AdvScriptColor
-10:F:*AdvScriptRules
-11:F:*AdvScriptBatchMode
+4:F:*AdvScriptHashes
+5:F:*AdvScriptExpr
+6:F:*AdvScriptStatements
+7:F:*AdvScriptUserInput
+8:F:*AdvScriptBindings
+9:F:*AdvScriptTermAttr
+10:F:*AdvScriptColor
+11:F:*AdvScriptRules
+12:F:*AdvScriptBatchMode

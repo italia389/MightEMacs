@@ -1,26 +1,22 @@
-# (c) Copyright 2022 Richard W. Marinelli
+# (c) Copyright 2026 Richard W. Marinelli
 #
 # This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 # "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
 #
-# site.ms	Ver. 9.6.0
+# site.ms	Ver. 10.0.0
 #	MightEMacs user-customizable site-wide startup file.
 
 # This file is loaded by the "memacs.ms" main startup file.  It contains site-wide settings which may be customized by the user.
-$BulletList = ['*', '-']	# List of bullet prefixes recognized by the bfFormatItem (ESC .) command in the 'blockFormat'
-				# package.
-$CommentList = ['#', '//']	# List of single-line comment prefixes recognized by the bfFormatItem command in the
-				# 'blockFormat' package.
-$EndSentence = '.?!'		# End-of-sentence characters.  Set to '' if extra space not wanted when lines are joined.
+EndSentence = '.?!'		# End-of-sentence characters.  Set to '' if extra space not wanted when lines are joined.
 				# Used by wpJoinLines (C-c C-j) and wpWrapLine (C-c RTN) commands (defined in "memacs.ms" if
-				# this variable is not nil or null).  Also used by the bfFormatItem command in the 'blockFormat'
-				# package.
+				# this variable is not nil or null).  Also used by the tfFormatItem (ESC .) command in the
+				# 'textFormat' package.
 
 # Uncomment the following line to enable Ratliff-style indentation in all programming languages that use left and right braces
 # to enclose a block of lines.  In this style, the right brace '}' has the same indentation as the nested line block it
 # terminates instead of being aligned with the statement header.  This also enables the same indentation style for the right
 # paren ')' and right bracket ']' when it is entered on a line by itself.
-#1 => chgMode nil, 'RFIndt'
+#1 => chgMode 'RFIndt'
 
 # Uncomment any or all of the following lines to disable color.
 #setDispColor 'Info', nil	# Disable colored informational displays (revert to bold text).
@@ -36,20 +32,25 @@ $EndSentence = '.?!'		# End-of-sentence characters.  Set to '' if extra space no
 
 # Wrap column.  Uncomment the following line to set wrap column to full terminal width on first screen
 # and any subsequent screens.  Default wrap column is "terminal width - 4".  Set to zero to disable.
-#setDefault 'WrapCol', setWrapCol($TermSize[0])
+#setDefault 'WrapCol', setWrapCol(TermSize[0])
 
 # Global modes.  Uncomment any of the following lines to change the default.
-#1 => chgMode nil, 'ASave'	# Auto-save files.
-#-1 => chgMode nil, 'Exact'	# Searches are NOT case-sensitive by default.
-#-1 => chgMode nil, 'HScrl'	# Do NOT horizontally scroll all window lines simultaneously.
-#1 => chgMode nil, 'Safe'	# Copy buffer to temporary file when saving.
-#1 => chgMode nil, 'Clob'	# Allow (silent) overwrite of a user command or function buffer.
+#1 => chgMode 'ASave'		# Auto-save files.
+#1 => chgMode 'BufCount'		# Display count of visible buffers on bottom mode line.
+#-1 => chgMode 'Exact'		# Searches are NOT case-sensitive by default.
+#-1 => chgMode 'HScrl'		# Do NOT horizontally scroll all window lines simultaneously.
+#1 => chgMode 'Safe'		# Copy buffer to temporary file when saving.
+#1 => chgMode 'Clob'		# Allow user commands and functions to be redefined.
 
 # Uncomment the following lines to make 'ATerm' a global mode and enable it.
 # This ensures that all files end with a newline when saved.
 #editMode 'ATerm', 'Global: true', 'Hidden: true'
-#1 => chgMode nil, 'ATerm'
+#1 => chgMode 'ATerm'
 
 # Optional packages.  Uncomment any of the following lines to load.
-require 'blockFormat'		# Package for formatting comment blocks and numbered item lists.
+require 'textFormat', ['#', '//'], '-*.'
+				# Package for formatting comment and plain text blocks, numbered item lists, and bulleted lists.
+				# Package arguments are (1), array of single-line comment prefixes; and (2), string list of
+				# bullet characters, which comprise text characters that should be recognized by the
+				# tfFormatItem command in the package when formatting text blocks.
 #require 'macroUtil'		# Package for saving and restoring macros from a file.

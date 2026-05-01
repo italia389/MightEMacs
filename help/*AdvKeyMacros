@@ -4,8 +4,8 @@ You may find during an editing session that you need to perform the same series
 of commands on multiple lines or portions of text.  MightEMacs has the ability
 to save (or record) keystrokes in memory (a "key macro" or just "macro") and
 then play them back as many times as you like, as if you had entered them by
-hand.  Each macro you create is given a name when you complete it and saved on
-the "Macro" ring.
+hand.  Each macro you create is given a name when you complete it and saved in
+an internal macro table.
 
 The general method of recording and playing back a macro is as follows:
 
@@ -53,18 +53,39 @@ which produces the following result:
 This can definitely save you a lot of typing, especially when you have many
 similar text objects to edit.
 
-Note that when you press ~#uC-x e~U to execute a macro, it executes the macro on the
-top of the macro ring by default.  If you use a negative numeric prefix for the
-command, it first prompts you for a macro name (which can be completed with the
-~utab~U key), then executes that macro abs(n) times.  This allows you to quickly
-execute a macro by name other than the most recent one executed.  Additionally,
-you can press ~#uC-h M~U (showMacroRing) to see all macros that exist.
+As mentioned previously, macros that you create are named and saved in an
+internal macro table.  You can record and save as many macros as you like.  To
+see all macros that exist, press ~#uC-h M~U (showMacros).  To edit a macro (which is
+displayed on the message line as a series of key literals), press ~#uC-c M~U
+(editMacro).  The macro table can also be saved to disk at any time by enabling
+the macro package (see "Library Packages" advanced help topic for details) and
+pressing ~#uC-c C-s~U (saveMacros).  (Enabling the package also causes the saved
+macros to be loaded automatically at startup.)
 
-You can also use the ~bseti~B (~#uESC i~U) and ~binserti~B (~#uC-c i~U) commands in
-combination with a macro to insert a series of numbers (ascending or descending)
-into the current buffer, optionally with associated text.  For example, let's
-say you wanted to insert line numbers before ten consecutive lines in form
-"NN. ", where NN is the line number.  You could accomplish this as follows:
+When several macros exist, it is often desirable to switch back and forth
+between them quickly.  This can be done by creating a "shortcut" for each macro,
+which is a single character, like a mark in a buffer.  Shortcuts are created
+with the ~#uESC ,~U (setShortcut) command.  To create a shortcut for the active
+macro, press "~#uESC ,~U".  To create one for a named macro, supply a numeric
+argument to the command; for example, "~#uC-u ESC ,~U".  You will be prompted for a
+character to assign to the macro (any printable character except space or tilde)
+and, in the latter case, the name of the macro.
+
+Note that when you press ~#uC-x e~U to execute a macro, it executes the active macro
+(if any) by default.  If you use a negative numeric prefix for the command, it
+first prompts you for a macro name (which can be completed with the ~utab~U key),
+then executes that macro abs(n) times.  If you use zero or a positive numeric
+prefix for the command, it prompts you for a macro shortcut, then executes the
+macro it is associated with n times.  Thus, a numeric prefix allows you to
+quickly execute a macro by name or shortcut other than the most recent one
+executed.  Additionally, you can activate a macro without executing it with the
+~#uESC M~U (selectMacro) command.
+
+You can also use the ~bseti~B (~#uESC i~U) and ~binserti~B (~#uC-c i~U) commands in combination
+with a macro to insert a series of numbers (ascending or descending) into the
+current buffer, optionally with associated text.  For example, let's say you
+wanted to insert line numbers before ten consecutive lines in form "NN. ", where
+NN is the line number.  You could accomplish this as follows:
 
      1. Set the beginning line number, format string, and increment with the
         ~#uESC i~U command.

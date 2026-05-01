@@ -18,48 +18,61 @@ which case all elements beginning at the offset through the end of the array are
 selected.  For example, [1, 2, 3, 4, 5][2, 99] evaluates to [3, 4, 5].
 
 Arrays may also be created by using the ~barray~B function or a function that
-returns a new array as a result of its operation; for example, ~baclone~B, ~bacompact~B,
+returns a new array as a result of its operation; for example, ~baclone~B, ~basort~B,
 or ~bsplit~B (among others).  Additionally, the ~u&~U, ~u|~U, ~u*~U, and ~u-~U operators (which
 perform concatenation, set union, set intersection, and set exclusion,
-respectively) return a new array when both of their operands are arrays.  For
-example:
+respectively, on two arrays) return the result as a new array.  For example:
 
     a1 = [1, nil, 2, nil]
-    a2 = acompact(a1)       # a2 is the new array [1, 2].
-    a3 = a2 | a1            # a3 is the new array [1, 2, nil].
+    a2 = adelete(a1, 0, 2)  # a2 is the new array [1, nil].
+    a3 = a2 | a1            # a3 is the new array [1, nil, 2].
 
-Arrays may be "auto extended" by assigning a value to an element beyond the end
-of the array.  The intervening elements if any, are set to ~unil~U.  For example,
-the sequence:
+Note that the operators ~u&=~U, ~u&|~U, ~u&*~U, and ~u&-~U perform the same operations as the ~u&~U,
+~u|~U, ~u*~U, and ~u-~U operators, except that the left-hand array is modified in place.
+
+Another feature of arrays is that they may be "auto extended" by assigning a
+value to an element beyond the end of the array.  The intervening elements if
+any, are set to ~unil~U.  For example, the sequence:
 
     x = [1, 2]
     x[4] = false
 
 would set local variable "x" to [1, 2, nil, nil, false].
 
-Arrays may be compared with the ~u==~U or ~u!=~U operators, and may be specified as the
-second argument to the ~bainclude?~B function, such as:
+It is also possible to assign multiple variables to array elements at once by
+using "parallel assignment".  To do this, you would specify two or more
+variables separated by commas on the left side of the assignment operator.  For
+example, the expression:
+
+    x, y, z = [1, 2, 3, 4]
+
+would assign values 1, 2, and 3 to variables x, y, and z, respectively (and the
+4 in the array would be left unassigned).  However, the expression:
+
+    x, y, z = [1, 2]
+
+would assign values 1 and 2 to variables x and y, and variable z would be set to
+nil (because there are no elements left in the array to assign).
+
+To test two arrays for equality, they may be compared with the ~u==~U or ~u!=~U
+operators, and may be specified as the second argument to the ~bainclude?~B
+function, such as:
 
    ainclude? [1, [2, 3], 4], [2, 3]
 
 which would return ~utrue~U.
 
-Lastly, the operators ~u&=~U, ~u&|~U, ~u&*~U, and ~u&-~U perform the same operations as the ~u&~U,
-~u|~U, ~u*~U, and ~u-~U operators mentioned previously, except that the left-hand array is
-modified in place.
+Arrays may also be combined with hashes at any nesting level and vice versa.
+Following are some examples:
 
-Arrays may also be concatenated with other values via the ~u&~U or ~u&=~U operators.  If
-the first argument of the expression is string, all following arguments will be
-converted to string, including arrays, and the result will be string.  However,
-arrays will be processed recursively as if each element was specified
-separately.  If the first argument of the concatenation expression is an array,
-the result will be a new array containing a clone of the first array plus all
-following arguments appended to it as separate elements.  Any array argument
-will be "exploded" into separate arguments first.  Following are some examples:
+    a1 = ['Blue', nil, {'x' => 2, 'y' => [-1, 0]}]
+    a2 = htoa(a1[2])                # a2 is [['x', 2], ['y', [-1, 0]]].
+    a2[2] = 'z'
+    h1 = atoh(a2)                   # h1 is {'x' => 2, 'y' => [-1, 0],
+                                    #  'z' => nil}
+    v1 = h1{'y'}[1]                 # v1 is 0.
+    v2 = a1[2]['y'][0]              # v2 is -1.
 
-    a1 = ['Blue', nil, 4]
-    a2 = [4, 3, 4, 5]
-    a2 &= a1                        # a2 is [4, 3, 4, 5, 'Blue', nil, 4].
-    a2 *= a1                        # a2 is [4, 'Blue', nil].
-    a2 |= [['Green', false], 4]     # a2 is [4, 'Blue', nil, ['Green', false]]
-    a1 -= [0, nil, 4]               # a1 is ['Blue'].
+Lastly, there are several built-in functions (which all begin with the letter
+"a") that perform various operations on arrays.  To see a list, use the
+~bshowRoutines~B (~#uC-h r~U) command and enter "^a:r" for the apropos pattern.

@@ -34,7 +34,7 @@ MightEMacs uses "pop-up" windows for many purposes; for example, to display a
 file or list (like buffers or commands).  Press ~u?~U at the prompt to see the
 paging commands.  To exit a pop-up display, press ~uq~U or ~uESC~U.
 
-Abort command .................... ~uC-g~U    Show commands .................. ~#uC-h c~U
+Abort command .................... ~uC-g~U    Show commands .................. ~#uC-h r~U
 Positive numeric prefix .......... ~uC-u~U    Show key ....................... ~#uC-h ?~U
 Negative numeric prefix .......... ~uC--~U    Show buffers ................... ~#uC-h b~U
 Exit MightEMacs ..... ~#uC-x C-c~U or ~#uESC e~U    About MightEMacs ............... ~#uC-h A~U
@@ -43,7 +43,7 @@ Save all changes and exit ...... ~#uESC z~U    Help ........................... 
 ================================================================================
                                 ~bCURSOR MOVEMENT~B
 
-Go to line ..................... ~#uESC g~U    Go to mark ................... ~#uESC SPC~U
+Go to line ..................... ~#uESC g~U    Go to mark ................. ~#uESC C-SPC~U
 Beginning of line text ....... ~#uESC C-a~U    Traverse (jump across) line ...... ~uC-t~U
 
 ---------- Backward Motion -----------    ---------- Forward Motion ------------
@@ -61,33 +61,35 @@ Beginning of buffer ............ ~#uESC <~U    End of buffer .................. 
 ~bundeleteCycle~B commands.  In general, copy commands have a ~uC-c~U (copy) prefix,
 kill commands have a ~uC-h~U (homicide) prefix, and delete commands have no prefix.
 To yank older kills, ~byank~B first, then immediately ~byankCycle~B one or more
-times.  You may also specify a negative numeric prefix to yank older kills. Most
-of the following commands will operate on multiple items forward or backward if
-given a + or - numeric prefix.
+times.  You may also specify a negative numeric prefix to yank older kills.
+Additionally, you can yank a kill and delete it from the ring in one step with
+~byankDel~B.  Most of the following commands will operate on multiple items forward
+or backward if given a + or - numeric prefix.
 
-Delete backward character ........ ~uDEL~U    Newline ................... ~uRTN~U or ~uC-m~U
-Delete forward character .. [x> or ~uC-d~U    Newline and indent ..............  ~uC-j~U
-Delete word ...................... C-\    Handle (insert) tab ....... ~uTAB~U or ~uC-i~U
-Delete to line break ............. ~uC-k~U    Insert space(s) ahead ........ ~#uC-x SPC~U
-Delete line ...................... ~uC-l~U    Open line ........................ ~uC-o~U
-Copy word .................... ~#uC-c C-\~U    Open line and indent ........... ~#uC-x o~U
-Copy to line break ........... ~#uC-c C-k~U    Upper case word .............. ~#uESC C-u~U
-Copy line .................... ~#uC-c C-l~U    Upper case line .............. ~#uC-x C-u~U
-Duplicate line ................. ~#uESC d~U    Lower case word .............. ~#uESC C-l~U
-Kill word .................... ~#uC-h C-\~U    Lower case line .............. ~#uC-x C-l~U
-Kill to line break ........... ~#uC-h C-k~U    Title case word .............. ~#uESC C-t~U
-Kill line .................... ~#uC-h C-l~U    Title case line .............. ~#uC-x C-t~U
-Delete white space ............. ~#uESC \~U    Yank ............................. ~uC-y~U
-Delete blank lines ........... ~#uC-x C-o~U    Yank cycle (next kill) ....... ~#uESC C-y~U
+Delete backward character ........ ~uDEL~U    Set wrap column ................ ~#uESC w~U
+Delete forward character .. [x> or ~uC-d~U    Handle (insert) tab ....... ~uTAB~U or ~uC-i~U
+Delete word ...................... C-\    Insert space(s) ahead ........ ~#uESC SPC~U
+Delete to line break ............. ~uC-k~U    Open line ........................ ~uC-o~U
+Delete line ...................... ~uC-l~U    Open line and indent ........... ~#uC-x o~U
+Copy word .................... ~#uC-c C-\~U    Upper case word .............. ~#uESC C-u~U
+Copy to line break ........... ~#uC-c C-k~U    Upper case line .............. ~#uC-x C-u~U
+Copy line .................... ~#uC-c C-l~U    Lower case word .............. ~#uESC C-l~U
+Duplicate line ................. ~#uESC d~U    Lower case line .............. ~#uC-x C-l~U
+Kill word .................... ~#uC-h C-\~U    Title case word .............. ~#uESC C-t~U
+Kill to line break ........... ~#uC-h C-k~U    Title case line .............. ~#uC-x C-t~U
+Kill line .................... ~#uC-h C-l~U    Yank ............................. ~uC-y~U
+Delete white space ........... ~#uC-x SPC~U    Yank cycle (next kill) ....... ~#uC-c C-y~U
+Delete blank lines ........... ~#uC-x C-o~U    Yank and delete kill ......... ~#uC-h C-y~U
 Trim line .................... ~#uC-x C-\~U    Cycle kill ring ................ ~#uC-c k~U
 Detab line ................... ~#uC-x C-d~U    Show kill ring ................. ~#uC-h k~U
 Entab line ................... ~#uC-x C-e~U    Delete kill .................... ~#uC-x k~U
-Quote character .................. ~uC-q~U    Undelete ....................... ~#uESC u~U
-Set wrap column ................ ~#uESC w~U    Undelete cycle ................. ~#uESC U~U
+Newline ................... ~uRTN~U or ~uC-m~U    Undelete ....................... ~#uESC u~U
+Newline and indent ..............  ~uC-j~U    Undelete cycle ................. ~#uC-c u~U
+Quote character .................. ~uC-q~U
 
 ================================================================================
                                 ~bREGION COMMANDS~B
-A region is the area of text between mark ' ' and the current position (point).
+A region is the area of text between mark . and the current position (point).
 
 Set mark ....................... ~uC-SPC~U    Delete region .................... ~uC-w~U
 Swap point and mark .......... ~#uC-x C-x~U    Copy region .................. ~#uC-c C-w~U
@@ -100,8 +102,8 @@ Title case region .............. ~#uC-x t~U    Outdent region (n tab stops) ... 
 
 Search forward ................... ~uC-s~U    Search backward .................. ~uC-r~U
 Hunt forward ..................... ~uC-]~U    Hunt backward .................... ~uC-^~U
-Replace string ................. ~#uESC r~U    Show search ring ............... ~#uC-h s~U
-Query replace string ........... ~#uESC q~U    Show replace ring .............. ~#uC-h r~U
+Replace pattern ................ ~#uESC r~U    Show search ring ............... ~#uC-h s~U
+Query replace pattern .......... ~#uESC q~U    Show replace ring .............. ~#uC-h R~U
                                           Delete search pattern .......... ~#uC-x s~U
 Query replace all ............ ~#uESC C-q~U    Delete replace pattern ......... ~#uC-x r~U
 
@@ -142,7 +144,7 @@ PHP, Python, Ruby, Shell, Swift) are commonly used.
 ================================================================================
                                 ~bWINDOW COMMANDS~B
 
-Reframe window ................. ~#uESC l~U    Next window .................... ~#uC-x n~U
+Reframe window ................. ~#uC-x .~U    Next window .................... ~#uC-x n~U
 Split current window ........... ~#uC-x 2~U    Previous window ................ ~#uC-x p~U
 Only window (delete others) .... ~#uC-x 1~U    Select window .................. ~#uC-x w~U
 Delete window .................. ~#uC-x 0~U    Move window up ............... ~#uC-x C-p~U
@@ -161,17 +163,17 @@ Next buffer .................... ~#uC-x ]~U    Truncate buffer ................ 
 Last buffer on current screen .. ~#uC-x \~U    Clear buffer ................. ~#uC-x DEL~U
 Select buffer .................. ~#uC-x b~U    Insert buffer .................. ~#uC-x ^~U
 Delete buffer ................ ~#uC-x C-b~U    Unchange buffer ................ ~#uESC ~~~U
-Narrow buffer .................. ~#uC-x <~U    Mark whole buffer .......... ~#uESC C-SPC~U
+Narrow buffer .................. ~#uC-x <~U    Mark whole buffer .......... ~#uC-c C-SPC~U
 Widen buffer ................... ~#uC-x >~U    Show point position ............ ~#uC-h .~U
 Create scratch buffer .......... ~#uC-x #~U    Show buffers ................... ~#uC-h b~U
-Pipe buffer .................... ~#uC-x |~U
 
 ================================================================================
                                 ~bSCREEN COMMANDS~B
 Screens maintain their own working directory.
 
-Select screen .................. ~#uESC s~U    Previous screen ................ ~#uESC [~U
-Delete screen ................ ~#uESC C-d~U    Next screen .................... ~#uESC ]~U
+Select screen .................. ~#uESC S~U    Previous screen ................ ~#uESC [~U
+Delete screen .................. ~#uC-x S~U    Next screen .................... ~#uESC ]~U
+Swap screens ................... ~#uC-c S~U    Last screen .................... ~#uESC \~U
 Show screens ................... ~#uC-h S~U
 
 ================================================================================
@@ -180,11 +182,12 @@ Show screens ................... ~#uC-h S~U
 prompted for a macro name when recording is completed.  Press ~utab~U when entering
 a macro name to see a match list.
 
-Begin recording macro .......... ~#uC-x (~U    Rename macro ................... ~#uC-x N~U
+Begin recording macro .......... ~#uC-x (~U    Rename macro ................... ~#uC-c m~U
 End recording macro ............ ~#uC-x )~U    Delete macro ................... ~#uC-x M~U
-Execute macro .................. ~#uC-x e~U    Edit macro ..................... ~#uESC M~U
-Cycle macro ring ............... ~#uC-c M~U    Save macro ring to a file .... ~#uESC C-s~U
-Show macro ring ................ ~#uC-h M~U
+Execute macro .................. ~#uC-x e~U    Edit macro ..................... ~#uC-c M~U
+Select macro ................... ~#uESC M~U    Show macro table ............... ~#uC-h M~U
+Create macro shortcut .......... ~#uESC ,~U    Save macro table to a file ... ~#uC-c C-s~U
+Delete macro shortcut .......... ~#uC-x ,~U
 
 ================================================================================
                         ~bACCESSING THE OPERATING SYSTEM~B
@@ -202,10 +205,10 @@ Change directory ............... ~#uC-c D~U   Change working directory
                             ~bVARIABLES AND SCRIPTS~B
 Press ~utab~U when entering a variable name to see a match list.
 
-Show variables ................. ~#uC-h v~U   Execute (eval) command line ... ~#uESC C-x~U
+Show variables (and constants) . ~#uC-h v~U   Execute (eval) command line ... ~#uESC C-x~U
 Show variable on message line .. ~#uC-h =~U   Execute buffer .................. ~#uC-x x~U
 Assign variable ................ ~#uESC =~U   Execute file .................... ~#uC-x /~U
-Show functions ................. ~#uC-h f~U
+Show functions (and commands) .. ~#uC-h r~U
 
 ================================================================================
                                 ~bMISCELLANEOUS~B

@@ -21,15 +21,16 @@ enter the following lines:
 
     # Example script that defines a function which accepts two arguments.
     function example(2)
-        print "Base name of file '#{$1}' is '#{-1 => basename $1}'"
+        print "Root name of file '#{$1}' is '#{-1 => basename $1}'"
         $2
     endroutine
 
 Execute the buffer by entering ~#uC-x x~U and typing the name of the scratch buffer
 at the prompt.  Function ~bexample~B is now defined.  (You can verify this via the
-~bshowFunctions~B (~#uC-h f~U) command.  Enter "exam" at the "Apropos function" prompt
-and you should see "example" in the "user" section of the list with no key
-binding or description.)
+~bshowRoutines~B command.  Invoke the command with a -1 numeric prefix (~#uC-- C-h r~U),
+enter "uf" at the "Select type" prompt, then enter "exam" at the "Apropos
+routines" prompt.  You should see "example" in the list with no key binding or
+description.)
 
 Now let's execute the function and capture it's return value in a global
 variable.  Type ~#uESC C-x~U (eval) to execute a command line.  At the prompt, enter:
@@ -39,7 +40,7 @@ variable.  Type ~#uESC C-x~U (eval) to execute a command line.  At the prompt, e
 and press ~ureturn~U, which will execute the assignment statement and run the
 function.  You should see:
 
-    Base name of file '/dir1/myfile.txt' is 'myfile'
+    Root name of file '/dir1/myfile.txt' is 'myfile'
 
 on the message line.  Now check the global variable.  Enter ~#uC-h v res~U, press
 ~ureturn~U, and observe that variable $result has a value of 77.
@@ -71,9 +72,9 @@ Now the ~bgetInfo~B function is available.  It provides various types of system
 and session information, including hook names.  Here is the same code fragment
 rewritten using ~bgetInfo~B:
 
-    # Clear all hooks.  getInfo returns hooks as an array in
-    # form: [[hook-name, func-name], ...].
-    for hookInfo in getInfo('Hooks')
+    # Clear all hooks.  getInfo returns hooks as a hash in
+    # form: {hook-name => func-name, ...}.
+    for hookInfo in getInfo('Hooks')    # Each node is [key, value].
         eval "clearHook '", hookInfo[0], "'"
     endloop
 

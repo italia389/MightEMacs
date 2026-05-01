@@ -1,4 +1,4 @@
-// (c) Copyright 2022 Richard W. Marinelli
+// (c) Copyright 2026 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -9,20 +9,64 @@
 
 #include "std.h"
 #include "bind.h"
-#include "cmd.h"
 #include "exec.h"
 #include "search.h"
 
-static long lastYankSize = -1;	// Last number of bytes yanked (used by yankCycle to delete prior yank).
+static long lastYankSize = -1;		// Last number of bytes yanked (used by yankCycle to delete prior yank).
+
+// Convert string or byte string in *pDatum to visible form and return result, or NULL if error.
+static char *cvtstr(Datum *pDatum) {
+	DFab entry;
+	const char *str;
+	size_t len;
+
+	if(pDatum->type == dat_byteStr) {
+		str = dgetmemptr(pDatum);
+		len = dgetmemsize(pDatum);
+		}
+	else
+		len = strlen(str = pDatum->str);
+
+	return dopentrack(&entry) != 0 || esctofab(str, len, &entry) != 0 || dclose(&entry, FabStr) != 0 ? NULL :
+	 entry.pDatum->str;
+	}
+
+// Add top ring entry to open fabrication object.  Return status code.
+static int toptofab(Ring *pRing, DFab *pFab) {
+	char *str;
+	size_t len, maxNewLen = term.cols / 3;
+	char workBuf[maxNewLen + 1];
+
+	if(dtypstr(&pRing->pEntry->data) && strchr(pRing->pEntry->data.str, AttrSpecBegin) == NULL)
+		str = pRing->pEntry->data.str;
+	else if((str = cvtstr(&pRing->pEntry->data)) == NULL)
+		goto LibFail;
+	if((len = strlen(str)) > maxNewLen) {
+		strfit(workBuf, maxNewLen + 1, str, len);
+		str = workBuf;
+		}
+	if((pRing->flags & RingIDMask) == RingIdxKill) {
+		int c = lowCase[(int) *pRing->ringName];
+		if(dputf(pFab, 0, text529, c, pRing->ringName + 1, str) != 0)
+				// ": ~btop %c%s now~B '%s'"
+			goto LibFail;
+		}
+	else if(dputf(pFab, 0, text528, (pRing->flags & RingIDMask) == RingIdxDel ? text143 : pRing->entryName, str) != 0)
+			// ":~b%s now~B '%s'",					" top entry"
+LibFail:
+		return libfail();
+
+	return 0;
+	}
 
 // Cycle a data ring forward or backward abs(n) times.  Return status.
-int rcycle(Ring *pRing, int n, bool msg) {
+int rcycle(Ring *pRing, long n, bool msg) {
 
 	if(pRing->size == 0)
 		(void) rsset(Failure, 0, text202, pRing->ringName);
 				// "%s ring is empty"
 	else if(n != 0 && pRing->size > 1) {
-		if(n == INT_MIN)
+		if(n == DefN)
 			n = 1;
 		if(n < 0)
 			do {
@@ -32,9 +76,15 @@ int rcycle(Ring *pRing, int n, bool msg) {
 			do {
 				pRing->pEntry = pRing->pEntry->prev;
 				} while(--n > 0);
-		if(msg)
-			(void) rsset(Success, 0, text42, pRing->ringName);
-				// "%s ring cycled"
+		if(msg) {
+			DFab msg;
+
+			if(dopentrack(&msg) != 0 || dputf(&msg, 0, text42, pRing->ringName) != 0 ||
+							// "%s ring cycled"
+			 toptofab(pRing, &msg) != 0 || dclose(&msg, FabStr) != 0)
+				return libfail();
+			(void) rsset(Success, RSHigh | RSNoFormat | RSTermAttr, msg.pDatum->str);
+			}
 		}
 	return sess.rtn.status;
 	}
@@ -71,8 +121,8 @@ int killPrep(int kill) {
 	ushort flag = kill ? SF_Kill : SF_Del;
 
 	if(!(keyEntry.prevFlags & flag))			// If last command was not in "kill" or "delete" family...
-		(void) rnew(flag == SF_Kill ?			// cycle kill or delete ring and start fresh (don't append this
-		 ringTable + RingIdxKill : ringTable + RingIdxDel);	// kill or delete to the last one).
+		(void) rnew(ringTable + (flag == SF_Kill ?	// cycle kill or delete ring and start fresh (don't append this
+		 RingIdxKill : RingIdxDel));			// kill or delete to the last one).
 
 	keyEntry.curFlags |= flag;				// Mark this command as a "kill" or "delete".
 	return sess.rtn.status;
@@ -85,10 +135,14 @@ void dumpRing(Ring *pRing) {
 
 	fprintf(logfile, "  RING DUMP -- %s (%hu entries)\n", pRing->ringName, pRing->size);
 	if(pRing->size > 0) {
-		int n = 0;
+		int i = 0;
 		RingEntry *pEntry = pRing->pEntry;
 		do {
-			fprintf(logfile, "%6d  %.80s\n", n--, pEntry->data.str);
+			if(pEntry->data.type == dat_byteStr)
+				fprintf(logfile, "%6d  %.*s\n", i--, pEntry->data.u.mem.size > 80 ? 80 :
+				 (int) pEntry->data.u.mem.size, pEntry->data.u.mem.ptr);
+			else
+				fprintf(logfile, "%6d  %.80s\n", i--, pEntry->data.str);
 			++size;
 			} while((pEntry = pEntry->prev) != pRing->pEntry);
 		}
@@ -96,7 +150,8 @@ void dumpRing(Ring *pRing) {
 	}
 #endif
 
-// Find an entry in a ring.  If found, return slot pointer, otherwise NULL.
+// Find an entry in a ring (that is assumed to not be "Kill" or "Delete", which allow byte string entries).  If found, return
+// slot pointer, otherwise NULL.
 static RingEntry *rfind(Ring *pRing, const char *value) {
 
 	if(pRing->size > 0) {
@@ -113,7 +168,7 @@ static RingEntry *rfind(Ring *pRing, const char *value) {
 	}
 
 // Move entry to the top of the ring if not already there.
-void rtop(Ring *pRing, RingEntry *pEntry) {
+static void rtop(Ring *pRing, RingEntry *pEntry) {
 	RingEntry *pEntry0 = pRing->pEntry;
 	if(pEntry != pEntry0) {
 
@@ -131,8 +186,9 @@ void rtop(Ring *pRing, RingEntry *pEntry) {
 		}
 	}
 
-// Save an entry to a ring if entry not null.  If force is false and entry matches an existing entry, move old entry to the top
-// (without cycling); otherwise, create an entry.  Return status.
+// Save an entry to a ring (that is assumed to not be "Kill" or "Delete", which allow byte string entries) if value not null.
+// If force is false and entry matches an existing entry, move old entry to the top (without cycling); otherwise, create an
+// entry.  Return status.
 int rsave(Ring *pRing, const char *value, bool force) {
 
 	if(*value != '\0') {
@@ -152,33 +208,37 @@ AddIt:
 	return sess.rtn.status;
 	}
 
-// Get ring entry specified by n and return pointer to it.  If not found, set an error and return NULL.
-RingEntry *rget(Ring *pRing, int n) {
+// Get ring entry specified by e and return pointer to it.  If not found, set an error and return NULL.
+RingEntry *rget(Ring *pRing, long e) {
 	RingEntry *pEntry;
 
-	// n in range?
+	// e in range?
 	if(pRing->size == 0) {
 		(void) rsset(Failure, 0, text202, pRing->ringName);
 				// "%s ring is empty"
 		return NULL;
 		}
-	if(n > 0 || n <= -pRing->size) {
-		(void) rsset(Failure, 0, text19, n, -((int) pRing->size - 1));
-				// "No such ring entry %d (max %d)"
+	if(e > 0 || e <= -pRing->size) {
+		(void) rsset(Failure, 0, text19, e, -((int) pRing->size - 1));
+				// "No such ring entry %'ld (max %'d)"
 		return NULL;
 		}
 
-	// n is valid.  Find entry #n in ring...
-	for(pEntry = pRing->pEntry; n < 0; ++n)
+	// e is valid.  Find entry in ring...
+	for(pEntry = pRing->pEntry; e < 0; ++e)
 		pEntry = pEntry->prev;
 
 	// and return it.
 	return pEntry;
 	}
 
-// Attempt to delete n entries from given ring, beginning at top.  It is assumed that ring->pEntry != NULL and n > 0.  Return
-// number of entries actually deleted.
-static ushort rtrim(Ring *pRing, int n) {
+// Attempt to delete "count" entries from given ring, beginning at top.  It is assumed that ring->pEntry != NULL and count > 0.
+// Return number of entries actually deleted.
+//
+// Note that most recent ring entry (top) is pointed to by pRing->pEntry, next most recent one is pointed to by
+// pRing->pEntry->prev (not "next"), top entry's next pointer points to bottom entry, and bottom entry's prev pointer points to
+// top entry.
+static long rtrim(Ring *pRing, int count) {
 	RingEntry *pEntry;
 	RingEntry *pBotEntry = pRing->pEntry->next;
 	ushort origSize = pRing->size;
@@ -188,7 +248,7 @@ static ushort rtrim(Ring *pRing, int n) {
 		pRing->pEntry = pEntry->prev;
 		dclear(&pEntry->data);
 		free((void *) pEntry);
-		} while(--pRing->size > 0 && --n > 0);
+		} while(--pRing->size > 0 && --count > 0);
 	if(pRing->size == 0)
 		pRing->pEntry = NULL;
 	else {
@@ -199,47 +259,97 @@ static ushort rtrim(Ring *pRing, int n) {
 	return origSize - pRing->size;
 	}
 
-// Delete the most recent n entries (default 1) from given ring, kill number n if n < 0, or all entries if n == 0.
-// Return status.
-int rdelete(Ring *pRing, int n) {
+// Delete the most recent e entries from given ring, entry number e if e < 0, or all entries if e == 0.  Return status.
+int rdelete(Ring *pRing, long e) {
+	Datum oldEntry;
+	size_t maxOldLen;
+	int ringSize;
 
 	if(pRing->size == 0)
 		return rsset(Failure, 0, text202, pRing->ringName);
 				// "%s ring is empty"
-	if(n == INT_MIN)
-		n = 1;
-	else if(n == 0)
-		n = pRing->size;
-	else if(n < 0) {
-		RingEntry *pEntry = rget(pRing, n);
+	dinit(&oldEntry);
+	maxOldLen = term.cols / 4;
+
+	if(e == DefN)
+		e = 1;
+	else if(e == 0)
+		e = pRing->size;
+	else if(e < 0) {
+		RingEntry *pEntry = rget(pRing, e);
 		if(pEntry == NULL)
 			return sess.rtn.status;
 
-		// Delete "entry" item, which is not at top.  (Ring contains at least two entries.)
+		// Delete "pEntry" item, which is not at top.  (Ring contains at least two entries.)
 		pEntry->next->prev = pEntry->prev;
 		pEntry->prev->next = pEntry->next;
-		dclear(&pEntry->data);
+		// Save pattern, kill, or delete for return message.
+		dxfer(&oldEntry, &pEntry->data);
 		free((void *) pEntry);
 		--pRing->size;
-		n = 1;
 		goto NukeMsg;
 		}
 
-	// Delete the most recent n entries.
-	int sz0 = pRing->size;
-	if((n = rtrim(pRing, n)) == sz0)
+	// Delete the most recent e entries (e > 0).
+	ringSize = pRing->size;
+	if(e == 1)
+		dxfer(&oldEntry, &pRing->pEntry->data);
+	if((e = rtrim(pRing, e)) == ringSize)
 		(void) rsset(Success, 0, text228, pRing->ringName);
 				// "%s ring cleared"
-	else
-NukeMsg:
-		(void) rsset(Success, RSHigh, text357, pRing->ringName, pRing->entryName, n > 1 ? "s" : "");
-				// "%s%s%s deleted"
+	else {
+NukeMsg:;
+		// Build and display post-operation status message (e < 0 or e > 0).
+		DFab msg;
+		char *str;
+		size_t len;
+		bool showOld = false;
+		bool showNew = e > 0;
+
+		// Show old entry if saved and length does not exceed maxOldLen.
+		if(!disnil(&oldEntry)) {
+			if(dtypstr(&oldEntry) && strchr(oldEntry.str, AttrSpecBegin) == NULL)
+				str = oldEntry.str;
+			else if((str = cvtstr(&oldEntry)) == NULL)
+				goto LibFail;
+			showOld = (len = strlen(str)) <= maxOldLen;
+			}
+
+		// Write "Search pattern" or "Kill".
+		if(dopentrack(&msg) != 0 || (showOld && showNew && dputs("~b", &msg, 0) != 0) ||
+		 dputs(pRing->ringName, &msg, 0) != 0 || dputs(pRing->entryName, &msg, 0) != 0 ||
+		 (showOld && showNew && dputs("~B", &msg, 0) != 0))
+			goto LibFail;
+
+		// Add "s" or ring entry that was deleted, if available.
+		if(disnil(&oldEntry)) {
+			if(e > 1 && dputc('s', &msg, 0) != 0)
+				goto LibFail;
+			}
+		else if(showOld && dputf(&msg, 0, " '%s'", str) != 0)
+			goto LibFail;
+
+		// Add " deleted" and new top pattern or kill if changed.
+		if(dputs(text530, &msg, 0) != 0)
+				// " deleted"
+			goto LibFail;
+		if(showNew && toptofab(pRing, &msg) != 0)
+			goto LibFail;
+
+		if(dclose(&msg, FabStr) != 0)
+LibFail:
+			return libfail();
+		(void) rsset(Success, showNew ? RSHigh | RSNoFormat | RSTermAttr : RSHigh | RSNoFormat, msg.pDatum->str);
+		}
+
+	if(!disnil(&oldEntry))
+		dclear(&oldEntry);
 
 	return sess.rtn.status;
 	}
 
 // Find ring for given name and return pointer to it.  If not found, set an error and return NULL.
-Ring *findRing(Datum *pName) {
+static Ring *findRing(Datum *pName) {
 	Ring *pRing, *pRingEnd;
 
 	// Search ring table.
@@ -250,8 +360,8 @@ Ring *findRing(Datum *pName) {
 		} while(++pRing < pRingEnd);
 
 	// No such ring.
-	(void) rsset(Failure, 0, text395, text157, pName->str);
-			// "No such %s '%s'", "ring"
+	(void) rsset(Failure, 0, text52, text157, pName->str);
+			// "No such %s \"%s\"", "ring"
 	return NULL;
 	}
 
@@ -261,11 +371,11 @@ int getRingName(Ring **ppRing) {
 	Ring *pRing;
 
 	// Get ready.
-	if(dnewtrack(&pDatum) != 0)
+	if((pDatum = dnewtrack()) == NULL)
 		return libfail();
 
 	if(!(sess.opFlags & OpScript)) {
-		if(termInp(pDatum, text43, ArgFirst | ArgNotNull1, Term_C_Ring, NULL) != Success || disnil(pDatum))
+		if(termInp(pDatum, text43, ArgFirst | ArgNotNull1, TermC_Ring, NULL) != Success || disnil(pDatum))
 				// "Ring name"
 			return sess.rtn.status;
 		}
@@ -278,9 +388,9 @@ int getRingName(Ring **ppRing) {
 	return sess.rtn.status;
 	}
 
-// Get or set ring size information and return status.  If n argument, set maximum ring size to 'size' argument.  Return
-// two-element array of form [current number of entries, maximum size].
-int ringSize(Datum *pRtnVal, int n, Datum **args) {
+// Get or set ring size information and return status.  If interactive and n argument, or argument given in script mode, set
+// maximum ring size to 'size' argument.  Return two-element array of form [current number of entries, maximum size].
+int ringSize(Datum *pRtnVal, long n, Datum **args) {
 	Array *pArray;
 	Datum *pArrayEl;
 	Ring *pRing;
@@ -290,8 +400,8 @@ int ringSize(Datum *pRtnVal, int n, Datum **args) {
 		goto Retn;
 
 	// Set ring size, if requested.
-	if(n != INT_MIN) {
-		long longVal;
+	if(haveArg(n, NULL, true)) {
+		long newSize;
 
 		// Get size argument and check it.
 		if(!(sess.opFlags & OpScript)) {
@@ -300,27 +410,27 @@ int ringSize(Datum *pRtnVal, int n, Datum **args) {
 			sprintf(workBuf, text126, pRing->maxSize);
 				// "Current size: %hu, new size"
 			if(termInp(pRtnVal, workBuf, ArgInt1, 0, NULL) != Success || disnil(pRtnVal) ||
-			 ascToLong(pRtnVal->str, &longVal, false) != Success)
+			 ascToLong(pRtnVal->str, 10, &newSize, false) != Success)
 				goto Retn;
 			}
 		else {
 			if(funcArg(pRtnVal, ArgInt1) != Success)
 				goto Retn;
-			longVal = pRtnVal->u.intNum;
+			newSize = dgetint(pRtnVal);
 			}
-		if(longVal < 0 || longVal > USHRT_MAX)
-			return rsset(Failure, 0, text12, text155, (int) longVal, 0, USHRT_MAX);
-				// "%s (%d) must be between %d and %d", "Ring size"
-		if(longVal < pRing->size)
-			return rsset(Failure, 0, text241, longVal, (int) pRing->size);
-				// "Maximum ring size (%ld) less than current size (%d)"
-		pRing->maxSize = longVal;
+		if(newSize < 0 || newSize > MaxRingSize)
+			return rsset(Failure, 0, text12, text155, newSize, 0, (long) MaxRingSize);
+				// "%s (%'ld) must be in range %d - %'ld", "Ring size"
+		if(newSize < pRing->size)
+			return rsset(Failure, 0, text241, newSize, (int) pRing->size);
+				// "Maximum ring size (%'ld) less than current size (%'d)"
+		pRing->maxSize = newSize;
 		}
 
 	// Success.  Set return value and message.
 	if((pArray = anew(2, NULL)) == NULL)
 		goto LibFail;
-	agStash(pRtnVal, pArray);
+	astash(pRtnVal, pArray);
 	if((pArrayEl = aget(pArray, 0, 0)) == NULL)
 		goto LibFail;
 	dsetint((long) pRing->size, pArrayEl);
@@ -335,134 +445,87 @@ LibFail:
 	return libfail();
 	}
 
-// Set pattern or macro at top of search, replace, or macro ring.  If search pattern, make a copy so that a search
-// pattern on the ring is not modified by checkOpts() if newSearchPat() is called.
+// Set pattern at top of "Search" or "Replace" ring.  If search pattern, make a copy so that a search pattern on the ring is not
+// modified by checkOpts() if newSearchPat() is called.
 static int setTopEntry(Ring *pRing) {
 	char *entry = (pRing->size == 0) ? "" : pRing->pEntry->data.str;
-	if(pRing == ringTable + RingIdxSearch) {
+	if((pRing->flags & RingIDMask) == RingIdxSearch) {
 		char workBuf[strlen(entry) + 1];
 
 		// Set search pattern.
 		return newSearchPat(strcpy(workBuf, entry), &bufSearch.match, NULL, false);
 		}
-	if(pRing == ringTable + RingIdxRepl)
 
-		// Set replacement pattern.
-		return newReplPat(entry, &bufSearch.match, false);
-
-	// Set macro.
-	return decodeMacro(entry);
-	}
-
-// Delete entri(es) from search or replace ring and update or delete current pattern.
-static int delEntry(Ring *pRing, int n) {
-
-	if(rdelete(pRing, n) == Success)
-		(void) setTopEntry(pRing);
-
-	return sess.rtn.status;
+	// Set replacement pattern.
+	return newReplPat(entry, &bufSearch.match, false);
 	}
 
 // Cycle a ring per n argument and return status.
-int cycleRing(Datum *pRtnVal, int n, Datum **args) {
+int cycleRing(Datum *pRtnVal, long n, Datum **args) {
 	Ring *pRing;
 
 	if(getRingName(&pRing) == Success) {
-		ptrdiff_t ringId = pRing - ringTable;
-		if(ringId == RingIdxMacro) {
-			if(macBusy(true, text338, text473, text466, text466))
-					// "Cannot %s a %s from a %s, cancelled", "operate on", "macro", "macro"
-				goto Retn;
-			}
 
-		// Cycle ring forward or backward.  If search, replace, or macro ring, also set entry at top when done.
+		// Cycle ring forward or backward.  If search or replace ring, also set entry at top when done.
 		if(n != 0 && pRing->size > 1 && rcycle(pRing, n, true) == Success)
-			if(ringId != RingIdxDel && ringId != RingIdxKill)
+			if(!(pRing->flags & RingKD))
 				(void) setTopEntry(pRing);
 		}
-Retn:
 	return sess.rtn.status;
 	}
 
-// Delete ring entri(es) and return status.
-int delRingEntry(Datum *pRtnVal, int n, Datum **args) {
+// Delete ring entri(es) and, if script mode, return number deleted, or zero if error.  Return status.
+int delRingEntry(Datum *pRtnVal, long n, Datum **args) {
 	Ring *pRing;
+	int count = n == DefN ? 1 : n;		// May be garbage due to integer overflow.
 
 	if(getRingName(&pRing) == Success) {
-		switch(pRing - ringTable) {
+		if(sess.opFlags & OpScript)
+			count = count == 0 || count >= pRing->size ? pRing->size :
+			 count <= -pRing->size ? 0 : count < 0 ? 1 : count;
+		switch(pRing->flags & RingIDMask) {
 			case RingIdxDel:
 			case RingIdxKill:
 				(void) rdelete(pRing, n);
 				break;
-			case RingIdxMacro:
-				(void) delMacro(pRtnVal, pRing, n);
-				break;
 			default:	// RingIdxRepl or RingIdxSearch
-				(void) delEntry(pRing, n);
+				{RingEntry *pTopEntry = pRing->pEntry;		// May be NULL.
+				if(rdelete(pRing, n) == Success && pRing->pEntry != pTopEntry)
+					(void) setTopEntry(pRing);
+				}
 			}
-		}
-	return sess.rtn.status;
-	}
 
-// Create array of ring names and save in *pRtnVal.  Return status.
-int ringNames(Datum *pRtnVal) {
-	Array *pArray;
-
-	if(makeArray(pRtnVal, ringTableSize, &pArray) == Success) {
-		Ring *pRing, *pRingEnd;
-		Datum **ppArrayEl = pArray->elements;
-		pRingEnd = (pRing = ringTable) + ringTableSize;
-		do {
-			if(dsetstr(pRing->ringName, *ppArrayEl++) != 0)
-				return libfail();
-			} while(++pRing < pRingEnd);
-		}
-	return sess.rtn.status;
-	}
-
-// Insert, overwrite, or replace a character at point.  Return status.
-static int iorChar(short c, ushort t) {
-
-	// Newline?
-	if(c == '\n' && !(t & Txt_LiteralNL))
-		return einsertNL();
-
-	// Not a newline or processing literally.  Overwrite or replace and not at end of line?
-	Point *pPoint = &sess.edit.pFace->point;
-	if(!(t & Txt_Insert) && pPoint->offset < pPoint->pLine->used) {
-		int hardTabSize = sess.edit.pScrn != NULL ? sess.edit.pScrn->hardTabSize : 8;
-
-		// Yes.  Replace mode, not a tab, or at a tab stop?
-		if((t & Txt_Replace) || pPoint->pLine->text[pPoint->offset] != '\t' ||
-		 getCol(NULL, false) % hardTabSize == hardTabSize - 1) {
-
-			// Yes.  Delete before insert.
-			if(edelc(1, 0) != Success)
-				return sess.rtn.status;
+		// Ignore any non-fatal error in script mode.
+		if(sess.opFlags & OpScript && sess.rtn.status >= Failure) {
+			if(sess.rtn.status != Success) {
+				rsunfail();
+				count = 0;
+				}
+			dsetint(count, pRtnVal);
 			}
 		}
 
-	// Insert the character! (amen).
-	return einsertc(1, c);
+	return sess.rtn.status;
 	}
 
-// Insert, overwrite, or replace a string from a string buffer (src != NULL) or a kill or delete ring entry (src == NULL) at
+// Insert, overwrite, or replace a string from a string buffer (src != NULL) or a "Kill" or "Delete" ring entry (src == NULL) at
 // point n times (default 1) and return status.  In the latter case, use given ring and mark text as a region.  If n == 0, do
 // one repetition and leave point before the new text, otherwise after.  If n < 0 and src != NULL, process newline characters
 // literally.  If n < 0 and src == NULL, get the -nth ring entry instead of the most recent one without cycling the ring.
 // Update kill state if src is NULL.
-int iorStr(const char *src, int n, ushort style, Ring *pRing) {
-	long size;
-	int reps;
-	const char *str;	// Pointer into string to insert.
-	Line *pCurLine;
+int iorStr(const char *src, long n, uint insertType, EScreen *pScrn, Ring *pRing) {
+	long size0, size;		// Size of (byte) string to insert.
 	int curOffset;
+	const char *str0, *str;		// Pointer to string to insert.
+	Line *pCurLine;
 	RingEntry *pEntry;
-	bool preText;		// Leave point before inserted text?
+	bool preText;			// Leave point before inserted text?
+	int hardTabSize = pScrn != NULL ? pScrn->hardTabSize : 8;
 	Point *pPoint = &sess.edit.pFace->point;
+	short c;
 
 	// Check if we have something to insert.  Not an error if no text.
-	if(n == INT_MIN)
+	if(n == DefN)
 		n = 1;
 	if(src == NULL) {
 
@@ -478,14 +541,14 @@ int iorStr(const char *src, int n, ushort style, Ring *pRing) {
 			n = 1;
 			}
 
-		if(disnull(&pEntry->data)) {
+		if(disnull(&pEntry->data) || (pEntry->data.type == dat_byteStr && pEntry->data.u.mem.size == 0)) {
 			lastYankSize = 0;
 			return sess.rtn.status;
 			}
 
 		// Set region mark.  Can assume we're editing current buffer (and current window) here because we got the
 		// text from a ring, which implies a yank or undelete command.
-		setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
+		setWindMark(&sess.cur.pBuf->markHdr, sess.pCurWind);
 		}
 	else if(*src == '\0')
 		return sess.rtn.status;
@@ -498,36 +561,62 @@ int iorStr(const char *src, int n, ushort style, Ring *pRing) {
 		n = 1;
 		}
 
-	// For "reps" times...
+	// For n times...
 	if(n < 0) {
-		reps = 1;
-		style |= Txt_LiteralNL;
+		n = 1;
+		insertType |= Txt_LiteralNL;
+		}
+	if(src != NULL)
+		size0 = strlen(str0 = src);
+	else if(pEntry->data.type == dat_byteStr) {
+		str0 = pEntry->data.u.mem.ptr;
+		size0 = pEntry->data.u.mem.size;
 		}
 	else
-		reps = n;
-	while(reps-- > 0) {
-		size = 0;
-		str = (src == NULL) ? pEntry->data.str : src;
+		size0 = strlen(str0 = pEntry->data.str);
+	while(n-- > 0) {
+		str = str0;
+		size = size0;
 		do {
-			if(iorChar(*str++, style) != Success)
-				return sess.rtn.status;
-			++size;
-			} while(*str != '\0');
+			// Have a newline?
+			if((c = *str++) == '\n' && !(insertType & Txt_LiteralNL)) {
+				if(einsertNL() != Success)
+					return sess.rtn.status;
+				}
+			else {
+				// Not a newline or processing literally.  Overwrite or replace and not at end of line?
+				if(!(insertType & Txt_Insert) && pPoint->offset < pPoint->pLine->used) {
+
+					// Yes.  Replace mode, not a tab, or at a tab stop?
+					if(insertType & Txt_Replace || pPoint->pLine->text[pPoint->offset] != '\t' ||
+					 getCol(NULL, false) % hardTabSize == hardTabSize - 1) {
+
+						// Yes.  Delete before insert.
+						if(edelc(1, 0) != Success)
+							return sess.rtn.status;
+						}
+					}
+
+				// Insert the character!  Amen.
+				if(einsertc(1, c) != Success)
+					return sess.rtn.status;
+				}
+			} while(--size > 0);
 		}
 
 	// If requested, set point back to the beginning of the new text and move region mark.
 	if(preText) {
 		if(src == NULL)
-			setWindMark(&sess.cur.pBuf->markHdr, sess.cur.pWind);
+			setWindMark(&sess.cur.pBuf->markHdr, sess.pCurWind);
 		pPoint->pLine = (pCurLine == NULL) ? sess.edit.pBuf->pFirstLine : pCurLine->next;
 		pPoint->offset = curOffset;
 		}
 
 	// Update kill state.
 	if(src == NULL) {
-		reps = (pRing == ringTable + RingIdxKill) ? SF_Yank : SF_Undel;
-		keyEntry.curFlags |= (preText ? (reps | SF_NoMove) : reps);
-		lastYankSize = size;
+		curOffset = (pRing->flags & RingIDMask) == RingIdxKill ? SF_Yank : SF_Undel;
+		keyEntry.curFlags |= (preText ? curOffset | SF_NoMove : curOffset);
+		lastYankSize = size0;
 		}
 
 	return sess.rtn.status;
@@ -545,10 +634,10 @@ int yrevert(ushort flags) {
 	}
 
 // Yank or undelete text, replacing the text from the last invocation if this not the first.
-int ycycle(Datum *pRtnVal, int n, Ring *pRing, ushort flag, ushort cmd) {
+int ycycle(Datum *pRtnVal, long n, Ring *pRing, ushort flag, uint cmd) {
 
 	// If not the first consecutive time...
-	if((keyEntry.prevFlags & flag) && n != 0) {
+	if(keyEntry.prevFlags & flag && n != 0) {
 		if(yrevert(flag) == Success &&			// delete the last yank or undelete...
 		 rcycle(pRing, n, false) == Success)		// cycle the ring per n...
 			(void) execCmdFunc(pRtnVal, 1, cmdFuncTable + cmd, 0, 0);	// and insert the current ring entry.

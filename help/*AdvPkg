@@ -5,20 +5,18 @@ use.  Language-specific commands and functions are loaded, activated, and
 deactivated automatically when buffers, filenames, or modes are changed.  For
 all other commands, note the following:
 
-  * The word processing commands are activated if the $EndSentence variable is
+  * The word processing commands are activated if the EndSentence variable is
     set to a non-empty value in "site.ms".
-  * The block-processing and macro packages can be loaded by uncommenting the
+  * The text-processing and macro packages can be loaded by uncommenting the
     appropriate line(s) in "site.ms" or by adding ~brequire~B statements to the
     user startup file ".memacs".
 
-See the ~bshowCommands~B (~#uC-h c~U) or ~bshowKey~B (~#uC-h ?~U) displays for details.  A
-brief description of each command is presented here.
+See the ~bshowRoutines~B (~#uC-h r~U) or ~bshowKey~B (~#uC-h ?~U) help text for details.  A brief
+description of each command is presented here.
 
 --------------------------------------------------------------------------------
 ~bGENERAL USE~B                                     (defined in "memacs.ms")
 
-chgIndent           ~#uC-c TAB~U     Change indentation at beginning of current
-                                line without moving point.
 enumLine            ~#uESC #~U       Insert sequential numbers at beginning of all
                                 lines in a block.
 fenceWord           ~#uESC "~U       Wrap a pair of fence characters around one or
@@ -27,23 +25,16 @@ findFiles           ~#uC-x f~U    	Open all files matching a shell template and
                                 optionally, also matching a search pattern.
 getFile             ~#uC-x C-g~U    	Find a file and open it in a new screen.  If
                                 n <= 0, also set its buffer to read-only.
-indentLine          ~#uC-c )~U
-outdentLine         ~#uC-c (~U       Indent or outdent a block of lines.
 joinLines0          ~#uC-x C-j~U     Join lines with no spacing in between.
-nextGrepBuf         ~#uC-c ]~U
-prevGrepBuf         ~#uC-c [~U       Switch to next or previous buffer from result of
+nextListBuf         ~#uC-c ]~U
+prevListBuf         ~#uC-c [~U       Switch to next or previous buffer from result of
                                 most recent ~bfindFiles~B invocation.  If n < 0,
                                 also delete buffer that was exited from.
-nextHomeBuf         ~#uC-h ]~U
-prevHomeBuf         ~#uC-h [~U       Switch to next or previous "homed" buffer.  If
-				n < 0, also delete buffer that was exited from.
 popFileList         ~#uC-h l~U       Display a directory listing in a pop-up window.
 queryReplaceAll     ~#uESC C-q~U     Invoke the ~bqueryReplace~B command on multiple
                                 buffers in succession.
 showBindings        ~#uC-h n~U       Display all possible key bindings and what they
                                 are bound to in a pop-up window.
-showVar             ~#uC-h =~U       Display a variable name and its value on the
-                                message line.
 trimBuf             ~#uESC C-\~U     Trim white space from end of all lines in
                                 current buffer.
 unchangeBuf         ~#uESC ~~~U       Clear the "changed" attribute of the current
@@ -56,18 +47,16 @@ wpJoinLines         ~#uC-c C-j~U     Join lines with extra spacing in between.
 wpWrapLine          ~#uC-c RTN~U     Wrap line(s) with extra spacing in between.
 
 --------------------------------------------------------------------------------
-~bBLOCK PROCESSING~B                                (defined in "blockFormat.ms")
+~bLINE BLOCK PROCESSING~B                           (defined in "textFormat.ms")
 
-bfFormatItem        ~#uESC .~U       Format a block of comment lines or one numbered
-                                list item.
-bfFormatList        ~#uESC L~U       Format a sequence of numbered list items.
+tfFormatItem        ~#uESC .~U       Format a block of comment lines, one numbered
+                                list item, one bulleted list item, or a plain
+                                line block.
 
 --------------------------------------------------------------------------------
 ~bKEY MACROS~B                                      (defined in "macroUtil.ms")
 
-editMacro           ~#uESC M~U       Display a macro in a temporary buffer so that it
-                                can be edited and updated.
-saveMacros          ~#uESC C-s~U     Save macro ring to disk, in file
+saveMacros          ~#uC-c C-s~U     Save macro table to disk, in file
                                 ~~/.memacs-macros.  (File is loaded automatically
                                 at startup if it exists.)
 
@@ -152,7 +141,7 @@ swfFindFunc         ~#uC-c C-f~U     Find a function definition in a source file
 --------------------------------------------------------------------------------
 ~bPREPROCESSOR (C, C++, Swift)~B                    (defined in "ppLib.ms")
 
-ppDeletePPLines     ~#uC-c #~U       Remove conditional preprocessor lines.
+ppDelPPLines        ~#uC-h #~U       Remove conditional preprocessor lines.
 ppGotoIfEndif       ~#uC-c C-g~U     Go to matching ~u#if...~U or ~u#endif~U.
 ppWrapIf0           ~#uESC 0~U       Wrap ~#u#if 0~U and ~u#endif~U around a block of lines.
 ppWrapIf1           ~#uESC 1~U       Wrap ~#u#if 1~U and ~u#endif~U around a block of lines.

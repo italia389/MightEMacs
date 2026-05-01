@@ -68,5 +68,5 @@ lines in a window up or down without changing the point position:
 
 All the window commands can be more finely controlled with a numeric prefix.
 For example, scrolling can be done in half pages by using a negative numeric
-prefix.  See the ~bshowKey~B (~#uC-h ?~U) or ~bshowCommands~B (~#uC-h c~U) help descriptions
-for details.
+prefix.  See the ~bshowKey~B (~#uC-h ?~U) or ~bshowRoutines~B (~#uC-h r~U) help descriptions for
+details.

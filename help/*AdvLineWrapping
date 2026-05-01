@@ -4,7 +4,7 @@ MightEMacs provides the ability to wrap text, either automatically as you type,
 or all at once by specifying a block of lines to operate on and invoking one of
 the "wrap" commands.
 
-Automatic line wrapping is done when the "Wrap" buffer mode is enabled, the
+Automatic line wrapping is done when the "Wrap" buffer mode is activated, the
 "ReadOnly" buffer attribute is not set, a space or ~ureturn~U is entered (or more
 precisely, the ~bspace~B or ~bnewline~B command is executed), and the point is at or
 past the wrap column.  A wrap column exists for every screen and is managed with
@@ -66,64 +66,78 @@ following steps:
 
      1. Edit the "site.ms" startup file:
 
-             a. Set the $CommentList array to all of the possible comment
-                prefixes you will use in all programming languages you want to
-                code in.  For example, if you routinely code in the shell,
-                Python, and JavaScript, you can use the default value:
+             a. Locate and uncomment the following line, which will load the text-
+                formatting routines:
 
-                    $CommentList = ['#', '//']
+                    require 'textFormat', ['#', '//'], '-*.'
+
+             b. Set the first (array) argument of this line to all of the
+                possible comment prefixes you will use in all programming
+                languages you want to code in.  For example, if you routinely
+                code in the shell, Python, and JavaScript, you can use the
+                default value:
+
+                    ['#', '//']
 
                 If you code in Assembly also, you can add a semicolon:
 
-                    $CommentList = ['#', '//', ';']
+                    ['#', '//', ';']
 
                 Note that these must be "whole line" prefixes.  /* ... */
                 comments are not supported.
 
-             b. Set the $EndSentence variable.  If you want two spaces between
-                sentences:
+             c. Set the second (string) argument to the list of bullet
+                characters you want to use in a bulleted list; for example:
 
-                    $EndSentence = '.?!'
+                    - this is a bulleted item that wraps
+                      to the next line.
+
+                The default bullet characters are '-', '*', and '.', but you may
+                change them by editing the string argument.
+
+             d. Set the EndSentence variable (near top of file).  If you want
+                two spaces between sentences:
+
+                    EndSentence = '.?!'
 
                 which is the default value.  If you want one space between
                 sentences:
 
-                    $EndSentence = ''
+                    EndSentence = ''
 
-             c. Set the wrap column.  If you want a block of lines to extend all
-                the way to the right edge of the screen after wrapping, use the
-                default setting:
+             e. Set the wrap column.  If you want a block of lines to extend all
+                the way to the right edge of the screen after wrapping, locate and
+                uncomment the following line:
 
-                    setWrapCol $TermSize[0]
+                    setDefault 'WrapCol', setWrapCol(TermSize[0])
 
-                If you want a right margin instead (say, four spaces), use:
+                If you want a right margin instead (say, six spaces), use:
 
-                    setWrapCol $TermSize[0] - 4
+                    setDefault 'WrapCol', setWrapCol(TermSize[0] - 6)
 
-             d. Uncomment the following line, which will load the text-
-                formatting routines:
+                Note however that the default right margin is four spaces, so if
+                you want that, leave this line commented out.
 
-                    require 'blockFormat'
-
-             e. Save your changes: ~#uC-x C-s~U.
+             f. Save your changes: ~#uC-x C-s~U.
 
         Alternatively, you can put the following lines (using the defaults in
         this example) in your user startup file, ~/.memacs:
 
-            $CommentList = ['#', '//']
-            $EndSentence = '.?!'
-            setWrapCol $TermSize[0]
-            require 'blockFormat'
+            EndSentence = '.?!'
+            setDefault 'WrapCol', setWrapCol(TermSize[0] - 4)
+            require 'textFormat', ['#', '//'], '-*.'
 
      2. Quit MightEMacs.
 
 Now your customizations will be set automatically every time you start
-MightEMacs.  From this point forward, you will be able to do either of the
+MightEMacs.  From this point forward, you will be able to do any of the
 following in an editing session:
 
      1. Rewrap a block of lines with or without leading white space.
      2. Rewrap a comment block (or a single line) that contains leading comment
         prefixes.
+     3. Rewrap a numbered list item of form " 1. The quick brown fox."
+     4. Rewrap a bulleted list item (as discussed previously).
 
 To rewrap a block of lines, you would do the following:
 
@@ -153,7 +167,7 @@ all subsequent lines.  For example, if your screen looked like this:
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r=* (Exact) == unnamed ============================= MightEMacs 9.7.0 ~R|
+    |~r=* (Exact) == unnamed [1] ======================== MightEMacs 10.0.0 ~R|
 
 with the point following the word "fork?", and you typed ~#uC-- 3 C-c RTN~U, the
 four-line block would be converted to this (assuming $wrapCol is set to the
@@ -170,7 +184,7 @@ terminal width):
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r=* (Exact) == unnamed ============================= MightEMacs 9.7.0 ~R|
+    |~r=* (Exact) == unnamed [1] ======================== MightEMacs 10.0.0 ~R|
 
 with the point left at the end of the block.
 
@@ -178,7 +192,7 @@ You can also do this with comment blocks.  To rewrap a line block that contains
 leading comment prefixes:
 
      1. Move point to any line in the block.
-     2. Execute the ~bbfFormatItem~B (~#uESC .~U) command.
+     2. Execute the ~btfFormatItem~B (~#uESC .~U) command.
 
 For example, if the buffer contained the following lines:
      ~u                                                                     ~U
@@ -192,7 +206,7 @@ For example, if the buffer contained the following lines:
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r=* (Exact) == myscript ============================ MightEMacs 9.7.0 ~R|
+    |~r=* (Exact) == myscript [1] ======================= MightEMacs 10.0.0 ~R|
 
 with the point in the middle of the third line (after "away"), and you entered
 ~#uESC .~U, the first four lines would be converted to:
@@ -207,7 +221,7 @@ with the point in the middle of the third line (after "away"), and you entered
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r=* (Exact) == myscript ============================ MightEMacs 9.7.0 ~R|
+    |~r=* (Exact) == myscript [1] ======================= MightEMacs 10.0.0 ~R|
 
 with the point left at the end of the comment block.  Notice that the first line
 determines the indentation for the whole block.

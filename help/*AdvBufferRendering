@@ -55,4 +55,4 @@ purpose and provides options for controlling how the pop-up window is displayed
 (like left-shifting long lines).  A common use of the ~bpopFile~B command is to
 pop a file on disk during an editing session, scroll through it, then dismiss
 the window and return to where you left off.  See the ~bshowKey~B (~#uC-h ?~U) or
-~bshowCommands~B (~#uC-h c~U) descriptions for details.
+~bshowRoutines~B (~#uC-h r~U) descriptions for details.

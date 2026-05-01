@@ -1,10 +1,10 @@
 Instructions for Installing MightEMacs
 
 Installer packages are included for the macOS platform and Linux platforms
-(CentOS, Debian, GNU/Linux, Red Hat, Ubuntu, and others).  The standard
-installation packages place files in /usr/local and require superuser (root)
-privileges.  If you are not installing on a macOS or GNU/Linux platform, want to
-install MightEMacs in your HOME directory, or want to customize the installation
+(CentOS, GNU/Linux, Red Hat, Ubuntu, and others).  The standard installation
+packages place files in /usr/local and may require superuser (root) privileges.
+If you are not installing on a macOS or GNU/Linux platform, want to install
+MightEMacs in your HOME directory, or want to customize the installation
 process, please refer to file CustomInstall.txt for instructions.
 
 For a standard installation of MightEMacs, perform the following steps:
@@ -18,32 +18,41 @@ For a standard installation of MightEMacs, perform the following steps:
     as /usr/local/share/memacs/scripts/site.ms.bak.
 
     If you are installing on a Linux platform, go to the next step; otherwise,
-    go to step 5.
+    go to step 8.
 
- 3. The Linux installer is memacs-9.7.0.sh, which includes a 64-bit binary built
-    on a CentOS vers. 6 machine.  To run the installer, type the following
-    commands:
+ 3. The Linux installer is memacs-10.0.0.sh, which includes a 64-bit binary built
+    on a CentOS vers. 6 machine.  If you are the owner of the /usr/local
+    directory and want the installed files to be owned by you, go to the next
+    step; otherwise, go to step 6.
+
+ 4. Run the installer by typing the following command:
+
+	$ ./memacs-A.B.C.sh
+
+ 5. Go to step 9.
+
+ 6. Run the installer (as root) by typing the following commands:
 
 	$ su root
-	# ./memacs-9.7.0.sh
+	# ./memacs-10.0.0.sh
 	# exit
 
- 4. Go to step 6.
+ 7. Go to step 9.
 
- 5. The macOS installer is memacs-9.7.0.pkg, which includes a 64-bit binary
+ 8. The macOS installer is memacs-10.0.0.pkg, which includes a 64-bit binary
     built for macOS vers. 10.12 (Sierra) and later.  Open the installer
     package with the following command:
 
-	$ open memacs-9.7.0.pkg
+	$ open memacs-10.0.0.pkg
 
     and run the installer.
 
- 6. If you want to install the sample user startup file (.memacs) into your HOME
+ 9. If you want to install the sample user startup file (.memacs) into your HOME
     directory, type the following command:
 
 	$ cp scripts/.memacs ~
 
- 7. Make sure directory /usr/local/bin is in your shell PATH so that the shell
+10. Make sure directory /usr/local/bin is in your shell PATH so that the shell
     can find the MightEMacs binary.  Display it with the following command:
 
 	$ echo $PATH
@@ -67,7 +76,7 @@ For a standard installation of MightEMacs, perform the following steps:
 
 	export MSPATH=":/usr/local/share/memacs/scripts:$HOME/scripts"
 
- 8. Review and/or edit file /usr/local/share/memacs/scripts/site.ms to customize
+11. Review and/or edit file /usr/local/share/memacs/scripts/site.ms to customize
     site-wide defaults for the editor, such as scrolling options, the search
     string delimiter, etc.  If an old version of the file was saved in step 3 or
     5, you may have to change settings in the new "site.ms" file to match the

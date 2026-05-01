@@ -1,4 +1,4 @@
-// (c) Copyright 2022 Richard W. Marinelli
+// (c) Copyright 2026 Richard W. Marinelli
 //
 // This work is licensed under the GNU General Public License (GPLv3).  To view a copy of this license, see the
 // "License.txt" file included with this distribution or visit http://www.gnu.org/licenses/gpl-3.0.en.html.
@@ -10,7 +10,7 @@
 // Programming Notes:
 // 1. After program initialization, the core operation of the editor is as follows: keys are read in editLoop(), system or user
 // commands are called with a numeric argument, and a status code is returned.  If no numeric argument is specified by the user,
-// INT_MIN is used as the default (and many commands will have a default behavior in that case).  The called routines typically
+// DefN is used as the default (and many commands will have a default behavior in that case).  The called routines typically
 // call (many) other routines, which may include hook routines.  Most of these functions return a status code as well.  The
 // return code is usually Success or Failure; however, it can be more severe (see std.h for a list), such as UserAbort or
 // FatalError.  Any code worse than UserAbort will cause program termination.  The most severe return code from the most distant
@@ -31,9 +31,8 @@
 // regScan(), scan()						Search string not found.
 // ereaddir()							No entries left.
 
-// Make selected global definitions local.
+// Load global data in std.h.
 #define MainData
-#define CmdData
 #include "std.h"
 
 #include <stdarg.h>
@@ -54,7 +53,6 @@
 #define ExecSite	0x0001		// Execute site startup file.
 #define ExecUser	0x0002		// Execute user startup file.
 
-enum h_type {h_copyright, h_version, h_usage, h_help};
 static const char				// Switch names.
 	*sw_buf_mode[] = {"buf-mode", "B", NULL},
 	*sw_copyright[] = {"copyright", "C", NULL},
@@ -126,17 +124,23 @@ static Switch argSwitchTable[] = {		// Argument switch table.
 #include "file.h"
 #include "search.h"
 #include "var.h"
+
+// Load global data in cmd.h.
+#define CmdData
 #include "cmd.h"
 
 // Return true if in interactive mode.
 bool interactive(void) {
 
-	return !(sess.opFlags & (OpStartup | OpNoLoad)) && (!(sess.opFlags & OpScript) || (sess.opFlags & OpUserCmd));
+	return (sess.opFlags & (OpScript | OpUserCmd)) != OpScript;
 	}
 
 // Clear return message if RSKeepMsg flag not set, clear return flags, and set return status to Success.
 void rsclear(ushort flags) {
 
+#if MMDebug & Debug_MsgLnRtn
+	fprintf(logfile, "rsclear(%.4hx)\n", flags);
+#endif
 	if(!(flags & RSKeepMsg))
 		dsetnull(&sess.rtn.msg);
 	sess.rtn.flags = 0;
@@ -151,9 +155,9 @@ static int rscpy(RtnStatus *pDest, RtnStatus *pSrc) {
 		dxfer(&pDest->msg, &pSrc->msg);
 	else if(dcpy(&pDest->msg, &pSrc->msg) != 0)
 		(void) libfail();
-#if MMDebug & Debug_Datum
-	fprintf(logfile, "rscpy(): copied from (%hu) '%s' [%d] to (%hu) '%s' [%d]\n",
-	 pSrc->msg.type, pSrc->msg.str, pSrc->status, pDest->msg.type, pDest->msg.str, pDest->status);
+#if MMDebug & Debug_MsgLnRtn
+	fprintf(logfile, "rscpy(): copied message \"%s\", status %hd, flags %.4x\n",
+	 pDest->msg.str, pDest->status, pDest->flags);
 #endif
 	return sess.rtn.status;
 	}
@@ -184,7 +188,7 @@ void rsunfail(void) {
 int rsset(int status, ushort flags, const char *fmt, ...) {
 	bool newMsgSet = false;
 
-#if MMDebug & Debug_MsgLine
+#if MMDebug & Debug_MsgLnRtn
 	fprintf(logfile, "rsset(%d, %.4hx, \"%s\", ...), current flags %.4hx, msg \"%s\"\n",
 	 status, flags, fmt, sess.rtn.flags, sess.rtn.msg.str);
 #endif
@@ -192,7 +196,7 @@ int rsset(int status, ushort flags, const char *fmt, ...) {
 	// or (2), same status but already have a message, return old one.
 	if(status > sess.rtn.status)				// Return if new status is less severe.
 		goto Retn;
-	if(status < sess.rtn.status || (flags & RSForce))	// Set new message if more severe status or a force.
+	if(status < sess.rtn.status || flags & RSForce)		// Set new message if more severe status or a force.
 		goto Set;
 
 	// Same status.  Check special conditions.
@@ -200,8 +204,8 @@ int rsset(int status, ushort flags, const char *fmt, ...) {
 
 		// If RSOverride flag set or 'RtnMsg' global mode enabled and either (1), existing message is null; or (2),
 		// RSHigh flag set and existing RSForce and RSHigh flags are clear, set new message.
-		if(((flags & RSOverride) || (modeInfo.cache[MdIdxRtnMsg]->flags & MdEnabled)) &&
-		 ((disnull(&sess.rtn.msg) || ((flags & RSHigh) && !(sess.rtn.flags & (RSForce | RSHigh))))))
+		if((flags & RSOverride || mode.cache[MdIdxRtnMsg]->flags & MdActive) &&
+		 ((disnull(&sess.rtn.msg) || flags & RSHigh && !(sess.rtn.flags & (RSForce | RSHigh)))))
 			goto Set;
 		goto Retn;
 		}
@@ -213,7 +217,7 @@ Retn:
 		return sess.rtn.status;
 		}
 Set:
-#if MMDebug & Debug_MsgLine
+#if MMDebug & Debug_MsgLnRtn
 	fprintf(logfile, "    -> attempting to set \"%s\" message...\n", fmt);
 #endif
 	// Save message (if RSKeepMsg flag not set) and new status.
@@ -227,10 +231,8 @@ Set:
 			char *str;
 
 			if(status != Panic) {
-				if(flags & RSNoFormat) {
-					if((str = (char *) malloc(strlen(fmt) + 1)) != NULL)
-						strcpy(str, fmt);
-					}
+				if(flags & RSNoFormat)
+					str = strdup(fmt);
 				else {
 					va_start(varArgList, fmt);
 					(void) vasprintf(&str, fmt, varArgList);
@@ -264,20 +266,41 @@ Set:
 
 	// Preserve RSNoWrap and RSTermAttr flags if new message was not set.
 	sess.rtn.flags = newMsgSet ? flags : (sess.rtn.flags & (RSNoWrap | RSTermAttr)) | flags;
-#if MMDebug & Debug_MsgLine
+#if MMDebug & Debug_MsgLnRtn
 	fprintf(logfile, "rsset(%d, %.4x, ...): set msg '%s', status %d, new flags %.4x\n",
 	 status, (uint) flags, sess.rtn.msg.str, status, (uint) sess.rtn.flags);
 #endif
 	return (sess.rtn.status = status);
 	}
 
-// Save current return code and message for $ReturnMsg.  Return status.
+// Append text to return message and return status.
+int rscat(const char *fmt, ...) {
+	va_list varArgList;
+	char *str;
+
+	va_start(varArgList, fmt);
+	(void) vasprintf(&str, fmt, varArgList);
+	va_end(varArgList);
+	if(str == NULL)
+		return rsset(Panic, 0, text94, "rscat");
+			// "%s(): Out of memory!"
+	if(disnull(&sess.rtn.msg))
+		dadoptstr(str, &sess.rtn.msg);
+	else {
+		DFab msg;
+
+		if(dopenwith(&msg, &sess.rtn.msg, FabAppend) != 0 || dputs(str, &msg, 0) != 0 || dclose(&msg, FabStr) != 0)
+			return libfail();
+		free((void *) str);
+		}
+	return sess.rtn.status;
+	}
+
+// Save current return message for ReturnMsg system constant (code and flags not used).  Return status.
 int rssave(void) {
 
-	// Copy to sess.scriptRtn.
-	if(dcpy(&sess.scriptRtn.msg, &sess.rtn.msg) == 0)
-		sess.scriptRtn.status = sess.rtn.status;
-	return sess.rtn.status;
+	// Copy message to sess.scriptRtn.
+	return dsetstr(sess.rtn.msg.str, &sess.scriptRtn.msg) != 0 ? libfail() : sess.rtn.status;
 	}
 
 // If current status not Success, save and clear it so it can be restored later.
@@ -304,7 +327,7 @@ void rspop(short oldStatus, ushort oldFlags) {
 // Set and return proper status from a failed CXL library call.
 static int librsset(int status) {
 
-	return rsset((cxlExcep.flags & ExcepMem) ? Panic : status, 0, "%s", cxlExcep.msg);
+	return rsset(cxlExcep.flags & ExcepMem ? Panic : status, RSNoFormat, cxlExcep.msg);
 	}
 
 // Set and return Failure status from a failed CXL library call.
@@ -314,33 +337,38 @@ int libfail(void) {
 	}
 
 // Set and return FatalError status from a failed CXL library call.
-int libfatal(void) {
+static int libfatal(void) {
 
 	return librsset(FatalError);
 	}
 
-// Copy a string to open fabrication object pFab, escaping AttrSpecBegin (~) characters.  Return -1 if error, otherwise 0.
-int esctofab(const char *str, DFab *pFab) {
+// Copy a non-zero-length byte string to open fabrication object pFab with CvtVizChar flag, escaping AttrSpecBegin (~)
+// characters.  Return -1 if error, otherwise zero.
+int esctofab(const char *str, size_t len, DFab *pFab) {
 
-	while(*str != '\0')
-		if((*str == AttrSpecBegin && dputc(AttrSpecBegin, pFab, 0) != 0) || dputc(*str++, pFab, 0) != 0)
+	do {
+		if((*str == AttrSpecBegin && dputc(AttrSpecBegin, pFab, 0) != 0) || dputc(*str++, pFab, CvtVizChar) != 0)
 			return -1;
+		} while(--len > 0);
 	return 0;
 	}
 
 // Copy global return message to open fabrication object, escaping AttrSpecBegin (~) characters in terminal attribute
-// specifications.  Return status.
-int escAttr(DFab *pFab) {
+// specifications if needed.  Return status.
+int escMsgAttr(DFab *pFab) {
 	char *str = sess.rtn.msg.str;
 	if(sess.rtn.flags & RSTermAttr) {
 		if(dputs(str, pFab, 0) != 0 || dputc(AttrSpecBegin, pFab, 0) != 0 || dputc(AttrAllOff, pFab, 0) != 0)
 			goto LibFail;
 		}
-	else if(esctofab(str, pFab) != 0)
+	else {
+		while(*str != '\0')
+			if((*str == AttrSpecBegin && dputc(AttrSpecBegin, pFab, 0) != 0) || dputc(*str++, pFab, 0) != 0)
 LibFail:
-		return libfail();
+				return libfail();
+		}
 
-	return Success;
+	return sess.rtn.status;
 	}
 
 // Concatenate any function arguments via catArgs() and save prefix and result in *ppDatum.  Return status.
@@ -348,7 +376,7 @@ static int buildMsg(Datum **ppDatum, const char *prefix, int minRequired) {
 	DFab msg;
 	Datum *pDatum;
 
-	if(dnewtrack(&pDatum) != 0 || dnewtrack(ppDatum) != 0)
+	if((pDatum = dnewtrack()) == NULL || (*ppDatum = dnewtrack()) == NULL)
 		goto LibFail;
 	if(catArgs(pDatum, minRequired, NULL, 0) != Success || (prefix == NULL && isNN(pDatum)))
 		return sess.rtn.status;
@@ -368,16 +396,16 @@ LibFail:
 int abortInp(void) {
 
 	tbeep();
-	if(curMacro.state == MacRecord)
-		sess.cur.pWind->flags |= WFMode;
-	curMacro.state = MacStop;
+	if(macro.state == MacRecording)
+		sess.pCurWind->face.wflags |= WFMode;
+	macro.state = MacStopped;
 	return rsset(UserAbort, RSNoFormat, text8);
 			// "Aborted"
 	}
 
 // "abort" command: Call abortInp() to abort processing and build optional exception message.  Enable terminal attributes in
 // message if n argument.
-int abortOp(Datum *pRtnVal, int n, Datum **args) {
+int abortOp(Datum *pRtnVal, long n, Datum **args) {
 
 	(void) abortInp();
 
@@ -390,7 +418,7 @@ int abortOp(Datum *pRtnVal, int n, Datum **args) {
 	Datum *pDatum;
 	if(buildMsg(&pDatum, text189, 0) == Success)
 			// "Abort"
-		(void) rsset(UserAbort, n == INT_MIN ? RSNoFormat : RSNoFormat | RSTermAttr, pDatum->str);
+		(void) rsset(UserAbort, n == DefN ? RSNoFormat : RSNoFormat | RSTermAttr, pDatum->str);
 
 	return sess.rtn.status;
 	}
@@ -404,29 +432,19 @@ int abortOp(Datum *pRtnVal, int n, Datum **args) {
 // Concatenate arguments and set result as a return message.  Return status.  First argument is option string if n argument;
 // otherwise, it is skipped.  Message is built from following argument(s).  Return value (pRtnVal) is set to false if "Fail"
 // option specified, otherwise true.
-int message(Datum *pRtnVal, int n, Datum **args) {
+int message(Datum *pRtnVal, long n, Datum **args) {
 	Datum *pDatum;
 	bool rtnVal = true;
 	ushort rtnFlags = RSNoFormat | RSOverride;
 	uint argFlags = ArgFirst;
-	static Option options[] = {
-		{"^Force", NULL, 0, RSForce},
-		{"^High", NULL, 0, RSHigh},
-		{"No^Wrap", NULL, 0, RSNoWrap},
-		{"^TermAttr", NULL, 0, RSTermAttr},
-		{"^Fail", NULL, 0, 0},
-		{NULL, NULL, 0, 0}};
-	static OptHdr optHdr = {
-		ArgNotNull1, text451, false, options};
-			// "function option"
+	OptHdr *pOptHdr = cmdFuncTable[cf_message].pOptHdr;
 
 	// Get options and set flags.
-	if(n != INT_MIN) {
-		if(funcArg(pRtnVal, ArgFirst) != Success || parseOpts(&optHdr, NULL, pRtnVal, NULL) != Success ||
-		 !needSym(s_comma, true))
+	if(pOptHdr->ctrlFlags & OHdrFound) {
+		if(!needSym(s_comma, true))
 			return sess.rtn.status;
-		rtnFlags |= getFlagOpts(options);
-		if(options[4].ctrlFlags & OptSelected) {
+		rtnFlags |= pOptHdr->selFlags;
+		if(pOptHdr->optTable[4].ctrlFlags & OptSelected) {	// "NoWrap"
 			rtnFlags |= RSNoWrap;
 			rtnVal = false;
 			}
@@ -449,13 +467,13 @@ int allowEdit(bool edit) {
 	if(edit) {
 		if(sess.edit.pBuf->flags & BFReadOnly) {
 			tbeep();
-			return rsset(Failure, 0, text109, text58, text460);
-				// "%s is %s", "Buffer", "read-only"
+			return rsset(Failure, 0, text284, text276, text460);
+				// "Cannot %s %s buffer", "modify", "read-only"
 			}
-		if(sess.edit.pBuf->pCallInfo != NULL && sess.edit.pBuf->pCallInfo->execCount > 0) {
+		if(sess.edit.pBuf->pCallHdr != NULL && sess.edit.pBuf->pCallHdr->execCount > 0) {
 			tbeep();
-			return rsset(Failure, 0, text284, text276, text248);
-				// "Cannot %s %s buffer", "modify", "an executing"
+			return rsset(Failure, 0, text284, text276, text238);
+				// "Cannot %s %s buffer", "modify", "executing"
 			}
 		}
 
@@ -476,25 +494,6 @@ char *pad(char *s, uint len) {
 		*str1 = '\0';
 		}
 	return str1;
-	}
-
-// Return a sample of a string for error reporting, given pointer, length, and maximum length (excluding the trailing null).
-// If maximum length is zero, use a small size derived from the terminal width.
-char *strSamp(const char *src, size_t srcLen, size_t maxLen) {
-	size_t len;
-
-	// Set maxLen to maximum destination size.
-	if(maxLen == 0)
-		maxLen = sampBuf.smallSize;
-	else if(maxLen >= sampBuf.bufLen)
-		maxLen = sampBuf.bufLen - 1;
-
-	// Now compute sample size...
-	if((len = srcLen) > maxLen)
-		len = maxLen;
- 
-	// and return string sample.
-	return strfit(sampBuf.buf, len, src, srcLen);
 	}
 
 // Return true if have fence character and other conditions are met that warrant display of matching fence, otherwise false.
@@ -528,25 +527,27 @@ static bool hiliteFence(short fence, bool rightOnly) {
 	}
 
 // Execute a system or user command bound to given key (not a hook).  Return status.
-static int execKey(KeyBind *pKeyBind, int n) {
-	UnivPtr *pUniv = &pKeyBind->targ;
+static int execKey(KeyBind *pKeyBind, long n) {
+	ExecPtr *pExec = &pKeyBind->cmd;
 	Datum *pSink;				// For throw-away return value, if any.
 
-	if(dnewtrack(&pSink) != 0)
+	if((pSink = dnewtrack()) == NULL)
 		return libfail();
-	dsetnil(pSink);
 
 	// Bound to a user command?
-	if(pUniv->type == PtrUserCmd) {
+	if(pExec->type == PtrUserCmd) {
+
+		// Save and restore OpUserCmd flag.
+		ushort oldUserCmd = sess.opFlags & OpUserCmd;
 		sess.opFlags |= OpUserCmd;
-		(void) execBuf(pSink, n, pUniv->u.pBuf, NULL, 0);
-		sess.opFlags &= ~OpUserCmd;
+		(void) execBuf(pSink, n, pExec->u.pBuf, NULL, 0);
+		sess.opFlags = (sess.opFlags & ~OpUserCmd) | oldUserCmd;
 		}
 	else {
 		// Bound to a system command.  Skip execution if n is zero and a repeat count; otherwise, perform "edit" check
 		// before invoking it.
-		CmdFunc *pCmdFunc = pUniv->u.pCmdFunc;
-		if(n == 0 && (pCmdFunc->attrFlags & CFNCount))
+		CmdFunc *pCmdFunc = pExec->u.pCmdFunc;
+		if(n == 0 && pCmdFunc->attrFlags & CFNCount)
 			return sess.rtn.status;
 		if(allowEdit(pCmdFunc->attrFlags & CFEdit) == Success)
 			(void) execCmdFunc(pSink, n, pCmdFunc, 0, 0);
@@ -554,7 +555,7 @@ static int execKey(KeyBind *pKeyBind, int n) {
 
 	// False return?
 	if(sess.rtn.status == Success && pSink->type == dat_false) {
-		if(curMacro.state == MacPlay)
+		if(macro.state == MacPlaying)
 			(void) rsset(Failure, RSNoFormat | RSKeepMsg, text300);
 							// "False return"
 		else
@@ -567,14 +568,16 @@ static int execKey(KeyBind *pKeyBind, int n) {
 // Initialize global Datum objects and return status.
 static int editInit0(void) {
 
-	// Initialize i var, return status, and numeric literals.
 	dinit(&iVar.format);
 	dinit(&sess.rtn.msg);
 	dsetnull(&sess.rtn.msg);
 	dinit(&sess.scriptRtn.msg);
 	dsetnull(&sess.scriptRtn.msg);
-	dinit(&curMacro.name);
-	return dsetsubstr("%d", 2, &iVar.format) != 0 ? libfail() : sess.rtn.status;
+	dinit(&sess.qSearchPat);
+	dsetnull(&sess.qSearchPat);
+	dinit(&sess.qReplPat);
+	dsetnull(&sess.qReplPat);
+	return dsetstr("%d", &iVar.format) != 0 ? libfail() : sess.rtn.status;
 	}
 
 // Set a list of characters to be considered in a word.  The word table is assumed to be already cleared.  Return status.
@@ -597,25 +600,25 @@ static int setWordList(const char *wordList) {
 
 // Initialize all of the core data structures and return status.
 static int editInit1(void) {
-	uint n;
+	size_t k;
 	CoreKey *pCoreKey;
-	UnivPtr univ;
+	ExecPtr exec;
 	KeyBind *pKeyBind;
 	CmdFunc *pCmdFunc;
 	ModeSpec *pModeSpec, **ppModeSpec;
 	ModeGrp *pModeGrp1, *pModeGrp2;
-	ssize_t index;
-	static const char myName[] = "editInit1";
 	struct AliasInfo {
 		const char *alias;
-		UnivPtr targ;
+		ExecPtr targ;
 		} *aliasInfo;
 	static struct AliasInfo aliases[] = {
-		{"cd",{PtrSysCmd, cmdFuncTable + cf_chgDir}},
+		{"cd",{PtrSysCmd, cmdFuncTable + cf_chdir}},
 		{"lcstr",{PtrSysFunc, cmdFuncTable + cf_lowerCaseStr}},
-		{"pwd",{PtrSysCmd, cmdFuncTable + cf_showDir}},
+		{"ln",{PtrSysCmd, cmdFuncTable + cf_linkFile}},
 		{"quit",{PtrSysCmd, cmdFuncTable + cf_exit}},
 		{"require",{PtrSysCmd, cmdFuncTable + cf_xeqFile}},
+		{"rm",{PtrSysCmd, cmdFuncTable + cf_delFile}},
+		{"size",{PtrSysFunc, cmdFuncTable + cf_length}},
 		{"ucstr",{PtrSysFunc, cmdFuncTable + cf_upperCaseStr}},
 		{NULL,{PtrNull, NULL}}};
 	struct ModeGrpInfo {
@@ -636,25 +639,31 @@ static int editInit1(void) {
 			{"ASave", MLit_AutoSave, MdGlobal | MdLocked, -1},
 			{"ATerm", MLit_AutoTerm, 0, -1},
 			{"Bak", MLit_Backup, 0, -1},
+			{"BufCount", MLit_BufCount, MdGlobal | MdLocked | MdHidden, -1},
 			{"Clob", MLit_Clobber, MdGlobal | MdLocked | MdHidden, -1},
 			{"Col", MLit_ColDisp, MdHidden | MdInLine, -1},
-			{"Exact", MLit_Exact, MdGlobal | MdEnabled, -1},
-			{"Fence1", MLit_Fence1, MdGlobal | MdHidden | MdEnabled, 1},
+			{"Exact", MLit_Exact, MdGlobal | MdActive, -1},
+			{"Fence1", MLit_Fence1, MdGlobal | MdHidden | MdActive, 1},
 			{"Fence2", MLit_Fence2, MdGlobal | MdHidden, 1},
-			{"HScrl", MLit_HorzScroll, MdGlobal | MdEnabled, -1},
+			{"HScrl", MLit_HorzScroll, MdGlobal | MdActive, -1},
 			{"Line", MLit_LineDisp, MdHidden | MdInLine, -1},
 			{"Over", MLit_Overwrite, MdLocked, 2},
 			{"ReadOnly", MLit_ReadOnly, MdGlobal | MdLocked, -1},
 			{"Regexp", MLit_Regexp, MdGlobal, -1},
 			{"Repl", MLit_Replace, MdLocked, 2},
-			{"RtnMsg", MLit_RtnMsg, MdGlobal | MdLocked | MdHidden | MdEnabled, -1},
+			{"RtnMsg", MLit_RtnMsg, MdGlobal | MdLocked | MdHidden | MdActive, -1},
 			{"Safe", MLit_SafeSave, MdGlobal, -1},
 			{"WkDir", MLit_WorkDir, MdGlobal | MdLocked | MdHidden | MdInLine, -1},
 			{"Wrap", MLit_Wrap, 0, -1},
 			{NULL, NULL, 0, -1}};
 
-	// Initialize macro object.
-	if(growMacro() != Success)
+	// Initialize macro parameters.
+	dinit(&macro.macro1.name);
+	dinit(&macro.macro2.name);
+	hinit(&macro.index.table, 1, 0);	// Minimum size.
+	hinit(&macro.shortcuts, 1, 0);		// Minimum size.
+	if(growMacro(macro.pActiveMacro = &macro.macro1) != Success ||
+	 growMacro(macro.pStageMacro = &macro.macro2) != Success)
 		return sess.rtn.status;
 
 	// Add labels to the rings.
@@ -664,8 +673,6 @@ static int editInit1(void) {
 		// " ring item"
 	ringTable[RingIdxKill].ringName = text436;
 		// "Kill"
-	ringTable[RingIdxMacro].ringName = text471;
-		// "Macro"
 	ringTable[RingIdxSearch].ringName = text78;
 		// "Search"
 	ringTable[RingIdxRepl].ringName = text84;
@@ -673,37 +680,36 @@ static int editInit1(void) {
 	ringTable[RingIdxSearch].entryName = ringTable[RingIdxRepl].entryName = text311;
 		// " pattern"
 
-	// Get space for SampBuf buffers.
-	sampBuf.bufLen = n = term.maxCols + 1;
-	sampBuf.smallSize = n / 4;
-	if((sampBuf.buf = (char *) malloc(sampBuf.bufLen)) == NULL)
-		return rsset(Panic, 0, text94, myName);
-			// "%s(): Out of memory!"
-	*sampBuf.buf = '\0';
-
 	// Load all the key bindings.
-	if(loadBindings() != Success)
+	if(initBindings() != Success)
 		return sess.rtn.status;
 
-	// Initialize the key cache and the "exec" hash table with all command and function names.
-	if((execTable = hnew(CmdFuncCount, 0.7, 1.1)) == NULL)
+	// Initialize the key cache and the "exec" hash with all command and function names.
+	k = elementsof(cmdFuncTable);
+	hinit(&execTable, k + k / 3, 0);
+	if(hconfig(&execTable, CfgBuild, 0.7, 1.1) != 0)
 		return libfail();
 	pCoreKey = coreKeys;
 	pCmdFunc = cmdFuncTable;
 	do {
-		univ.type = (pCmdFunc->attrFlags & CFFunc) ? PtrSysFunc :
-		 (pCmdFunc->attrFlags & CFHidden) ? PtrPseudo : PtrSysCmd;
-		univ.u.pCmdFunc = pCmdFunc;
-		if(execNew(pCmdFunc->name, &univ) != Success)
+		exec.type = pCmdFunc->attrFlags & CFFunc ? PtrSysFunc :
+		 pCmdFunc->attrFlags & CFHidden ? PtrPseudo : PtrSysCmd;
+		exec.u.pCmdFunc = pCmdFunc;
+		if(execNew(pCmdFunc->name, &exec) != Success)
 			return sess.rtn.status;
 
 		// Store frequently-used bindings in key cache.
 		if(pCmdFunc->attrFlags & CFUniq) {
-			pCoreKey->extKey = ((pKeyBind = getPtrEntry(&univ)) == NULL) ? 0 : pKeyBind->code;
+			pCoreKey->extKey = ((pKeyBind = findBindPtr(&exec)) == NULL) ? 0 : pKeyBind->extKey;
 			pCoreKey->id = pCmdFunc - cmdFuncTable;
 			++pCoreKey;
 			}
-		} while((++pCmdFunc)->name != NULL);
+		} while(++pCmdFunc < pCmdFuncEnd);
+
+	// Initialize the global constant and variable hashes.
+	if(cvinit() != Success)
+		return sess.rtn.status;
+	hinit(&fileLinkKeepers, 1, 0);
 
 	// Initialize the alias list.
 	aliasInfo = aliases;
@@ -724,21 +730,20 @@ static int editInit1(void) {
 		} while((++pModeGrpInfo)->name != NULL);
 
 	// Initialize the mode table.
-	ainit(&modeInfo.modeTable);
-	ppModeSpec = modeInfo.cache;
+	hinit(&mode.idx.table, ModeTableSize, PropIgnoreCase);
+	ppModeSpec = mode.cache;
 	modeInit = modeInitTable;
-	index = 0;
 	do {
-		if(mcreate(modeInit->name, index++, modeInit->descrip, modeInit->flags, &pModeSpec) != Success)
+		if(mcreate(modeInit->name, modeInit->descrip, modeInit->flags, &pModeSpec) != Success)
 			return sess.rtn.status;
 		*ppModeSpec++ = pModeSpec;
 		if(modeInit->group > 0)
-			pModeSpec->pModeGrp = (modeInit->group == 1) ? modeInfo.grpHead : modeInfo.grpHead->next;
+			pModeSpec->pModeGrp = (modeInit->group == 1) ? mode.grpHead : mode.grpHead->next;
 		} while((++modeInit)->name != NULL);
 
 	// Clear the search tables and initialize the word list.
-	if(newSearchPat("", &bufSearch.match, NULL, false) == Success && newSearchPat("", &matchRE, NULL, false) == Success &&
-	 newReplPat("", &bufSearch.match, false) == Success && newReplPat("", &matchRE, false) == Success)
+	if(newSearchPat("", &bufSearch.match, NULL, false) == Success && newSearchPat("", &strMatch, NULL, false) == Success &&
+	 newReplPat("", &bufSearch.match, false) == Success && newReplPat("", &strMatch, false) == Success)
 		(void) setWordList(WordChars);
 
 	return sess.rtn.status;
@@ -748,14 +753,14 @@ static int editInit1(void) {
 static int editInit2(void) {
 
 	// Allocate the initial buffer and screen.
-	ainit(&bufTable);
-	if(bfind(buffer1, BS_Create, 0, &sess.cur.pBuf, NULL) != Success || sfind(1, sess.cur.pBuf, &sess.scrnHead) != Success)
+	hinit(&buf.table, BufTableSize, 0);
+	if(bfind(buffer1, BN_Create, 0, &sess.cur.pBuf, NULL) != Success || sfind(1, sess.cur.pBuf, &sess.scrnHead) != Success)
 		return sess.rtn.status;
 
 	// Set the global screen and window pointers.
 	sess.edit.pBuf = sess.cur.pBuf;
-	sess.cur.pWind = sess.windHead = (sess.edit.pScrn = sess.cur.pScrn = sess.scrnHead)->pCurWind = sess.scrnHead->windHead;
-	sess.edit.pFace  = sess.cur.pFace = &(sess.edit.pWind = sess.cur.pWind)->face;
+	sess.pCurWind = sess.windHead = (sess.pCurScrn = sess.scrnHead)->pCurWind = sess.scrnHead->windHead;
+	sess.edit.pFace  = sess.cur.pFace = &sess.pCurWind->face;
 
 	return sess.rtn.status;
 	}
@@ -823,7 +828,7 @@ static int runScript(char *filename, int argCount, char *argList[]) {
 	DFab cmd;
 	Datum *pSink;
 
-	if(dnewtrack(&pSink) != 0 || dopentrack(&cmd) != 0 || dputs("xeqFile ", &cmd, 0) != 0)
+	if((pSink = dnewtrack()) == NULL || dopentrack(&cmd) != 0 || dputs("xeqFile ", &cmd, 0) != 0)
 		goto LibFail;
 	if(argList == NULL) {
 		char *str = filename;
@@ -831,7 +836,7 @@ static int runScript(char *filename, int argCount, char *argList[]) {
 		// Use existing command line.  Pick off initial filename, quote it, and add a comma.
 		while(*str != '\0' && *str != ' ' && *str != '\t')
 			++str;
-		if(dputsubstr(filename, str - filename, &cmd, DCvtLang) != 0)
+		if(dputsubstr(filename, str - filename, &cmd, CvtLang) != 0)
 			goto LibFail;
 		if(*str != '\0')
 			if(dputc(',', &cmd, 0) != 0 || dputs(str, &cmd, 0) != 0)
@@ -839,10 +844,10 @@ static int runScript(char *filename, int argCount, char *argList[]) {
 		}
 	else {
 		// Build command line.
-		if(dputs(filename, &cmd, DCvtLang) != 0)
+		if(dputs(filename, &cmd, CvtLang) != 0)
 			goto LibFail;
 		while(--argCount > 0)
-			if(dputc(',', &cmd, 0) != 0 || dputs(*++argList, &cmd, DCvtLang) != 0)
+			if(dputc(',', &cmd, 0) != 0 || dputs(*++argList, &cmd, CvtLang) != 0)
 				goto LibFail;
 		}
 	if(dclose(&cmd, FabStr) != 0)
@@ -864,20 +869,20 @@ static int startup(const char *filename, ushort flag, int argCount, char *argLis
 	}
 
 // Build a command line with one argument per given flags and execute it with return messages disabled.  If RunQFull flag is
-// set, quote argument; if RunQSimple flag is set, wrap argument in double quotes; otherwise, leave it as is (unquoted).
-// If cmdSuffix not NULL, append it to "cmdPrefix + arg".  Return status.
-int runCmd(Datum *pRtnVal, const char *cmdPrefix, const char *arg, const char *cmdSuffix, ushort flags) {
+// set, quote argument; if RunQWrap flag is set, wrap argument in double quotes; otherwise, leave it as is (unquoted).
+// If cmdSuffix not NULL, append it directly to "cmdPrefix + ' ' + arg".  Return status.
+int runCmdline(Datum *pRtnVal, const char *cmdPrefix, const char *arg, const char *cmdSuffix, uint flags) {
 	DFab cmd;
 
 	// Concatenate command name with arguments.
 	if(dopentrack(&cmd) != 0 || dputs(cmdPrefix, &cmd, 0) != 0 || dputc(' ', &cmd, 0) != 0)
 		goto LibFail;
 	if(flags & RunQFull) {
-		if(dputs(arg, &cmd, DCvtLang) != 0)
+		if(dputs(arg, &cmd, CvtLang) != 0)
 			goto LibFail;
 		}
-	else if(((flags & RunQSimple) && dputc('"', &cmd, 0) != 0) ||
-	 dputs(arg, &cmd, 0) != 0 || ((flags & RunQSimple) && dputc('"', &cmd, 0) != 0))
+	else if((flags & RunQWrap && dputc('"', &cmd, 0) != 0) ||
+	 dputs(arg, &cmd, 0) != 0 || flags & RunQWrap && dputc('"', &cmd, 0 != 0))
 		goto LibFail;
 	if(cmdSuffix != NULL && dputs(cmdSuffix, &cmd, 0) != 0)
 		goto LibFail;
@@ -886,12 +891,12 @@ int runCmd(Datum *pRtnVal, const char *cmdPrefix, const char *arg, const char *c
 	if(dclose(&cmd, FabStr) != 0)
 LibFail:
 		return libfail();
-	ushort oldMsgFlag = modeInfo.cache[MdIdxRtnMsg]->flags & MdEnabled;
+	ushort oldMsgFlag = mode.cache[MdIdxRtnMsg]->flags & MdActive;
 	if(oldMsgFlag)
-		clearGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
+		clearGlobalMode(mode.cache[MdIdxRtnMsg]);
 	(void) execExprStmt(pRtnVal, cmd.pDatum->str, 0, NULL);
 	if(oldMsgFlag)
-		setGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
+		setGlobalMode(mode.cache[MdIdxRtnMsg]);
 	return sess.rtn.status;
 	}
 
@@ -910,11 +915,11 @@ static int modeSwitch(SwitchResult *pResult, Buffer *pBuf) {
 
 		// Set parameters, extract name, and call chgMode().
 		if(*value == '^') {
-			nArg = -2;		// Enable partial-name matching in chgMode().
+			nArg = -2;		// Enable partial-name matching in chgMode1().
 			offset = 1;
 			}
 		else {
-			nArg = 3;		// Enable partial-name matching in chgMode().
+			nArg = 3;		// Enable partial-name matching in chgMode1().
 			offset = 0;
 			}
 		len = end - value - offset;
@@ -936,7 +941,7 @@ static int startBuf(Buffer *pBuf, short stdInpFlag, bool readFirst) {
 
 	// Switch to first file (buffer) specified on command line if auto-load is enabled.
 	if(pBuf != NULL && readFirst)
-		if(bswitch(pBuf, 0) != Success || bactivate(pBuf) != Success)
+		if(bswitch(pBuf, 0) != Success || (!(pBuf->flags & BFActive) && bactivate(pBuf) != Success))
 			return sess.rtn.status;
 
 	// Delete first buffer if it is not reserved for standard input, it exists, is empty, and is not being displayed.
@@ -945,16 +950,15 @@ static int startBuf(Buffer *pBuf, short stdInpFlag, bool readFirst) {
 	return sess.rtn.status;
 	}
 
-// Display given type of help information and exit (return HelpExit status).
-static int helpExit(enum h_type t, const char *binName) {
-	char *info;
+// Build and return given type of help information in *pInfo.  Return status.
+int helpInfo(char **pInfo, enum h_type t, const char *binName) {
 
 	if(t == h_version) {
-		if(asprintf(&info, "%s %s (GPLv3) [linked with %s, %s]", Myself, Version, cxlvers(), xrevers()) < 0)
+		if(asprintf(pInfo, "%s %s (GPLv3) [linked with %s, %s]", Myself, Version, cxlvers(), xrevers()) < 0)
 			goto Err;
 		}
 	else if(t == h_copyright) {
-		if(asprintf(&info, "%s %s", Myself, Copyright) < 0)
+		if(asprintf(pInfo, "%s %s", Myself, Copyright) < 0)
 			goto Err;
 		}
 	else {		// h_usage or h_help
@@ -963,17 +967,23 @@ static int helpExit(enum h_type t, const char *binName) {
 		if(asprintf(&usage, "%s%s%s%s%s", Usage[0], binName, Usage[1], binName, Usage[2]) < 0)
 			goto Err;
 		if(t == h_usage)
-			info = usage;
+			*pInfo = usage;
 		else {
-			if(asprintf(&info, "%s%s%s%s", Myself, Help1, usage, Help2) < 0)
+			if(asprintf(pInfo, "%s%s%s%s", Myself, Help1, usage, Help2) < 0)
 Err:
-				return rsset(Panic, 0, text94, "helpExit");
+				return rsset(Panic, 0, text94, "helpInfo");
 					// "%s(): Out of memory!"
 			free((void *) usage);
 			}
 		}
+	return sess.rtn.status;
+	}
 
-	return rsset(HelpExit, 0, info);
+// Display given type of help information and exit (return HelpExit status).
+static int helpExit(enum h_type t, const char *binName) {
+	char *info;
+
+	return helpInfo(&info, t, binName) == Success ? rsset(HelpExit, 0, info) : sess.rtn.status;
 	}
 
 // Scan command line arguments, looking for any of the informational switches: -copyright, -help, -usage, or -version.  If one
@@ -988,7 +998,7 @@ static int procInfoSwitches(int argCount, char *argList[]) {
 		CSW_copyright, CSW_version, CSW_usage, CSW_help, 0};
 
 	// Get my name and scan command line arguments.
-	binName = fbasename(*argList++, true);
+	binName = cname(*argList++, CNBasename | CNPtrOnly);
 	--argCount;
 	while((rtnCode = getSwitch(&argCount, &argList, &pSwitch, elementsof(cmdSwitchTable), &result)) > 0) {
 		pHelpSwitch = helpSwitchTable;
@@ -1014,7 +1024,7 @@ static int procPreSwitches(int argCount, char *argList[], ushort *pFlags, char *
 
 	// Set default return value.
 	*pPath = NULL;
-	if(dnewtrack(&pDatum) != 0)
+	if((pDatum = dnewtrack()) == NULL)
 		goto LibFail;
 
 	// Scan command line arguments.
@@ -1026,7 +1036,7 @@ static int procPreSwitches(int argCount, char *argList[], ushort *pFlags, char *
 				foundD = true;
 				break;
 			case CSW_dir:			// -d
-				if(runCmd(pDatum, "chgDir ", result.arg, NULL, RunQFull) != Success)
+				if(runCmdline(pDatum, "chdir", result.arg, NULL, RunQFull) != Success)
 					return sess.rtn.status;
 				break;
 			case CSW_no_startup:		// -n
@@ -1046,14 +1056,12 @@ static int procPreSwitches(int argCount, char *argList[], ushort *pFlags, char *
 	// Process -D switch if found.
 	if(foundD && argCount > 0) {
 		char *dirname;
-		uint dirLen;
 
-		if(dsetstr(*argList, pDatum) != 0)
-			goto LibFail;
-		if(*(dirname = fdirname(pDatum->str, INT_MIN)) != '\0') {
-			dirLen = strlen(dirname);
-			if(runCmd(pDatum, "chgDir ", dirname, NULL, RunQFull) == Success)
-				*argList += dirLen + 1;
+		// Get directory component of filename, if any.
+		dirname = cname(*argList, CNDirname);
+		if(*dirname != '\0') {
+			if(runCmdline(pDatum, "chdir", dirname, NULL, RunQFull) == Success)
+				*argList += strlen(dirname) + 1;
 			}
 		}
 
@@ -1081,7 +1089,7 @@ LibFail:
 // The runScript() function would be called with 'home/jack/bin/testit' as the first argument in argList.
 static int procCmdLine(int argCount, char *argList[]) {
 	int rtnCode;
-	ushort bufFlags;
+	uint oflags;
 	ushort fileActionCt = 0;	// Count of data files.
 	Buffer *pBuf;			// Temp buffer pointer.
 	Buffer *pBuf1 = NULL;		// Buffer pointer to data file to read first.
@@ -1100,7 +1108,7 @@ static int procCmdLine(int argCount, char *argList[]) {
 	Switch *pSwitch = cmdSwitchTable;
 
 	goLine = 1;			// Line and character to go to.
-	if(dnewtrack(&pSink) != 0)
+	if((pSink = dnewtrack()) == NULL)
 		goto LibFail;
 
 	// Get command switches.
@@ -1117,20 +1125,20 @@ static int procCmdLine(int argCount, char *argList[]) {
 					return sess.rtn.status;
 				break;
 			case CSW_inp_delim:
-				str = "$inpDelim = ";
+				str = "$inpDelim =";
 				goto DoCmd;
 			case CSW_no_read:
 				readFirst = false;
 				break;
 			case CSW_otp_delim:
-				str = "$otpDelim = ";
+				str = "$otpDelim =";
 DoCmd:
-				if(runCmd(pSink, str, result.arg, NULL, RunQSimple) != Success)
+				if(runCmdline(pSink, str, result.arg, NULL, RunQWrap) != Success)
 					return sess.rtn.status;
 				break;
 			case CSW_r:
 				cRdOnly = true;
-				modeInfo.cache[MdIdxReadOnly]->flags |=  MdEnabled;
+				mode.cache[MdIdxReadOnly]->flags |=  MdActive;
 				break;
 			case CSW_shell:
 				shellScript = true;
@@ -1151,20 +1159,20 @@ DoCmd:
 		while(argCount-- > 0) {
 			if(strcmp(*argList, "-") == 0) {	// Solo '-' for reading from standard input.
 				if(stdInpFlag != 0)
-					return rsset(FatalError, 0, text45);
+					return rsset(FatalError, RSNoFormat, text45);
 						// "Multiple \"-\" arguments"
 				stdInpFlag = 1;			// Process it.
-				bufFlags = BS_Create | BS_CreateHook;
+				oflags = BN_Create | BN_CreateHook;
 				str = buffer1;
 				}
 			else {
 				str = *argList;
-				bufFlags = BS_Create | BS_CreateHook | BS_Force | BS_Derive;
+				oflags = BN_Create | BN_CreateHook | BN_Force | BN_Derive;
 				}
 			++argList;
 
 			// Process a data file.  Set up a buffer for the file and set it to inactive.
-			if(bfind(str, bufFlags, 0, &pBuf, NULL) != Success)
+			if(bfind(str, oflags, 0, &pBuf, NULL) != Success)
 				return sess.rtn.status;
 			if(stdInpFlag > 0)		// If using standard input...
 				stdInpFlag = -1;	// disable the flag so it can't be used again.
@@ -1189,7 +1197,7 @@ DoCmd:
 							goto Conflict2;
 						if(!readFirst)
 							goto Conflict3;
-						(void) ascToLong(result.arg, &goLine, false);
+						(void) ascToLong(result.arg, 10, &goLine, false);
 						gotoFlag = true;
 						pBuf1 = pBuf;
 						break;
@@ -1205,7 +1213,7 @@ DoCmd:
 					case 5:		// -rw for read/write file.
 						if(aRdOnly)
 Conflict1:
-							return rsset(FatalError, 0, text1);
+							return rsset(FatalError, RSNoFormat, text1);
 								// "-r and -rw switch conflict"
 						aRdWrite = true;
 SetRW:
@@ -1246,7 +1254,7 @@ Conflict3:
 	if(gotoFlag) {
 		char workBuf[WorkBufSize];
 
-		sprintf(workBuf, goLine >= 0 ? "gotoLine %ld" : "endBuf() || %ld => forwLine", goLine);
+		sprintf(workBuf, "gotoLine %ld", goLine);
 		(void) execExprStmt(pSink, workBuf, 0, NULL);
 		}
 	else if(searchFlag)
@@ -1259,10 +1267,10 @@ LibFail:
 
 // Prepare to insert one or more characters at point.  Delete characters first if in replace or overwrite mode and not at end
 // of line.  Assume n > 0.  Return status.
-int overPrep(int n) {
-	bool mdRepl = isBufModeSet(sess.cur.pBuf, modeInfo.cache[MdIdxRepl]);
+int overPrep(long n) {
+	bool mdRepl = isBufModeSet(sess.cur.pBuf, mode.cache[MdIdxRepl]);
 
-	if(mdRepl || isBufModeSet(sess.cur.pBuf, modeInfo.cache[MdIdxOver])) {
+	if(mdRepl || isBufModeSet(sess.cur.pBuf, mode.cache[MdIdxOver])) {
 		int count = 0;
 		Point *pPoint = &sess.cur.pFace->point;
 		do {
@@ -1271,7 +1279,7 @@ int overPrep(int n) {
 
 			// Delete character if we are in replace mode, character is not a tab, or we are at a tab stop.
 			if(mdRepl || (pPoint->pLine->text[pPoint->offset] != '\t' ||
-			 (getCol(NULL, false) + count) % sess.cur.pScrn->hardTabSize == (sess.cur.pScrn->hardTabSize - 1)))
+			 (getCol(NULL, false) + count) % sess.pCurScrn->hardTabSize == (sess.pCurScrn->hardTabSize - 1)))
 				if(edelc(1, 0) != Success)
 					break;
 			++count;
@@ -1283,7 +1291,7 @@ int overPrep(int n) {
 // This is the general interactive command execution routine for a key or key sequence.  It handles the fake binding of all the
 // printable keys to "self-insert".  It also clears out the "curFlags" word and arranges to move it to "prevFlags" so that the
 // next command can look at it.  "extKey" is the key to execute with argument "n".  Return status.
-static int execute(int n, ushort extKey, KeyBind *pKeyBind) {
+static int execute(long n, ExtKey extKey, KeyBind *pKeyBind) {
 	char keyBuf[16];
 
 	// If key(s) bound...
@@ -1294,20 +1302,17 @@ static int execute(int n, ushort extKey, KeyBind *pKeyBind) {
 		if(execKey(pKeyBind, n) == Success) {
 
 			// If a macro recording was ended, finish the process.
-			if(pKeyBind->targ.u.pCmdFunc == cmdFuncTable + cf_endMacro && finishMacro(pKeyBind) != Success) {
-				if(sess.rtn.status > MinExit)
-					(void) macReset();
+			if(pKeyBind->cmd.u.pCmdFunc == cmdFuncTable + cf_endMacro && finishMacro(pKeyBind) != Success)
 				goto ErrRtn;
-				}
 			}
 
 		goto ASaveChk;
 		}
 
 	// Key not bound... attempt self-insert abs(n) times.  Ignore "Over" and "Repl" buffer modes if n < 0.
-	if(extKey >= 0x20 && extKey < 0xFF) {
+	if(extKey >= 0x20 && extKey < 0xff) {
 		bool forceIns = false;
-		if(n == INT_MIN)
+		if(n == DefN)
 			n = 1;
 		else if(n < 0) {
 			n = -n;
@@ -1331,7 +1336,7 @@ static int execute(int n, ushort extKey, KeyBind *pKeyBind) {
 			if(hiliteFence(extKey, true)) {
 
 				// Show inserted character, then highlight other fence.
-				if(update(INT_MIN) == Success) {
+				if(update(DefN) == Success) {
 					(void) moveChar(-1);
 					(void) fenceMatch(extKey, false);
 					(void) moveChar(1);
@@ -1339,8 +1344,7 @@ static int execute(int n, ushort extKey, KeyBind *pKeyBind) {
 				}
 ASaveChk:
 			// Save all changed buffers if auto-save mode and keystroke count reached.
-			if((modeInfo.cache[MdIdxASave]->flags & MdEnabled) && sess.autoSaveTrig > 0 &&
-			 --sess.autoSaveCount == 0) {
+			if(mode.cache[MdIdxASave]->flags & MdActive && sess.autoSaveTrig > 0 && --sess.autoSaveCount == 0) {
 				Datum sink;		// For throw-away return value, if any.
 				dinit(&sink);
 				keyEntry.prevFlags = keyEntry.curFlags;
@@ -1356,27 +1360,183 @@ ASaveChk:
 
 	// Unknown key.
 	tbeep();							// Beep the beeper...
-	return rsset(Failure, RSTermAttr, text14, ektos(extKey, keyBuf, true));	// and complain.
+	return rsset(Failure, RSTermAttr, text14, ektos(keyBuf, extKey, true));	// and complain.
 		// "~#u%s~U not bound"
 ErrRtn:
 	keyEntry.prevFlags = 0;						// Invalidate last flags.
 	return sess.rtn.status;
 	}
 
+// Do universal/negative numeric argument processing.  ^U sequence is 2, 0, 3, 4, ...  ^_ is -1, -2, ...
+// Use the following decision table to determine what action to take as each key (^U, ^_, minus sign, digit,
+// or other) is entered in a given state.  Actions are:
+//	n = <value>	Set n to <value>
+//	-> state n	Change to state n
+//	begin n		Begin building number n
+//	continue n	Continue building number n
+//	insert it	Break out of processing loop and execute '-' key (self insert)
+//	execute it	Break out of processing loop and execute other key
+// State 0 is the point prior to entering ^U or ^_ for the first time:
+// =====	============	============	============	============	============
+// State	^U		^_		-		digit		other key
+// =====	============	============	============	============	============
+// 0		n = 2		n = -1
+// 		-> state 1	-> state 3
+// -----	------------	------------	------------	------------	------------
+// 1		n = 0		--n		n = -1		begin n		execute it
+// 		-> state 2	-> state 5	-> state 3	-> state 4
+// -----	------------	------------	------------	------------	------------
+// 2		n = 3		--n		n = -1		begin n		execute it
+// 		-> state 5	-> state 5	-> state 3	-> state 4
+// -----	------------	------------	------------	------------	------------
+// 3		++n		--n		insert it	begin n		execute it
+// 		-> state 5	-> state 5			-> state 4
+// -----	------------	------------	------------	------------	------------
+// 4		++n		--n		insert it	continue n	execute it
+// 		-> state 5	-> state 5
+// -----	------------	------------	------------	------------	------------
+// 5		++n		--n		insert it	insert it	execute it
+// -----	------------	------------	------------	------------	------------
+static int getn(long *pN, ExtKey *pExtKey, KeyBind **ppKeyBind) {
+	long n;
+	int neg;				// n negative?
+	int state;				// Numeric argument processing state.
+	bool digit;				// Digit entered?
+	ExtKey extKey = *pExtKey;
+
+	if(extKey == coreKeys[CK_NegArg].extKey) {
+		neg = true;
+		n = 1;				// Begin at -1.
+		state = 3;			// No digit entered yet.
+		}
+	else {
+		neg = false;
+		n = 2;				// Begin at +2.
+		state = 1;			// No sign or digit entered yet.
+		}
+
+	// Loop until numeric argument completed.
+	for(;;) {
+		// Display current value.
+		if(mlprintf(MLHome | MLFlush, text209, neg ? -n : n) != Success)
+					// "Arg: %ld"
+			break;
+
+		// Get next key.
+		if(getkey(true, &extKey, false) != Success)
+			goto Retn;
+		digit = (extKey >= '0' && extKey <= '9');
+
+		// Take action, depending on current state.
+		switch(state) {
+			case 1:
+				if(extKey == coreKeys[CK_UnivArg].extKey) {
+					n = 0;
+					state = 2;
+					continue;
+					}
+				if(extKey == coreKeys[CK_NegArg].extKey)
+					goto Decr5;
+				if(extKey == '-')
+					goto Neg3;
+				if(digit)
+					goto NBegin;
+				break;
+			case 2:
+				if(extKey == coreKeys[CK_UnivArg].extKey) {
+					n = 3;
+					state = 5;
+					continue;
+					}
+				if(extKey == coreKeys[CK_NegArg].extKey)
+					goto Decr5;
+				if(extKey == '-') {
+Neg3:
+					neg = true;
+					n = 1;
+					state = 3;
+					continue;
+					}
+				if(digit)
+					goto NBegin;
+				break;
+			case 3:
+			case 4:
+				if(extKey == coreKeys[CK_UnivArg].extKey)
+					goto Incr5;
+				if(extKey == coreKeys[CK_NegArg].extKey)
+					goto Decr5;
+				if(digit) {
+					if(state == 3) {
+NBegin:
+						n = extKey - '0';
+						state = 4;
+						}
+					else
+						n = n * 10 + (extKey - '0');
+					continue;
+					}
+				break;
+			case 5:
+				if(extKey == coreKeys[CK_UnivArg].extKey) {
+Incr5:
+					if(!neg)
+						++n;
+					else if(--n == 0)
+						neg = false;
+					state = 5;
+					continue;
+					}
+				if(extKey == coreKeys[CK_NegArg].extKey) {
+Decr5:
+					if(neg)
+						++n;
+					else if(--n < 0) {
+						n = 1;
+						neg = true;
+						}
+					state = 5;
+					continue;
+					}
+				}
+
+		// "n" has been finalized.  Process extKey as a command.
+		ungetkey(extKey);
+		if(getKeySeq(false, &extKey, ppKeyBind, true) != Success)
+			goto Retn;
+		break;
+		}
+
+	// Change sign of n if needed.
+	if(neg)
+		n = -n;
+
+	// Return updated n and key.
+	*pN = n;
+	*pExtKey = extKey;
+
+	// Clear the message line.
+	(void) mlerase(0);
+Retn:
+	return sess.rtn.status;
+	}
+
 // Interactive command-processing routine.  Read key sequences and process them.  Return if program exit.
 static int editLoop(void) {
-	ushort extKey;			// Extended key read from user.
-	int n;				// Numeric argument.
+	ExtKey extKey;			// Extended key read from user.
+	long n;				// Numeric argument.
 	ushort oldFlag;			// Old last flag value.
 	KeyBind *pKeyBind;
 	RtnStatus lastRtn;		// Return code from last key executed.
 	Datum hookRtnVal;		// For calling pre/postKey hooks.
+#if MMDebug & Debug_GarbInfo
+	char keyBuf[16];
+#endif
 
 	dinit(&lastRtn.msg);
 	dinit(&hookRtnVal);
 	dsetnull(&lastRtn.msg);
 	lastRtn.status = Success;
-	sess.opFlags &= ~OpStartup;
 
 	// If $lastKeySeq was set by a startup script, simulate it being entered as the first key.
 	if(keyEntry.useLast)
@@ -1385,13 +1545,31 @@ static int editLoop(void) {
 
 	// Do forever.
 	for(;;) {
+#if MMDebug & Debug_MsgLnRtn
+		fputs("editLoop(): calling rsclear(0)...\n", logfile);
+#endif
 		rsclear(0);
-		dgPop(NULL);				// Throw out all the datum garbage...
-		if(agFree() != Success)			// and the array garbage.
-			break;
 
+		// To reduce overhead, do garbage collection only if last key entered was not a printable character (normal text
+		// entry).
+#if MMDebug & Debug_GarbInfo
+		ektos(keyBuf, keyEntry.lastKeySeq, false);
+		fprintf(logfile, "lastKeySeq: %-12s ->  ", keyBuf);
+#endif
+		if(keyEntry.lastKeySeq & ~0x7f) {
+#if MMDebug & Debug_GarbInfo
+			fputs("GARBAGE COLLECTION\n", logfile);
+#endif
+			dtpop(NULL);				// Throw out all the datum garbage...
+			if(ahfree() != Success)			// and the array and hash garbage.
+				break;
+			}
+#if MMDebug & Debug_GarbInfo
+		else
+			fputs("skipped\n", logfile);
+#endif
 		// Fix up the screen.
-		if(update(INT_MIN) <= MinExit)
+		if(update(DefN) <= MinExit)
 			break;
 
 		// Any message from last loop to display?
@@ -1401,13 +1579,13 @@ static int editLoop(void) {
 				flags |= MLWrap;
 			if(lastRtn.flags & RSTermAttr)
 				flags |= MLTermAttr;
-			if(mlputs(flags, lastRtn.msg.str) != Success ||
-			 tmove(sess.cur.pScrn->cursorRow, sess.cur.pScrn->cursorCol) != Success || tflush() != Success)
+			if(mlputs(lastRtn.msg.str, flags) != Success ||
+			 tmove(sess.pCurScrn->cursorRow, sess.pCurScrn->cursorCol) != Success || tflush() != Success)
 				break;
 			}
 
 		// Get the next key from the keyboard or $lastKeySeq.
-		setGlobalMode(modeInfo.cache[MdIdxRtnMsg]);
+		setGlobalMode(mode.cache[MdIdxRtnMsg]);
 		if(keyEntry.useLast) {
 JumpStart:
 			pKeyBind = getBind(extKey = keyEntry.lastKeySeq);
@@ -1424,157 +1602,16 @@ JumpStart:
 		if(mlerase(0) != Success)
 			break;
 
-		// Set default.
-		n = INT_MIN;
+		// Set default n.
+		n = DefN;
 
-		// Do universal/negative repeat argument processing.  ^U sequence is 2, 0, 3, 4, ...  ^_ is -1, -2, ...
-		// Use the following decision table to determine what action to take as each key (^U, ^_, minus sign, digit,
-		// or other) is entered in a given state.  Actions are:
-		//	n = <value>	Set n to <value>
-		//	-> state n	Change to state n
-		//	begin n		Begin building number n
-		//	continue n	Continue building number n
-		//	insert it	Break out of processing loop and execute '-' key (self insert)
-		//	execute it	Break out of processing loop and execute other key
-		// State 0 is the point prior to entering ^U or ^_ for the first time:
-		// =====	============	============	============	============	============
-		// State	^U		^_		-		digit		other key
-		// =====	============	============	============	============	============
-		// 0		n = 2		n = -1
-		// 		-> state 1	-> state 3
-		// -----	------------	------------	------------	------------	------------
-		// 1		n = 0		--n		n = -1		begin n		execute it
-		// 		-> state 2	-> state 5	-> state 3	-> state 4
-		// -----	------------	------------	------------	------------	------------
-		// 2		n = 3		--n		n = -1		begin n		execute it
-		// 		-> state 5	-> state 5	-> state 3	-> state 4
-		// -----	------------	------------	------------	------------	------------
-		// 3		++n		--n		insert it	begin n		execute it
-		// 		-> state 5	-> state 5			-> state 4
-		// -----	------------	------------	------------	------------	------------
-		// 4		++n		--n		insert it	continue n	execute it
-		// 		-> state 5	-> state 5
-		// -----	------------	------------	------------	------------	------------
-		// 5		++n		--n		insert it	insert it	execute it
-		// -----	------------	------------	------------	------------	------------
+		// universalArg or negativeArg command entered?
+		if(extKey == coreKeys[CK_UnivArg].extKey || extKey == coreKeys[CK_NegArg].extKey) {
 
-		if(extKey == coreKeys[CK_UnivArg].extKey ||
-		 extKey == coreKeys[CK_NegArg].extKey) {		// universalArg or negativeArg command.
-			int neg;				// n negative?
-			int state;				// Numeric argument processing state.
-			bool digit;				// Digit entered?
-
-			if(extKey == coreKeys[CK_NegArg].extKey) {
-				neg = true;
-				n = 1;				// Begin at -1.
-				state = 3;			// No digit entered yet.
-				}
-			else {
-				neg = false;
-				n = 2;				// Begin at +2.
-				state = 1;			// No sign or digit entered yet.
-				}
-
-			// Loop until numeric argument completed.
-			for(;;) {
-				// Display current value.
-				if(mlprintf(MLHome | MLFlush, text209, neg ? -n : n) != Success)
-							// "Arg: %d"
-					break;
-
-				// Get next key.
-				if(getkey(true, &extKey, false) != Success)
-					goto Retn;
-				digit = (extKey >= '0' && extKey <= '9');
-
-				// Take action, depending on current state.
-				switch(state) {
-					case 1:
-						if(extKey == coreKeys[CK_UnivArg].extKey) {
-							n = 0;
-							state = 2;
-							continue;
-							}
-						if(extKey == coreKeys[CK_NegArg].extKey)
-							goto Decr5;
-						if(extKey == '-')
-							goto Neg3;
-						if(digit)
-							goto NBegin;
-						break;
-					case 2:
-						if(extKey == coreKeys[CK_UnivArg].extKey) {
-							n = 3;
-							state = 5;
-							continue;
-							}
-						if(extKey == coreKeys[CK_NegArg].extKey)
-							goto Decr5;
-						if(extKey == '-') {
-Neg3:
-							neg = true;
-							n = 1;
-							state = 3;
-							continue;
-							}
-						if(digit)
-							goto NBegin;
-						break;
-					case 3:
-					case 4:
-						if(extKey == coreKeys[CK_UnivArg].extKey)
-							goto Incr5;
-						if(extKey == coreKeys[CK_NegArg].extKey)
-							goto Decr5;
-						if(digit) {
-							if(state == 3) {
-NBegin:
-								n = extKey - '0';
-								state = 4;
-								}
-							else
-								n = n * 10 + (extKey - '0');
-							continue;
-							}
-						break;
-					case 5:
-						if(extKey == coreKeys[CK_UnivArg].extKey) {
-Incr5:
-							if(!neg)
-								++n;
-							else if(--n == 0)
-								neg = false;
-							state = 5;
-							continue;
-							}
-						if(extKey == coreKeys[CK_NegArg].extKey) {
-Decr5:
-							if(neg)
-								++n;
-							else if(--n < 0) {
-								n = 1;
-								neg = true;
-								}
-							state = 5;
-							continue;
-							}
-						}
-
-				// "n" has been finalized.  Process extKey as a command.
-				ungetkey(extKey);
-				if(getKeySeq(false, &extKey, &pKeyBind, true) != Success)
-					goto Retn;
+			// Yes, get n argument and new key from user.
+			if(getn(&n, &extKey, &pKeyBind) != Success)
 				break;
-				}
-
-			// Change sign of n if needed.
-			if(neg)
-				n = -n;
-
-			// Clear the message line.
-			if(mlerase(0) != Success)
-				break;
-			}
+		 	}
 
 		// Execute the user-assigned pre-key hook with n argument, preserving prevFlags.
 		oldFlag = keyEntry.prevFlags;
@@ -1611,9 +1648,9 @@ Decr5:
 		if(sess.rtn.status != Success) {
 Fail:
 			// Key retrieval/execution failed or returned false.  Kill off any running macro...
-			if(curMacro.state == MacPlay) {
-				curMacro.n = 0;
-				curMacro.state = MacStop;
+			if(macro.state == MacPlaying) {
+				macro.n = 0;
+				macro.state = MacStopped;
 				}
 
 			// and force terminal input next time around.
@@ -1621,6 +1658,10 @@ Fail:
 			}
 ChkMsg:
 		// Any message returned?
+#if MMDebug & Debug_MsgLnRtn
+		fprintf(logfile, "editLoop(): saving returned message \"%s\" (flags %.4hx)...\n",
+		 sess.rtn.msg.str, sess.rtn.flags);
+#endif
 		if(disnull(&sess.rtn.msg))
 			dsetnull(&lastRtn.msg);				// No, clear last.
 		else if(rscpy(&lastRtn, &sess.rtn) <= MinExit)		// Yes, save message and code.
@@ -1628,7 +1669,7 @@ ChkMsg:
 
 		dsetnil(&hookRtnVal);
 		}
-Retn:
+
 	return sess.rtn.status;
 	}
 
@@ -1639,9 +1680,9 @@ static int cleanMsg(char **pStr) {
 	char *str = *pStr = sess.scriptRtn.msg.str;
 	size_t len = strlen(text229);
 			// ", in"
+	short c;
 
 	if(dopentrack(&msg) == 0) {
-		short c;
 
 		// Copy string to fabrication object, replacing any ~~ in message with ~, ~u, ~#u, and ~U with ", and ~b, ~B,
 		// ~<n>c, ~C, ~r, ~R, and ~Z with nothing (remove) if RSTermAttr flag set.  Also insert newlines in text229
@@ -1681,7 +1722,7 @@ static int cleanMsg(char **pStr) {
 				}
 
 			// Make any non-printable characters other than newline and tab visible.
-			if(dputc(c, &msg, c == '\n' || c == '\t' || (c >= ' ' && c <= '~') ? 0 : DCvtVizChar) != 0)
+			if(dputc(c, &msg, c == '\n' || c == '\t' || (c >= ' ' && c <= '~') ? 0 : CvtVizChar) != 0)
 				break;
 			}
 		if(dclose(&msg, FabStr) == 0) {
@@ -1703,20 +1744,25 @@ int main(int argCount, char *argList[]) {
 	Buffer *pBuf;
 	ushort flags = ExecSite | ExecUser;
 
-	// Do global initializations.
-	sess.myPID = (unsigned) getpid();
-	initCharTables();
 #if MMDebug & Debug_Logfile
-#if MMDebug & Debug_Endless
-	logfile = fopen(MultiLogfile, "a");
-#else
-	logfile = fopen(LocalLogfile, "w");
-#endif
+	logfile = fopen(Logfile, "w");
 	(void) setlinebuf(logfile);
 	time_t t;
 	(void) time(&t);
-	fprintf(logfile, "\n----------\n%s started %s\n", Myself, ctime(&t));
+	(void) helpInfo(&path, h_version, NULL);
+	fprintf(logfile, "\n----------\n%s started %s\n", path, ctime(&t));
+	free((void *) path);
 #endif
+#if MMDebug & Debug_SanityChk
+	// Do sanity checks.
+	fprintf(logfile, "SANITY CHECKS\n\ncf_END = %d\nelementsof(cmdFuncTable) = %u    (Size should be equal to cf_END)\n",
+	 cf_END, (uint)(elementsof(cmdFuncTable)));
+	return 0;
+#endif
+	// Do global initializations.
+	sess.myPID = (unsigned) getpid();
+	initCharTables();
+
 	// Begin using sess.rtn (RtnStatus): do pre-edit-loop stuff, but use the same return-code mechanism as command calls.
 	if(editInit0() == Success &&				// Initialize the return value structures.
 	 procInfoSwitches(argCount, argList) == Success &&	// Scan command line for informational switches.
@@ -1734,20 +1780,21 @@ int main(int argCount, char *argList[]) {
 			goto Retn;
 
 		// Run site and user startup files and check for errors.
-		if(((flags & ExecSite) && startup(SiteStartup, 0, argCount, argList) != Success) ||
-		 ((flags & ExecUser) && startup(UserStartup, XP_HomeOnly, argCount, argList) != Success))
+		if((flags & ExecSite && startup(SiteStartup, 0, argCount, argList) != Success) ||
+		 (flags & ExecUser && startup(UserStartup, XP_HomeOnly, argCount, argList) != Success))
 			goto Retn;
 
 		// Run create-buffer and change-directory hooks.
-		if(execHook(NULL, INT_MIN, hookTable + HkCreateBuf, 1, sess.cur.pBuf->bufname) != Success ||
-		 execHook(NULL, INT_MIN, hookTable + HkChDir, 0) != Success)
+		if(execHook(NULL, DefN, hookTable + HkCreateBuf, 1, sess.cur.pBuf->bufname) != Success ||
+		 execHook(NULL, DefN, hookTable + HkChDir, 0) != Success)
 			goto Retn;
 
 		// Process the command line.
 		if(procCmdLine(argCount, argList) == Success) {
 
 			// Enter user-command loop.
-			sess.cur.pWind->flags |= WFMode;
+			sess.pCurWind->face.wflags |= WFMode;
+			sess.opFlags &= ~OpStartup;
 			(void) editLoop();
 			}
 		}
@@ -1763,22 +1810,26 @@ Retn:
 	// Close the terminal (ignoring any error) and return to line mode.
 	(void) tclose(false);
 #if MMDebug & Debug_Logfile
-#ifdef HashDebug
-	hstats(execTable);
-#endif
 	(void) fclose(logfile);
 #endif
 	// Exit MightEMacs.
 	if(sess.scriptRtn.status == UserExit || sess.scriptRtn.status == ScriptExit) {
-		Datum *pArrayEl;
-		Array *pArray = &bufTable;
+		HashNode *pNode;
+		HashEach each;
 
 		// Display names (in line mode) of any files saved via quickExit().
-		while((pArrayEl = aeach(&pArray)) != NULL) {
-			pBuf = bufPtr(pArrayEl);
-			if(pBuf->flags & BFQSave)
+		heachinit(&each, &buf.table);
+		while((pNode = heach(&each)) != NULL) {
+			pBuf = bufPtr(pNode->pVal);
+			if(pBuf->flags & BFQSave) {
 				fprintf(stderr, text193, pBuf->filename);
-						// "Saved file \"%s\"\n"
+						// "Saved file \"%s\""
+				if(pBuf->flags & BFQBak)
+					fprintf(stderr, "%s%s%s\"", text257, cname(pBuf->filename, CNBasename | CNPtrOnly),
+							// ", original file renamed to \""
+					 BackupExt);
+				fputc('\n', stderr);
+				}
 			}
 
 		// Display message, if any.
@@ -1826,48 +1877,47 @@ Retn:
 // Loop through the list of buffers (ignoring user commands and functions) and return true if any were changed, otherwise
 // false.
 static bool changedBuf(void) {
-	Datum *pArrayEl;
 	Buffer *pBuf;
-	Array *pArray = &bufTable;
+	HashNode *pNode;
+	HashEach each;
 
-	while((pArrayEl = aeach(&pArray)) != NULL) {
-		pBuf = bufPtr(pArrayEl);
+	heachinit(&each, &buf.table);
+	while((pNode = heach(&each)) != NULL) {
+		pBuf = bufPtr(pNode->pVal);
 		if((pBuf->flags & (BFCommand | BFFunc | BFChanged)) == BFChanged)
 			return true;
 		}
 	return false;
 	}
 
-// Exit (quit) command.  If n != 0 and not default, always quit; otherwise confirm if a buffer has been changed and not written
-// out.  If n < 0 and not default, force error return to OS.  Include message if script mode and one is available.
-int quit(Datum *pRtnVal, int n, Datum **args) {
+// Exit (quit) command.  If non-default n, quit unconditionally; otherwise, get confirmation if a buffer has been changed and
+// not saved.  If n < 0 and not default, force error return to OS.  Include message if script mode and one is available.
+int quit(Datum *pRtnVal, long n, Datum **args) {
 	char *msg = NULL;
 	int status = UserExit;		// Default return status.
 	bool forceClean = false;
 
-	if((sess.exitNArg = n) == INT_MIN)
-		n = 0;
+	sess.exitNArg = n;
 
-	// Not argument-force and changed buffer?
-	if(n == 0 && changedBuf()) {
+	// Not forced exit and changed buffer?
+	if(n == DefN && changedBuf()) {
 		bool yep;
 
 		// Have changed buffer(s)... user okay with that?
-		if(terminpYN(text104, &yep) != Success)
+		if(termInpYN(text104, &yep) != Success)
 				// "Modified buffers exist.  Exit anyway"
 			return sess.rtn.status;
+
+		// If user changed his mind, don't exit (no error).
 		if(yep) {
 			// Force clean exit.
 			forceClean = true;
 			}
-		else {
-			// User changed his mind... don't exit (no error).
-			status = Success;
-			}
 
-		// Clear prompt if script mode and user changed his mind.
-		if((sess.opFlags & OpScript) && status == Success && mlerase(MLForce) != Success)
-			return sess.rtn.status;
+		// Clear prompt if script mode.
+		if(sess.opFlags & OpScript)
+			if(mlerase(MLForce) != Success)
+				return sess.rtn.status;
 		}
 
 	// Script mode?
@@ -1885,7 +1935,7 @@ int quit(Datum *pRtnVal, int n, Datum **args) {
 		}
 
 	// Force error exit if negative n.
-	if(n < 0)
+	if(n < 0 && n != DefN)
 		status = ScriptExit;
 
 	return rsset(status, RSNoFormat, msg);

@@ -10,12 +10,12 @@ precedence, highest to lowest.
             --        Suffix decrement
 1           ()        Function call
           whitespace  Function call
-            []        Array subscripting
+            []        Array and string subscripting or hash lookup
 --------------------------------------------------------------------------------
             ++        Prefix increment                             Right-to-left
             --        Prefix decrement
-            +         Unary plus
-2           -         Unary minus
+2           +         Unary plus
+            -         Unary minus
             !         Logical NOT
             ~~         Bitwise NOT (one's complement)
 --------------------------------------------------------------------------------
@@ -46,7 +46,7 @@ precedence, highest to lowest.
 --------------------------------------------------------------------------------
 11          |         Union (if first operand is array)            Left-to-right
 --------------------------------------------------------------------------------
-12          &         Concatenation (if first operand is string)   Left-to-right
+12          &         Concatenation (if first operand not integer) Left-to-right
 --------------------------------------------------------------------------------
             <         Less than                                    Left-to-right
 13          <=        Less than or equal to
@@ -76,7 +76,7 @@ precedence, highest to lowest.
             <<=       Assignment by bitwise left shift
             >>=       Assignment by bitwise right shift
             &=        Assignment by bitwise AND (or concatenation
-                       if first operand is array)
+                       if both operands are strings, arrays, or hashes)
             |=        Assignment by bitwise OR (or union if
                        first operand is array)
             ^=        Assignment by bitwise XOR
@@ -87,8 +87,9 @@ precedence, highest to lowest.
             and       Logical AND (low precedence)
 --------------------------------------------------------------------------------
 
-Multiple expressions can be separated by a semicolon on the same line.  Here are
-some examples:
+Also, multiple expressions can be separated by a semicolon on the same line.
+
+Following are some scripting examples:
 
     print('Result is ', result)         # Function call using parentheses.
     print 'Result is ', result          # Function call using white space.
@@ -98,11 +99,11 @@ some examples:
     0 => insert '%2d' % 2 * i++, '. ', menuItem
 
     # Insert a title centered in current terminal width.
-    insert sprintf('%*s%s', ($TermSize[0] - length(title)) / 2, '', title)
+    insert sprintf('%*s%s', (TermSize[0] - length(title)) / 2, '', title)
 
     # Get a pathname from current line (from point to end of line), save it in
     # "path" variable, and open the file in another window.
-    2 => findFile(path = subline 0)
+    2 => findFile(path = subline(0))
 
     # Append a string containing interpolated variable "y" to current line,
     # then display a message.
@@ -115,7 +116,12 @@ some examples:
     endif
 
     # Strip '.sh' extension from a filename, if present.
-    substr(filename, -3) == '.sh' and filename = substr(filename, 0, -3)
+    filename[-3,] == '.sh' and filename = filename[0, -3]
+
+    # Check if first character of string "x" is a dollar sign.
+    if !null?(str) && str[0] == ?$
+        ...
+    endif
 
 Note that parentheses may generally be omitted in function calls as long as the
 name is followed by white space; however, they may be required in certain
@@ -139,4 +145,4 @@ fragment:
 
 The user is prompted for a search or replacement pattern according to the n
 argument ($0) and the corresponding system variable ($searchPat or $replacePat)
-is set to the result
+is set to the result.

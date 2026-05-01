@@ -1,14 +1,17 @@
-MightEMacs SCRIPT SYNTAX        Ver. 9.5
+MightEMacs SCRIPT SYNTAX        Ver. 9.8
 
 script =
     compound_statement { compound_statement }
 
 compound_statement =
-    routine_definition | if_statement | loop_statement | return_statement |
-    force_statement | expr_statement
+    routine_definition | statement
+
+statement =
+    if_statement | loop_statement | return_statement | force_statement |
+    expr_statement
 
 routine_definition =
-    routine_declaration EOL { compound_statement } "endroutine" EOL
+    routine_declaration EOL { statement } "endroutine" EOL
 
 routine_declaration =
     ( "command" | "function" ) white_space identifier
@@ -16,18 +19,20 @@ routine_declaration =
     { "{" help_clause { "," help_clause } "}" }
 
 help_clause =
-    ( "arguments:" | "description:" ) string_expr
+    ( "arguments" | "description" ) ":" string_expr
 
 if_statement =
-    "if" white_space and_or_expr EOL { compound_statement } , { "elsif"
-    white_space and_or_expr EOL { compound_statement } } , { "else" EOL
-    { compound_statement } } , "endif" EOL
+    "if" white_space and_or_expr EOL { statement } , { "elsif" white_space
+    and_or_expr EOL { statement } } , { "else" EOL { statement } } ,
+    "endif" EOL
 
 loop_statement =
-    ( "for" white_space identifier white_space "in" white_space assignment_expr
-    | ( "while" | "until" ) white_space assignment_expr | "loop" ) EOL ,
-    { compound_statement | "break" { white_space integer_expr } EOL | "next"
-    EOL } , "endloop" EOL
+    ( "for" white_space identifier white_space "in" white_space
+     ( array_expr | hash_expr | string_expr ) |
+    ( "while" | "until" ) white_space assignment_expr |
+    "loop" ) EOL ,
+    { statement | "break" { white_space integer_expr } EOL | "next" EOL } ,
+    "endloop" EOL
 
 return_statement =
     "return" { white_space and_or_expr } EOL
@@ -76,10 +81,14 @@ relational_expr =
     concatenation_expr { ( "<" | "<=" | ">" | ">=" ) concatenation_expr }
 
 concatenation_expr =
-    format_expr { "&" format_expr }
+    ( ( format_expr | or_expr ) { "&" ( format_expr | or_expr ) } |
+    array_expr { "&" array_expr } | hash_expr { "&" hash_expr } )
 
 format_expr =
-    bitwise_or_expr { "%" bitwise_or_expr }
+    string_expr "%" assignment_expr
+
+or_expr =
+    ( bitwise_or_expr | array_expr { "|" array_expr } )
 
 bitwise_or_expr =
     bitwise_and_expr { ( "|" | "^" ) bitwise_and_expr }
@@ -94,7 +103,8 @@ num_prefix_expr =
     additive_expr { "=>" postfix_expr }
 
 additive_expr =
-    multiplicative_expr { ( "+" | "-" ) multiplicative_expr }
+    ( multiplicative_expr { ( "+" | "-" ) multiplicative_expr } |
+    array_expr { ( "+" | "-" ) array_expr } )
 
 multiplicative_expr =
     unary_expr { ( "*" | "/" | "%" ) unary_expr }
@@ -104,17 +114,23 @@ unary_expr =
 
 postfix_expr =
     primary_expr | postfix_expr ( "++" | "--" ) | postfix_expr "(" { arg_list }
-    ")" | postfix_expr white_space arg_list | postfix_expr "[" and_or_expr
-    { "," and_or_expr } "]"
+    ")" | postfix_expr white_space arg_list | postfix_expr "[" assignment_expr
+    { "," assignment_expr } "]"
+
+primary_expr =
+    identifier | constant | array_expr | hash_expr | "(" and_or_expr ")"
+
+array_expr =
+    "[" { arg_list } "]"
+
+hash_expr =
+    "{" { hash_arg_list } "}" { ":" string_expr }
 
 arg_list =
     and_or_expr { "," arg_list }
 
-primary_expr =
-    identifier | constant | array_expr | "(" and_or_expr ")"
-
-array_expr =
-    "[" and_or_expr { "," and_or_expr } "]"
+hash_arg_list =
+    string_expr "=>" and_or_expr { "," hash_arg_list }
 
 constant =
     integer_constant | string_constant | "?" char_lit | "true" | "false" | "nil"
@@ -140,7 +156,9 @@ return [value]         Return from current routine unconditionally with optional
                         value.
 force <cmd-line>       Force routine to continue... even if <cmd-line> fails.
 
-for <var> in <array>   Execute a loop for each element in array.
+for <var> in <array> | <hash> | <string>
+                       Execute a loop for each element in array, node in hash, or
+                       character in string.
 while <cond>           Execute a loop while the condition is true.
 until <cond>           Execute a loop while the condition is false.
 loop                   Execute a loop forever (must contain a "break" or

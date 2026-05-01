@@ -23,7 +23,7 @@ first file; for example:
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r== (Exact) == Notes.txt == File: Notes.txt ======== MightEMacs 9.7.0 ~R|
+    |~r== (Exact) == Notes.txt [2] == File: Notes.txt === MightEMacs 10.0.0 ~R|
 
 A buffer for the second file will be created also, but it will be in the
 background.  To bring it to the foreground, you typically would type ~#uC-x ]~U
@@ -49,7 +49,7 @@ session:
     |                                                                     |
     |                                                                     |
     |                                                                     |
-    |~r== (Exact) == Notes.txt == File: Notes.txt ======== MightEMacs 9.7.0 ~R|
+    |~r== (Exact) == Notes.txt [2] == File: Notes.txt === MightEMacs 10.0.0 ~R|
     | End: ~b_~B                                                              |
      ---------------------------------------------------------------------
 
@@ -60,11 +60,18 @@ buffers, use a numeric prefix of -1 to get display options.  Type ~#uC-- C-h b~U
 enter "vh" at the prompt, and press ~ureturn~U.  You will now see buffer(s) whose
 names begin with "*Help-".  Press ~uq~U or ~uESC~U to get back to the edit window.
 
+Note also that if the ~uBufCount~U global mode is activated (which is assumed to be
+true in our example), the total number of visible buffers opened in the editor
+will be displayed on the bottom mode line in brackets, which is "[2]" in this
+case.  Additionally, an asterisk (*) will appear before the number if any of the
+buffers have been modified.  This provides a reminder that you have unsaved
+changes in buffer(s) other than the one you are currently working on.
+
 Continuing with our example editing session, you would be viewing one of the
-buffers ("Notes.txt" or "myscript.ms") at this point and could edit it.  Recall that
-you can always see which buffer you are in by looking at the mode line at the
-bottom of the window.  The buffer name and filename (if any) are at the end of
-the line.  As explained previously, you can switch to the next or previous
+buffers ("Notes.txt" or "myscript.ms") at this point and could edit it.  Recall
+that you can always see which buffer you are in by looking at the mode line at
+the bottom of the window.  The buffer name and filename (if any) are at the end
+of the line.  As explained previously, you can switch to the next or previous
 buffer at any time by typing ~#uC-x ]~U or ~#uC-x [~U, which would put the current buffer
 into the background and bring the next or previous buffer into the current
 window (the foreground).  You can also select a buffer directly by name.  To do
@@ -93,21 +100,32 @@ saved to disk and the name is displayed briefly on the message line.
 
 Let's say you wanted to open one more file in this editing session for output:
 "src/main.c".  However, the "src" directory does not exist so we'll have to
-create it first.  To do that, we can use the ~bshellCmd~B command.  You would
-press ~#uC-x !~U and the following would be displayed:
+create it first.  To do that, we can use the ~bmkDir~B command.  You would press
+~#uC-c :~U and the following would be displayed:
 
-    |~r== (Exact) == Notes.txt == File: Notes.txt ======== MightEMacs 9.7.0 ~R|
+    |~r== (Exact) == Notes.txt [2] == File: Notes.txt === MightEMacs 10.0.0 ~R|
+    | Create directory: ~b_~B                                                 |
+     ---------------------------------------------------------------------
+
+At the prompt, you would type the "src" directory name and hit ~ureturn~U, at which
+point you would see "Directory created" on the message line.
+
+Alternatively, you could use the ~bshellCmd~B command to create the directory.  To
+do this, you would press ~#uC-x !~U and the following would be displayed instead:
+
+    |~r== (Exact) == Notes.txt [2] == File: Notes.txt === MightEMacs 10.0.0 ~R|
     | > ~b_~B                                                                 |
      ---------------------------------------------------------------------
 
-At the "> " prompt, you would type the "mkdir src" shell command and hit ~ureturn~U,
+At the prompt, you would type the "mkdir src" shell command and hit ~ureturn~U,
 then press ~uq~U to dismiss the pop-up window (which will display the result of the
 command).
 
-Now we're ready to open our C file, which is done with the ~bfindFile~B command.
-You would type ~#uC-x C-f~U and at the prompt, enter "src/main.c":
+Once the directory is created, we're ready to open our C file, which is done
+with the ~bfindFile~B command.  You would type ~#uC-x C-f~U and at the prompt, enter
+"src/main.c":
 
-    |~r== (Exact) == Notes.txt == File: Notes.txt ======== MightEMacs 9.7.0 ~R|
+    |~r== (Exact) == Notes.txt [2] == File: Notes.txt === MightEMacs 10.0.0 ~R|
     | Find file: src/main.c~b_~B                                              |
      ---------------------------------------------------------------------
 
@@ -117,7 +135,7 @@ exited the editor at this point without making any changes to the buffer, it
 wouldn't be).  Additionally, the mode line would show the "C" buffer mode, which
 enables automatic indentation and fence matching as you type your C code:
 
-    |~r== (Exact) [C] == main.c == File: src/main.c ====== MightEMacs 9.7.0 ~R|
+    |~r== (Exact) [C] == main.c [3] == File: src/main.c = MightEMacs 10.0.0 ~R|
     |                                                                     |
      ---------------------------------------------------------------------
 
@@ -130,14 +148,16 @@ following upon exit from our example session:
     Saved file "src/main.c"
     $
 
-Note that MightEMacs can edit text files containing ~uCR-LF~U, ~uCR~U, or ~uNL~U line
-delimiters.  The line delimiter is determined automatically (by default) when a
-file is read.  However, regardless of which delimiter(s) a file contains, all
-lines in a buffer are assumed to end with ~uNL~U.  MightEMacs remembers the real
-line delimiter for each buffer and writes it back to disk at the end of each
-line when a file is saved.  The output delimiter can be changed however, by
-setting the $otpDelim system variable.  Additionally, the input delimiter(s) can
-be forced to be a certain value by setting the $inpDelim system variable.
+Note that MightEMacs can edit text files containing ~uCR-LF~U, ~uCR~U, ~uNL~U, or ~uNUL~U (null
+byte) line delimiters.  By default, the line delimiter (except ~uNUL~U) is
+determined automatically  when a file is read.  However, regardless of which
+delimiter(s) a file contains, all lines in a buffer are assumed to end with ~uNL~U.
+MightEMacs remembers the real line delimiter for each buffer and writes it back
+to disk at the end of each line when a file is saved.  The output delimiter can
+be changed however, by setting the $otpDelim system variable.  Additionally, the
+input delimiter(s) can be forced to be a certain value by setting the $inpDelim
+system variable.  Both variables are set to one of the string values "NL",
+"CRLF", "CR", "NUL", or "" (automatic) to indicate the delimiter.
 
 Note also that if you want to open one or more files for viewing only, you can
 use the -r switch when starting the editor; for example:

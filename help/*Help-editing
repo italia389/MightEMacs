@@ -89,7 +89,7 @@ follows:
 
 Note that even though delete commands do not save the target text in the kill
 ring, the text ~bis~B saved on the "delete ring", and deleted text can always be
-restored via the ~bundelete~B (~#uESC u~U) and ~bundeleteCycle~B (~#uESC U~U) commands.  This
+restored via the ~bundelete~B (~#uESC u~U) and ~bundeleteCycle~B (~#uC-c u~U) commands.  This
 is explained in detail in the next section, ~bUndeleting Text~B.
 
 You are encouraged to practice copying, killing, and deleting text with the

@@ -255,8 +255,9 @@ Lesson 1.7:  EDITING A FILE
 
       $ mm tutor
 
-    'mm' is the command to start the MightEMacs editor; 'tutor' is the name of the
-    file you wish to edit.  Use a file that does not exist or may be changed.
+    'mm' is the command to start the MightEMacs editor; 'tutor' is the name of
+    the file you wish to edit.  Use a file that does not exist or may be
+    changed.
 
 NOTE:
    You may also type 'memacs' instead of 'mm' if you prefer.
@@ -372,8 +373,8 @@ NOTE:
     before you start (the beginning or end of a word), then figure out how to
     get there by pressing  C-t  one or more times, followed by one or two word
     movement commands.
- 6. Type:  C-- C-a.  Notice that the point moved to the beginning of the previous
-    line.
+ 6. Type:  C-- C-a.  Notice that the point moved to the beginning of the
+    previous line.
  7. Type:  C-u C-e.  It now moves to the end of the next line.
 
     Note that for line movement (and line selection, discussed later), line 1 is
@@ -423,9 +424,9 @@ Lesson 2.2:  INSERTING RUNS OF CHARACTERS
 --------------------------------------------------------------------------------
 Lesson 2.3:  DELETION COMMANDS
 
-      * Type  C-\    to delete a word.
-      * Type  C-l    to delete a line.
-      * Type  ESC \  to delete white space.
+      * Type  C-\      to delete a word.
+      * Type  C-l      to delete a line.
+      * Type  C-x SPC  to delete white space.
 
  1. Move the point to the first line below marked --->.
  2. Move the point to the beginning of a word that needs to be removed.
@@ -449,7 +450,7 @@ Lesson 2.3:  DELETION COMMANDS
  9. Move to the next line, then move the point to the middle of the white space
     between the words "line" and "here".  Note that the white space contains
     spaces and a hard tab.
-10. Press  ESC \  to delete the white space.  Notice that all the white space
+10. Press  C-x SPC  to delete the white space.  Notice that all the white space
     characters were deleted, both before and after the point.
 11. Now delete the line.
 
@@ -501,19 +502,19 @@ NOTE:
 --------------------------------------------------------------------------------
 Lesson 2.5:  MORE UNDELETE COMMANDS
 
-      * Type  ESC U  to undelete prior text objects that were deleted.
+      * Type  C-c u    to (cycle) undelete prior text objects that were deleted.
       * Type  C-x C-y  to revert an undelete operation.
-      * Type  C-h d  to display the delete ring.
+      * Type  C-h d    to display the delete ring.
 
     As mentioned in the previous lesson, the  ESC u  key (lower case "u")
     undeletes the most recent "chunk of text" that was deleted -- a word, line,
     part of a line, or region of text (to be discussed later).  If you want to
-    go back further in the deletion history, you simply press  ESC U  (upper
-    case "U") one or more times after you press  ESC u.
+    go back further in the deletion history, you simply press  C-c u  one or
+    more times after you press  ESC u.
 
-    When  ESC U  is typed, the text that was just undeleted by the  ESC u  is
+    When  C-c u  is typed, the text that was just undeleted by the  ESC u  is
     REPLACED by the next older deleted text.  This process is repeated each time
-    you type ESC U.
+    you type C-c u.
 
     Let's try this out.
 
@@ -523,7 +524,7 @@ Lesson 2.5:  MORE UNDELETE COMMANDS
  3. Move the point down one line to the last line in the group.
  4. Press  C-l  to delete the last line also.
  5. Oops!  Didn't mean to do that... press  ESC u  to undelete the line.
- 6. Wait!  Really wanted the line before that... press  ESC U  to undelete the
+ 6. Wait!  Really wanted the line before that... press  C-c u  to undelete the
     prior line that was deleted.  Observe that the first line that was deleted
     has been restored to this location.
 
@@ -532,11 +533,11 @@ Lesson 2.5:  MORE UNDELETE COMMANDS
 ---> Delete this line, too.
 
 NOTES:
-    The first  ESC U  key that is typed must be entered AFTER an  ESC u  key;
+    The first  C-c u  key that is typed must be entered AFTER an  ESC u  key;
     otherwise, it does nothing.
 
-    Additional  ESC U  keys must be in succession.  Once another key is typed,
-    ESC U  has no effect.
+    Additional  C-c u  keys must be in succession.  Once another key is typed,
+    C-c u  has no effect.
 
     Undeleted text is ALWAYS inserted at point, not automatically at the place
     where it was originally deleted.  If you want to put it there, you must move
@@ -547,11 +548,11 @@ NOTES:
     restored.
 
 NOTES:
-    An  ESC u  or  ESC U  command can be cancelled by pressing  C-x C-y  which
+    An  ESC u  or  C-c u  command can be cancelled by pressing  C-x C-y  which
     removes the undeleted text.
 
-    The  C-x C-y  command must immediately follow an  ESC u  or  ESC U  command
-    (or a  C-y  or  ESC C-y  command, discussed later); otherwise, it does
+    The  C-x C-y  command must immediately follow an  ESC u  or  C-c u  command
+    (or a  C-y  or  C-h C-y  command, discussed later); otherwise, it does
     nothing.
 
  8. It's easy to lose track of what's been deleted as you are editing.  Not a
@@ -672,7 +673,7 @@ Lesson 2:  SUMMARY
 
  3. To delete   a line,     type:  C-l
     To delete   a word,     type:  C-\
-    To delete  white space, type:  ESC \
+    To delete  white space, type:  C-x SPC
 
  4. To undelete the most recent "chunk of text" that was deleted, press:
 
@@ -680,7 +681,7 @@ Lesson 2:  SUMMARY
 
     To undelete older text objects, follow with:
 
-        ESC U  (one or more times)
+        C-c u  (one or more times)
 
     To cancel the undelete sequence entirely, press:
 
@@ -1215,9 +1216,9 @@ Lesson 4.5:  COPYING TEXT
     "--->" entry followed by the text copied in step 11.
 
     As you can see in this lesson and the previous lessons in this section, you
-    can do pretty much any type of text editing using a combination of delete, kill,
-    and/or copy commands and yank.  You just need to remember the four "text
-    objects" keys:
+    can do pretty much any type of text editing using a combination of delete,
+    kill, and/or copy commands and yank.  You just need to remember the four
+    "text object" keys:
             C-\     word
             C-k     partial line
             C-l     line
@@ -1269,9 +1270,9 @@ Lesson 5.1:  MARKS
 
       * Press  C-SPC      to set the dot mark.
       * Press  C-u C-SPC  to set a custom mark.
-      * Press  ESC SPC    to go to a mark.
+      * Press  ESC C-SPC  to go to a mark.
       * Press  C-x C-x    to swap point with a mark.
-      * Press  C-h SPC    to display all marks in a pop-up window.
+      * Press  C-h C-SPC  to display all marks in a pop-up window.
 
     As mentioned previously, marks are visible characters of your choosing which
     are used to mark point positions in a buffer.  They are essentially
@@ -1306,7 +1307,7 @@ Lesson 5.1:  MARKS
 ---> The rain in Spain falls mainly on the Plain.
 ---> Experience enables you to recognise a mistake when you make it again.
 
- 6. Let's display the marks.  Press  C-h SPC  to display all marks in a pop-up
+ 6. Let's display the marks.  Press  C-h C-SPC  to display all marks in a pop-up
     window.  Observe that the first column shows the mark characters.
  7. We will now swap our position with mark 'b' (at the word "bird").  Press
     C-x C-x  and enter  b  at the prompt.  The point is now at "bird".
@@ -1317,7 +1318,7 @@ NOTE:
 
  8. Repeat step 7.  We're now back at "enables".
  9. Move the point to the end of the line.
-10. Now let's jump to "Spain".  Press  ESC SPC  and enter  S  at the prompt.
+10. Now let's jump to "Spain".  Press  ESC C-SPC  and enter  S  at the prompt.
 11. Move the point to some other places, set some marks, and practice using the
     swap and goto mark commands.
 12. Proceed to the next lesson when you're ready.
@@ -1331,11 +1332,10 @@ Lesson 5.2:  CONSTANTS AND VARIABLES
 
     The editor uses system constants and variables to provide information about
     the editing session and to maintain various settings; for example, the
-    length of the current line ($LineLen) and the column at which text is
-    wrapped ($wrapCol).  All system constants and variables begin with a dollar
-    sign.  If the first letter of the name is capitalized, it is a constant
-    (immutable); otherwise, it is a variable.  Constants and variables can be
-    viewed and variables can be changed at any time.
+    length of the current line (LineLen) and the column at which text is
+    wrapped ($wrapCol).  All system constants (which are immutable) begin with a
+    capital letter and all system variables begin with a dollar sign.  Constants
+    and variables can be viewed and variables can be changed at any time.
 
 
  1. Let's change the wrap column.  Press  ESC =  to set a variable.  You will be
@@ -1355,8 +1355,8 @@ NOTES:
  2. You are now being prompted to enter a new value for the $wrapCol variable,
     with the old value shown.  Enter  75  and press  RTN.
  3. The variable has now been changed.  Let's verify that.  Press  C-h v  to
-    display variables.  At the apropos prompt, enter "wrap" and press  RTN.
-    Notice that $wrapCol is now 75.
+    display constants and variables.  At the apropos prompt, enter "wrap" and
+    press  RTN.  Notice that $wrapCol is now 75.
 
 NOTE:
     The wrap column can also be changed with the  ESC w  command.
@@ -1400,9 +1400,9 @@ Lesson 5.3:  TABS AND INDENTATION
     following --->.
  4. Press  TAB  and notice that the line was shifted right to the next tab stop.
  5. Press  TAB  again followed by DEL.  Observe that the line was shifted
-    farther right, then shifted left back to its orignal position.  The  DEL  key
-    removed all four space characters.
- 6. Now let's open a line below the current line (remember the two keys?).  Press
+    farther right, then shifted left back to its orignal position.  The  DEL
+    key removed all four space characters.
+ 6. Now let's open a line below the current line (remember the two keys?). Press
     C-e C-j.  The indentation from the "Pizza" line was copied to the new line.
  7. Press the spacebar twice, then press  DEL.  Notice that the point was moved
     back to a tab stop again.
@@ -1421,7 +1421,7 @@ Lesson 5.3:  TABS AND INDENTATION
 --->
 
 11. Now let's try hard tabs.  First we'll delete the indentation from both
-    lines.  Press  ESC \, move up one line and press ESC \  again.
+    lines.  Press  C-x SPC, move up one line and press C-x SPC  again.
 12. We need to enable hard tabs.  Press  C-u C-u TAB.
 13. Press  TAB  now and observe that the line was shifted right 8 columns.
 14. Press  C-b  to move backward one character.  What happened?  The point
@@ -1551,8 +1551,8 @@ NOTE:
     line to lower case.
  8. Now move up two lines to the third line and change the first word to title
     case.
- 9. Move down one line to the middle of the word "Experience".  Press  C-x C-t  to
-    change the whole line to title case.  Notice that it doesn't matter where
+ 9. Move down one line to the middle of the word "Experience".  Press  C-x C-t
+    to change the whole line to title case.  Notice that it doesn't matter where
     the point is on the line.
 10. Move up one line and change the line to lower case.
 11. Move up one line again to the middle of the word "Experience" and set the
@@ -1569,32 +1569,32 @@ Lesson 5  SUMMARY
 
  1. To set the mark, press:             C-SPC
     To set a custom mark, press:        C-u C-SPC
-    To go to a mark, press:             ESC SPC
+    To go to a mark, press:             ESC C-SPC
     To swap point with a mark, press:   C-x C-x
-    To display all marks in a pop-up window, press:  C-h SPC
+    To display all marks in a pop-up window, press:  C-h C-SPC
 
  2. To set a system variable, press:    ESC =
     and enter the name of the variable and its new value.
 
- 3. To display variable(s), press:      C-h v
+ 3. To display constants and variable(s), press:  C-h v
     and enter an apropos pattern.
 
- 4. To set  hard  tabs, press:                  C-u 0 TAB
-    To set  soft  tabs with tab size n, press:  C-- n TAB
+ 4. To set  hard  tabs, press:                    C-u 0 TAB
+    To set  soft  tabs with tab size n, press:    C-- n TAB
 
- 5. To  indent   all lines in region, press:  ESC )
-    To  outdent  all lines in region, press:  ESC (
+ 5. To  indent   all lines in region, press:      ESC )
+    To  outdent  all lines in region, press:      ESC (
 
- 6. To  indent   a line block, press:  C-c )
-    To  outdent  a line block, press:  C-c (
+ 6. To  indent   a line block, press:             C-c )
+    To  outdent  a line block, press:             C-c (
 
- 7. To change a  word  to  lower  case, press:  ESC C-l
-    To change a  word  to  upper  case, press:  ESC C-u
-    To change a  word  to  title  case, press:  ESC C-t
+ 7. To change a  word  to  lower  case, press:    ESC C-l
+    To change a  word  to  upper  case, press:    ESC C-u
+    To change a  word  to  title  case, press:    ESC C-t
 
-    To change a  line  to  lower  case, press:  C-x C-l
-    To change a  line  to  upper  case, press:  C-x C-u
-    To change a  line  to  title  case, press:  C-x C-t
+    To change a  line  to  lower  case, press:    C-x C-l
+    To change a  line  to  upper  case, press:    C-x C-u
+    To change a  line  to  title  case, press:    C-x C-t
 
     To change text in the region to  lower  case, press:  C-x l
     To change text in the region to  upper  case, press:  C-x u
@@ -1615,7 +1615,7 @@ Lesson 6.1:  MODES
     specific buffer and affect only that buffer.  Global modes are global in
     scope and affect all buffers.
 
-    You can see which modes are enabled by looking at the mode line.  Active
+    You can see which modes are activated by looking at the mode line.  Active
     global modes are displayed at the left end of the mode line in parentheses
     ( ).  Active buffer modes are displayed immediately to the right of those
     (if any) in brackets [ ].
@@ -1639,12 +1639,12 @@ Lesson 6.1:  MODES
         Repl        Replace characters when typing.
 
     The difference between the "Over" and "Repl" buffer modes is how hard tabs
-    are handled.  When "Over" mode is enabled, a hard tab is not overwritten
-    until the point is at a tab stop.  When "Repl" mode is enabled, a hard tab
+    are handled.  When "Over" mode is activated, a hard tab is not overwritten
+    until the point is at a tab stop.  When "Repl" mode is activated, a hard tab
     is overwritten the moment it is encountered in a line.
 
-    Modes are enabled and disabled with the  ESC m  command, which prompts for a
-    mode name.  The action taken is dependent on the numeric prefix.  The
+    Modes are activated and inactivated with the  ESC m  command, which prompts
+    for a mode name.  The action taken is dependent on the numeric prefix.  The
     default action is to toggle the mode that is entered, which is usually
     sufficient.  However, you can specify a numeric prefix as follows:
 
@@ -1663,7 +1663,7 @@ Lesson 6.1:  MODES
  3. You will now get a "Toggle mode: " prompt at the bottom of the screen.
     Enter "as" and press  TAB, which will complete the mode name and execute the
     command.  "ASave" will now be displayed (or not displayed) on the mode line,
-    depending on whether it was displayed (enabled) before.
+    depending on whether it was displayed (activated) before.
     
 NOTE:
     Mode names are not case sensitive.
@@ -1679,15 +1679,15 @@ NOTES:
 
     Buffer names are case sensitive.
 
- 6. The buffer mode is now enabled.  You should see "C:nn" in the mode line,
+ 6. The buffer mode is now activated.  You should see "C:nn" in the mode line,
     where nn is the column number of point.
  7. Move the point backward and forward on the current line and notice how the
     column number changes.
  8. You may have noticed that "Col" is not shown in the mode line in brackets
-    even though the mode is enabled.  This is because the "Col" buffer mode is
+    even though the mode is activated.  This is because the "Col" buffer mode is
     hidden.  To verify this, press  C-h m  to display all modes in a pop-up
     window.  Mode attributes are shown in the first column.  A '+' means the
-    mode is enabled and a '?' means the mode is hidden.
+    mode is activated and a '?' means the mode is hidden.
  9. Repeat steps 4 and 5 using "Line" mode instead of "Col" mode.
 10. Toggle "Col" mode and "Line" mode to disable them.
 
@@ -1707,9 +1707,9 @@ Lesson 6.2:  SEARCHING FOR PATTERNS
 
     The type of pattern matching is controlled by option characters appended to
     the pattern string (explained below), and by two global modes: "Exact" and
-    "Regexp".  When enabled, the former mode specifies case-sensitive pattern
+    "Regexp".  When activated, the former mode specifies case-sensitive pattern
     matching by default and the latter specifies RE matching by default.  Either
-    or both can be enabled or disabled at any time.
+    or both can be activated or inactivated at any time.
 
     A colon and one or more lowercase letters may be appended to any pattern to
     specify options, as follows:
@@ -1729,10 +1729,10 @@ Lesson 6.2:  SEARCHING FOR PATTERNS
 
     Let's do some searches and see how this works.
 
- 1. We need to ensure that "Exact" global mode is enabled and "Regexp" global
-    mode is disabled.  Examine the global modes on the mode line and verify that
-    "Exact" is shown and "Regexp" is not.  If this is not the case, make the
-    necessary change(s) as you learned in the previous lesson.
+ 1. We need to ensure that "Exact" global mode is activated and "Regexp" global
+ mode is inactivated.  Examine the global modes on the mode line and verify that
+ "Exact" is shown and "Regexp" is not.  If this is not the case, make the
+ necessary change(s) as you learned in the previous lesson.
  2. Move the point to the beginning of the word "bird" in the first line below
     marked --->.
  3. Let's search forward for the word "good".  Press  C-s  to do a forward
@@ -1753,7 +1753,7 @@ NOTE:
     character of the pattern.
  5. Move the point to the end of the line and press  C-r  to search backward.
     Enter "ON" and press  ESC  to search for the word.  Recall that the "Exact"
-    global mode is enabled so searches are case-sensitive by default.
+    global mode is activated so searches are case-sensitive by default.
 
 ---> A bird in the hand is worth hundreds in the bush.
 ---> Now is the time for all good men to come to the aid of their country.
@@ -1798,7 +1798,7 @@ NOTE:
            Pattern Syntax" topic in the Advanced Help System for details.)
 
 
---------------------------------------------------------------------------------^
+--------------------------------------------------------------------------------
 Lesson 6.3:  SEARCH RING
 
       * Press  C-p    when prompted for a pattern to access older entries.
@@ -1856,8 +1856,8 @@ Lesson 6.4:  SEARCH AND REPLACE
  2. Press  ESC q  to execute the query replace command.  You will be prompted to
     enter a pattern to search for.  Enter "mispel" and press  ESC  to terminate
     the pattern.
- 3. You will now be prompted to enter replacement text.  Enter "misspel" and press
-    ESC.
+ 3. You will now be prompted to enter replacement text.  Enter "misspel" and
+    press ESC.
  4. MightEMacs will now search through the buffer for the pattern, beginning at
     point.  When the pattern is found (on the second line), it will pause,
     display a prompt showing the replacement it is about to make, and ask for
@@ -1905,7 +1905,7 @@ Lesson 6.4:  SEARCH AND REPLACE
 Lesson 6.5:  MORE SEARCH AND REPLACE
 
       * Press  ESC r  to do a replace operation without prompting.
-      * Press  C-h r  to display the replace ring in a pop-up window.
+      * Press  C-h R  to display the replace ring in a pop-up window.
 
     Recall from the SEARCH RING lesson that you can access previous patterns
     when doing searches.  That applies to query replace as well, including
@@ -1938,7 +1938,7 @@ Lesson 6.5:  MORE SEARCH AND REPLACE
  9. Let's make one final correction.  We didn't return to the starting point
     when we ended the last command; however, we can still get back to that spot
     by moving the point to mark ` (backtick).  Let's do that.  Go to mark  `
-    (press  ESC SPC `).
+    (press  ESC C-SPC `).
 10. We will now use the "do the rest" option.  Notice that there are three
     occurrences of a capitalized word in the practice text that don't belong
     there.  Execute the query replace command again and enter that word plus a
@@ -1969,7 +1969,7 @@ NOTES:
     replacement text at the prompts.
 
     Lastly, replacement patterns are kept on a ring, just like search patterns.
-    You can press  C-h r  to view it.
+    You can press  C-h R  to view it.
 
 
 --------------------------------------------------------------------------------
@@ -1990,7 +1990,7 @@ Lesson 6  SUMMARY
  4. To do a search and replace operation  with     prompting, press:  ESC q
     To do a search and replace operation  without  prompting, press:  ESC r
 
- 5. To display the replace ring in a pop-up window, press:  C-h r
+ 5. To display the replace ring in a pop-up window, press:  C-h R
 
 
 --------------------------------------------------------------------------------
@@ -2015,17 +2015,18 @@ Lesson 7.1:  POP-UP WINDOWS
 
  1. Let's view some commands in a pop-up window and scroll the display.  Read
     the next step in its entirety before pressing any keys.
- 2. Press  C-h c  to display commands.  At the "Apropos" prompt, enter "show" +
-    RTN.  You will see several commands in a pop-up window.  Press  ?  to
-    display help on the message line.  All the commands that can be used for
-    scrolling, etc.  will be underlined.  Try some of the commands, such as  SPC
-    to go forward,  b  to go back, and  G  to jump to the bottom.  When you are
-    done experimenting, press  q  to dismiss the window and return here.
+ 2. Press  C-h r  to display routines (commands).  At the "Apropos" prompt,
+    enter "show" and press RTN.  You will see several commands in a pop-up
+    window.  Press  ?  to display help on the message line.  All the commands
+    that can be used for scrolling, etc.  will be underlined.  Try some of the
+    commands, such as  SPC  to go forward,  b  to go back, and  G  to jump to
+    the bottom.  When you are done experimenting, press  q  to dismiss the
+    window and return here.
  3. Now we will use a different method to dismiss the window.  Move the point to
     the beginning of this line.
  4. Read the next step in its entirety before pressing any keys.
  5. Press  C-h k  to display the kill ring in a pop-up window.  Then press  C-e
-    DO NOT press  q  or  ESC  to dismiss the window.
+    but DO NOT press  q  or  ESC  to dismiss the window.
  6. Where is the point now?  Notice that the  C-e  you pressed dismissed the
     pop-up window AND was executed as a command (moved the point to the end of
     the line).
@@ -2082,21 +2083,21 @@ NOTE:
 Lesson 7.3:  GETTING HELP
 
       * Press  ESC ?  to enter the Help System.
-      * Press  ESC a  to do an apropos on a command or variable.
-      * Press  C-h c  to do an apropos on a command.
-      * Press  C-h v  to do an apropos on a variable.
+      * Press  ESC a  to do an apropos on a command, constant, or variable.
+      * Press  C-h r  to do an apropos on a command.
+      * Press  C-h v  to do an apropos on a constant or variable.
       * Press  C-h ?  to display help for particular key(s).
 
     MightEMacs has a comprehensive built-in Help System.  To access it, press
     ESC ?  and read the instructions on the first page to find out how it works.
 
-    You can also get help on commands and variables (as well as macros and
-    functions, which are discussed in Advanced Help) by pressing  ESC a  and
-    entering part of a name, like "file" or "buf".  All matching items will be
-    displayed in a pop-up window.
+    You can also get help on commands, constants, and variables (as well as
+    functions and aliases, which are discussed in Advanced Help) by pressing
+    ESC a  and entering part of a name, like "file" or "buf".  All matching
+    items will be displayed in a pop-up window.
 
-    To limit the apropos search to just commands,  press:  C-h c
-    To limit the apropos search to just variables, press:  C-h v
+    To limit the apropos search to just commands,  press:                C-h r
+    To limit the apropos search to just constants and variables, press:  C-h v
 
     Lastly, to find out what a particular key does, press  C-h ?  followed by
     the key(s) in question.  A description of the command will be displayed in a
@@ -2107,11 +2108,10 @@ Lesson 7.3:  GETTING HELP
 Lesson 7.4:  CREATING A STARTUP SCRIPT
 
     MightEMacs can be extensively customized.  You can for example, write your
-    own commands called "macros" in MScript (the scripting language), bind them
-    to keys, and execute them in your editing session just like the built-in
-    commands.  You can also do simpler things like change the default settings
-    at startup.  To do this, you have to create a ".memacs" file in your home
-    directory.
+    own commands in MScript (the scripting language), bind them to keys, and
+    execute them in your editing session just like the built-in commands.  You
+    can also do simpler things like change the default settings at startup.  To
+    do this, you have to create a ".memacs" file in your home directory.
 
     Let's create a startup file that does three things.  We will make them all
     comments in this example, but feel free to uncomment them (by removing the
@@ -2140,7 +2140,7 @@ NOTES:
  3. Move to the end of the buffer if it's not empty (press  ESC >  ).
  4. Enter the following lines:
 
-        # 1 => chgMode nil, 'ASave'
+        # 1 => chgMode 'ASave'
         # $searchDelim = 'RTN'
         # bindKey 'ESC h', help
 
@@ -2167,11 +2167,11 @@ Lesson 7 SUMMARY
     To move window frame  down  n lines, press:  C-x C-n
     To move window frame   up   n lines, press:  C-x C-p
 
- 3. To enter the Help System, press:                   ESC ?
-    To do an apropos on a command or variable, press:  ESC a
-    To do an apropos on a command, press:              C-h c
-    To do an apropos on a variable, press:             C-h v
-    To display help for particular key(s), press:      C-h ?
+ 3. To enter the Help System, press:                              ESC ?
+    To do an apropos on a command, constant, or variable, press:  ESC a
+    To do an apropos on a command, press:                         C-h r
+    To do an apropos on a constant or variable, press:            C-h v
+    To display help for particular key(s), press:                 C-h ?
 
 
 --------------------------------------------------------------------------------
@@ -2186,7 +2186,6 @@ Lesson 7 SUMMARY
     To learn how to write and use scripts, read the topics in Advanced Help.
 
 
-(c) Copyright 2022 Richard W. Marinelli
+(c) Copyright 2026 Richard W. Marinelli
 Email: italian389@yahoo.com
-Reddit: http://reddit.com/r/memacs
-Ver. 1.1.1
+Ver. 1.2.0

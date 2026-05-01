@@ -37,4 +37,4 @@ The commands that operate on line blocks are:
 
 Additionally, the ~bwpJoinLines~B (~#uC-c C-j~U) and ~bwpWrapLine~B (~#uC-c RTN~U) user commands,
 which provide additional features, also operate on line blocks.  See the user
-section of the ~bshowCommands~B (~#uC-h @~U) help display for details.
+section of the ~bshowRoutines~B (~#uC-h r~U) help text for details.

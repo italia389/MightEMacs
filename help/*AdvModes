@@ -9,11 +9,14 @@ GLOBAL MODES
 
     ~bASave~B       Automatically save all changed buffers (including hidden ones)
                 after $autoSave keystrokes have been entered.  If $autoSave is
-                set to zero, this mode is disabled and cannot be reenabled until
-                $autoSave is set to a value greater than zero.
+                set to zero, this mode is inactivated and cannot be reactivated
+                until $autoSave is set to a value greater than zero.
+    ~bBufCount~B    Display running count of visible buffers on bottom mode line
+                after buffer name and precede count with an asterisk if any user
+                buffer (visible or hidden) has been changed.
     ~bClob~B        Allow user commands and functions to be "clobbered"; that is,
-                recreated.  When enabled, any command or function buffer of the
-                same name as a user routine being defined will be silently
+                recreated.  When activated, any command or function buffer of
+                the same name as a user routine being defined will be silently
                 overwritten with the new routine's contents; otherwise, the
                 definition will fail and an error will be displayed.
     ~bExact~B       Perform case-sensitive buffer searches by default.  This can be
@@ -27,25 +30,25 @@ GLOBAL MODES
                 window is greater than the terminal width and the point is moved
                 past the right edge of the screen, scroll all lines in the
                 window simultaneously; otherwise, scroll just the current line.
-    ~bReadOnly~B    Open all files in read-only mode.  When enabled, forces the
+    ~bReadOnly~B    Open all files in read-only mode.  When activated, forces the
                 read-only buffer attribute to be set on any buffer created for
                 an input file.
     ~bRegexp~B      Perform regular expression buffer searches by default.  This
                 can be overridden by appending the "p" (plain) option character
                 to the search pattern.
     ~bRFIndt~B      Use Ratliff-style indentation of right fence character when a
-                language buffer mode is enabled; that is, indent a '}', ']', or
-                ')' at the same indentation level as the nested line block it
+                language buffer mode is activated; that is, indent a '}', ']',
+                or ')' at the same indentation level as the nested line block it
                 terminates instead of aligning it with the statement header (the
                 previous level).  The right fence must be entered on a line by
                 itself and be defined as a "trigger" character in the
                 initialization file for the particular language mode, like "C"
                 or "Java".
     ~bRtnMsg~B      Enable the display of messages on the message line.  This mode
-                can be disabled in a script to suppress extraneous messages
+                can be inactivated in a script to suppress extraneous messages
                 (which flicker on the message line) during script execution.
-                However, the mode is always enabled when control is returned to
-                the user just prior to reading the next key.
+                However, the mode is always activated when control is returned
+                to the user just prior to reading the next key.
     ~bSafe~B        When saving a buffer to disk, do the following:
                      1. Write the buffer to a temporary file.
                      2. Delete any existing file of the same name as the
@@ -77,7 +80,7 @@ BUILT-IN BUFFER MODES
     ~bWrap~B        Wrap words to the next line automatically as you type.  (See the
                 ~bLine Wrapping~B section for details.)
 
-Note that when the "Over" or "Repl" buffer mode is enabled, non-tab characters
+Note that when the "Over" or "Repl" buffer mode is activated, non-tab characters
 are replaced as you type; that is, the "self insert" pseudo-command deletes the
 character at point before inserting the new one.  You can force an "insert"
 however, by using a negative numeric prefix.  For example, if you entered ~#uC-- x~U,
@@ -97,27 +100,27 @@ USER-DEFINED BUFFER MODES (Language Modes)
 ~bMode Groups~B
 
 In addition to enabling and disabling features with modes, MightEMacs provides a
-means to categorize similar modes so that only one can be enabled at any given
+means to categorize similar modes so that only one can be activated at any given
 time.  This is done by putting like modes in a ~bmode group~B.  For example, the
 built-in "Typeover" group contains the "Repl" and "Over" modes mentioned above.
-It makes no sense for both of these modes to be enabled at the same time, so
+It makes no sense for both of these modes to be activated at the same time, so
 they are put into a mode group to prevent that from happening.  (When a mode in
-a group is enabled, any other mode in the same group that is enabled is
-automatically disabled.)  Note also that all modes in a mode group must be of
+a group is activated, any other mode in the same group that is activated is
+automatically inactivated.)  Note also that all modes in a mode group must be of
 the same type; that is, ~bglobal~B or ~bbuffer~B.  The first member of a group
 determines the group's type.
 
 Both modes and mode groups have ~battributes~B, which set various aspects of them;
 for example, whether a mode is shown on the mode line.  Attributes are edited
-with the ~beditMode~B (~#uC-x m~U) command for modes and the ~beditModeGroup~B (~#uC-x g~U)
-command for mode groups.  These commands are also used to create and delete
-modes and groups.  Both commands accept a mode or group name followed by zero or
-more string arguments in form "keyword: value" where "keyword" is one of the
-words listed below, and "value" is "true", "false", "nil", or text, depending on
-the kind of attribute.  (If either command is invoked interactively, one
-attribute is prompted for and processed.)  If the named mode or group does not
-exist, it is created if n > 0; otherwise, an error is returned.  If n <= 0, the
-mode or group is deleted and no attribute arguments are allowed.
+with the ~beditMode~B (~#uC-x m~U) command for modes and the ~beditModeGrp~B (~#uC-x g~U) command
+for mode groups.  These commands are also used to create and delete modes and
+groups.  Both commands accept a mode or group name followed by zero or more
+string arguments in form "keyword: value" where "keyword" is one of the words
+listed below, and "value" is "true", "false", "nil", or text, depending on the
+kind of attribute.  (If either command is invoked interactively, one attribute
+is prompted for and processed.)  If the named mode or group does not exist, it
+is created if n > 0; otherwise, an error is returned.  If n <= 0, the mode or
+group is deleted and no attribute arguments are allowed.
 
 All mode and group attributes, their data types, and a description of each are
 listed below.
@@ -127,7 +130,7 @@ MODE ATTRIBUTES
     ~bbuffer~B          Boolean         Designate mode as a "buffer" mode if true;
                                     otherwise, "global".
     ~bdescription~B     String          Set mode description, which is shown in the
-                                    ~bshowModes~B display.
+                                    ~bshowModes~B help text.
     ~bglobal~B          Boolean         Designate mode as a "global" mode if true;
                                     otherwise, "buffer".
     ~bgroup~B           String or nil   Make mode a member of given group if string
@@ -135,14 +138,14 @@ MODE ATTRIBUTES
                                     currently a member of), or remove mode from
                                     group it is a member of (if any) if nil.
     ~bhidden~B          Boolean         Do not display on mode line when mode is
-                                    enabled if true; otherwise, display it.
-    ~bvisible~B         Boolean         Display on mode line when mode is enabled
+                                    activated if true; otherwise, display it.
+    ~bvisible~B         Boolean         Display on mode line when mode is activated
                                     if true; otherwise, do not display it.
 
 GROUP ATTRIBUTES
 
     ~bdescription~B     String          Set mode group description, which is shown
-                                    in ~bshowModes~B display.
+                                    in ~bshowModes~B help text.
     ~bmodes~B           String or nil   Comma-separated list of modes to add to
                                     group if string; otherwise, remove all modes
                                     from group if nil.
@@ -155,9 +158,9 @@ that is, it may not be changed from a global mode to a buffer mode or vice versa
 (because it would make no sense to do so).  User modes on the other hand, have
 no such restriction.  Additionally, user modes and groups may be deleted at any
 time; whereas, built-in ones may not.  All mode and group attributes, including
-scope-lock, are shown in the ~bshowModes~B display.
+scope-lock, are shown in the ~bshowModes~B help text.
 
 Changing the scope of a mode can be useful at times.  For example, if you were
 editing several files at once and wanted to make backups of each when they were
-saved, you could simply change the "Bak" buffer mode to a global mode and enable
-it, instead of enabling it (as a buffer mode) in every buffer.
+saved, you could simply change the "Bak" buffer mode to a global mode and
+activate it, instead of activating it (as a buffer mode) in every buffer.

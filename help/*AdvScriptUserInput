@@ -32,13 +32,14 @@ result.  When using the function, note the following:
         Type: ~ut~U             Specify one of the following input types for ~ut~U:
                                 Buffer          Buffer name completion.
                                 Char            Single character.
+                                ConstVar        Constant and variable name
+                                                completion (all globals).
                                 DelRing         Delete ring access.
                                 File            Filename completion.
                                 Key             One key.
                                 KeySeq          One key sequence.
                                 KillRing        Kill ring access.
-                                Macro           Macro name completion and ring
-                                                access.
+                                Macro           Macro name completion.
                                 Mode            Mode name completion.
                                 MutableVar      Variable name completion,
                                                 mutable only.
@@ -46,8 +47,6 @@ result.  When using the function, note the following:
                                 RingName        Ring name completion.
                                 SearchRing      Search ring access.
                                 String          String (default).
-                                Var             Variable name completion,
-                                                mutable and immutable.
 
   * The prompt string may be nil or a null string for a null prompt; otherwise,
     the following steps are taken to build the prompt string that is displayed:
@@ -59,10 +58,10 @@ result.  When using the function, note the following:
             trailing white space is moved to the very end of the final prompt
             string that is built.
          2. If a non-empty default value is specified, it is displayed after the
-            prompt string between square brackets [ ] if the prompt type is
-            "Char", and must be an ASCII character in that case; otherwise, it
-            must be a string or int and is stored in the input buffer in string
-            form as the initial value.
+            prompt string between brackets [ ] if the prompt type is "Char", and
+            must be an ASCII character in that case; otherwise, it must be a
+            string or int and is stored in the input buffer in string form as
+            the initial value.
          3. A key literal is returned for types "Key" and "KeySeq"; otherwise,
             if the user presses just the delimiter key, the default value (if
             specified) is returned as an ASCII character if prompt type is
@@ -93,12 +92,12 @@ result.  When using the function, note the following:
     "KeySeq", the following rules apply:
 
           - If a non-nil default value is specified (including a null string),
-            it is displayed after the prompt string between square brackets [ ]
-            if the prompt type is "Char", and must be an ASCII character in that
-            case; otherwise, it must be string or integer and is stored in the
-            input buffer in string form as the initial value to be returned.
-            The default value may also be specified as ~unil~U for none (the
-            default) or simply omitted.
+            it is displayed after the prompt string between brackets [ ] if the
+            prompt type is "Char", and must be an ASCII character in that case;
+            otherwise, it must be string or integer and is stored in the input
+            buffer in string form as the initial value to be returned.  The
+            default value may also be specified as ~unil~U for none (the default) or
+            simply omitted.
 
           - A key literal is returned for types "Key" and "KeySeq"; otherwise,
             if the user enters just the delimiter key, the default value is
@@ -114,6 +113,9 @@ result.  When using the function, note the following:
         Char            Read a single character (one keystroke) and return it as
                         an 8-bit integer.  ~uC-q~U, ~uRTN~U, ~uC-j~U, and ~uC-SPC~U can be
                         quoted with ~uC-q~U to enter the key in raw form.
+        ConstVar        Enable constant and variable name completion during
+                        input and include all system and user global constants
+                        and variables.
         DelRing         Enable delete ring access during input.
         File            Enable filename completion during input.
         Key             Read one keystroke and return it verbatim in key
@@ -121,19 +123,15 @@ result.  When using the function, note the following:
         KeySeq          Read one key sequence and return it verbatim in key
                         binding format.
         KillRing        Enable kill ring access during input.
-        Macro           Enable macro name completion and macro ring access
-                        during input.
+        Macro           Enable macro name completion during input.
         Mode            Enable mode name completion during input.
         ReplaceRing     Enable replace ring access during input.
         RingName        Enable ring name completion during input.
         SearchRing      Enable search ring access during input.
         String          Read a string without completion (the default).
-        Var             Enable variable name completion during input and
-                        include all system and global variables.
         MutableVar      Enable variable name completion during input and
-                        include all system and global variables except read-only
-                        system variables and global variables that begin with a
-                        capital letter.
+                        include all system and user global variables (but not
+                        constants).
 
     In addition, the "NoAuto" option can be specified to disable auto
     completion, which causes the function to wait for the delimiter to be

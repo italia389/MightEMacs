@@ -21,19 +21,27 @@ When coding in MScript, take note of the following:
     by ~uand~U or ~uor~U.
 
   * There are two types of variables: global and local.  Global variables begin
-    with a dollar sign (~u$~U), have global scope, and are permanent.  Local
-    variables do not have a leading dollar sign, are accessible only within the
-    script or routine in which they are created (assigned to), and are deleted
-    when the script or routine exits.  Predefined global variables whose names
-    begin with a capital letter (for example, $LineLen) are read-only and thus,
-    cannot be assigned to.
+    with a dollar sign (~u$~U), have global scope, and are generally permanent,
+    although user-created global variables can be deleted with the ~bdelConstVar~B
+    (~#uC-x =~U) command (but predefined system ones cannot).  Local variables do not
+    have a leading dollar sign, are accessible only within the script or routine
+    in which they are created (assigned to), and are deleted when the script or
+    routine exits.
 
-  * Multiple variables may be assigned to elements of an array by separating the
-    variable names with a comma on the left side of the assignment operator; for
-    example:
+  * There are two types of constants: system and user.  Both types begin with a
+    capital letter.  System constants are predefined (for example, LineLen) and
+    cannot be assigned to.  User constants can be assigned to when they are
+    created (for example, MyConst = 10), but thereafter are read-only and thus,
+    cannot be assigned to again.  User constants can be deleted with the
+    ~bdelConstVar~B (~#uC-x =~U) command, but system constants cannot.
+
+  * Multiple variables (including array elements and hash nodes) may be assigned
+    to elements of an array at once by separating the variable names with a
+    comma on the left side of the assignment operator; for example:
 
         arr = []
-        a, b, arr[0] = [1, false, 'xyz']
+        hsh = {}
+        a, b, arr[0], hsh['one'] = [nil, false, 'xyz', 1]
 
     If there are more elements than variables, the extra elements will be
     ignored.  If there are more variables than elements, the extra variables
@@ -74,24 +82,24 @@ When coding in MScript, take note of the following:
 
   * The n argument is accessed from a routine or executing buffer via the $0
     variable.  Other arguments are accessed via the $1, $2, ... variables or the
-    $ARGV array.  All $~un~U variables may be assigned to, although $0 must be an
-    integer value.  The $ARGV variable may not be assigned to; however, its
+    ArgList array.  All $~un~U variables may be assigned to, although $0 must be an
+    integer value.  The ArgList constant may not be assigned to; however, its
     (array) contents may be modified just like any other array.  Note that the
-    $1, $2, ... variables are just shortcuts for $ARGV[0], $ARGV[1], ... and
-    will change if the $ARGV array is changed.
+    $1, $2, ... variables are just shortcuts for ArgList[0], ArgList[1], ... and
+    will change if the ArgList array is changed.
 
   * When writing a routine, an important aspect to consider is whether it will
     be called interactively, as a function with arguments, or both.  If both
     calling modes are desired, then the routine should be coded as a "command"
     and can use the ~binteractive?~B system function to determine its calling
     mode.  If the function returns true, the user command is being called
-    directly by the user (for example, via a key binding) and $ARGV will be
+    directly by the user (for example, via a key binding) and ArgList will be
     empty.  In this case, the command routine will have to query the user via
     the ~bprompt~B function to obtain its argument(s), if any.
 
     If the ~binteractive?~B function returns false instead, the user command is
     being called in script mode, possibly with arguments.  In this case, all
-    arguments are available in the $ARGV array.  Recall in the ~bStatements~B
+    arguments are available in the ArgList array.  Recall in the ~bStatements~B
     section that a user routine can be declared to accept (and require) a fixed,
     minimum, and/or maximum number of arguments by using one of the following
     forms (e.g., for a "command"):
@@ -107,14 +115,14 @@ When coding in MScript, take note of the following:
         command ~uname~U
 
     Another aspect to consider is whether the routine will be bound to a key
-    (and run interactively).  If so, it must be defined as a "command" because a
+    and run interactively.  If so, it must be defined as a "command" because a
     "function" cannot be bound to a key.
 
     A final aspect to consider for a function is whether it should be known to
     the user; that is, whether it is a general purpose routine intended to be
     called by other routines.  If not, it should be defined without help text so
     that it is kept mostly hidden and does not clutter the help displays.  By
-    default, user functions are displayed in the ~bshowFunctions~B (~#uC-h f~U) listing
+    default, user functions are displayed in the ~bshowRoutines~B (~#uC-h r~U) listing
     only if help text is defined in the function header.
 
   * All scripts and user routines are invoked as "functions" and return a value,
@@ -124,10 +132,10 @@ When coding in MScript, take note of the following:
          2. The result of the last expression statement evaluated.
          3. ~unil~U (by default).
 
-    The return value may be of any type, including array.  In general, the
-    editor will execute commands, functions, and scripts without regard for the
-    return values, except as follows.  If a Boolean value is returned that
-    evaluates to ~ufalse~U, then:
+    The return value may be of any type, including array or hash.  In general,
+    the editor will execute commands, functions, and scripts without regard for
+    the return values, except as follows.  If a routine returns a Boolean value
+    that evaluates to ~ufalse~U, then:
 
           * If the ~ufalse~U return is from a system or user command being executed
             interactively via a macro, the macro will be stopped and "False
@@ -144,8 +152,8 @@ When coding in MScript, take note of the following:
     ~bexit~B command is coded with arguments, they will be concatenated and
     displayed after returning to the shell.  Additionally, a shell return code
     of 1 may be specified by using a negative numeric prefix with the ~bexit~B
-    command.  (See the ~bshowKey~B (~#uC-h ?~U) or ~bshowCommands~B (~#uC-h c~U) help displays
-    for details.)
+    command.  (See the ~bshowKey~B (~#uC-h ?~U) or ~bshowRoutines~B (~#uC-h r~U) help text for
+    details.)
 
   * Return messages (which are different from return ~bvalues~B) are generated by
     certain commands and by using the ~bmessage~B function in a script or routine.
@@ -153,21 +161,21 @@ When coding in MScript, take note of the following:
     interactive use; that is, to be seen by the user on the message line during
     editing.
 
-    Generally, the "RtnMsg" global mode must be enabled in order for return
+    Generally, the "RtnMsg" global mode must be activated in order for return
     messages to be saved, which is always the case during normal editing.
-    However, when a script begins executing, the mode is disabled to avoid
+    However, when a script begins executing, the mode is inactivated to avoid
     extraneous messages from being displayed on the message line during
-    execution.  It can be re-enabled in a script, if desired, at any time.
+    execution.  It can be re-activated in a script, if desired, at any time.
 
     When a script is executing, the most recent return message that was saved is
-    available in the $ReturnMsg variable.  Messages have low and high priority,
+    available in the ReturnMsg variable.  Messages have low and high priority,
     the latter of which will replace the former.  A message from a command (like
     ~bsetMark~B or ~bcopyLine~B) has low priority and will not replace an existing
     message.  The ~bmessage~B function operates the same way by default; however,
     it can set a message to high priority if called with the "High" option.  It
     can also force message replacement if called with the "Force" option.
     Additionally, the "RtnMsg" global mode has no effect on the ~bmessage~B
-    function; that is, the function always operates as if the mode is enabled.
+    function; that is, the function always operates as if the mode is activated.
     When control is eventually returned to the user, the final saved message (if
     any) is displayed on the message line.
 
@@ -176,12 +184,12 @@ When coding in MScript, take note of the following:
     and thus may not be seen, depending on script execution time.  The ~bpause~B
     function can be used in this case as a workaround.
 
-  * The ~bprintf~B and ~bsprintf~B functions and the ~u%~U format operator support most
-    of the conversion specifications described in the printf(3) man page, except
-    the ones associated with floating point numbers.
+  * The ~bbprintf~B, ~binsertf~B, ~bprintf~B, and ~bsprintf~B functions and the ~u%~U format
+    operator support most of the conversion specifications described in the
+    printf(3) man page, except the ones associated with floating point numbers.
 
 Note that all system and user commands return ~unil~U by default.  Some commands
-however, have different return values.  See the ~bshowCommands~B (~#uC-h c~U),
-~bshowFunctions~B (~#uC-h f~U), and ~bshowVariables~B (~#uC-h v~U) listings for descriptions
-of all the commands, functions, and variables that are available for use in
-MScript and what values they return.
+however, have different return values.  See the ~bshowRoutines~B (~#uC-h r~U) and
+~bshowConstVars~B (~#uC-h v~U) listings for descriptions of all the commands, functions,
+constants, and variables that are available for use in MScript and what values
+they return.

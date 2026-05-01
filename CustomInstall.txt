@@ -1,10 +1,11 @@
 Advanced Installation Instructions for MightEMacs
 
 This distribution includes standard installer packages for the macOS platform
-and Linux platforms (CentOS, Debian, GNU/Linux, Red Hat, Ubuntu, and others).
-If you are installing on one of these platforms, have superuser (root)
-privileges, do not want to install MightEMacs in your HOME directory, and do not
-want to customize the installation process, please refer to file Install.txt for
+and Linux platforms (CentOS, GNU/Linux, Red Hat, Ubuntu, and others).  If you
+are installing on one of these platforms, have superuser (root) privileges (or are the owner of
+the /usr/local directory), do
+not want to install MightEMacs in your HOME directory, and do not want to
+customize the installation process, please refer to file Install.txt for
 instructions on using the standard installers.
 
 Make files for macOS and Linux platforms are included in this distribution.
@@ -12,10 +13,11 @@ Compilation on other Unix platforms should be possible as well, however it has
 not been tested, so there may be errors.  If this occurs, please contact the
 author with the details so that the problem can be resolved.  (See the ReadMe.md
 file for contact information.)  Note that if you are installing on a macOS
-system, Xcode must already be installed (vers. 7.2.1 or later recommended) so
-that command-line tools are available.
+system, Xcode Command-Line Tools must already be installed (vers. 7.2.1 or later
+recommended).
 
-To install MightEMacs with optional customizations, perform the following steps:
+To build and install MightEMacs with optional customizations, perform the
+following steps:
 
  1. Move to the directory that contains this CustomInstall.txt file:
 
@@ -61,7 +63,7 @@ To install MightEMacs with optional customizations, perform the following steps:
     the file to another directory now.  For example, to copy the file to your
     home directory (assuming MightEMacs was previously installed in /usr/local):
 
-	$ cp /usr/local/lib/memacs/site.ms ~
+	$ cp /usr/local/share/memacs/scripts/site.ms ~
 
  8. If you have superuser privileges and want to do a site-wide install, go to
     the next step; otherwise, go to step 12.

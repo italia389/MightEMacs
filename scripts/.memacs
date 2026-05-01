@@ -1,12 +1,11 @@
-# .memacs	Ver. 9.6.0
+# .memacs	Ver. 10.0.0
 #	MightEMacs user startup file.
 
 # Pop or open file whose pathname is in current buffer.
 command openBufPath(0) {description: "Extract a pathname from current buffer and display the file in a pop-up window or open\
  it.  User is prompted to enter one or two of the following options:\n\tFindFile\tOpen file with ~bfindFile~B command.\n\t\
 PopFile\t\tDisplay the file in a pop-up window.\n\tUseRegion\tUse region contents as pathname.\nEither \"FindFile\" or\
- \"PopFile\" must be specified.  If \"UseRegion\" not specified, pathname is extracted from buffer at point and is assumed to\
- be bounded by white space and/or line breaks."}
+ \"PopFile\" must be specified.  If \"UseRegion\" not specified, user is prompted to \"trim\" pathname from current line."}
 
 	# Get options.
 	if empty?(options = prompt('Options (~u~bF~ZindFile, ~u~bP~ZopFile, Use~u~bR~Zegion)', 'TermAttr'))
@@ -36,41 +35,12 @@ PopFile\t\tDisplay the file in a pop-up window.\n\tUseRegion\tUse region content
 		return -1 => message 'Fail', 'Either "FindFile" or "PopFile" must be specified'
 	endif
 
-	# Get pathname.
-	if useRegion
-		path = $RegionText
-	else
-		# Do sanity checks.
-		goBack = true
-		if $lineChar == ?\s || $lineChar == ?\t
-			endWhite
-			if $lineChar == ?\n
-				beginWhite
-				if $lineOffset == 0
-					return 1 => message('Fail', 'Pathname not found')
-				endif
-			else
-				goBack = false
-			endif
-		endif
-
-		# Find beginning and end of pathname.
-		1 => setMark ??
-		$searchPat = '[[:graph:]]+:re'
-		goBack and huntBack
-		setMark
-		huntForw
-		delRingEntry 'Search'
-		path = $RegionText
-		-1 => gotoMark ??
-	endif
-
 	# Open or pop file.
-	if !empty?(path = prompt(findPop == 'f' ? 'Find file' : 'Pop file', 'Type: File', path))
+	if !empty?(path = prompt(findPop == 'f' ? 'Find file' : 'Pop file', 'Type: File', useRegion ? RegionText : $lineText))
 		if findPop == 'f'
 			findFile path
 		else
-			1 => popFile path, 'AltModeLine, Delete'
+			popFile path, 'AltModeLine, Delete'
 		endif
 	endif
 endroutine

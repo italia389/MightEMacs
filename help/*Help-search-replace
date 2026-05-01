@@ -10,9 +10,9 @@ or another pattern.  MightEMacs supports searching using regular expressions
 sensitive or case-insensitive, and searching can be done either forward or
 backward.  The type of pattern matching is controlled by option characters
 appended to the pattern string (explained below), and by two global modes:
-"Exact" and "Regexp".  When enabled, the former mode specifies case-sensitive
+"Exact" and "Regexp".  When activated, the former mode specifies case-sensitive
 pattern matching by default and the latter specifies RE matching by default.
-Either or both can be enabled or disabled at any time.
+Either or both can be activated or inactivated at any time.
 
 A colon and one or more lowercase letters may be appended to any pattern to
 specify options, as follows:
@@ -28,11 +28,11 @@ specify options, as follows:
 
 Pattern options always override the corresponding global modes.  For example,
 the pattern "abc.:ri" would be processed as a regular expression and case would
-be ignored, whether or not the ~uExact~U or ~uRegexp~U global modes were enabled.
+be ignored, whether or not the ~uExact~U or ~uRegexp~U global modes were activated.
 Whereas "abc.:e" would cause case to be significant, but would be processed as a
-regular expression if ~uRegexp~U mode was enabled, and as plain text if not.  Also,
-to allow a pattern option string to be part of a pattern and avoid ambiguity
-when a pattern is interpreted, the following rule is used:
+regular expression if ~uRegexp~U mode was activated, and as plain text if not.
+Also, to allow a pattern option string to be part of a pattern and avoid
+ambiguity when a pattern is interpreted, the following rule is used:
 
     "If a pattern ends with a colon followed by one or more valid option
     letters, and the colon is not the first character of the pattern, then

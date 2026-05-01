@@ -28,29 +28,34 @@ commonly used ones:
                                         (default 1).
 
     ~uC-t~U               traverseLine      Move point forward or backward $travJump
-                                        characters (or to far right if n == 0).
+                                        characters, or to far right if n == 0.
 
     ~#uESC g~U             gotoLine          Prompt for a line number and move point
-                                        to beginning of that line (or to end of
-                                        buffer if line number is zero).
+                                        to beginning of that line, or nth line
+                                        from end of buffer if line number is
+                                        negative, or to end of buffer if line
+                                        number is zero.
 
     ~#uESC C-a~U           beginText         Move point to beginning of text on
                                         [-]nth line (default 1).
 
-    ~#uESC f~U             forwWord          Move point forward [-]n words
-                                        (default 1).
+    ~#uESC f~U             forwWord          Move point forward abs(n) words
+					(default 1), but restrict movement to
+					current line if n < 0.
 
-    ~#uESC b~U             backWord          Move point backward [-]n words
-                                        (default 1).
+    ~#uESC b~U             backWord          Move point backward abs(n) words
+                                        (default 1), but restrict movement to
+					current line if n < 0.
 
-    ~#uESC C-e~U           endWord           Move point to end of [-]nth word
-                                        (default 1).
+    ~#uESC C-e~U           endWord           Move point to end of abs(nth) word
+                                        (default 1), but restrict movement to
+					current line if n < 0.
 
     ~uC-v~U               forwPage          Scroll current window forward n pages
-                                        (or half a page if n < 0, default 1).
+                                        (default 1), or half a page if n < 0.
 
     ~uC-z~U               backPage          Scroll current window backward n pages
-                                        (or half a page if n < 0, default 1).
+                                        (default 1), or half a page if n < 0.
 
     ~#uESC <~U             beginBuf          Move point to beginning of current
                                         buffer.
